@@ -895,7 +895,9 @@ handle_client_io (jack_engine_t *engine, int fd)
 	if (read (client->request_fd, &req, sizeof (req)) < sizeof (req)) {
 		jack_error ("cannot read request from client");
 		/* XXX interlock problems with the driver thread here */
+		pthread_mutex_lock (&engine->graph_lock);
 		jack_remove_client (engine, client);
+		pthread_mutex_unlock (&engine->graph_lock);
 		return -1;
 	}
 
@@ -1424,6 +1426,9 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 		engine->control->time.frame = 0;
 	}
 
+	/* FIXME: called again in jack_client_delete(),
+	          still needed here? (kaiv) 
+	*/
 	jack_client_disconnect (engine, client);
 
 	/* try to force the server thread to return from poll */
@@ -1561,8 +1566,11 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 		}
 
 		if (client_err || status != 0) {
+			/* FIXME: caller is not expecting the client to be 
+			          removed while delivering an event! (kaiv) 
+			*/
+			jack_error("error while delivering an event");
 			/* jack_remove_client (engine, client); */
-			client->control->active = FALSE;
 		}
 	}
 
@@ -1743,19 +1751,23 @@ jack_trace_terminal (jack_client_internal_t *c1, jack_client_internal_t *rbase)
 		   once.
 		*/
 
-		if (g_slist_find (rbase->fed_by, c2) == NULL) {
-			rbase->fed_by = g_slist_prepend (rbase->fed_by, c2);
+		if (c2 != rbase && c2 != c1) {
 
-			if (c2 != rbase && c2 != c1) {
+			if (g_slist_find (rbase->fed_by, c2) == NULL) {
+				rbase->fed_by = g_slist_prepend (rbase->fed_by, c2);
+			}
 
+			/* FIXME: if c2->fed_by is not up-to-date, we may end up
+			          recursing infinitely (kaiv)
+			*/
+
+			if (g_slist_find (c2->fed_by, c1) == NULL) {
 				/* now recurse, so that we can mark base as being fed by
 				   all routes that feed c2
 				*/
-
 				jack_trace_terminal (c2, rbase);
 			}
 		}
-
 	}
 }
 
