@@ -1896,7 +1896,6 @@ jack_server_thread (void *arg)
 	engine->pfd[1].events = POLLIN|POLLERR;
 	engine->pfd_max = 2;
 
-
 	while (!done) {
 		DEBUG ("start while");
 		
@@ -1919,6 +1918,9 @@ jack_server_thread (void *arg)
 		}
 
 		DEBUG("server thread back from poll");
+		
+		/* Stephane Letz: letz@grame.fr : has to be added otherwise pthread_cancel does not work on MacOSX */
+		pthread_testcancel();
 			
 		/* check each client socket before handling other request*/
 		for (i = 2; i < max; i++) {
@@ -1947,7 +1949,7 @@ jack_server_thread (void *arg)
                                     */
                                     handle_client_socket_error(engine, pfd[i].fd);
 #endif /* JACK_USE_MACH_THREADS */
-                                                }
+				}
 			}
 		}
 		
@@ -2034,10 +2036,10 @@ jack_engine_new (int realtime, int rtpriority,
 
 	engine->set_sample_rate = jack_set_sample_rate;
 	engine->set_buffer_size = jack_driver_buffer_size;
-        engine->run_cycle = jack_run_cycle;
+	engine->run_cycle = jack_run_cycle;
 	engine->delay = jack_engine_notify_clients_about_delay;
 	engine->driver_exit = jack_engine_driver_exit;
-        engine->transport_cycle_start = jack_transport_cycle_start;
+	engine->transport_cycle_start = jack_transport_cycle_start;
 	engine->client_timeout_msecs = client_timeout;
 
 	engine->next_client_id = 1;
@@ -2574,8 +2576,15 @@ jack_engine_delete (jack_engine_t *engine)
 
 	/* stop the other engine threads */
 	VERBOSE (engine, "stopping server thread\n");
+
+#if JACK_USE_MACH_THREADS 
+	// MacOSX pthread_cancel still not implemented correctly in Darwin
+	mach_port_t machThread = pthread_mach_thread_np (engine->server_thread);
+	thread_terminate (machThread);
+#else
 	pthread_cancel (engine->server_thread);
 	pthread_join (engine->server_thread, NULL);
+#endif	
 
 #ifndef JACK_USE_MACH_THREADS 
 	/* Cancel the watchdog thread and wait for it to terminate.
