@@ -87,6 +87,15 @@ void jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void 
  * Tell the Jack server to call 'process_callback' whenever there is work
  * be done, passing 'arg' as the second argument.
  *
+ * The code in the supplied function must be suitable for real-time
+ * execution.  That means that it cannot call functions that might block for
+ * a long time.  This includes malloc, free, printf, pthread_mutex_lock,
+ * sleep, wait, poll, select, pthread_join, pthread_cond_wait, etc, etc. 
+ * See
+ * http://jackit.sourceforge.net/docs/design/design.html#SECTION00411000000000000000
+ * for more information.
+ * 
+ *
  * @return 0 on success, otherwise a non-zero error code
  */
 int jack_set_process_callback (jack_client_t *, JackProcessCallback process_callback, void *arg);
