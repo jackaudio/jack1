@@ -26,39 +26,42 @@
 
 #include <jack/messagebuffer.h>
 
-#define MB_BUFFERS		32		/* must be 2^n */
+#define MB_BUFFERS	32		/* must be 2^n */
 
 static char mb_buffers[MB_BUFFERS][MB_BUFFERSIZE];
-static const char *mb_prefix;
 static unsigned int mb_initialized = 0;
 static unsigned int mb_inbuffer = 0;
 static unsigned int mb_outbuffer = 0;
 static pthread_t mb_writer_thread;
+
+static void
+mb_flush()
+{
+	while (mb_outbuffer != mb_inbuffer) {
+		fputs(mb_buffers[mb_outbuffer], stderr);
+		mb_outbuffer = (mb_outbuffer + 1) & (MB_BUFFERS - 1);
+	}
+}
 
 static void *
 mb_thread_func(void *arg)
 {
 	while (mb_initialized) {
 		usleep(1000);
-		while (mb_outbuffer != mb_inbuffer) {
-			fprintf(stderr, "%s%s", mb_prefix,
-				mb_buffers[mb_outbuffer]);
-			mb_outbuffer = (mb_outbuffer + 1) & (MB_BUFFERS - 1);
-		}
+		mb_flush();
 	}
 
 	return NULL;
 }
 
 void 
-jack_messagebuffer_init (const char *prefix)
+jack_messagebuffer_init ()
 {
 	if (mb_initialized)
 		return;
 
 	mb_initialized = 1;
 
-	mb_prefix = prefix;
 	if (pthread_create(&mb_writer_thread, NULL, &mb_thread_func, NULL) != 0)
 		mb_initialized = 0;
 }
@@ -71,7 +74,8 @@ jack_messagebuffer_exit ()
 
 	mb_initialized = 0;
 
-	pthread_join(&mb_writer_thread, NULL);
+	pthread_join(mb_writer_thread, NULL);
+	mb_flush();
 }
 
 

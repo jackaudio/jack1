@@ -174,9 +174,6 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 		} 
 	}
 	
-	/* start a thread to display messages from realtime threads */
-	jack_messagebuffer_init("");
-
 	if (verbose) {
 		fprintf (stderr, "%d waiting for signals\n", getpid());
 	}

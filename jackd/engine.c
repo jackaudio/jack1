@@ -1543,6 +1543,10 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	uid_t uid = getuid ();
 	uid_t euid = geteuid ();
 #endif /* USE_CAPABILITIES */
+
+	/* start a thread to display messages from realtime threads */
+	jack_messagebuffer_init();
+
 	jack_init_time ();
 
 	engine = (jack_engine_t *) malloc (sizeof (jack_engine_t));

@@ -21,7 +21,7 @@ noinst_HEADERS =		\
 	internal.h 		\
 	jslist.h		\
 	memops.h		\
-f	messagebuffer.h		\
+	messagebuffer.h		\
 	pool.h			\
 	port.h			\
 	ringbuffer.h	        \

@@ -36,7 +36,7 @@
 		jack_messagebuffer_add(msg);	\
 	}
 
-void jack_messagebuffer_init(const char *prefix);
+void jack_messagebuffer_init();
 void jack_messagebuffer_exit();
 
 void jack_messagebuffer_add(const char *msg);
