@@ -336,7 +336,7 @@ typedef struct _jack_client_internal {
     struct  _jack_client_internal *next_client; /* not a linked list! */
     dlhandle handle;
     int     (*initialize)(jack_client_t*, const char*);  /* for internal clients only */
-    void    (*finish)(void);  /* for internal clients only */
+    void    (*finish)(void *);  /* for internal clients only */
     int      error;
     
 #if defined(__APPLE__) && defined(__POWERPC__) 

@@ -13,7 +13,7 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=77
+JACK_MINOR_VERSION=78
 JACK_MICRO_VERSION=0
 
 
@@ -296,6 +296,7 @@ libjack/Makefile
 drivers/Makefile
 drivers/alsa/Makefile
 drivers/solaris/Makefile
+drivers/dummy/Makefile
 example-clients/Makefile
 doc/Makefile
 doc/reference.doxygen

@@ -191,9 +191,9 @@ static void
 alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 
 {
-	switch (driver->sample_bytes) {
+	switch (driver->playback_sample_bytes) {
 	case 2:
-		if (driver->interleaved) {
+		if (driver->playback_interleaved) {
 			driver->channel_copy = memcpy_interleave_d16_s16;
 		} else {
 			driver->channel_copy = memcpy_fake;
@@ -219,12 +219,10 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 			driver->write_via_copy = sample_move_d16_sS;
 			break;
 		}
-
-		driver->read_via_copy = sample_move_dS_s16;
 		break;
 
 	case 4:
-		if (driver->interleaved) {
+		if (driver->playback_interleaved) {
 			driver->channel_copy = memcpy_interleave_d32_s32;
 		} else {
 			driver->channel_copy = memcpy_fake;
@@ -250,9 +248,15 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 			driver->write_via_copy = sample_move_d32u24_sS;
 			break;
 		}
+		break;
+	}
 
+	switch (driver->capture_sample_bytes) {
+	case 2:
+		driver->read_via_copy = sample_move_dS_s16;
+		break;
+	case 4:
 		driver->read_via_copy = sample_move_dS_s32u24;
-
 		break;
 	}
 }
@@ -389,10 +393,6 @@ static int
 alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cycle, jack_nframes_t user_nperiods, jack_nframes_t rate)
 
 {
-	int p_noninterleaved = 0;
-	int c_noninterleaved = 0;
-	snd_pcm_format_t c_format = 0;
-	snd_pcm_format_t p_format = 0;
 	int dir;
 	unsigned int p_period_size = 0;
 	unsigned int c_period_size = 0;
@@ -431,8 +431,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	if (driver->playback_handle) {
 		p_period_size = snd_pcm_hw_params_get_period_size (driver->playback_hw_params, &dir);
 		p_nfragments = snd_pcm_hw_params_get_periods (driver->playback_hw_params, &dir);
-		p_format = (snd_pcm_format_t) snd_pcm_hw_params_get_format (driver->playback_hw_params);
-		p_noninterleaved = (snd_pcm_hw_params_get_access (driver->playback_hw_params) == SND_PCM_ACCESS_MMAP_NONINTERLEAVED);
+		driver->playback_sample_format = (snd_pcm_format_t) snd_pcm_hw_params_get_format (driver->playback_hw_params);
+		driver->playback_interleaved = (snd_pcm_hw_params_get_access (driver->playback_hw_params) == SND_PCM_ACCESS_MMAP_INTERLEAVED);
 
 		if (p_period_size != driver->frames_per_cycle) {
 			jack_error ("alsa_pcm: requested an interrupt every %u frames but got %uc frames for playback",
@@ -444,8 +444,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	if (driver->capture_handle) {
 		c_period_size = snd_pcm_hw_params_get_period_size (driver->capture_hw_params, &dir);
 		c_nfragments = snd_pcm_hw_params_get_periods (driver->capture_hw_params, &dir);
-		c_format = (snd_pcm_format_t) snd_pcm_hw_params_get_format (driver->capture_hw_params);
-		c_noninterleaved = (snd_pcm_hw_params_get_access (driver->capture_hw_params) == SND_PCM_ACCESS_MMAP_NONINTERLEAVED);
+		driver->capture_sample_format = (snd_pcm_format_t) snd_pcm_hw_params_get_format (driver->capture_hw_params);
+		driver->capture_interleaved = (snd_pcm_hw_params_get_access (driver->capture_hw_params) == SND_PCM_ACCESS_MMAP_INTERLEAVED);
 	
 		if (c_period_size != driver->frames_per_cycle) {
 			jack_error ("alsa_pcm: requested an interrupt every %u frames but got %uc frames for capture",
@@ -460,44 +460,23 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 			return -1;
 		}
 
-		/* Check that we are using the same sample format on both streams */
-		
-		if (p_format != c_format) {
-			jack_error ("Sorry. The PCM device \"%s\" and \"%s\""
-				    "don't support the same sample format for capture and playback."
-				    "We cannot use this PCM device.", driver->alsa_name_playback, driver->alsa_name_capture );
-			return -1;
-		}
-
-		/* check interleave setup */
-		
-		if (c_noninterleaved != p_noninterleaved) {
-			jack_error ("ALSA: the playback and capture components for this PCM device differ "
-				    "in their use of channel interleaving. We cannot use this PCM device.");
-			return -1;
-		}
-		
 		driver->nfragments = c_nfragments;
-		driver->interleaved = !c_noninterleaved;
-		driver->sample_format = c_format;
 
 	} else if (driver->capture_handle) {
 
 		driver->nfragments = c_nfragments;
-		driver->interleaved = !c_noninterleaved;
-		driver->sample_format = c_format;
 
 	} else {
 
 		driver->nfragments = p_nfragments;
-		driver->interleaved = !p_noninterleaved;
-		driver->sample_format = p_format;
+
 	}
 
 	driver->buffer_frames = driver->frames_per_cycle * driver->nfragments;
-	driver->sample_bytes = snd_pcm_format_physical_width (driver->sample_format) / 8;
+	driver->playback_sample_bytes = snd_pcm_format_physical_width (driver->playback_sample_format) / 8;
+	driver->capture_sample_bytes = snd_pcm_format_physical_width (driver->capture_sample_format) / 8;
 
-	switch (driver->sample_format) {
+	switch (driver->playback_sample_format) {
 	case SND_PCM_FORMAT_S32_LE:
 	case SND_PCM_FORMAT_S16_LE:
 	case SND_PCM_FORMAT_S32_BE:
@@ -505,11 +484,23 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 		break;
 
 	default:
-		jack_error ("programming error: unhandled format type");
+		jack_error ("programming error: unhandled format type for playback");
 		exit (1);
 	}
 
-	if (driver->interleaved) {
+	switch (driver->capture_sample_format) {
+	case SND_PCM_FORMAT_S32_LE:
+	case SND_PCM_FORMAT_S16_LE:
+	case SND_PCM_FORMAT_S32_BE:
+	case SND_PCM_FORMAT_S16_BE:
+		break;
+
+	default:
+		jack_error ("programming error: unhandled format type for capture");
+		exit (1);
+	}
+
+	if (driver->playback_interleaved) {
 		const snd_pcm_channel_area_t *my_areas;
 		snd_pcm_uframes_t offset, frames;
 		if (snd_pcm_mmap_begin(driver->playback_handle, &my_areas, &offset, &frames) < 0) {
@@ -517,16 +508,22 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 			return -1;
 		}
 		driver->playback_interleave_skip = my_areas[0].step / 8;
+		driver->interleave_unit = snd_pcm_format_physical_width (driver->playback_sample_format) / 8;
+	} else {
+		driver->interleave_unit = 0;  /* NOT USED */
+		driver->playback_interleave_skip = snd_pcm_format_physical_width (driver->playback_sample_format) / 8;
+	}
+
+	if (driver->capture_interleaved) {
+		const snd_pcm_channel_area_t *my_areas;
+		snd_pcm_uframes_t offset, frames;
 		if (snd_pcm_mmap_begin(driver->capture_handle, &my_areas, &offset, &frames) < 0) {
-			jack_error ("ALSA: %s: mmap areas info error", driver->alsa_name_playback);
+			jack_error ("ALSA: %s: mmap areas info error", driver->alsa_name_capture);
 			return -1;
 		}
 		driver->capture_interleave_skip = my_areas[0].step / 8;
-		driver->interleave_unit = snd_pcm_format_physical_width (driver->sample_format) / 8;
 	} else {
-		driver->interleave_unit = 0;  /* NOT USED */
-		driver->playback_interleave_skip = snd_pcm_format_physical_width (driver->sample_format) / 8;
-		driver->capture_interleave_skip = driver->playback_interleave_skip;
+		driver->capture_interleave_skip = snd_pcm_format_physical_width (driver->capture_sample_format) / 8;
 	}
 
 	if (driver->playback_nchannels > driver->capture_nchannels) {
@@ -576,8 +573,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	}
 
 	driver->clock_sync_data = (ClockSyncStatus *) malloc (sizeof (ClockSyncStatus) * 
-							      (driver->capture_nchannels > driver->playback_nchannels ?
-							       driver->capture_nchannels : driver->playback_nchannels));
+							      driver->max_nchannels);
 
 	driver->period_usecs = (jack_time_t) floor ((((float) driver->frames_per_cycle) / driver->frame_rate) * 1000000.0f);
 	driver->poll_timeout = (int) floor (1.5f * driver->period_usecs);
@@ -1170,6 +1166,7 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 	snd_pcm_sframes_t contiguous;
 	snd_pcm_sframes_t offset;
 	jack_port_t *port;
+	int err;
 
 	driver->process_count++;
 
@@ -1224,9 +1221,10 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 			alsa_driver_silence_untouched_channels (driver, contiguous);
 		}
 		
-		if (snd_pcm_mmap_commit (driver->playback_handle, offset, contiguous) < 0) {
-			jack_error ("could not complete playback of %lu frames", contiguous);
-			return -1;
+		if ((err = snd_pcm_mmap_commit (driver->playback_handle, offset, contiguous)) < 0) {
+			jack_error ("could not complete playback of %lu frames: error = %d", contiguous, err);
+			if (err != -EPIPE && err != -ESTRPIPE)
+				return -1;
 		}
 
 		nframes -= contiguous;

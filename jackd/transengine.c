@@ -22,6 +22,7 @@
 #include <config.h>
 #include <errno.h>
 #include <assert.h>
+#include <string.h>
 #include <stdio.h>
 #include <jack/internal.h>
 #include <jack/engine.h>

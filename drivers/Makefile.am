@@ -12,6 +12,7 @@ else
 SOLARIS_DIR =
 endif
 
-SUBDIRS = $(ALSA_DIR) $(SOLARIS_DIR)
+SUBDIRS = dummy $(ALSA_DIR) $(SOLARIS_DIR)
 
-DIST_SUBDIRS = alsa solaris
+DIST_SUBDIRS = dummy alsa solaris
+

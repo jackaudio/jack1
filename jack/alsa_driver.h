@@ -62,7 +62,8 @@ typedef struct {
     channel_t                     user_nchannels;
     channel_t                     playback_nchannels;
     channel_t                     capture_nchannels;
-    unsigned long                 sample_bytes;
+    unsigned long                 playback_sample_bytes;
+    unsigned long                 capture_sample_bytes;
 
     jack_nframes_t                frame_rate;
     jack_nframes_t                frames_per_cycle;
@@ -76,7 +77,8 @@ typedef struct {
     snd_pcm_uframes_t             buffer_frames;
     unsigned long                 channels_not_done;
     unsigned long                 channel_done_bits;
-    snd_pcm_format_t              sample_format;
+    snd_pcm_format_t              playback_sample_format;
+    snd_pcm_format_t              capture_sample_format;
     float                         max_sample_val;
     unsigned long                 user_nperiods;
     unsigned long                 nfragments;
@@ -102,7 +104,8 @@ typedef struct {
     char   hw_metering : 1;
     char   all_monitor_in : 1;
     char   capture_and_playback_not_synced : 1;
-    char   interleaved : 1;
+    char   playback_interleaved : 1;
+    char   capture_interleaved : 1;
     char   with_monitor_ports : 1;
 
     ReadCopyFunction read_via_copy;
@@ -130,27 +133,27 @@ static __inline__ void alsa_driver_mark_channel_done (alsa_driver_t *driver, cha
 }
 
 static __inline__ void alsa_driver_silence_on_channel (alsa_driver_t *driver, channel_t chn, jack_nframes_t nframes) {
-	if (driver->interleaved) {
+	if (driver->playback_interleaved) {
 		memset_interleave 
 			(driver->playback_addr[chn],
-			 0, nframes * driver->sample_bytes,
+			 0, nframes * driver->playback_sample_bytes,
 			 driver->interleave_unit,
 			 driver->playback_interleave_skip);
 	} else {
-		memset (driver->playback_addr[chn], 0, nframes * driver->sample_bytes);
+		memset (driver->playback_addr[chn], 0, nframes * driver->playback_sample_bytes);
 	}
 	alsa_driver_mark_channel_done (driver,chn);
 }
 
 static __inline__ void alsa_driver_silence_on_channel_no_mark (alsa_driver_t *driver, channel_t chn, jack_nframes_t nframes) {
-	if (driver->interleaved) {
+	if (driver->playback_interleaved) {
 		memset_interleave 
 			(driver->playback_addr[chn],
-			 0, nframes * driver->sample_bytes,
+			 0, nframes * driver->playback_sample_bytes,
 			 driver->interleave_unit,
 			 driver->playback_interleave_skip);
 	} else {
-		memset (driver->playback_addr[chn], 0, nframes * driver->sample_bytes);
+		memset (driver->playback_addr[chn], 0, nframes * driver->playback_sample_bytes);
 	}
 }
 
@@ -184,7 +187,7 @@ static __inline__ void alsa_driver_copy_channel (alsa_driver_t *driver,
 
 	driver->channel_copy (driver->playback_addr[output_channel],
 			      driver->capture_addr[input_channel],
-			      nsamples * driver->sample_bytes,
+			      nsamples * driver->playback_sample_bytes,
 			      driver->playback_interleave_skip,
 			      driver->capture_interleave_skip);
 	alsa_driver_mark_channel_done (driver, output_channel);

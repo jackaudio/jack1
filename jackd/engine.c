@@ -779,7 +779,7 @@ jack_client_unload (jack_client_internal_t *client)
 {
 	if (client->handle) {
 		if (client->finish) {
-			client->finish ();
+			client->finish (client->control->process_arg);
 		}
 		dlclose (client->handle);
 	}
