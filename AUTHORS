@@ -20,6 +20,7 @@ callback, and added much documentation.  Taybin Rutkin helps with
 patch management and releases.  Melanie Thielker contributed
 significantly to JACK's interaction with aspects of both POSIX and
 System V APIs.  Stephane Letz ported JACK to Mac OS X.  Jussi Laako
-wrote the OSS driver interface.
+wrote the OSS driver interface.  Tilman Linneweh ported JACK to
+FreeBSD.
 
 Many others have contributed patches and/or test results.
