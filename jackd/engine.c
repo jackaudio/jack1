@@ -2921,8 +2921,6 @@ jack_port_do_connect (jack_engine_t *engine,
 		srcport->connections =
 			jack_slist_prepend (srcport->connections, connection);
 		
-		jack_sort_graph (engine);
-
 		DEBUG ("actually sorted the graph...");
 
 		jack_send_connection_notification (engine,
@@ -2931,7 +2929,8 @@ jack_port_do_connect (jack_engine_t *engine,
 		jack_send_connection_notification (engine,
 						   dstport->shared->client_id,
 						   dst_id, src_id, TRUE);
-
+						   
+		jack_sort_graph (engine);
 	}
 
 	jack_unlock_graph (engine);
