@@ -32,23 +32,6 @@
 //012
 //013
 //014
-//030
-//031
-//032
-//033
-//034
-		034768E8FF38A79811DB9C8B = {
-			explicitFileType = "compiled.mach-o.executable";
-			isa = PBXFileReference;
-			path = jackd;
-			refType = 3;
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-//030
-//031
-//032
-//033
-//034
 //080
 //081
 //082
@@ -66,14 +49,13 @@
 			mainGroup = 08FB7794FE84155DC02AAC07;
 			projectDirPath = "";
 			targets = (
-				08FB779FFE84155DC02AAC07,
 				4BA1CADE0470D14500053105,
-				4BBB87300406EF300019BE76,
 				4BCA2602040B8B9400053105,
 				4BF8712F040BDE8200053105,
 				4BA1CB000470D38800053105,
 				4BA1E4570442D99D00053105,
 				4B81402507240F550025D71C,
+				4BBB87300406EF300019BE76,
 			);
 		};
 		08FB7794FE84155DC02AAC07 = {
@@ -107,86 +89,6 @@
 			refType = 4;
 			sourceTree = "<group>";
 		};
-		08FB779FFE84155DC02AAC07 = {
-			buildPhases = (
-				08FB77A0FE84155DC02AAC07,
-				08FB77A1FE84155DC02AAC07,
-				08FB77A3FE84155DC02AAC07,
-				08FB77A5FE84155DC02AAC07,
-				C6A0FF2D029079AD04C91782,
-			);
-			buildSettings = {
-				FRAMEWORK_SEARCH_PATHS = "";
-				HEADER_SEARCH_PATHS = "../../../ ../../";
-				INSTALL_PATH = "$(HOME)/bin";
-				LIBRARY_SEARCH_PATHS = "";
-				OPTIMIZATION_CFLAGS = "-O3";
-				OTHER_CFLAGS = "-DJACK_LOCATION=\\\"/usr/local/bin\\\" ";
-				OTHER_LDFLAGS = "-framework CoreAudio -ldl ";
-				OTHER_REZFLAGS = "";
-				PRODUCT_NAME = jackd;
-				REZ_EXECUTABLE = YES;
-				SECTORDER_FLAGS = "";
-				WARNING_CFLAGS = "-Wmost -Wno-four-char-constants -Wno-unknown-pragmas";
-			};
-			dependencies = (
-			);
-			isa = PBXToolTarget;
-			name = Jackd;
-			productInstallPath = "$(HOME)/bin";
-			productName = jackd;
-			productReference = 034768E8FF38A79811DB9C8B;
-		};
-		08FB77A0FE84155DC02AAC07 = {
-			buildActionMask = 2147483647;
-			files = (
-				4B16FF920467B5A000053105,
-				4BB9E095046FADED00053105,
-				4B5B51EE047D353A00053105,
-				4BAA76A7047E0D5200053105,
-				4B783E1B049F824D00053105,
-				4B117C7B05DD0CC000B5DA5A,
-				4B4DCBA205DD234100DC3452,
-				4B4DCBA505DD234800DC3452,
-				4B4DCBA805DD235B00DC3452,
-				4BA39A1F05DD2C63008919E8,
-				4BA39A2305DD2CA5008919E8,
-			);
-			isa = PBXHeadersBuildPhase;
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		08FB77A1FE84155DC02AAC07 = {
-			buildActionMask = 2147483647;
-			files = (
-				4B117C5905DD0C3600B5DA5A,
-				4B117C5B05DD0C4100B5DA5A,
-				4B117C5E05DD0C5B00B5DA5A,
-				4B117C6405DD0C8000B5DA5A,
-				4B117C6705DD0C8700B5DA5A,
-				4B117C6A05DD0C8D00B5DA5A,
-				4B117C6D05DD0C9400B5DA5A,
-				4B117C7005DD0C9900B5DA5A,
-				4B117C7305DD0C9D00B5DA5A,
-				4B117C7605DD0CA000B5DA5A,
-				4B813FEF07240CCF0025D71C,
-			);
-			isa = PBXSourcesBuildPhase;
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		08FB77A3FE84155DC02AAC07 = {
-			buildActionMask = 2147483647;
-			files = (
-			);
-			isa = PBXFrameworksBuildPhase;
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		08FB77A5FE84155DC02AAC07 = {
-			buildActionMask = 2147483647;
-			files = (
-			);
-			isa = PBXRezBuildPhase;
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 //080
 //081
 //082
@@ -199,7 +101,6 @@
 //1A4
 		1AB674ADFE9D54B511CA2CBB = {
 			children = (
-				034768E8FF38A79811DB9C8B,
 				4BBB87310406EF300019BE76,
 				4BCA2603040B8B9400053105,
 				4BF87130040BDE8200053105,
@@ -240,12 +141,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4B117C5905DD0C3600B5DA5A = {
-			fileRef = 4B117C5805DD0C3600B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B117C5A05DD0C4100B5DA5A = {
 			fileEncoding = 30;
 			isa = PBXFileReference;
@@ -254,12 +149,6 @@
 			path = ../../../jackd/engine.c;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
-		};
-		4B117C5B05DD0C4100B5DA5A = {
-			fileRef = 4B117C5A05DD0C4100B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
 		};
 		4B117C5D05DD0C5B00B5DA5A = {
 			fileEncoding = 30;
@@ -270,12 +159,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4B117C5E05DD0C5B00B5DA5A = {
-			fileRef = 4B117C5D05DD0C5B00B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B117C6305DD0C8000B5DA5A = {
 			fileEncoding = 30;
 			isa = PBXFileReference;
@@ -284,12 +167,6 @@
 			path = ../../../libjack/port.c;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
-		};
-		4B117C6405DD0C8000B5DA5A = {
-			fileRef = 4B117C6305DD0C8000B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
 		};
 		4B117C6505DD0C8000B5DA5A = {
 			fileRef = 4B117C6305DD0C8000B5DA5A;
@@ -306,12 +183,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4B117C6705DD0C8700B5DA5A = {
-			fileRef = 4B117C6605DD0C8700B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B117C6805DD0C8700B5DA5A = {
 			fileRef = 4B117C6605DD0C8700B5DA5A;
 			isa = PBXBuildFile;
@@ -326,12 +197,6 @@
 			path = ../../../libjack/driver.c;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
-		};
-		4B117C6A05DD0C8D00B5DA5A = {
-			fileRef = 4B117C6905DD0C8D00B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
 		};
 		4B117C6B05DD0C8D00B5DA5A = {
 			fileRef = 4B117C6905DD0C8D00B5DA5A;
@@ -348,12 +213,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4B117C6D05DD0C9400B5DA5A = {
-			fileRef = 4B117C6C05DD0C9400B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B117C6E05DD0C9400B5DA5A = {
 			fileRef = 4B117C6C05DD0C9400B5DA5A;
 			isa = PBXBuildFile;
@@ -368,12 +227,6 @@
 			path = ../../../libjack/transclient.c;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
-		};
-		4B117C7005DD0C9900B5DA5A = {
-			fileRef = 4B117C6F05DD0C9900B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
 		};
 		4B117C7105DD0C9900B5DA5A = {
 			fileRef = 4B117C6F05DD0C9900B5DA5A;
@@ -390,12 +243,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4B117C7305DD0C9D00B5DA5A = {
-			fileRef = 4B117C7205DD0C9D00B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B117C7405DD0C9D00B5DA5A = {
 			fileRef = 4B117C7205DD0C9D00B5DA5A;
 			isa = PBXBuildFile;
@@ -411,12 +258,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4B117C7605DD0CA000B5DA5A = {
-			fileRef = 4B117C7505DD0CA000B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B117C7705DD0CA000B5DA5A = {
 			fileRef = 4B117C7505DD0CA000B5DA5A;
 			isa = PBXBuildFile;
@@ -431,12 +272,6 @@
 			path = ../../../config.h;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
-		};
-		4B117C7B05DD0CC000B5DA5A = {
-			fileRef = 4B117C7A05DD0CC000B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
 		};
 		4B117C7C05DD0CC000B5DA5A = {
 			fileRef = 4B117C7A05DD0CC000B5DA5A;
@@ -487,12 +322,6 @@
 			path = pThreadUtilities.h;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
-		};
-		4B16FF920467B5A000053105 = {
-			fileRef = 4B16FF900467B5A000053105;
-			isa = PBXBuildFile;
-			settings = {
-			};
 		};
 		4B1A735D07252DA3007105CE = {
 			fileEncoding = 30;
@@ -611,12 +440,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4B4DCBA205DD234100DC3452 = {
-			fileRef = 4B4DCBA105DD234100DC3452;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B4DCBA305DD234100DC3452 = {
 			fileRef = 4B4DCBA105DD234100DC3452;
 			isa = PBXBuildFile;
@@ -635,12 +458,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4B4DCBA505DD234800DC3452 = {
-			fileRef = 4B4DCBA405DD234800DC3452;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B4DCBA605DD234800DC3452 = {
 			fileRef = 4B4DCBA405DD234800DC3452;
 			isa = PBXBuildFile;
@@ -658,12 +475,6 @@
 			path = ../../../jack/types.h;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
-		};
-		4B4DCBA805DD235B00DC3452 = {
-			fileRef = 4B4DCBA705DD235B00DC3452;
-			isa = PBXBuildFile;
-			settings = {
-			};
 		};
 		4B4DCBA905DD235B00DC3452 = {
 			fileRef = 4B4DCBA705DD235B00DC3452;
@@ -743,12 +554,6 @@
 			sourceTree = SOURCE_ROOT;
 		};
 		4B5B51EC047D353A00053105 = {
-			fileRef = 4B5B51EA047D353A00053105;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		4B5B51EE047D353A00053105 = {
 			fileRef = 4B5B51EA047D353A00053105;
 			isa = PBXBuildFile;
 			settings = {
@@ -947,18 +752,6 @@
 		};
 		4B77679F072D2BAD00F14709 = {
 			fileRef = 4B77679E072D2BAD00F14709;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		4B783E1B049F824D00053105 = {
-			fileRef = 4B099343041FB67A00053105;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		4B813FEF07240CCF0025D71C = {
-			fileRef = 4B89C95906F596060003AD09;
 			isa = PBXBuildFile;
 			settings = {
 			};
@@ -1172,10 +965,10 @@
 				HEADER_SEARCH_PATHS = "../../ ../../../";
 				LIBRARY_SEARCH_PATHS = "";
 				OPTIMIZATION_CFLAGS = "-O3";
-				OTHER_CFLAGS = "-D JACK_LOCATION=\\\"/usr/local/bin\\\" ";
 				OTHER_LDFLAGS = "-framework CoreAudio ";
 				OTHER_LIBTOOL_FLAGS = "";
 				OTHER_REZFLAGS = "";
+				PREFIX_HEADER = ./JACK_LOCATION.h;
 				PRINCIPAL_CLASS = "";
 				PRODUCT_NAME = Jack;
 				SECTORDER_FLAGS = "";
@@ -1368,12 +1161,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4BA39A1F05DD2C63008919E8 = {
-			fileRef = 4BA39A1E05DD2C63008919E8;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4BA39A2005DD2C63008919E8 = {
 			fileRef = 4BA39A1E05DD2C63008919E8;
 			isa = PBXBuildFile;
@@ -1391,12 +1178,6 @@
 			path = ../../../jack/jack.h;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
-		};
-		4BA39A2305DD2CA5008919E8 = {
-			fileRef = 4BA39A2205DD2CA5008919E8;
-			isa = PBXBuildFile;
-			settings = {
-			};
 		};
 		4BA39A2405DD2CA5008919E8 = {
 			fileRef = 4BA39A2205DD2CA5008919E8;
@@ -1472,12 +1253,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4BAA76A7047E0D5200053105 = {
-			fileRef = 4BAA76A6047E0D5200053105;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4BB9E091046FADED00053105 = {
 			fileEncoding = 30;
 			isa = PBXFileReference;
@@ -1485,12 +1260,6 @@
 			path = mach_port.h;
 			refType = 4;
 			sourceTree = "<group>";
-		};
-		4BB9E095046FADED00053105 = {
-			fileRef = 4BB9E091046FADED00053105;
-			isa = PBXBuildFile;
-			settings = {
-			};
 		};
 		4BB9E097046FB05700053105 = {
 			fileRef = 4BB9E091046FADED00053105;
@@ -1696,25 +1465,6 @@
 			path = jack_connect;
 			refType = 3;
 			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-//4B0
-//4B1
-//4B2
-//4B3
-//4B4
-//C60
-//C61
-//C62
-//C63
-//C64
-		C6A0FF2D029079AD04C91782 = {
-			buildActionMask = 8;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			isa = PBXCopyFilesBuildPhase;
-			runOnlyForDeploymentPostprocessing = 1;
 		};
 	};
 	rootObject = 08FB7793FE84155DC02AAC07;
