@@ -1,23 +1,35 @@
+/* This module provides a set of abstract shared memory interfaces
+ * with support using both System V and POSIX shared memory
+ * implementations.  The code is divided into three sections:
+ *
+ *	- common (interface-independent) code
+ *	- POSIX implementation
+ *	- System V implementation
+ *
+ * The implementation used is determined by whether USE_POSIX_SHM was
+ * set in the ./configure step.
+ */
+
 /*
-    Copyright (C) 2003 Paul Davis
-    Copyright (C) 2004 Jack O'Quin
-    
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-
-    $Id$
-*/
+ * Copyright (C) 2003 Paul Davis
+ * Copyright (C) 2004 Jack O'Quin
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ *
+ * $Id$
+ */
 #include <config.h>
 
 #include <unistd.h>
@@ -30,7 +42,10 @@
 #include <dirent.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <sysdeps/ipc.h>
 #include <sys/shm.h>
+#include <sys/sem.h>
 #include <sysdeps/ipc.h>
 
 #include <jack/shm.h>
@@ -49,14 +64,6 @@ static char *shmtype_name = "System V";
 static int	jack_access_registry (jack_shm_info_t *ri);
 static void	jack_remove_shm (jack_shm_id_t *id);
 
-/* This module supports both System V and POSIX shared memory
- * interfaces.  The code is divided into three sections:
- *
- *	- common (interface-independent) code
- *	- POSIX implementation
- *	- System V implementation
- */
-
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * common interface-independent section
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
@@ -72,18 +79,96 @@ jack_shm_info_t registry_info = {	/* SHM info for the registry */
 static jack_shm_header_t* jack_shm_header = NULL;
 static jack_shm_registry_t* jack_shm_registry = NULL;
 
+/* jack_shm_lock_registry() serializes updates to the shared memory
+ * segment JACK uses to keep track of the SHM segements allocated to
+ * all its processes, including multiple servers.
+ *
+ * This is not a high-contention lock, but it does need to work across
+ * multiple processes.  High transaction rates and realtime safety are
+ * not required.  Any solution needs to at least be portable to POSIX
+ * and POSIX-like systems.
+ *
+ * We must be particularly careful to ensure that the lock be released
+ * if the owning process terminates abnormally.  Otherwise, a segfault
+ * or kill -9 at the wrong moment could prevent JACK from ever running
+ * again on that machine until after a reboot.
+ */
+
+#define JACK_SEMAPHORE_KEY 0x282929
+#ifndef USE_POSIX_SHM
+#define JACK_SHM_REGISTRY_KEY JACK_SEMAPHORE_KEY
+#endif
+
+static int semid = -1;
+
+/* all semaphore errors are fatal -- issue message, but do not return */
+static void
+semaphore_error (char *msg)
+{
+	jack_error ("Fatal JACK semaphore error: %s (%s)",
+		    msg, strerror (errno));
+	abort ();
+}
+
+static void
+semaphore_init ()
+{
+	key_t semkey = JACK_SEMAPHORE_KEY;
+	struct sembuf sbuf;
+	int create_flags = IPC_CREAT | IPC_EXCL
+		| S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+
+	/* Get semaphore ID associated with this key. */
+	if ((semid = semget(semkey, 0, 0)) == -1) {
+
+		/* Semaphore does not exist - Create. */
+		if ((semid = semget(semkey, 1, create_flags)) != -1) {
+
+			/* Initialize the semaphore, allow one owner. */
+			sbuf.sem_num = 0;
+			sbuf.sem_op = 1;
+			sbuf.sem_flg = 0;
+			if (semop(semid, &sbuf, 1) == -1) {
+				semaphore_error ("semop");
+			}
+
+		} else if (errno == EEXIST) {
+			if ((semid = semget(semkey, 0, 0)) == -1) {
+				semaphore_error ("semget");
+			}
+
+		} else {
+			semaphore_error ("semget creation"); 
+		}
+	}
+}
+
+static inline void
+semaphore_add (int value)
+{
+	struct sembuf sbuf;
+
+	sbuf.sem_num = 0;
+	sbuf.sem_op = value;
+	sbuf.sem_flg = SEM_UNDO;
+	if (semop(semid, &sbuf, 1) == -1) {
+		semaphore_error ("semop");
+	}
+}
+
 static void 
 jack_shm_lock_registry (void)
 {
-	/* XXX magic with semaphores here */
-	//JOQ: this is really needed now with multiple servers
+	if (semid == -1)
+		semaphore_init ();
+
+	semaphore_add (-1);
 }
 
 static void 
 jack_shm_unlock_registry (void)
 {
-	/* XXX magic with semaphores here */
-	//JOQ: this is really needed now with multiple servers
+	semaphore_add (1);
 }
 
 static void
@@ -124,7 +209,7 @@ jack_shm_validate_registry ()
 	jack_error ("incompatible shm registry (%s)", strerror (errno));
 
 	/* Apparently, this registry was created by an older JACK
-	 * version.  Delete it and try again. */
+	 * version.  Delete it so we can try again. */
 	jack_release_shm (&registry_info);
 	jack_remove_shm (&registry_id);
 
@@ -194,10 +279,9 @@ jack_destroy_shm (jack_shm_info_t* si)
 jack_shm_registry_t *
 jack_get_free_shm_info ()
 {
+	/* registry must be locked */
 	jack_shm_registry_t* si = NULL;
 	int i;
-
-	jack_shm_lock_registry ();
 
 	for (i = 0; i < MAX_SHM_ID; ++i) {
 		if (jack_shm_registry[i].size == 0) {
@@ -208,8 +292,6 @@ jack_get_free_shm_info ()
 	if (i < MAX_SHM_ID) {
 		si = &jack_shm_registry[i];
 	}
-	
-	jack_shm_unlock_registry ();
 
 	return si;
 }
@@ -466,37 +548,39 @@ jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
 {
 	jack_shm_registry_t* registry;
 	int shm_fd;
-	int perm = O_RDWR|O_CREAT;
+	int rc = -1;
 
-	if ((registry = jack_get_free_shm_info ()) == NULL) {
-		return -1;
-	}
+	jack_shm_lock_registry ();
 
-	if ((shm_fd = shm_open (shm_name, O_RDWR|O_CREAT, 0666)) < 0) {
-		jack_error ("cannot create shm segment %s (%s)", shm_name,
-			    strerror (errno));
-		return -1;
-	}
-        
-	if (perm & O_CREAT) {
-		if (ftruncate (shm_fd, size) < 0) {
+	if ((registry = jack_get_free_shm_info ())) {
+
+		if ((shm_fd = shm_open (shm_name, O_RDWR|O_CREAT, 0666)) >= 0) {
+
+			if (ftruncate (shm_fd, size) >= 0) {
+
+				close (shm_fd);
+				registry->size = size;
+				snprintf (registry->id, sizeof (registry->id),
+					  "%s", shm_name);
+				registry->allocator = getpid();
+				si->index = registry->index;
+				si->attached_at = MAP_FAILED; /* not attached */
+				rc = 0;	/* success */
+
+			} else {
 				jack_error ("cannot set size of engine shm "
 					    "registry 0 (%s)",
 					    strerror (errno));
-				return -1;
+			}
+
+		} else {
+			jack_error ("cannot create shm segment %s (%s)",
+				    shm_name, strerror (errno));
 		}
 	}
 
-	close (shm_fd);
-
-	registry->size = size;
-	snprintf (registry->id, sizeof (registry->id), "%s", shm_name);
-	registry->allocator = getpid();
-	
-	si->index = registry->index;
-	si->attached_at = MAP_FAILED;	/* segment not attached */
-	
-	return 0;
+	jack_shm_unlock_registry ();
+	return rc;
 }
 
 int
@@ -652,28 +736,33 @@ jack_shmalloc (const char* name_not_used, jack_shmsize_t size,
 {
 	int shmflags;
 	int shmid;
+	int rc = -1;
 	jack_shm_registry_t* registry;
 
-	if ((registry = jack_get_free_shm_info ()) == NULL) {
-		return -1;
+	jack_shm_lock_registry ();
+
+	if ((registry = jack_get_free_shm_info ())) {
+
+		shmflags = 0666 | IPC_CREAT | IPC_EXCL;
+
+		if ((shmid = shmget (IPC_PRIVATE, size, shmflags)) >= 0) {
+
+			registry->size = size;
+			registry->id = shmid;
+			registry->allocator = getpid();
+			si->index = registry->index;
+			si->attached_at = MAP_FAILED; /* not attached */
+			rc = 0;
+
+		} else {
+			jack_error ("cannot create shm segment %s (%s)",
+				    name_not_used, strerror (errno));
+		}
 	}
 
-	shmflags = 0666 | IPC_CREAT | IPC_EXCL;
+	jack_shm_unlock_registry ();
 
-	if ((shmid = shmget (IPC_PRIVATE, size, shmflags)) < 0) {
-		jack_error ("cannot create shm segment %s (%s)",
-			    name_not_used, strerror (errno));
-		return -1;
-	}
-
-	registry->size = size;
-	registry->id = shmid;
-	registry->allocator = getpid();
-
-	si->index = registry->index;
-	si->attached_at = MAP_FAILED;	/* segment not attached */
-
-	return 0;
+	return rc;
 }
 
 int

@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=99
-JACK_MICRO_VERSION=30
+JACK_MICRO_VERSION=31
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -151,8 +151,6 @@ then
 	USE_POSIX_SHM="true"
 else
 	AC_MSG_RESULT([System V shmget().])
-	JACK_SHM_REGISTRY_KEY=0x00282929
-	AC_SUBST(JACK_SHM_REGISTRY_KEY)
 	USE_POSIX_SHM="false"
 fi
 AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
