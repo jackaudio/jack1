@@ -25,3 +25,5 @@ rpm: dist
 	rpm -ta $(distdir).tar.gz
 
 dist-hook: dist-check-doxygen
+
+EXTRA_DIST = depcomp
