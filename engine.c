@@ -498,19 +498,20 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 				}
 
 				if (pfd[0].revents & ~POLLIN) {
-					status = -1; /* client went away */
+					jack_error ("subgraph starting at %s lost client", client->control->name);
+					status = -1; 
 				}
 
 				if (pfd[0].revents & POLLIN) {
 					status = 0;
 				} else {
-					status = 1;  /* client timed out */
+					jack_error ("subgraph starting at %s timed out (subgraph_wait_fd=%d, status = %d, state = %d)", 
+						    client->control->name, client->subgraph_wait_fd, status, client->control->state);
+					status = 1;
 				}
 			}
 
 			if (status != 0) {
-				jack_error ("subgraph starting at %s timed out (subgraph_wait_fd=%d, status = %d, state = %d)", 
-					    client->control->name, client->subgraph_wait_fd, status, client->control->state);
 				client->control->timed_out = 1;
 				engine->process_errors++;
 				break;
@@ -1727,7 +1728,10 @@ jack_trace_terminal (jack_client_internal_t *c1, jack_client_internal_t *rbase)
 {
 	jack_client_internal_t *c2;
 
-	/* make a copy of the existing list of routes that feed c1 */
+	/* make a copy of the existing list of routes that feed c1. this provides
+	   us with an atomic snapshot of c1's "fed-by" state, which will be
+	   modified as we progress ...
+	*/
 
 	GSList *existing;
 	GSList *node;
@@ -1769,6 +1773,8 @@ jack_trace_terminal (jack_client_internal_t *c1, jack_client_internal_t *rbase)
 			}
 		}
 	}
+
+	g_slist_free (existing);
 }
 
 static int 
