@@ -1,4 +1,12 @@
 /*
+ * messagebuffer.c -- realtime-safe message handling for jackd.
+ *
+ *  This interface is included in libjack so backend drivers can use
+ *  it, *not* for external client processes.  It implements the
+ *  VERBOSE() and MESSAGE() macros in a realtime-safe manner.
+ */
+
+/*
  *  Copyright (C) 2004 Rui Nuno Capela, Steve Harris
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -25,13 +33,18 @@
 #include <stdio.h>
 
 #include <jack/messagebuffer.h>
+#include <jack/atomicity.h>
 
-#define MB_BUFFERS	64		/* must be 2^n */
+/* MB_NEXT() relies on the fact that MB_BUFFERS is a power of two */
+#define MB_BUFFERS	128
+#define MB_NEXT(index) ((index+1) & (MB_BUFFERS-1))
+#define MB_BUFFERSIZE	256		/* message length limit */
 
 static char mb_buffers[MB_BUFFERS][MB_BUFFERSIZE];
-static unsigned int mb_initialized = 0;
-static unsigned int mb_inbuffer = 0;
-static unsigned int mb_outbuffer = 0;
+static volatile unsigned int mb_initialized = 0;
+static volatile unsigned int mb_inbuffer = 0;
+static volatile unsigned int mb_outbuffer = 0;
+static volatile _Atomic_word mb_overruns = 0;
 static pthread_t mb_writer_thread;
 static pthread_mutex_t mb_write_lock;
 static pthread_cond_t mb_ready_cond;
@@ -39,20 +52,27 @@ static pthread_cond_t mb_ready_cond;
 static void
 mb_flush()
 {
+	/* called WITHOUT the mb_write_lock */
 	while (mb_outbuffer != mb_inbuffer) {
 		fputs(mb_buffers[mb_outbuffer], stderr);
-		mb_outbuffer = (mb_outbuffer + 1) & (MB_BUFFERS - 1);
+		mb_outbuffer = MB_NEXT(mb_outbuffer);
 	}
 }
 
 static void *
 mb_thread_func(void *arg)
 {
+	/* The mutex is only to eliminate collisions between multiple
+	 * writer threads and protect the condition variable. */
 	pthread_mutex_lock(&mb_write_lock);
 
 	while (mb_initialized) {
 		pthread_cond_wait(&mb_ready_cond, &mb_write_lock);
+
+		/* releasing the mutex reduces contention */
+		pthread_mutex_unlock(&mb_write_lock);
 		mb_flush();
+		pthread_mutex_lock(&mb_write_lock);
 	}
 
 	pthread_mutex_unlock(&mb_write_lock);
@@ -69,6 +89,7 @@ jack_messagebuffer_init ()
 	pthread_mutex_init(&mb_write_lock, NULL);
 	pthread_cond_init(&mb_ready_cond, NULL);
 
+	mb_overruns = 0;
 	mb_initialized = 1;
 
 	if (pthread_create(&mb_writer_thread, NULL, &mb_thread_func, NULL) != 0)
@@ -89,18 +110,40 @@ jack_messagebuffer_exit ()
 	pthread_join(mb_writer_thread, NULL);
 	mb_flush();
 
+	if (mb_overruns)
+		fprintf(stderr, "WARNING: %d message buffer overruns!\n",
+			mb_overruns);
+	else
+		fprintf(stderr, "No message buffer overruns.\n");
+
 	pthread_mutex_destroy(&mb_write_lock);
 	pthread_cond_destroy(&mb_ready_cond);
 }
 
 
 void 
-jack_messagebuffer_add (const char *msg)
+jack_messagebuffer_add (const char *fmt, ...)
 {
+	va_list ap;
+
+	if (!mb_initialized) {
+		/* Unable to print message with realtime safety.  So,
+		 * complain and print it anyway. */
+		fprintf(stderr, "ERROR: messagebuffer not initialized...\n");
+		va_start(ap, fmt);
+		vfprintf(stderr, fmt, ap);
+		va_end(ap);
+		return;
+	}
+
 	if (pthread_mutex_trylock(&mb_write_lock) == 0) {
-		strncpy(mb_buffers[mb_inbuffer], msg, MB_BUFFERSIZE - 1);
-		mb_inbuffer = (mb_inbuffer + 1) & (MB_BUFFERS - 1);
+		va_start(ap, fmt);
+		vsnprintf(mb_buffers[mb_inbuffer], MB_BUFFERSIZE, fmt, ap);
+		va_end(ap);
+		mb_inbuffer = MB_NEXT(mb_inbuffer);
 		pthread_cond_signal(&mb_ready_cond);
 		pthread_mutex_unlock(&mb_write_lock);
+	} else {			/* lock collision */
+		atomic_add(&mb_overruns, 1);
 	}
 }

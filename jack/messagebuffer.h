@@ -1,4 +1,12 @@
 /*
+ * messagebuffer.h -- realtime-safe message interface for jackd.
+ *
+ *  This function is included in libjack so backend drivers can use
+ *  it, *not* for external client processes.  The VERBOSE() and
+ *  MESSAGE() macros are realtime-safe.
+ */
+
+/*
  *  Copyright (C) 2004 Rui Nuno Capela, Steve Harris
  *  
  *  This program is free software; you can redistribute it and/or modify
@@ -21,24 +29,14 @@
 #ifndef __jack_messagebuffer_h__
 #define __jack_messagebuffer_h__
 
-#define MB_BUFFERSIZE	256
-
-#define MESSAGE(fmt,args...) {			\
-		char msg[MB_BUFFERSIZE];		\
-		snprintf(msg, MB_BUFFERSIZE-1, fmt, ##args); \
-		jack_messagebuffer_add(msg);	\
-	}
-
-#define VERBOSE(engine,fmt,args...)		\
-	if ((engine)->verbose) {			\
-		char msg[MB_BUFFERSIZE];		\
-		snprintf(msg, MB_BUFFERSIZE-1, fmt, ##args); \
-		jack_messagebuffer_add(msg);	\
-	}
+#define MESSAGE(fmt...) jack_messagebuffer_add(##fmt)
+#define VERBOSE(engine,fmt...)	\
+	if ((engine)->verbose)		\
+		jack_messagebuffer_add(##fmt)
 
 void jack_messagebuffer_init();
 void jack_messagebuffer_exit();
 
-void jack_messagebuffer_add(const char *msg);
+void jack_messagebuffer_add(const char *fmt, ...);
 
 #endif /* __jack_messagebuffer_h__ */
