@@ -3788,7 +3788,8 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 
 	port->shared = shared;
 	port->connections = 0;
-
+	port->buffer_info = NULL;
+	
 	if (jack_port_assign_buffer (engine, port)) {
 		jack_error ("cannot assign buffer for port");
 		return -1;
