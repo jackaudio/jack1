@@ -9,6 +9,7 @@ libjackinclude_HEADERS = jack.h \
 			 engine.h
 
 noinst_HEADERS = alsa_driver.h \
+	         hardware.h \
 		 generic.h \
 		 hammerfall.h \
 		 internal.h \

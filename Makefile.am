@@ -43,7 +43,5 @@ jack_alsa_la_LDFLAGS = -module
 jack_alsa_la_SOURCES = alsa_driver.c hammerfall.c generic_hw.c memops.c 
 jack_alsa_la_LIBADD = -lasound $(GLIB_LIBS)
 
-EXTRA_DIST = jack
-
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = jack.pc
