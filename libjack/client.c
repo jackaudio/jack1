@@ -537,7 +537,7 @@ jack_client_thread (void *arg)
 	   about this and it needs fixing.
 	*/
 
-	client->control->pid = getpid()
+	client->control->pid = getpid();
 
 	DEBUG ("client thread is now running");
 
