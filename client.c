@@ -146,7 +146,7 @@ jack_port_by_name (jack_client_t *client, const char *port_name)
 {
 	unsigned long i, limit;
 	jack_port_shared_t *port;
-
+	
 	limit = client->engine->port_max;
 	port = &client->engine->ports[0];
 	
@@ -1336,10 +1336,19 @@ jack_port_request_monitor_by_name (jack_client_t *client, const char *port_name,
 
 {
 	jack_port_t *port;
+	unsigned long i, limit;
+	jack_port_shared_t *ports;
 
-	if ((port = jack_port_by_name (client, port_name)) != NULL) {
-		return jack_port_request_monitor (port, onoff);
-		free (port);
+	limit = client->engine->port_max;
+	ports = &client->engine->ports[0];
+	
+	for (i = 0; i < limit; i++) {
+		if (ports[i].in_use && strcmp (ports[i].name, port_name) == 0) {
+			port = jack_port_new (client, ports[i].id, client->engine);
+			return jack_port_request_monitor (port, onoff);
+			free (port);
+			return 0;
+		}
 	}
 
 	return -1;

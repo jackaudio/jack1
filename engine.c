@@ -98,6 +98,11 @@ static int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_
 
 static int  jack_get_total_latency (jack_engine_t *engine, const char *portname, nframes_t *latency);
 
+static int jack_engine_process_lock (jack_engine_t *);
+static int jack_engine_process_unlock (jack_engine_t *);
+static int jack_engine_post_process (jack_engine_t *);
+
+
 static int *jack_shm_registry;
 static int  jack_shm_id_cnt;
 
@@ -193,9 +198,6 @@ jack_cleanup_clients (jack_engine_t *engine)
 	jack_client_control_t *ctl;
 	jack_client_internal_t *client;
 	GSList *node, *tmp;
-	static int x = 0;
-
-	x++;
 
 	pthread_mutex_lock (&engine->graph_lock); 
 
@@ -210,10 +212,10 @@ jack_cleanup_clients (jack_engine_t *engine)
 			fprintf (stderr, "client %s state = %d\n", ctl->name, ctl->state);
 		}
 
-		if (ctl->state > NotTriggered) {
+		if (ctl->state > NotTriggered && ctl->state != Finished) {
 
 			if (engine->verbose) {
-				fprintf (stderr, "%d: removing failed client %s\n", x, ctl->name);
+				fprintf (stderr, "removing failed client %s\n", ctl->name);
 			}
 
 			jack_remove_client (engine, (jack_client_internal_t *) node->data);
@@ -401,6 +403,18 @@ jack_set_sample_rate (jack_engine_t *engine, nframes_t nframes)
 	return 0;
 }
 
+int
+jack_engine_process_lock (jack_engine_t *engine)
+{
+	return pthread_mutex_trylock (&engine->graph_lock);
+}
+
+int
+jack_engine_process_unlock (jack_engine_t *engine)
+{
+	return pthread_mutex_unlock (&engine->graph_lock);
+}
+
 static int
 jack_process (jack_engine_t *engine, nframes_t nframes)
 {
@@ -411,9 +425,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 	struct pollfd pollfd[1];
 	char c;
 
-	if (pthread_mutex_trylock (&engine->graph_lock) != 0) {
-		return 0;
-	}
+	engine->process_errors = 0;
 
 	for (node = engine->clients; node; node = g_slist_next (node)) {
 		ctl = ((jack_client_internal_t *) node->data)->control;
@@ -446,7 +458,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 				ctl->state = Finished;
 			} else {
 				jack_error ("in-process client %s failed", client->control->name);
-				err++;
+				engine->process_errors++;
 				break;
 			}
 
@@ -460,7 +472,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 
 			if (write (client->subgraph_start_fd, &c, sizeof (c)) != sizeof (c)) {
 				jack_error ("cannot initiate graph processing (%s)", strerror (errno));
-				err++;
+				engine->process_errors++;
 				break;
 			} 
 
@@ -476,22 +488,22 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 					continue;
 				}
 				jack_error ("engine cannot poll for graph completion (%s)", strerror (errno));
-				err++;
+				engine->process_errors++;
 				break;
 			}
 			
 			if (pollfd[0].revents == 0) {
 				jack_error ("subgraph starting at %s timed out (state = %d)", client->control->name, client->control->state);
-				err++;
+				engine->process_errors++;
 				break;
 			} else if (pollfd[0].revents & ~POLLIN) {
 				jack_error ("error/hangup on graph wait fd");
-				err++;
+				engine->process_errors++;
 				break;
 			} else {
 				if (read (client->subgraph_wait_fd, &c, sizeof (c)) != sizeof (c)) {
 					jack_error ("cannot clean up byte from graph wait fd (%s)", strerror (errno));
-					err++;
+					engine->process_errors++;
 					break;
 				}
 			}
@@ -507,14 +519,16 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 
 		}
 	}
-		
 
-	pthread_mutex_unlock (&engine->graph_lock);
-	
-	if (err) {
+	return 0;
+}
+
+int
+jack_engine_post_process (jack_engine_t *engine)
+{
+	if (engine->process_errors) {
 		jack_cleanup_clients (engine);
-	} 
-
+	}
 	return 0;
 }
 
@@ -714,12 +728,12 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 			client = (jack_client_internal_t *) node->data;
 			client->control->active = TRUE;
 
-			/* we call thus to make sure the FIFO is built by the time
+			/* we call this to make sure the FIFO is built by the time
 			   the client needs it. we don't care about the return
 			   value at this point.
 			*/
-			jack_get_fifo_fd (engine, ++engine->external_client_cnt);
 
+			jack_get_fifo_fd (engine, ++engine->external_client_cnt);
 			jack_rechain_graph (engine, FALSE);
 
 			ret = 0;
@@ -1065,6 +1079,9 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine->process = jack_process;
 	engine->set_sample_rate = jack_set_sample_rate;
 	engine->set_buffer_size = jack_set_buffer_size;
+	engine->process_lock = jack_engine_process_lock;
+	engine->process_unlock = jack_engine_process_unlock;
+	engine->post_process = jack_engine_post_process;
 
 	engine->next_client_id = 1;
 	engine->timebase_client = 0;
@@ -1798,6 +1815,58 @@ jack_sort_graph (jack_engine_t *engine, int take_lock)
 	if (take_lock) {
 		pthread_mutex_unlock (&engine->graph_lock);
 	}
+}
+
+/**
+ * Dumps current engine configuration to stderr.
+ */
+void jack_dump_configuration(jack_engine_t *engine, int take_lock)
+{
+        GSList *clientnode, *portnode, *connectionnode;
+	jack_client_internal_t *client;
+	jack_client_control_t *ctl;
+	jack_port_internal_t *port;
+	jack_connection_internal_t* connection;
+	int n, m, o;
+	
+	fprintf(stderr, "engine.c: <-- dump begins -->\n");
+
+	if (take_lock) {
+	        pthread_mutex_lock (&engine->graph_lock);
+	}
+	
+	for (n = 0, clientnode = engine->clients; clientnode; clientnode = g_slist_next (clientnode)) {
+	        client = (jack_client_internal_t *) clientnode->data;
+		ctl = client->control;
+
+		fprintf (stderr, "client #%d: %s\n",
+			 ++n,
+			 ctl->name);
+		
+		for(m = 0, portnode = client->ports; portnode; portnode = g_slist_next (portnode)) {
+		        port = (jack_port_internal_t *) portnode->data;
+
+			fprintf(stderr, "\t port #%d: %s\n", ++m, port->shared->name);
+
+			for(o = 0, connectionnode = port->connections; 
+			    connectionnode; 
+			    connectionnode = g_slist_next (connectionnode)) {
+			        connection = (jack_connection_internal_t *) connectionnode->data;
+	
+				fprintf(stderr, "\t\t connection #%d: %s -> %s\n",
+					++o,
+					connection->source->shared->name,
+					connection->destination->shared->name);
+			}
+		}
+	}
+
+	if (take_lock) {
+	        pthread_mutex_unlock (&engine->graph_lock);
+	}
+
+	
+	fprintf(stderr, "engine.c: <-- dump ends -->\n");
 }
 
 static int 

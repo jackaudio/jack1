@@ -95,6 +95,7 @@ posix_me_harder (void)
 	sigaddset(&signals, SIGFPE);
 	sigaddset(&signals, SIGPIPE);
 	sigaddset(&signals, SIGTERM);
+	sigaddset(&signals, SIGUSR1);
 
 	/* this can make debugging a pain, but it also makes
 	   segv-exits cleanup_files after themselves rather than
@@ -193,7 +194,20 @@ jack_main ()
 		sigdelset (&signals, SIGINT);
 	}
 
-	err = sigwait (&signals, &sig);
+	while(1) {
+	  err = sigwait (&signals, &sig);
+	  
+	  if (sig == SIGUSR1) {
+	    /* take lock although not exactly a safe thing
+	     * to do (pthread_mutex_lock/unlock not 
+	     * async safe */
+	    jack_dump_configuration(engine, 1);
+	  }
+	  else {
+	    /* continue to kill engine */
+	    break;
+	  }
+	} 
 
 	fprintf (stderr, "signal waiter: exiting due to signal %d\n", sig);
 
@@ -334,6 +348,3 @@ main (int argc, char *argv[])
 
 	return 0;
 }
-
-
-

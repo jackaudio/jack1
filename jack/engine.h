@@ -34,9 +34,13 @@ struct _jack_engine {
     int (*process)(struct _jack_engine *, nframes_t frames);
     int (*set_buffer_size)(struct _jack_engine *, nframes_t frames);
     int (*set_sample_rate)(struct _jack_engine *, nframes_t frames);
+    int (*process_lock)(struct _jack_engine *);
+    int (*process_unlock)(struct _jack_engine *);
+    int (*post_process)(struct _jack_engine *);
     pthread_mutex_t graph_lock;
     pthread_mutex_t buffer_lock;
     pthread_mutex_t port_lock;
+    int process_errors;
     int period_msecs;
     int port_max;
     int control_shm_id;
@@ -84,5 +88,7 @@ int             jack_run (jack_engine_t *engine);
 int             jack_wait (jack_engine_t *engine);
 int             jack_use_driver (jack_engine_t *, struct _jack_driver *);
 void            jack_set_temp_dir (const char *);
+
+void            jack_dump_configuration(jack_engine_t *engine, int take_lock);
 
 #endif /* __jack_engine_h__ */

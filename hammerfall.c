@@ -104,6 +104,8 @@ hammerfall_check_sync (hammerfall_t *h, snd_ctl_elem_value_t *ctl)
 	const char *name;
 	int val;
 	snd_ctl_elem_id_t *ctl_id;
+	
+	printf ("check sync\n");
 
 	snd_ctl_elem_id_alloca (&ctl_id);
 	snd_ctl_elem_value_get_id (ctl, ctl_id);
@@ -285,9 +287,11 @@ jack_alsa_hammerfall_hw_new (alsa_driver_t *driver)
 
 	hw->private = h;
 
+#if 0
 	if (pthread_create (&h->monitor_thread, 0, hammerfall_monitor_controls, hw)) {
 		jack_error ("ALSA/Hammerfall: cannot create sync monitor thread");
 	}
+#endif
 
 	return hw;
 }

@@ -693,9 +693,9 @@ alsa_driver_wait (alsa_driver_t *driver)
 	int xrun_detected;
 	channel_t chn;
 	GSList *node;
-	sample_t *buffer;
 	int need_capture = 1;
 	int need_playback = 1;
+	jack_engine_t *engine = driver->engine;
 	int i;
 
   again:
@@ -850,27 +850,29 @@ alsa_driver_wait (alsa_driver_t *driver)
 
 		driver->channels_not_done = driver->channel_done_bits;
 
-		/* XXX race condition on engine ptr */
-
-		if (driver->engine && driver->engine->process (driver->engine, contiguous)) {
-			jack_error ("alsa_pcm: engine processing error - stopping.");
-			return -1;
-		}
-
-		/* now move data from ports to channels */
-		
-		for (chn = 0, node = driver->playback_ports; node; node = g_slist_next (node), chn++) {
-
-			jack_port_t *port = (jack_port_t *) node->data;
-
-			/* optimize needless data copying away */
-
-			if (port->connections == 0) {
-				continue;
+		if (engine->process_lock (engine) == 0) {
+			
+			if (engine->process (engine, contiguous)) {
+				jack_error ("alsa_pcm: engine processing error - stopping.");
+				return -1;
 			}
-
-			buffer = (sample_t *) jack_port_get_buffer (port, contiguous);
-			alsa_driver_write_to_channel (driver, chn, buffer, contiguous, 0, 1.0);
+			
+			/* now move data from ports to channels */
+			
+			for (chn = 0, node = driver->playback_ports; node; node = g_slist_next (node), chn++) {
+				
+				jack_port_t *port = (jack_port_t *) node->data;
+				
+				/* optimize needless data copying away */
+				
+				if (!jack_port_connected (port)) {
+					continue;
+				}
+				
+				alsa_driver_write_to_channel (driver, chn, jack_port_get_buffer (port, contiguous), contiguous, 0, 1.0);
+			}
+			
+			engine->process_unlock (engine);
 		}
 
 		/* Now handle input monitoring */
@@ -913,7 +915,9 @@ alsa_driver_wait (alsa_driver_t *driver)
 
 		avail -= contiguous;
 	}
-
+	
+	engine->post_process (engine);
+	
 //	rdtscl (now);
 //	fprintf (stderr, "engine cycle took %.6f usecs\n", (((float) (now - start))/450.0f));
 
@@ -933,11 +937,11 @@ alsa_driver_process (nframes_t nframes, void *arg)
 
 		port = (jack_port_t *) node->data;
 
-		if (port->connections == 0) {
+		if (!jack_port_connected (port)) {
 			continue;
 		}
 
-		alsa_driver_read_from_channel (driver, chn, jack_port_buffer (port), nframes, 0);
+		alsa_driver_read_from_channel (driver, chn, jack_port_get_buffer (port, nframes), nframes, 0);
 	}
 
 	return 0;
