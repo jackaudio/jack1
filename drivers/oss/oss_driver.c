@@ -1116,9 +1116,9 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	driver->finish = driver_finish;
 
 	if (driver->indev == NULL)
-		driver->indev = strdup("/dev/dsp");
+		driver->indev = strdup(OSS_DRIVER_DEF_DEV);
 	if (driver->outdev == NULL)
-		driver->outdev = strdup(driver->indev);
+		driver->outdev = strdup(OSS_DRIVER_DEF_DEV);
 	driver->infd = -1;
 	driver->outfd = -1;
 	switch (driver->bits)
