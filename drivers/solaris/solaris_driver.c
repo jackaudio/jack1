@@ -24,7 +24,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <glib.h>
 #include <stdarg.h>
 
 #include <jack/solaris_driver.h>

@@ -10,10 +10,10 @@ endif
 
 bin_PROGRAMS = jackd $(CAP_PROGS)
 
-AM_CFLAGS = $(JACK_CFLAGS) -DJACKD_LOCATION=\"$(bindir)/jackd\" $(GLIB_CFLAGS)
+AM_CFLAGS = $(JACK_CFLAGS) -DJACKD_LOCATION=\"$(bindir)/jackd\" 
 
 jackd_SOURCES = jackd.c engine.c
-jackd_LDADD = ../libjack/libjack.la -lm -ldl -lpthread $(GLIB_LIBS) $(CAP_LIBS)
+jackd_LDADD = ../libjack/libjack.la -lm -ldl -lpthread $(CAP_LIBS)
 
 noinst_HEADERS = jack_md5.h md5.h md5_loc.h
 

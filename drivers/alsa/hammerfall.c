@@ -22,6 +22,7 @@
 #include <jack/alsa_driver.h>
 #include <jack/hammerfall.h>
 #include <jack/error.h>
+#include <jack/internal.h>
 
 static void 
 set_control_id (snd_ctl_elem_id_t *ctl, const char *name)

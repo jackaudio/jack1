@@ -35,7 +35,7 @@ bin_PROGRAMS = jack_simple_client \
 	       jack_lsp \
 	       $(FLTK_CLIENT) $(JACKREC)
 
-AM_CFLAGS = -I.. $(JACK_CFLAGS) $(GLIB_CFLAGS)
+AM_CFLAGS = -I.. $(JACK_CFLAGS)
 AM_CXXFLAGS = -I.. $(JACK_CFLAGS)
 
 jack_simple_client_SOURCES = simple_client.c

@@ -27,10 +27,10 @@
 #include <unistd.h>
 #include <sndfile.h>
 #include <pthread.h>
-#include <glib.h>
 #include <getopt.h>
 
 #include <jack/jack.h>
+#include <jack/jslist.h>
 
 typedef struct _thread_info {
     pthread_t thread_id;
@@ -73,8 +73,8 @@ sample_buffer_new (jack_nframes_t nframes, unsigned int nchans)
 	return buf;
 }
 
-GSList *pending_writes = NULL;
-GSList *free_buffers = NULL;
+JSList *pending_writes = NULL;
+JSList *free_buffers = NULL;
 
 sample_buffer_t *
 get_free_buffer (jack_nframes_t nframes, unsigned int nchans)
@@ -85,7 +85,7 @@ get_free_buffer (jack_nframes_t nframes, unsigned int nchans)
 		buf = sample_buffer_new (nframes, nchans);
 	} else {
 		buf = (sample_buffer_t *) free_buffers->data;
-		free_buffers = g_slist_next (free_buffers);
+		free_buffers = jack_slist_next (free_buffers);
 	}
 
 	return buf;
@@ -101,7 +101,7 @@ get_write_buffer ()
 	} 
 
 	buf = (sample_buffer_t *) pending_writes->data;
-	pending_writes = g_slist_next (pending_writes);
+	pending_writes = jack_slist_next (pending_writes);
 
 	return buf;
 }
@@ -109,13 +109,13 @@ get_write_buffer ()
 void
 put_write_buffer (sample_buffer_t *buf)
 {
-	pending_writes = g_slist_append (pending_writes, buf);
+	pending_writes = jack_slist_append (pending_writes, buf);
 }
 
 void
 put_free_buffer (sample_buffer_t *buf)
 {
-	free_buffers = g_slist_prepend (free_buffers, buf);
+	free_buffers = jack_slist_prepend (free_buffers, buf);
 }
 
 void *

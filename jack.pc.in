@@ -5,7 +5,6 @@ includedir=@includedir@
 
 Name: jack
 Description: the Jack Audio Connection Kit: a low-latency synchronous callback-based media server
-Requires: glib >= 1.0.0
 Version: @JACK_VERSION@
-Libs: -L${libdir} -ljack -lglib -lpthread -ldl
+Libs: -L${libdir} -ljack -lpthread -ldl
 Cflags: -I${includedir}

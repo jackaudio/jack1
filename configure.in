@@ -3,10 +3,29 @@ AC_INIT(jackd/jackd.c)
 
 AC_CONFIG_AUX_DIR(.)
 
+dnl ---
+dnl HOWTO: updating the JACK version number
+dnl
+dnl major version = ask on jackit-devel :)
+dnl minor version = incremented when any of the public or internal
+dnl                 interfaces are changed
+dnl micro version = incremented when implementation-only
+dnl                 changes are made
+dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=39
+JACK_MINOR_VERSION=40
 JACK_MICRO_VERSION=0
 
+dnl ---
+dnl HOWTO: updating the libjack interface version
+dnl
+dnl current = incremented whenever the public libjack API is changed 
+dnl revision = incremented when the libjack implementation is changed
+dnl age = current libjack is both source and binary compatible with
+dnl       libjack interfaces current,current-1,...,current-age
+dnl
+dnl Note! see libtool documentation for detailed documentation
+dnl ---
 JACK_API_CURRENT=0
 JACK_API_REVISION=4
 JACK_API_AGE=0
@@ -125,26 +144,7 @@ fi
 
 AC_SUBST(HTML_DIR)
 
-# jack depends on alsa 0.9 and glib. some example apps depend on libsndfile and fltk.
-
-AM_PATH_GLIB(1.0.0,
-             [:],
-             [AC_MSG_ERROR([*** JACK requires GLib, but it does not appear to be installed])]
-)
-
-# check for the presence of glib2 and build libjack-glib2
-
-
-PKG_CHECK_MODULES(GLIB2, glib-2.0 >= 2.0.0,
-	[
-		HAVE_GLIB2="true"
-	],
-	[
-		HAVE_GLIB2="false"
-	])	
-AC_SUBST(GLIB2_LIBS)
-AC_SUBST(GLIB2_CFLAGS)
-	
+# jack depends on alsa 0.9. some example apps depend on libsndfile and fltk.
 
 AC_CHECK_LIB(asound,snd_pcm_drop,
 	     [
@@ -202,11 +202,9 @@ AM_CONDITIONAL(USE_CAPABILITIES, $USE_CAPABILITIES)
 AM_CONDITIONAL(STRIPPED_JACKD, $STRIPPED_JACKD)
 AM_CONDITIONAL(HAVE_ALSA, $HAVE_ALSA)
 AM_CONDITIONAL(HAVE_SOLARIS, $HAVE_SOLARIS)
-AM_CONDITIONAL(HAVE_GLIB2, $HAVE_GLIB2)
 
 AC_OUTPUT(
 Makefile
-jack-glib2.pc
 jack.pc
 jack.spec
 jack/Makefile

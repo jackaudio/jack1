@@ -2,9 +2,9 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <jack/jack.h>
-#include <glib.h>
 #include <jack/port.h>
 #include <jack/cycles.h>
 

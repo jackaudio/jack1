@@ -21,4 +21,6 @@ noinst_HEADERS = 		\
 	memops.h 		\
 	pool.h			\
 	port.h			\
-	start.h
+	start.h			\
+	jslist.h
+

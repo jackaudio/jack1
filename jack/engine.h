@@ -52,18 +52,18 @@ struct _jack_engine {
     
     /* these lists are protected by `buffer_lock' */
 
-    GSList *port_segments;
-    GSList *port_buffer_freelist;
+    JSList *port_segments;
+    JSList *port_buffer_freelist;
 
     /* these lists are all protected by `client_lock' */
 
-    GSList *clients;
-    GSList *clients_waiting;
-    GSList *connections;
+    JSList *clients;
+    JSList *clients_waiting;
+    JSList *connections;
 
     struct _jack_port_internal *internal_ports;
 
-    GSList *port_types; /* holds ptrs to jack_port_type_info_t */
+    JSList *port_types; /* holds ptrs to jack_port_type_info_t */
 
     int fds[2];
     jack_client_id_t next_client_id;

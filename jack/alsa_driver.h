@@ -91,8 +91,8 @@ typedef struct {
     ClockSyncStatus              *clock_sync_data;
     struct _jack_engine          *engine;
     jack_client_t                *client;
-    GSList                       *capture_ports;
-    GSList                       *playback_ports;
+    JSList                       *capture_ports;
+    JSList                       *playback_ports;
 
     unsigned long input_monitor_mask;
 
@@ -109,7 +109,7 @@ typedef struct {
     dither_state_t *dither_state;
 
     SampleClockMode clock_mode;
-    GSList *clock_sync_listeners;
+    JSList *clock_sync_listeners;
     pthread_mutex_t clock_sync_lock;
     unsigned long next_clock_sync_listener_id;
     char has_clock_sync_reporting : 1;

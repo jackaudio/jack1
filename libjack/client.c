@@ -41,6 +41,7 @@
 #include <jack/pool.h>
 #include <jack/error.h>
 #include <jack/cycles.h>
+#include <jack/jslist.h>
 
 char *jack_temp_dir = "/tmp";
 
@@ -71,8 +72,8 @@ struct _jack_client {
     int pollmax;
     int graph_next_fd;
     int request_fd;
-    GSList *port_segments;
-    GSList *ports;
+    JSList *port_segments;
+    JSList *ports;
     pthread_t thread;
     char fifo_prefix[PATH_MAX+1];
     void (*on_shutdown)(void *arg);
@@ -140,9 +141,9 @@ jack_port_by_id (jack_client_t *client, jack_port_id_t id)
         if (client->engine->ports[id].in_use)
                 return jack_port_new (client, id, client->engine);
 */
-	GSList *node;
+	JSList *node;
 
-	for (node = client->ports; node; node = g_slist_next (node)) {
+	for (node = client->ports; node; node = jack_slist_next (node)) {
 		if (((jack_port_t *) node->data)->shared->id == id) {
 			return (jack_port_t *) node->data;
 		}
@@ -173,7 +174,7 @@ static void
 jack_client_invalidate_port_buffers (jack_client_t *client)
 
 {
-	GSList *node;
+	JSList *node;
 	jack_port_t *port;
 
 	/* This releases all local memory owned by input ports
@@ -182,7 +183,7 @@ jack_client_invalidate_port_buffers (jack_client_t *client)
 	   buffer on the next call (if there is one).
 	*/
 
-	for (node = client->ports; node; node = g_slist_next (node)) {
+	for (node = client->ports; node; node = jack_slist_next (node)) {
 		port = (jack_port_t *) node->data;
 
 		if (port->shared->flags & JackPortIsInput) {
@@ -201,14 +202,14 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 {
 	jack_port_t *control_port;
 	jack_port_t *other;
-	GSList *node;
+	JSList *node;
 
 	switch (event->type) {
 	case PortConnected:
 		other = jack_port_new (client, event->y.other_id, client->engine);
 		control_port = jack_port_by_id (client, event->x.self_id);
 		pthread_mutex_lock (&control_port->connection_lock);
-		control_port->connections = g_slist_prepend (control_port->connections, other);
+		control_port->connections = jack_slist_prepend (control_port->connections, (void*)other);
 		pthread_mutex_unlock (&control_port->connection_lock);
 		break;
 
@@ -217,13 +218,13 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 
 		pthread_mutex_lock (&control_port->connection_lock);
 
-		for (node = control_port->connections; node; node = g_slist_next (node)) {
+		for (node = control_port->connections; node; node = jack_slist_next (node)) {
 
 			other = (jack_port_t *) node->data;
 
 			if (other->shared->id == event->y.other_id) {
-				control_port->connections = g_slist_remove_link (control_port->connections, node);
-				g_slist_free_1 (node);
+				control_port->connections = jack_slist_remove_link (control_port->connections, node);
+				jack_slist_free_1 (node);
 				free (other);
 				break;
 			}
@@ -300,7 +301,7 @@ server_connect (int which)
 	}
 
 	addr.sun_family = AF_UNIX;
-	g_snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d", jack_temp_dir, which);
+	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d", jack_temp_dir, which);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server", strerror (errno));
@@ -326,7 +327,7 @@ server_event_connect (jack_client_t *client)
 	}
 
 	addr.sun_family = AF_UNIX;
-	g_snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0", jack_temp_dir);
+	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0", jack_temp_dir);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server for events", strerror (errno));
@@ -447,7 +448,7 @@ jack_client_new (const char *client_name)
 		jack_zero_filled_buffer = si->address;
 	}
 
-	client->port_segments = g_slist_prepend (client->port_segments, si);
+	client->port_segments = jack_slist_prepend (client->port_segments, si);
 
 	/* attach the engine control/info block */
 
@@ -937,7 +938,7 @@ int
 jack_client_close (jack_client_t *client)
 
 {
-	GSList *node;
+	JSList *node;
 	void *status;
 
 	/* stop the thread that communicates with the jack server */
@@ -948,16 +949,16 @@ jack_client_close (jack_client_t *client)
 	shmdt ((char *) client->control);
 	shmdt (client->engine);
 
-	for (node = client->port_segments; node; node = g_slist_next (node)) {
+	for (node = client->port_segments; node; node = jack_slist_next (node)) {
 		shmdt (((jack_port_segment_info_t *) node->data)->address);
 		free (node->data);
 	}
-	g_slist_free (client->port_segments);
+	jack_slist_free (client->port_segments);
 
-	for (node = client->ports; node; node = g_slist_next (node)) {
+	for (node = client->ports; node; node = jack_slist_next (node)) {
 		free (node->data);
 	}
-	g_slist_free (client->ports);
+	jack_slist_free (client->ports);
 
 	if (client->graph_wait_fd) {
 		close (client->graph_wait_fd);
@@ -1080,7 +1081,7 @@ jack_driver_become_client (const char *client_name)
 		jack_zero_filled_buffer = si->address;
 	}
 
-	client->port_segments = g_slist_prepend (client->port_segments, si);
+	client->port_segments = jack_slist_prepend (client->port_segments, si);
 
 	/* allow the engine to act on the client's behalf
 	   when dealing with in-process clients.
@@ -1110,7 +1111,7 @@ jack_port_new (jack_client_t *client, jack_port_id_t port_id, jack_control_t *co
 	jack_port_t *port;
 	jack_port_shared_t *shared;
 	jack_port_segment_info_t *si;
-	GSList *node;
+	JSList *node;
 
 	shared = &control->ports[port_id];
 
@@ -1124,7 +1125,7 @@ jack_port_new (jack_client_t *client, jack_port_id_t port_id, jack_control_t *co
 
 	si = NULL;
 
-	for (node = client->port_segments; node; node = g_slist_next (node)) {
+	for (node = client->port_segments; node; node = jack_slist_next (node)) {
 
 		si = (jack_port_segment_info_t *) node->data;
 
@@ -1208,7 +1209,7 @@ jack_port_register (jack_client_t *client,
 
 	memcpy (&port->shared->type_info, type_info, sizeof (jack_port_type_info_t));
 
-	client->ports = g_slist_prepend (client->ports, port);
+	client->ports = jack_slist_prepend (client->ports, port);
 
 	return port;
 }
@@ -1367,7 +1368,7 @@ void *
 jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 
 {
-	GSList *node, *next;
+	JSList *node, *next;
 
 	/* Output port. The buffer was assigned by the engine
 	   when the port was registered.
@@ -1396,7 +1397,7 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 		return jack_zero_filled_buffer;
 	}
 
-	if ((next = g_slist_next (node)) == NULL) {
+	if ((next = jack_slist_next (node)) == NULL) {
 
 		/* one connection: use zero-copy mode - just pass
 		   the buffer of the connected (output) port.
@@ -1584,14 +1585,14 @@ jack_port_request_monitor (jack_port_t *port, int onoff)
 
 	if ((port->shared->flags & JackPortIsOutput) == 0) {
 
-		GSList *node;
+		JSList *node;
 
 		/* this port is for input, so recurse over each of the 
 		   connected ports.
 		 */
 
 		pthread_mutex_lock (&port->connection_lock);
-		for (node = port->connections; node; node = g_slist_next (node)) {
+		for (node = port->connections; node; node = jack_slist_next (node)) {
 			
 			/* drop the lock because if there is a feedback loop,
 			   we will deadlock. XXX much worse things will
@@ -1822,7 +1823,7 @@ jack_port_unlock (jack_client_t *client, jack_port_t *port)
 static void 
 jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 {
-	GSList *node;
+	JSList *node;
 	jack_port_t *input;
 	jack_nframes_t n;
 	jack_default_audio_sample_t *buffer;
@@ -1844,7 +1845,7 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 
 	memcpy (buffer, jack_port_buffer (input), sizeof (jack_default_audio_sample_t) * nframes);
 
-	for (node = g_slist_next (node); node; node = g_slist_next (node)) {
+	for (node = jack_slist_next (node); node; node = jack_slist_next (node)) {
 
 		input = (jack_port_t *) node->data;
 
@@ -1862,7 +1863,7 @@ const char **
 jack_port_get_connections (const jack_port_t *port)
 {
 	const char **ret;
-	GSList *node;
+	JSList *node;
 	unsigned int n;
 
 	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
@@ -1872,9 +1873,9 @@ jack_port_get_connections (const jack_port_t *port)
 		return NULL;
 	}
 
-	ret = (const char **) malloc (sizeof (char *) * (g_slist_length (port->connections) + 1));
+	ret = (const char **) malloc (sizeof (char *) * (jack_slist_length (port->connections) + 1));
 
-	for (n = 0, node = port->connections; node; node = g_slist_next (node), n++) {
+	for (n = 0, node = port->connections; node; node = jack_slist_next (node), n++) {
 		ret[n] = ((jack_port_t *) node->data)->shared->name;
 	}
 
@@ -1894,12 +1895,12 @@ jack_port_connected (const jack_port_t *port)
 int
 jack_port_connected_to (const jack_port_t *port, const char *portname)
 {
-	GSList *node;
+	JSList *node;
 	int ret = FALSE;
 
 	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
 
-	for (node = port->connections; node; node = g_slist_next (node)) {
+	for (node = port->connections; node; node = jack_slist_next (node)) {
 		jack_port_t *other_port = (jack_port_t *) node->data;
 		
 		if (strcmp (other_port->shared->name, portname) == 0) {
@@ -1915,12 +1916,12 @@ jack_port_connected_to (const jack_port_t *port, const char *portname)
 int
 jack_port_connected_to_port (const jack_port_t *port, const jack_port_t *other_port)
 {
-	GSList *node;
+	JSList *node;
 	int ret = FALSE;
 	
 	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
 	
-	for (node = port->connections; node; node = g_slist_next (node)) {
+	for (node = port->connections; node; node = jack_slist_next (node)) {
 
 		jack_port_t *this_port = (jack_port_t *) node->data;
 		

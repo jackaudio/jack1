@@ -23,6 +23,7 @@
 
 #include <pthread.h>
 #include <jack/types.h>
+#include <jack/jslist.h>
 
 #define JACK_PORT_NAME_SIZE 32
 #define JACK_PORT_TYPE_SIZE 32
@@ -88,7 +89,7 @@ struct _jack_port {
     char                     *client_segment_base;
     struct _jack_port_shared *shared;
     pthread_mutex_t           connection_lock;
-    GSList                   *connections;
+    JSList                   *connections;
 };
 
 /* inline would be cleaner, but it needs to be fast even in non-optimized 
@@ -103,7 +104,7 @@ struct _jack_port {
 
 typedef struct _jack_port_internal {
     struct _jack_port_shared *shared;
-    GSList                   *connections;
+    JSList                   *connections;
     void                     *buffer_info;
 } jack_port_internal_t;
 

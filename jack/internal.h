@@ -28,7 +28,6 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <pthread.h>
-#include <glib.h>
 
 #include <jack/jack.h>
 #include <jack/types.h>
@@ -41,6 +40,14 @@
 	printf ("jack:%5d %s:%s:%d: " format "\n", getpid(), __FILE__, __FUNCTION__, __LINE__ , ## args)
 #else
 #define DEBUG(format,args...)
+#endif
+
+#ifndef	FALSE
+#define	FALSE	(0)
+#endif
+
+#ifndef	TRUE
+#define	TRUE	(!FALSE)
 #endif
 
 typedef struct _jack_engine  jack_engine_t;

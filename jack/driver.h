@@ -21,7 +21,6 @@
 #ifndef __jack_driver_h__
 #define __jack_driver_h__
 
-#include <glib.h>
 #include <pthread.h>
 #include <jack/types.h>
 #include <jack/port.h>

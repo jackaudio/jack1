@@ -23,7 +23,6 @@
 #include <math.h>
 #include <jack/jack.h>
 #include <jack/transport.h>
-#include <glib.h>
 #include <getopt.h>
 #include <string.h>
 

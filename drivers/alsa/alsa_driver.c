@@ -24,7 +24,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <glib.h>
 #include <stdarg.h>
 #include <getopt.h>
 
@@ -1005,7 +1004,7 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 	snd_pcm_uframes_t capture_offset = 0;
 	snd_pcm_uframes_t playback_offset = 0;
 	channel_t chn;
-	GSList *node;
+	JSList *node;
 	jack_engine_t *engine = driver->engine;
 	static int cnt = 0;
 
@@ -1069,11 +1068,11 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 
 			channel_t chn;
 			jack_port_t *port;
-			GSList *node;
+			JSList *node;
 			int ret;
 
 			if (driver->capture_handle) {
-				for (chn = 0, node = driver->capture_ports; node; node = g_slist_next (node), chn++) {
+				for (chn = 0, node = driver->capture_ports; node; node = jack_slist_next (node), chn++) {
 					
 					port = (jack_port_t *) node->data;
 					
@@ -1102,7 +1101,7 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 			if (driver->playback_handle) {
 				/* now move data from ports to channels */
 				
-				for (chn = 0, node = driver->playback_ports; node; node = g_slist_next (node), chn++) {
+				for (chn = 0, node = driver->playback_ports; node; node = jack_slist_next (node), chn++) {
 					jack_default_audio_sample_t *buf;
 
 					jack_port_t *port = (jack_port_t *) node->data;
@@ -1124,7 +1123,7 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 		
 		driver->input_monitor_mask = 0;
 		
-		for (chn = 0, node = driver->capture_ports; node; node = g_slist_next (node), chn++) {
+		for (chn = 0, node = driver->capture_ports; node; node = jack_slist_next (node), chn++) {
 			if (((jack_port_t *) node->data)->shared->monitor_requests) {
 				driver->input_monitor_mask |= (1<<chn);
 			}
@@ -1208,7 +1207,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 
 		jack_port_set_latency (port, driver->frames_per_cycle);
 
-		driver->capture_ports = g_slist_append (driver->capture_ports, port);
+		driver->capture_ports = jack_slist_append (driver->capture_ports, port);
 	}
 	
 	port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
@@ -1226,7 +1225,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 
 		jack_port_set_latency (port, driver->frames_per_cycle * driver->nfragments);
 
-		driver->playback_ports = g_slist_append (driver->playback_ports, port);
+		driver->playback_ports = jack_slist_append (driver->playback_ports, port);
 	}
 
 	jack_activate (driver->client);
@@ -1236,24 +1235,24 @@ static void
 alsa_driver_detach (alsa_driver_t *driver, jack_engine_t *engine)
 
 {
-	GSList *node;
+	JSList *node;
 
 	if (driver->engine == 0) {
 		return;
 	}
 
-	for (node = driver->capture_ports; node; node = g_slist_next (node)) {
+	for (node = driver->capture_ports; node; node = jack_slist_next (node)) {
 		jack_port_unregister (driver->client, ((jack_port_t *) node->data));
 	}
 
-	g_slist_free (driver->capture_ports);
+	jack_slist_free (driver->capture_ports);
 	driver->capture_ports = 0;
 		
-	for (node = driver->playback_ports; node; node = g_slist_next (node)) {
+	for (node = driver->playback_ports; node; node = jack_slist_next (node)) {
 		jack_port_unregister (driver->client, ((jack_port_t *) node->data));
 	}
 
-	g_slist_free (driver->playback_ports);
+	jack_slist_free (driver->playback_ports);
 	driver->playback_ports = 0;
 	
 	driver->engine = 0;
@@ -1310,12 +1309,12 @@ static void
 alsa_driver_delete (alsa_driver_t *driver)
 
 {
-	GSList *node;
+	JSList *node;
 
-	for (node = driver->clock_sync_listeners; node; node = g_slist_next (node)) {
+	for (node = driver->clock_sync_listeners; node; node = jack_slist_next (node)) {
 		free (node->data);
 	}
-	g_slist_free (driver->clock_sync_listeners);
+	jack_slist_free (driver->clock_sync_listeners);
 
 	if (driver->capture_handle) {
 		snd_pcm_close (driver->capture_handle);
@@ -1516,7 +1515,7 @@ alsa_driver_listen_for_clock_sync_status (alsa_driver_t *driver,
 	csl->id = driver->next_clock_sync_listener_id++;
 	
 	pthread_mutex_lock (&driver->clock_sync_lock);
-	driver->clock_sync_listeners = g_slist_prepend (driver->clock_sync_listeners, csl);
+	driver->clock_sync_listeners = jack_slist_prepend (driver->clock_sync_listeners, csl);
 	pthread_mutex_unlock (&driver->clock_sync_lock);
 	return csl->id;
 }
@@ -1525,14 +1524,14 @@ int
 alsa_driver_stop_listening_to_clock_sync_status (alsa_driver_t *driver, int which)
 
 {
-	GSList *node;
+	JSList *node;
 	int ret = -1;
 	pthread_mutex_lock (&driver->clock_sync_lock);
-	for (node = driver->clock_sync_listeners; node; node = g_slist_next (node)) {
+	for (node = driver->clock_sync_listeners; node; node = jack_slist_next (node)) {
 		if (((ClockSyncListener *) node->data)->id == which) {
-			driver->clock_sync_listeners = g_slist_remove_link (driver->clock_sync_listeners, node);
+			driver->clock_sync_listeners = jack_slist_remove_link (driver->clock_sync_listeners, node);
 			free (node->data);
-			g_slist_free_1 (node);
+			jack_slist_free_1 (node);
 			ret = 0;
 			break;
 		}
@@ -1544,10 +1543,10 @@ alsa_driver_stop_listening_to_clock_sync_status (alsa_driver_t *driver, int whic
 void 
 alsa_driver_clock_sync_notify (alsa_driver_t *driver, channel_t chn, ClockSyncStatus status)
 {
-	GSList *node;
+	JSList *node;
 
 	pthread_mutex_lock (&driver->clock_sync_lock);
-	for (node = driver->clock_sync_listeners; node; node = g_slist_next (node)) {
+	for (node = driver->clock_sync_listeners; node; node = jack_slist_next (node)) {
 		ClockSyncListener *csl = (ClockSyncListener *) node->data;
 		csl->function (chn, status, csl->arg);
 	}
