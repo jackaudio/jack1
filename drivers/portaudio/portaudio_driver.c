@@ -38,8 +38,12 @@
 #include <string.h>
 
 #include <jack/engine.h>
-#include <CoreAudio/CoreAudio.h>
+
 #include "portaudio_driver.h"
+
+#ifdef JACK_USE_MACH_THREADS
+
+#include <CoreAudio/CoreAudio.h>
 
 static OSStatus GetDeviceNameFromID(AudioDeviceID id, char name[60])
 {
@@ -71,6 +75,10 @@ static OSStatus get_device_id_from_num(int i, AudioDeviceID * id)
     *id = theDeviceList[i];
     return theStatus;
 }
+
+#else
+typedef unsigned int AudioDeviceID;
+#endif
 
 static int
 paCallback(void *inputBuffer, void *outputBuffer,
@@ -522,7 +530,8 @@ portaudio_driver_new (char *name,
 	driver->start = (JackDriverStartFunction) portaudio_driver_audio_start;
 	driver->stop = (JackDriverStopFunction) portaudio_driver_audio_stop;
 	driver->stream = NULL;
-	
+
+#ifdef JACK_USE_MACH_THREADS	
 	char deviceName[60];
     bzero(&deviceName[0], sizeof(char) * 60);
 
@@ -532,17 +541,17 @@ portaudio_driver_new (char *name,
     } else {
 		strcpy(&deviceName[0], driver_name);
     }
+#endif
        
 	err = Pa_Initialize();
 	printf("Pa_Initialize OK \n");
 	
 	printf("Driver name required %s\n",driver_name);
-	
 	numDevices = Pa_CountDevices();
 	
 	if( numDevices < 0 )
 	{
-		printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices );
+		printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices);
 		err = numDevices;
 		goto error;
 	}
@@ -760,8 +769,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 	const JSList * node;
 	const jack_driver_param_t * param;
 	char *name = "";
-	get_device_id_from_num(0, &deviceID);
-
+	
 	for (node = params; node; node = jack_slist_next (node)) {
 		param = (const jack_driver_param_t *) node->data;
 
