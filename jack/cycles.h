@@ -107,7 +107,22 @@ static inline cycles_t get_cycles (void)
 }
 
 #else
-#error You are compiling JACK on a platform for which jack/cycles.h needs work
+/* generic solution */
+
+#warning You are compiling JACK on a platform for which jack/cycles.h needs work
+#include <sys/time.h>
+
+typedef long cycles_t;
+extern cycles_t cacheflush_time;
+
+static inline cycles_t get_cycles(void)
+{
+       struct timeval tv;
+       gettimeofday (&tv, NULL);
+
+       return tv.tv_usec;
+}
+
 #endif
 
 #endif /* __jack_cycles_h__ */
