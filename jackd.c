@@ -277,6 +277,12 @@ main (int argc, char *argv[])
 		}
 	}
 
+	printf ( "jackd " VERSION "\n"
+		 "Copyright 2001-2002 Paul Davis and others.\n\n"
+		 "jackd comes with ABSOLUTELY NO WARRANTY\n"
+		 "This is free software, and you are welcome to redistribute it\n"
+		 "under certain conditions; see the file COPYING for details\n");
+
 	if (!with_fork) {
 
 		/* This is really here so that we can run gdb easily */
