@@ -643,7 +643,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	} else {
 		poll_timeout = (engine->control->real_time == 0 ?
 				engine->client_timeout_msecs :
-				engine->driver->period_usecs/1000);
+				1 + engine->driver->period_usecs/1000);
 	}
 
 	pfd[0].fd = client->subgraph_wait_fd;
