@@ -105,6 +105,10 @@ void default_jack_error_callback (const char *desc)
     fprintf(stderr, "%s\n", desc);
 }
 
+void silent_jack_error_callback (const char *desc)
+{
+}
+
 void (*jack_error_callback)(const char *desc) = &default_jack_error_callback;
 
 static int

@@ -349,6 +349,7 @@ static void usage (FILE *file)
 "             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
 "             [ --verbose OR -v ]\n"
+"             [ --silent OR -s ]\n"
 "             [ --tmpdir OR -D directory-for-temporary-files ]\n"
 "             [ --version OR -V ]\n"
 "         -d driver [ ... driver args ... ]\n");
@@ -378,7 +379,7 @@ main (int argc, char *argv[])
 
 {
         jack_driver_desc_t * desc;
-	const char *options = "-ad:D:P:vhVRFl:t:";
+	const char *options = "-ad:D:P:vshVRFl:t:";
 	struct option long_options[] = 
 	{ 
 		{ "asio", 0, 0, 'a' },
@@ -390,6 +391,7 @@ main (int argc, char *argv[])
 		{ "realtime-priority", 1, 0, 'P' },
 		{ "timeout", 1, 0, 't' },
 		{ "version", 0, 0, 'V' },
+		{ "silent", 0, 0, 's' },
 		{ 0, 0, 0, 0 }
 	};
 	int option_index;
@@ -460,6 +462,10 @@ main (int argc, char *argv[])
 
 		case 'v':
 			verbose = 1;
+			break;
+
+		case 's':
+			jack_set_error_function (silent_jack_error_callback);
 			break;
 
 		case 'P':

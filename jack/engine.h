@@ -27,7 +27,7 @@
 #include <jack/driver_interface.h>
 
 #define VERBOSE(engine,format,args...) \
-	if ((engine)->verbose) fprintf (stderr, format, ## args)
+	if ((engine)->verbose) jack_error (format, ## args)
 
 struct _jack_driver;
 struct _jack_client_internal;
