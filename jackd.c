@@ -38,6 +38,7 @@ static int realtime = 0;
 static int realtime_priority = 10;
 static int with_fork = 1;
 static int verbose = 0;
+static int asio_mode = 0;
 
 typedef struct {
     pid_t  pid;
@@ -139,6 +140,10 @@ jack_engine_waiter_thread (void *arg)
 		jack_use_driver (engine, driver);
 	}
 
+	if (asio_mode) {
+		jack_set_asio_mode (engine, TRUE);
+	} 
+
 	if (jack_run (engine)) {
 		fprintf (stderr, "cannot start main JACK thread\n");
 		kill (warg->pid, SIGTERM);
@@ -219,7 +224,8 @@ static void usage ()
 
 {
 	fprintf (stderr, "\
-usage: jackd [ --realtime OR -R [ --realtime-priority OR -P priority ] ]
+usage: jackd [ --asio OR -a ]
+	     [ --realtime OR -R [ --realtime-priority OR -P priority ] ]
              [ --verbose OR -v ]
              [ --tmpdir OR -D directory-for-temporary-files ]
          -d driver [ ... driver args ... ]
@@ -230,9 +236,10 @@ int
 main (int argc, char *argv[])
 
 {
-	const char *options = "d:D:P:vhRF";
+	const char *options = "ad:D:P:vhRF";
 	struct option long_options[] = 
 	{ 
+		{ "asio", 0, 0, 'a' },
 		{ "driver", 1, 0, 'd' },
 		{ "tmpdir", 1, 0, 'D' },
 		{ "verbose", 0, 0, 'v' },
@@ -253,6 +260,10 @@ main (int argc, char *argv[])
 	opterr = 0;
 	while (!seen_driver && (opt = getopt_long (argc, argv, options, long_options, &option_index)) != EOF) {
 		switch (opt) {
+		case 'a':
+			asio_mode = TRUE;
+			break;
+
 		case 'D':
 			jack_set_temp_dir (optarg);
 			break;

@@ -214,7 +214,7 @@ jack_cleanup_clients (jack_engine_t *engine)
 			fprintf (stderr, "client %s state = %d\n", ctl->name, ctl->state);
 		}
 
-		if (ctl->state > NotTriggered && ctl->state != Finished) {
+		if (ctl->timed_out || (ctl->state > NotTriggered && ctl->state != Finished)) {
 
 			if (engine->verbose) {
 				fprintf (stderr, "removing failed client %s\n", ctl->name);
@@ -476,6 +476,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 			/* out of process subgraph */
 
 			ctl->state = Triggered; // a race exists if we do this after the write(2) 
+			ctl->timed_out = 0;
 
 			if (write (client->subgraph_start_fd, &c, sizeof (c)) != sizeof (c)) {
 				jack_error ("cannot initiate graph processing (%s)", strerror (errno));
@@ -483,11 +484,34 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 				break;
 			} 
 
-			engine->driver->wait (engine->driver, client->subgraph_wait_fd, &status);
-			
+			if (engine->asio_mode) {
+				engine->driver->wait (engine->driver, client->subgraph_wait_fd, &status);
+			} else {
+				struct pollfd pfd[1];
+
+				pfd[0].fd = client->subgraph_wait_fd;
+				pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
+				
+				if (poll (pfd, 1, engine->driver->period_interval) < 0) {
+					jack_error ("poll on subgraph processing failed (%s)", strerror (errno));
+					status = -1; 
+				}
+
+				if (pfd[0].revents & ~POLLIN) {
+					status = -1; /* client went away */
+				}
+
+				if (pfd[0].revents & POLLIN) {
+					status = 0;
+				} else {
+					status = 1;  /* client timed out */
+				}
+			}
+
 			if (status != 0) {
 				jack_error ("subgraph starting at %s timed out (status = %d, state = %d)", 
 					    client->control->name, status, client->control->state);
+				client->control->timed_out = 1;
 				engine->process_errors++;
 				break;
 			} else {
@@ -1064,6 +1088,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine->rtpriority = rtpriority;
 	engine->silent_buffer = 0;
 	engine->verbose = verbose;
+	engine->asio_mode = FALSE;
 
 	pthread_mutex_init (&engine->graph_lock, 0);
 	pthread_mutex_init (&engine->buffer_lock, 0);
@@ -1334,8 +1359,9 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	}
 
 	client->control->type = req->type;
-	client->control->active = FALSE;
-	client->control->dead = FALSE;
+	client->control->active = 0;
+	client->control->dead = 0;
+	client->control->timed_out = 0;
 	client->control->id = engine->next_client_id++;
 	strcpy ((char *) client->control->name, req->name);
 
@@ -2482,3 +2508,8 @@ jack_send_connection_notification (jack_engine_t *engine, jack_client_id_t clien
 	return 0;
 }
 
+void
+jack_set_asio_mode (jack_engine_t *engine, int yn)
+{
+	engine->asio_mode = yn;
+}

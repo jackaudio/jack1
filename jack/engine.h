@@ -78,6 +78,7 @@ struct _jack_engine {
     unsigned long external_client_cnt;
     int rtpriority;
     char verbose;
+    char asio_mode;
 };
 
 /* public functions */
@@ -88,6 +89,7 @@ int             jack_run (jack_engine_t *engine);
 int             jack_wait (jack_engine_t *engine);
 int             jack_use_driver (jack_engine_t *, struct _jack_driver *);
 void            jack_set_temp_dir (const char *);
+void            jack_set_asio_mode (jack_engine_t *, int yn);
 
 void            jack_dump_configuration(jack_engine_t *engine, int take_lock);
 

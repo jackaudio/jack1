@@ -125,6 +125,7 @@ typedef volatile struct {
     volatile ClientType type;             /* w: engine r: engine and client */
     volatile char       active : 1;       /* w: engine r: engine and client */
     volatile char       dead : 1;         /* r/w: engine */
+    volatile char       timed_out : 1;    /* r/w: engine */
 
     /* callbacks */
     
