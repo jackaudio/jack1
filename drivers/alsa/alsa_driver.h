@@ -51,7 +51,7 @@ typedef void (*CopyCopyFunction)  (char *dst, char *src,
 				   unsigned long dst_skip_bytes,
 				   unsigned long src_skip_byte);
 
-typedef struct {
+typedef struct _alsa_driver {
 
     JACK_DRIVER_NT_DECL
 
@@ -207,6 +207,7 @@ static __inline__ void alsa_driver_copy_channel (alsa_driver_t *driver,
 	alsa_driver_mark_channel_done (driver, output_channel);
 }
 
+void  alsa_driver_silence_untouched_channels (alsa_driver_t *driver, jack_nframes_t nframes);
 void  alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn, ClockSyncStatus status);
 int   alsa_driver_listen_for_clock_sync_status (alsa_driver_t *, ClockSyncListenerFunction, void *arg);
 int   alsa_driver_stop_listen_for_clock_sync_status (alsa_driver_t *, unsigned int);

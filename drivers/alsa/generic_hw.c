@@ -31,9 +31,8 @@ static int generic_change_sample_clock (jack_hardware_t *hw, SampleClockMode mod
 	return -1;
 }
 
-void
-jack_alsa_generic_hw_release (jack_hardware_t *hw)
-
+static void
+generic_release (jack_hardware_t *hw)
 {
 	return;
 }
@@ -51,7 +50,7 @@ jack_alsa_generic_hw_new (alsa_driver_t *driver)
 	
 	hw->set_input_monitor_mask = generic_set_input_monitor_mask;
 	hw->change_sample_clock = generic_change_sample_clock;
-	hw->release = jack_alsa_generic_hw_release;
+	hw->release = generic_release;
 
 	return hw;
 }

@@ -192,9 +192,8 @@ static double hdsp_get_hardware_power (jack_port_t *port, jack_nframes_t frame)
 	return 0;
 }
 
-void
-jack_alsa_hdsp_release (jack_hardware_t *hw)
-
+static void
+hdsp_release (jack_hardware_t *hw)
 {
 	hdsp_t *h = (hdsp_t *) hw->private;
 
@@ -222,7 +221,7 @@ jack_alsa_hdsp_hw_new (alsa_driver_t *driver)
 
 	hw->set_input_monitor_mask = hdsp_set_input_monitor_mask;
 	hw->change_sample_clock = hdsp_change_sample_clock;
-	hw->release = jack_alsa_hdsp_release;
+	hw->release = hdsp_release;
 	hw->get_hardware_peak = hdsp_get_hardware_peak;
 	hw->get_hardware_power = hdsp_get_hardware_power;
 	

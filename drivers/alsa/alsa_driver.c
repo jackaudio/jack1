@@ -41,6 +41,7 @@
 #include "hammerfall.h"
 #include "hdsp.h"
 #include "ice1712.h"
+#include "usx2y.h"
 #include "generic.h"
 
 extern void store_work_time (int);
@@ -154,6 +155,13 @@ alsa_driver_ice1712_hardware (alsa_driver_t *driver)
 }
 
 static int
+alsa_driver_usx2y_hardware (alsa_driver_t *driver)
+{
+	driver->hw = jack_alsa_usx2y_hw_new (driver);
+	return 0;
+}
+
+static int
 alsa_driver_generic_hardware (alsa_driver_t *driver)
 {
 	driver->hw = jack_alsa_generic_hw_new (driver);
@@ -178,6 +186,10 @@ alsa_driver_hw_specific (alsa_driver_t *driver, int hw_monitoring,
                 if ((err = alsa_driver_ice1712_hardware (driver)) !=0) {
                         return err;
                 }
+	} else if (!strcmp(driver->alsa_driver, "USB US-X2Y")) {
+		if ((err = alsa_driver_usx2y_hardware (driver)) !=0) {
+				return err;
+		}
 	} else {
 	        if ((err = alsa_driver_generic_hardware (driver)) != 0) {
 			return err;
@@ -958,13 +970,14 @@ alsa_driver_start (alsa_driver_t *driver)
 		
 		pavail = snd_pcm_avail_update (driver->playback_handle);
 
-		if (pavail != driver->frames_per_cycle * driver->playback_nperiods) {
+		if (pavail !=
+		    driver->frames_per_cycle * driver->playback_nperiods) {
 			jack_error ("ALSA: full buffer not available at start");
 			return -1;
 		}
 	
-		if (alsa_driver_get_channel_addresses (driver, 0, &pavail,
-						       0, &poffset)) {
+		if (alsa_driver_get_channel_addresses (driver,
+					0, &pavail, 0, &poffset)) {
 			return -1;
 		}
 
@@ -978,15 +991,18 @@ alsa_driver_start (alsa_driver_t *driver)
 		*/
 		
 		for (chn = 0; chn < driver->playback_nchannels; chn++) {
-			alsa_driver_silence_on_channel (driver, chn,
-							driver->user_nperiods * driver->frames_per_cycle);
+			alsa_driver_silence_on_channel (
+				driver, chn,
+				driver->user_nperiods
+				* driver->frames_per_cycle);
 		}
 		
 		snd_pcm_mmap_commit (driver->playback_handle, poffset,
-				     driver->user_nperiods * driver->frames_per_cycle);
+				     driver->user_nperiods
+				     * driver->frames_per_cycle);
 		
 		if ((err = snd_pcm_start (driver->playback_handle)) < 0) {
-			jack_error ("could not start playback (%s)",
+			jack_error ("ALSA: could not start playback (%s)",
 				    snd_strerror (err));
 			return -1;
 		}
@@ -995,7 +1011,7 @@ alsa_driver_start (alsa_driver_t *driver)
 	if ((driver->capture_handle && driver->capture_and_playback_not_synced)
 	    || !driver->playback_handle) {
 		if ((err = snd_pcm_start (driver->capture_handle)) < 0) {
-			jack_error ("could not start capture (%s)",
+			jack_error ("ALSA: could not start capture (%s)",
 				    snd_strerror (err));
 			return -1;
 		}
@@ -1029,7 +1045,7 @@ alsa_driver_stop (alsa_driver_t *driver)
 		
 	if (driver->playback_handle) {
 		if ((err = snd_pcm_drop (driver->playback_handle)) < 0) {
-			jack_error ("alsa_pcm: channel flush for playback "
+			jack_error ("ALSA: channel flush for playback "
 				    "failed (%s)", snd_strerror (err));
 			return -1;
 		}
@@ -1039,7 +1055,7 @@ alsa_driver_stop (alsa_driver_t *driver)
 	    || driver->capture_and_playback_not_synced) {
 		if (driver->capture_handle) {
 			if ((err = snd_pcm_drop (driver->capture_handle)) < 0) {
-				jack_error ("alsa_pcm: channel flush for "
+				jack_error ("ALSA: channel flush for "
 					    "capture failed (%s)",
 					    snd_strerror (err));
 				return -1;
@@ -1052,6 +1068,14 @@ alsa_driver_stop (alsa_driver_t *driver)
 	}
 
 	return 0;
+}
+
+static int
+alsa_driver_restart (alsa_driver_t *driver)
+{
+ 	if (driver->nt_stop((struct _jack_driver_nt *) driver))
+ 	    return -1;
+ 	return driver->nt_start((struct _jack_driver_nt *) driver);
 }
 
 static int
@@ -1087,15 +1111,13 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 			*delayed_usecs / 1000.0);
 	}
 
-	if (alsa_driver_stop (driver) ||
-	    alsa_driver_start (driver)) {
+	if (alsa_driver_restart (driver)) {
 		return -1;
-
 	}
 	return 0;
 }	
 
-static void
+void
 alsa_driver_silence_untouched_channels (alsa_driver_t *driver,
 					jack_nframes_t nframes)
 {
@@ -1461,6 +1483,7 @@ alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 	channel_t chn;
 	JSList *node;
 	jack_port_t* port;
+	int err;
 
 	if (!driver->capture_handle || driver->engine->freewheeling) {
 		return 0;
@@ -1491,17 +1514,15 @@ alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 				/* no-copy optimization */
 				continue;
 			}
-
 			buf = jack_port_get_buffer (port, nframes);
 			alsa_driver_read_from_channel (driver, chn,
-						       buf + nread,
-						       contiguous);
+				buf + nread, contiguous);
 		}
 		
-		if (snd_pcm_mmap_commit (driver->capture_handle, offset,
-					 contiguous) < 0) {
-			jack_error ("alsa_pcm: could not complete read of %"
-				    PRIu32 " frames\n", contiguous);
+		if ((err = snd_pcm_mmap_commit (driver->capture_handle,
+				offset, contiguous)) < 0) {
+			jack_error ("ALSA: could not complete read of %"
+				PRIu32 " frames: error = %d\n", contiguous, err);
 			return -1;
 		}
 
@@ -1573,12 +1594,9 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 			if (!jack_port_connected (port)) {
 				continue;
 			}
-			
 			buf = jack_port_get_buffer (port, contiguous);
-
 			alsa_driver_write_to_channel (driver, chn,
-						      buf + nwritten,
-						      contiguous);
+				buf + nwritten, contiguous);
 		}
 
 		if (driver->channels_not_done) {
@@ -1587,11 +1605,9 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 		}
 		
 		if ((err = snd_pcm_mmap_commit (driver->playback_handle,
-						offset, contiguous))
-		    < 0) {
-			jack_error ("could not complete playback of %"
-				    PRIu32 " frames: error = %d",
-				    contiguous, err);
+				offset, contiguous)) < 0) {
+			jack_error ("ALSA: could not complete playback of %"
+				PRIu32 " frames: error = %d", contiguous, err);
 			if (err != EPIPE && err != ESTRPIPE)
 				return -1;
 		}
@@ -1939,6 +1955,16 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 	driver->xrun_count = 0;
 	driver->process_count = 0;
 
+	driver->alsa_name_playback = strdup (playback_alsa_device);
+	driver->alsa_name_capture = strdup (capture_alsa_device);
+
+	if (alsa_driver_check_card_type (driver)) {
+		alsa_driver_delete (driver);
+		return NULL;
+	}
+
+	alsa_driver_hw_specific (driver, hw_monitoring, hw_metering);
+
 	if (playing) {
 		if (snd_pcm_open (&driver->playback_handle,
 				  playback_alsa_device,
@@ -1951,6 +1977,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 					    " application using it and "
 					    "run JACK again",
 					    playback_alsa_device);
+				alsa_driver_delete (driver);
 				return NULL;
 				break;
 
@@ -1958,6 +1985,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 				jack_error ("you do not have permission to open "
 					    "the audio device \"%s\" for playback",
 					    playback_alsa_device);
+				alsa_driver_delete (driver);
 				return NULL;
 				break;
 			} 
@@ -1982,6 +2010,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 					    " application using it and "
 					    "run JACK again",
 					    capture_alsa_device);
+				alsa_driver_delete (driver);
 				return NULL;
 				break;
 
@@ -1989,6 +2018,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 				jack_error ("you do not have permission to open "
 					    "the audio device \"%s\" for capture",
 					    capture_alsa_device);
+				alsa_driver_delete (driver);
 				return NULL;
 				break;
 			} 
@@ -2012,8 +2042,8 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 
 			if (driver->capture_handle == NULL) {
 				/* can't do anything */
-				free (driver);
-				return 0;
+				alsa_driver_delete (driver);
+				return NULL;
 			}
 			
 			playing = FALSE;
@@ -2031,26 +2061,12 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 			
 			if (driver->playback_handle == NULL) {
 				/* can't do anything */
-				free (driver);
-				return 0;
+				alsa_driver_delete (driver);
+				return NULL;
 			}
 
 			capturing = FALSE;
 		}
-	}
-
-	driver->alsa_name_playback = strdup (playback_alsa_device);
-	driver->alsa_name_capture = strdup (capture_alsa_device);
-
-	if (alsa_driver_check_card_type (driver)) {
-		if (driver->capture_handle) {
-			snd_pcm_close (driver->capture_handle);
-		}
-		if (driver->playback_handle) {
-			snd_pcm_close (driver->playback_handle);
-		}
-		free (driver);
-		return 0;
 	}
 
 	driver->playback_hw_params = 0;
@@ -2064,7 +2080,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 			jack_error ("ALSA: could not allocate playback hw"
 				    " params structure");
 			alsa_driver_delete (driver);
-			return 0;
+			return NULL;
 		}
 
 		if ((err = snd_pcm_sw_params_malloc (
@@ -2072,7 +2088,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 			jack_error ("ALSA: could not allocate playback sw"
 				    " params structure");
 			alsa_driver_delete (driver);
-			return 0;
+			return NULL;
 		}
 	}
 
@@ -2082,7 +2098,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 			jack_error ("ALSA: could not allocate capture hw"
 				    " params structure");
 			alsa_driver_delete (driver);
-			return 0;
+			return NULL;
 		}
 
 		if ((err = snd_pcm_sw_params_malloc (
@@ -2090,14 +2106,14 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 			jack_error ("ALSA: could not allocate capture sw"
 				    " params structure");
 			alsa_driver_delete (driver);
-			return 0;
+			return NULL;
 		}
 	}
 
 	if (alsa_driver_set_parameters (driver, frames_per_cycle,
 					user_nperiods, rate)) {
 		alsa_driver_delete (driver);
-		return 0;
+		return NULL;
 	}
 
 	driver->capture_and_playback_not_synced = FALSE;
@@ -2108,8 +2124,6 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 			driver->capture_and_playback_not_synced = TRUE;
 		} 
 	}
-
-	alsa_driver_hw_specific (driver, hw_monitoring, hw_metering);
 
 	driver->client = client;
 

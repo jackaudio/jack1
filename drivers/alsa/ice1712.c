@@ -83,12 +83,17 @@ ice1712_change_sample_clock (jack_hardware_t *hw, SampleClockMode mode)
 
 static void
 ice1712_release (jack_hardware_t *hw)
-
 {
+	ice1712_t *h = (ice1712_t *) hw->private;
+	
+	if (h == 0)
 	return;
+
+	if (h->eeprom)
+		free(h->eeprom);
+
+	free(h);
 }
-
-
 
 
 jack_hardware_t *
