@@ -64,7 +64,7 @@ typedef struct _jack_driver {
 void jack_driver_init (jack_driver_t *);
 void jack_driver_release (jack_driver_t *);
 
-jack_driver_t *jack_driver_load (const char *path_to_so, ...);
+jack_driver_t *jack_driver_load (int argc, char **argv);
 void jack_driver_unload (jack_driver_t *);
 
 #endif /* __jack_driver_h__ */

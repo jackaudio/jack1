@@ -48,17 +48,19 @@ jack_driver_init (jack_driver_t *driver)
 }
 
 jack_driver_t *
-jack_driver_load (const char *path_to_so, ...)
+jack_driver_load (int argc, char **argv)
 
 {
 	va_list ap;
 	const char *errstr;
 	dlhandle handle;
 	jack_driver_t *driver;
-	jack_driver_t *(*initialize)(va_list);
+	jack_driver_t *(*initialize)(int, char **);
 	void (*finish)(jack_driver_t *);
+	char path_to_so[PATH_MAX+1];
 
-	va_start (ap, path_to_so);
+	snprintf (path_to_so, sizeof (path_to_so), ADDON_DIR "/jack_%s.so", argv[0]);
+	
 	handle = dlopen (path_to_so, RTLD_NOW|RTLD_GLOBAL);
 	
 	if (handle == 0) {
@@ -89,7 +91,7 @@ jack_driver_load (const char *path_to_so, ...)
 		return 0;
 	}
 
-	if ((driver = initialize (ap)) != 0) {
+	if ((driver = initialize (argc, argv)) != 0) {
 		driver->handle = handle;
 		driver->finish = finish;
 	}

@@ -34,15 +34,16 @@
 static sigset_t signals;
 static jack_engine_t *engine = 0;
 static int jackd_pid;
-static char *alsa_pcm_name = "default";
-static nframes_t frames_per_interrupt = 1024;
-static nframes_t srate = 48000;
-static unsigned long user_nperiods = 2;
 static int realtime = 0;
 static int realtime_priority = 10;
 static int with_fork = 1;
-static int hw_monitoring = 0;
 static int verbose = 0;
+
+typedef struct {
+    pid_t  pid;
+    int argc;
+    char **argv;
+} waiter_arg_t;
 
 static void
 signal_handler (int sig)
@@ -116,50 +117,49 @@ posix_me_harder (void)
 static void *
 jack_engine_waiter_thread (void *arg)
 {
-	pid_t signal_pid = (pid_t) arg;
+	waiter_arg_t *warg = (waiter_arg_t *) arg;
 	jack_driver_t *driver;
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
 	if ((engine = jack_engine_new (realtime, realtime_priority, verbose)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
-		kill (signal_pid, SIGTERM);
+		kill (warg->pid, SIGTERM);
 		return 0;
 	}
 
-	if ((driver = jack_driver_load (ADDON_DIR "/jack_alsa.so", 
-					alsa_pcm_name, 
-					frames_per_interrupt,
-					user_nperiods,
-					srate, 
-					hw_monitoring)) == 0) {
-		fprintf (stderr, "cannot load ALSA driver module\n");
-		kill (signal_pid, SIGTERM);
-		return 0;
-	}
+	if (warg->argc) {
+		
+		if ((driver = jack_driver_load (warg->argc, warg->argv)) == 0) {
+			fprintf (stderr, "cannot load driver module %s\n", warg->argv[0]);
+			kill (warg->pid, SIGTERM);
+			return 0;
+		}
 
-	jack_use_driver (engine, driver);
+		jack_use_driver (engine, driver);
+	}
 
 	if (jack_run (engine)) {
 		fprintf (stderr, "cannot start main JACK thread\n");
-		kill (signal_pid, SIGTERM);
+		kill (warg->pid, SIGTERM);
 		return 0;
 	}
 
 	jack_wait (engine);
 
 	fprintf (stderr, "telling signal thread that the engine is done\n");
-	kill (signal_pid, SIGHUP);
+	kill (warg->pid, SIGHUP);
 
 	return 0; /* nobody cares what this returns */
 }
 
 static void
-jack_main ()
+jack_main (int argc, char **argv)
 {
 	int sig;
 	int err;
 	pthread_t waiter_thread;
+	waiter_arg_t warg;
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
@@ -182,7 +182,11 @@ jack_main ()
 	   for us and will cleanup.
 	*/
 
-	if (pthread_create (&waiter_thread, 0, jack_engine_waiter_thread, (void *) getpid())) {
+	warg.pid = getpid();
+	warg.argc = argc;
+	warg.argv = argv;
+
+	if (pthread_create (&waiter_thread, 0, jack_engine_waiter_thread, &warg)) {
 		fprintf (stderr, "jackd: cannot create engine waiting thread\n");
 		return;
 	}
@@ -195,22 +199,16 @@ jack_main ()
 	}
 
 	while(1) {
-	  err = sigwait (&signals, &sig);
-	  
-	  if (sig == SIGUSR1) {
-	    /* take lock although not exactly a safe thing
-	     * to do (pthread_mutex_lock/unlock not 
-	     * async safe */
-	    jack_dump_configuration(engine, 1);
-	  }
-	  else {
-	    /* continue to kill engine */
-	    break;
-	  }
+		err = sigwait (&signals, &sig);
+		
+		if (sig == SIGUSR1) {
+			jack_dump_configuration(engine, 1);
+		} else {
+			/* continue to kill engine */
+			break;
+		}
 	} 
-
-	fprintf (stderr, "signal waiter: exiting due to signal %d\n", sig);
-
+	
 	pthread_cancel (waiter_thread);
 	jack_engine_delete (engine);
 
@@ -220,15 +218,11 @@ jack_main ()
 static void usage () 
 
 {
-	fprintf (stderr, 
-"usage: jackd [ --device OR -d ALSA-PCM-device ]
-              [ --srate OR -r sample-rate ] 
-              [ --frames-per-period OR -p frames_per_period ]
-              [ --periods OR -n nr_of_periods ]
-              [ --realtime OR -R [ --realtime-priority OR -P priority ] ]
-              [ --hw-monitor OR -H ]
-              [ --spoon OR -F ]  (don't fork)
-              [ --verbose OR -v ]
+	fprintf (stderr, "\
+usage: jackd [ --realtime OR -R [ --realtime-priority OR -P priority ] ]
+             [ --verbose OR -v ]
+             [ --tmpdir OR -D directory-for-temporary-files ]
+         -d driver [ ... driver args ... ]
 ");
 }	
 
@@ -236,46 +230,36 @@ int
 main (int argc, char *argv[])
 
 {
-	const char *options = "hd:n:r:p:RP:FD:Hv";
+	const char *options = "d:D:P:vhRF";
 	struct option long_options[] = 
 	{ 
+		{ "driver", 1, 0, 'd' },
 		{ "tmpdir", 1, 0, 'D' },
-		{ "device", 1, 0, 'd' },
-		{ "srate", 1, 0, 'r' },
-		{ "frames-per-interrupt", 1, 0, 'p' },
-		{ "periods", 1, 0, 'n' },
 		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
-		{ "hw-monitor", 0, 0, 'H' },
 		{ "spoon", 0, 0, 'F' },
 		{ 0, 0, 0, 0 }
 	};
 	int option_index;
 	int opt;
-	
+	int seen_driver = 0;
+	char *driver_name = 0;
+	char **driver_args = 0;
+	int driver_nargs = 1;
+	int i;
+
 	opterr = 0;
-	while ((opt = getopt_long (argc, argv, options, long_options, &option_index)) != EOF) {
+	while (!seen_driver && (opt = getopt_long (argc, argv, options, long_options, &option_index)) != EOF) {
 		switch (opt) {
 		case 'D':
 			jack_set_temp_dir (optarg);
 			break;
 
 		case 'd':
-			alsa_pcm_name = optarg;
-			break;
-
-		case 'n':
-			user_nperiods = atoi (optarg);
-			break;
-
-		case 'r':
-			srate = atoi (optarg);
-			break;
-
-		case 'p':
-			frames_per_interrupt = atoi (optarg);
+			seen_driver = 1;
+			driver_name = optarg;
 			break;
 
 		case 'v':
@@ -294,16 +278,31 @@ main (int argc, char *argv[])
 			realtime = 1;
 			break;
 
-		case 'H':
-			hw_monitoring = 1;
-			break;
-
 		default:
-			fprintf (stderr, "unknown option character %c\n", opt);
+			fprintf (stderr, "unknown option character %c\n", optopt);
+			/*fallthru*/
 		case 'h':
 			usage();
 			return -1;
 		}
+	}
+
+	if (!seen_driver) {
+		usage ();
+		exit (1);
+	}
+
+	if (optind < argc) {
+		driver_nargs = 1 + argc - optind;
+	} else {
+		driver_nargs = 1;
+	}
+
+	driver_args = (char **) malloc (sizeof (char *) * driver_nargs);
+	driver_args[0] = driver_name;
+	
+	for (i = 1; i < driver_nargs; i++) {
+		driver_args[i] = argv[optind++];
 	}
 
 	printf ( "jackd " VERSION "\n"
@@ -316,7 +315,7 @@ main (int argc, char *argv[])
 
 		/* This is really here so that we can run gdb easily */
 
-		jack_main ();
+		jack_main (driver_nargs, driver_args);
 
 	} else {
 
@@ -329,7 +328,7 @@ main (int argc, char *argv[])
 
 		} else if (pid == 0) {
 
-			jack_main ();
+			jack_main (driver_nargs, driver_args);
 
 		} else {
 			jackd_pid = pid;

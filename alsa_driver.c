@@ -26,6 +26,7 @@
 #include <errno.h>
 #include <glib.h>
 #include <stdarg.h>
+#include <getopt.h>
 #include <asm/msr.h>
 
 #include <jack/alsa_driver.h>
@@ -1296,22 +1297,74 @@ alsa_driver_clock_sync_notify (alsa_driver_t *driver, channel_t chn, ClockSyncSt
 
 }
 
-/* PLUGIN INTERFACE */
+/* DRIVER "PLUGIN" INTERFACE */
+
+static void
+alsa_usage ()
+{
+	fprintf (stderr, "\
+
+alsa PCM driver args: 
+    -d alsa-pcm-name (default: default)
+    -s sample-rate (default: 48kHz)
+    -p frames-per-period (default: 1024)
+    -n periods-per-hardware-buffer (default: 2)
+    -H (use hardware monitoring if available, default: no)
+
+");
+}
 
 jack_driver_t *
-driver_initialize (va_list ap)
+driver_initialize (int argc, char **argv)
 {
-	nframes_t srate;
-	nframes_t frames_per_interrupt;
-	unsigned long user_nperiods;
-	char *pcm_name;
-	int hw_monitoring;
+	nframes_t srate = 48000;
+	nframes_t frames_per_interrupt = 1024;
+	unsigned long user_nperiods = 2;
+	char *pcm_name = "default";
+	int hw_monitoring = FALSE;
+	int i;
 
-	pcm_name = va_arg (ap, char *);
-	frames_per_interrupt = va_arg (ap, nframes_t);
-	user_nperiods = va_arg(ap, unsigned long);
-	srate = va_arg (ap, nframes_t);
-	hw_monitoring = va_arg (ap, int);
+	/* grrrr ... getopt() cannot be called in more than one "loop"
+	   per process instance. ridiculous, but true. why isn't there
+	   a getopt_reinitialize() function?
+	*/
+
+	for (i = 1; i < argc; i++) {
+		if (argv[i][0] == '-') {
+			switch (argv[i][1]) {
+			case 'd':
+				pcm_name = argv[i+1];
+				i++;
+				break;
+				
+			case 'n':
+				user_nperiods = atoi (argv[i+1]);
+				i++;
+				break;
+				
+			case 'r':
+				srate = atoi (argv[i+1]);
+				i++;
+				break;
+				
+			case 'p':
+				frames_per_interrupt = atoi (argv[i+1]);
+				i++;
+				break;
+				
+			case 'H':
+				hw_monitoring = 1;
+				break;
+				
+			default:
+				alsa_usage ();
+				return NULL;
+			}
+		} else {
+			alsa_usage ();
+			return NULL;
+		}
+	}
 
 	return alsa_driver_new ("alsa_pcm", pcm_name, frames_per_interrupt, 
 				user_nperiods, srate, hw_monitoring);

@@ -1567,8 +1567,6 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 	sample_t *buffer;
 	sample_t *dst, *src;
 
-	printf ("audio mixdown on %s\n", port->shared->name);
-
 	/* by the time we've called this, we've already established
 	   the existence of more than 1 connection to this input port.
 	*/
