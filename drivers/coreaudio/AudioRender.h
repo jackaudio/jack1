@@ -74,5 +74,10 @@ class AudioRender {
 			    AudioBufferList * outOutputData,
 			    const AudioTimeStamp * inOutputTime,
 			    void *inClientData);
+	static OSStatus notification(AudioDeviceID inDevice,
+									UInt32 inChannel,
+									Boolean	isInput,
+									AudioDevicePropertyID inPropertyID,
+									void* inClientData);
     static AudioRender *theRender;
 };

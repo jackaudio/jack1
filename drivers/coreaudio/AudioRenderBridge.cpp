@@ -31,11 +31,14 @@ void *openPandaAudioInstance(float sampleRate, long bufferSize,
 			     int inChannels, int outChannels, char *device)
 {
     AudioRender *newInst =
-	new AudioRender(sampleRate, bufferSize, inChannels, outChannels,
-			device);
-    if (newInst->status)
+		new AudioRender(sampleRate, bufferSize, inChannels, outChannels,
+				device);
+    if (newInst->status) 
 		return newInst;
-    return NULL;
+	else {
+		delete newInst;
+		return NULL;
+	}
 }
 
 void closePandaAudioInstance(void *instance)

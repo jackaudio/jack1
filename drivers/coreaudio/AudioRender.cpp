@@ -142,7 +142,7 @@ vBufferSize(bufferSize)
     inBuffers = NULL;
     outBuffers = NULL;
     status =
-	ConfigureAudioProc(sampleRate, bufferSize, outChannels, inChannels,
+		ConfigureAudioProc(sampleRate, bufferSize, outChannels, inChannels,
 			   device);
 
     AudioRender::gSampleRate = vSampleRate;
@@ -164,11 +164,9 @@ vBufferSize(bufferSize)
 AudioRender::~AudioRender()
 {
     if (status) {
-		if (isProcessing)
-			AudioDeviceStop(vDevice, process);
-		OSStatus err = AudioDeviceRemoveIOProc(vDevice, process);
-		if (err == noErr)
-			status = false;
+		if (isProcessing) AudioDeviceStop(vDevice, process);
+		AudioDeviceRemoveIOProc(vDevice, process);
+		AudioDeviceRemovePropertyListener(vDevice,0,true,kAudioDeviceProcessorOverload,notification);
 		free(inBuffers);
 		free(outBuffers);
     }
@@ -322,6 +320,8 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 			       kAudioDevicePropertyBufferFrameSize, &size,
 			       &bufFrame);
     if (err != noErr) return false;
+	
+	JCALog("Internal buffer size %d.\n", bufFrame);
 
     vBufferSize = (long) bufFrame;
 
@@ -380,6 +380,9 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 
     err = AudioDeviceAddIOProc(vDevice, process, this);
     if (err != noErr) return false;
+	
+	err = AudioDeviceAddPropertyListener(vDevice,0,true,kAudioDeviceProcessorOverload,notification,this);
+	if (err != noErr) return false;
 
     return true;
 }
@@ -408,6 +411,23 @@ bool AudioRender::StopAudio()
     return false;
 }
 
+OSStatus AudioRender::notification(AudioDeviceID inDevice,
+									UInt32 inChannel,
+									Boolean	isInput,
+									AudioDevicePropertyID inPropertyID,
+									void* inClientData)
+{
+	AudioRender *classe = (AudioRender *) inClientData;
+	
+	switch(inPropertyID) {
+	
+		case kAudioDeviceProcessorOverload:
+			JCALog("notification kAudioDeviceProcessorOverload\n");
+			break;
+	
+	}
+}
+
 OSStatus AudioRender::process(AudioDeviceID inDevice,
 			      const AudioTimeStamp * inNow,
 			      const AudioBufferList * inInputData,
@@ -428,28 +448,26 @@ OSStatus AudioRender::process(AudioDeviceID inDevice,
 	if (!*classe->isInterleaved) {
 		for (unsigned int a = 0; a < inInputData->mNumberBuffers; a++) {
 			classe->inBuffers[channel] =
-			(float *) inInputData->mBuffers[a].mData;
+				(float *) inInputData->mBuffers[a].mData;
 			channel++;
-			if (channel == classe->vInChannels)
-			break;
+			if (channel == classe->vInChannels) break;
 		}
 		channel = 0;
 		for (unsigned int a = 0; a < outOutputData->mNumberBuffers; a++) {
 			classe->outBuffers[channel] =
-			(float *) outOutputData->mBuffers[a].mData;
+				(float *) outOutputData->mBuffers[a].mData;
 			channel++;
-			if (channel == classe->vOutChannels)
-			break;
+			if (channel == classe->vOutChannels) break;
 		}
 	} else {
 		for (unsigned int b = 0; b < inInputData->mNumberBuffers; b++) {
 			classe->channelsPerStream[b] =
-			(int) inInputData->mBuffers[b].mNumberChannels;
+				(int) inInputData->mBuffers[b].mNumberChannels;
 			classe->inBuffers[b] = (float *) inInputData->mBuffers[b].mData;	// but jack will read only the inBuffers[0], anyway that should not be a problem.
 		}
 		for (unsigned int b = 0; b < outOutputData->mNumberBuffers; b++) {
 			classe->out_channelsPerStream[b] =
-			(int) outOutputData->mBuffers[b].mNumberChannels;
+				(int) outOutputData->mBuffers[b].mNumberChannels;
 			classe->outBuffers[b] = (float *) outOutputData->mBuffers[b].mData;	// but jack will read only the outBuffers[0], anyway that should not be a problem.
 		}
     }
@@ -460,14 +478,10 @@ OSStatus AudioRender::process(AudioDeviceID inDevice,
 
 float **AudioRender::getADC()
 {
-    if (AudioRender::theRender == NULL)
-		return NULL;
-    return AudioRender::theRender->inBuffers;
+    return (AudioRender::theRender == NULL) ? NULL : AudioRender::theRender->inBuffers;
 }
 
 float **AudioRender::getDAC()
 {
-    if (AudioRender::theRender == NULL)
-		return NULL;
-    return AudioRender::theRender->outBuffers;
+    return (AudioRender::theRender == NULL) ? NULL : AudioRender::theRender->outBuffers;		
 }

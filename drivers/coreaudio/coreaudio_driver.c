@@ -66,15 +66,13 @@ static OSStatus get_device_id_from_num(int i, AudioDeviceID * id)
     int nDevices;
     AudioDeviceID *theDeviceList;
 
-    theStatus =
-	AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDevices,
+    theStatus = AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDevices,
 				     &theSize, NULL);
     nDevices = theSize / sizeof(AudioDeviceID);
     theDeviceList =
 	(AudioDeviceID *) malloc(nDevices * sizeof(AudioDeviceID));
-    theStatus =
-	AudioHardwareGetProperty(kAudioHardwarePropertyDevices, &theSize,
-				 theDeviceList);
+    theStatus = AudioHardwareGetProperty(kAudioHardwarePropertyDevices, 
+					&theSize, theDeviceList);
 
     *id = theDeviceList[i];
     return theStatus;
@@ -111,50 +109,46 @@ coreaudio_driver_attach(coreaudio_driver_t * driver,
      */
 
     for (chn = 0; chn < driver->capture_nchannels; chn++) {
+		//snprintf (buf, sizeof(buf) - 1, "capture_%lu", chn+1);
+		snprintf(buf, sizeof(buf) - 1, "%s:out%lu", driver->driver_name,
+			 chn + 1);
 
-	//snprintf (buf, sizeof(buf) - 1, "capture_%lu", chn+1);
-	snprintf(buf, sizeof(buf) - 1, "%s:out%lu", driver->driver_name,
-		 chn + 1);
+		if ((port = jack_port_register(driver->client, buf,
+					JACK_DEFAULT_AUDIO_TYPE, port_flags,
+					0)) == NULL) {
+			jack_error("coreaudio: cannot register port for %s", buf);
+			break;
+		}
 
-	if ((port =
-	     jack_port_register(driver->client, buf,
-				JACK_DEFAULT_AUDIO_TYPE, port_flags,
-				0)) == NULL) {
-	    jack_error("coreaudio: cannot register port for %s", buf);
-	    break;
-	}
+		/* XXX fix this so that it can handle: systemic (external) latency
+		 */
 
-	/* XXX fix this so that it can handle: systemic (external) latency
-	 */
-
-	jack_port_set_latency(port, driver->frames_per_cycle);
-
-	driver->capture_ports =
-	    jack_slist_append(driver->capture_ports, port);
+		jack_port_set_latency(port, driver->frames_per_cycle);
+		driver->capture_ports =
+			jack_slist_append(driver->capture_ports, port);
     }
 
     port_flags = JackPortIsInput | JackPortIsPhysical | JackPortIsTerminal;
 
-    for (chn = 0; chn < driver->playback_nchannels; chn++) {
-	//snprintf (buf, sizeof(buf) - 1, "playback_%lu", chn+1);
-	snprintf(buf, sizeof(buf) - 1, "%s:in%lu", driver->driver_name,
-		 chn + 1);
+	for (chn = 0; chn < driver->playback_nchannels; chn++) {
+		//snprintf (buf, sizeof(buf) - 1, "playback_%lu", chn+1);
+		snprintf(buf, sizeof(buf) - 1, "%s:in%lu", driver->driver_name,
+			 chn + 1);
 
-	if ((port =
-	     jack_port_register(driver->client, buf,
-				JACK_DEFAULT_AUDIO_TYPE, port_flags,
-				0)) == NULL) {
-	    jack_error("coreaudio: cannot register port for %s", buf);
-	    break;
+		if ((port = jack_port_register(driver->client, buf,
+					JACK_DEFAULT_AUDIO_TYPE, port_flags,
+					0)) == NULL) {
+			jack_error("coreaudio: cannot register port for %s", buf);
+			break;
+		}
+
+		/* XXX fix this so that it can handle: systemic (external) latency
+		 */
+
+		jack_port_set_latency(port, driver->frames_per_cycle);
+		driver->playback_ports =
+			jack_slist_append(driver->playback_ports, port);
 	}
-
-	/* XXX fix this so that it can handle: systemic (external) latency
-	 */
-
-	jack_port_set_latency(port, driver->frames_per_cycle);
-	driver->playback_ports =
-	    jack_slist_append(driver->playback_ports, port);
-    }
 
     jack_activate(driver->client);
     return 0;
@@ -232,15 +226,15 @@ coreaudio_driver_read(coreaudio_driver_t * driver, jack_nframes_t nframes)
 		} else {
 			if (jack_port_connected(port)
 			&& (driver->incoreaudio[b] != NULL)) {
-				int channels = driver->channelsPerStream[b];
+				int channels = driver->channelsPerInputStream[b];
 				if (channels <= chn) {
 					b++;
-					if (driver->numberOfStreams > 1
-					&& b < driver->numberOfStreams) {
-					channels = driver->channelsPerStream[b];
-					chn = 0;
+					if (driver->numberOfInputStreams > 1
+						&& b < driver->numberOfInputStreams) {
+						channels = driver->channelsPerInputStream[b];
+						chn = 0;
 					} else
-					return 0;
+						return 0;
 				}
 				if (channels > 0) {
 					float *in = driver->incoreaudio[b];
@@ -285,15 +279,15 @@ coreaudio_driver_write(coreaudio_driver_t * driver, jack_nframes_t nframes)
 		} else {
 			if (jack_port_connected(port)
 				&& (driver->outcoreaudio[b] != NULL)) {
-				int channels = driver->out_channelsPerStream[b];
+				int channels = driver->channelsPerOuputStream[b];
 				if (channels <= chn) {
 					b++;
-					if (driver->out_numberOfStreams > 1
-					&& b < driver->out_numberOfStreams) {
-					channels = driver->out_channelsPerStream[b];
-					chn = 0;
+					if (driver->numberOfOuputStreams > 1
+						&& b < driver->numberOfOuputStreams) {
+						channels = driver->channelsPerOuputStream[b];
+						chn = 0;
 					} else
-					return 0;
+						return 0;
 				}
 				if (channels > 0) {
 					float *out = driver->outcoreaudio[b];
@@ -330,16 +324,15 @@ coreaudio_driver_bufsize(coreaudio_driver_t * driver,
      * be serialized with the driver thread.  Stopping the audio
      * also stops that thread. */
 
-
     closePandaAudioInstance(driver->stream);
 
     driver->stream =
-	openPandaAudioInstance((float) driver->frame_rate,
+		openPandaAudioInstance((float) driver->frame_rate,
 			       driver->frames_per_cycle, driver->capturing,
 			       driver->playing, &driver->driver_name[0]);
 
     if (!driver->stream)
-	return FALSE;
+		return FALSE;
 
     setHostData(driver->stream, driver);
     setCycleFun(driver->stream, coreaudio_runCycle);
@@ -406,7 +399,7 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     }
 
     driver->stream =
-	openPandaAudioInstance((float) rate, frames_per_cycle, chan_in,
+		openPandaAudioInstance((float) rate, frames_per_cycle, chan_in,
 			       chan_out, &deviceName[0]);
 
     if (!driver->stream)
@@ -414,25 +407,25 @@ static jack_driver_t *coreaudio_driver_new(char *name,
 
     driver->client = client;
     driver->period_usecs =
-	(((float) driver->frames_per_cycle) / driver->frame_rate) *
-	1000000.0f;
+		(((float) driver->frames_per_cycle) / driver->frame_rate) *
+		1000000.0f;
 
     setHostData(driver->stream, driver);
     setCycleFun(driver->stream, coreaudio_runCycle);
     setParameter(driver->stream, 'inte', &driver->isInterleaved);
-    setParameter(driver->stream, 'nstr', &driver->numberOfStreams);
-    setParameter(driver->stream, 'nstO', &driver->out_numberOfStreams);
+    setParameter(driver->stream, 'nstr', &driver->numberOfInputStreams);
+    setParameter(driver->stream, 'nstO', &driver->numberOfOuputStreams);
 
-    JCALog("There are %d input streams.\n", driver->numberOfStreams);
-    JCALog("There are %d output streams.\n", driver->out_numberOfStreams);
+    JCALog("There are %d input streams.\n", driver->numberOfInputStreams);
+    JCALog("There are %d output streams.\n", driver->numberOfOuputStreams);
 
-    driver->channelsPerStream =
-	(int *) malloc(sizeof(int) * driver->numberOfStreams);
-    driver->out_channelsPerStream =
-	(int *) malloc(sizeof(int) * driver->out_numberOfStreams);
+    driver->channelsPerInputStream =
+		(int *) malloc(sizeof(int) * driver->numberOfInputStreams);
+    driver->channelsPerOuputStream =
+		(int *) malloc(sizeof(int) * driver->numberOfOuputStreams);
 
-    setParameter(driver->stream, 'cstr', driver->channelsPerStream);
-    setParameter(driver->stream, 'cstO', driver->out_channelsPerStream);
+    setParameter(driver->stream, 'cstr', driver->channelsPerInputStream);
+    setParameter(driver->stream, 'cstO', driver->channelsPerOuputStream);
 
     driver->incoreaudio = getPandaAudioInputs(driver->stream);
     driver->outcoreaudio = getPandaAudioOutputs(driver->stream);
@@ -441,7 +434,8 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     driver->capture_nchannels = chan_in;
 
     strcpy(&driver->driver_name[0], &deviceName[0]);
-    jack_init_time();
+	// steph
+    //jack_init_time();
     return ((jack_driver_t *) driver);
 
   error:
@@ -457,8 +451,8 @@ static void coreaudio_driver_delete(coreaudio_driver_t * driver)
 {
     /* Close coreaudio stream and terminate */
     closePandaAudioInstance(driver->stream);
-    free(driver->channelsPerStream);
-    free(driver->out_channelsPerStream);
+    free(driver->channelsPerInputStream);
+    free(driver->channelsPerOuputStream);
     free(driver);
 }
 
