@@ -53,7 +53,7 @@ jack_client_t *jack_client_new_inprocess (const char *client_name, const char *s
 /**
  * Disconnects from Jack server.
  */
-int            jack_client_close (jack_client_t *client);
+int jack_client_close (jack_client_t *client);
 
 /** 
  * @param client The Jack client structure.
@@ -172,7 +172,7 @@ const char * jack_port_short_name (const jack_port_t *port);
 /**
  * Returns the flags of the jack_port_t.
  */
-int          jack_port_flags (const jack_port_t *port);
+int jack_port_flags (const jack_port_t *port);
 
 /**
  * Returns the type of the jack_port_t.
@@ -182,7 +182,7 @@ const char * jack_port_type (const jack_port_t *port);
 /** 
  * Returns 1 if the jack_port_t belongs to the jack_client_t.
  */
-int          jack_port_is_mine (const jack_client_t *, const jack_port_t *port);
+int jack_port_is_mine (const jack_client_t *, const jack_port_t *port);
 
 /** 
  * This returns a positive integer indicating the number
