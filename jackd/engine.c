@@ -38,9 +38,6 @@
 #include <limits.h>
 #include <sys/mman.h>
 
-//REMOVE ME XXX - swh
-#include <glib.h>
-
 #include <config.h>
 
 #include <jack/internal.h>
@@ -2969,11 +2966,11 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int re
 	
 {
 	jack_port_internal_t *port = &engine->internal_ports[req->x.port_info.port_id];
-	GSList *node;
+	JSList *node;
 
 	DEBUG ("Getting connections for port '%s'.", port->shared->name);
 	
-	req->x.nports = g_slist_length (port->connections);
+	req->x.nports = jack_slist_length (port->connections);
 
 	if (write (reply_fd, req, sizeof (*req)) < sizeof (req)) {
 		jack_error ("cannot write GetPortConnections result to client");
@@ -2982,7 +2979,7 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int re
 
 	if (req->type == GetPortConnections)
 	{
-		for (node = port->connections; node; node = g_slist_next (node) ) {
+		for (node = port->connections; node; node = jack_slist_next (node) ) {
 			jack_port_id_t port_id;
 			
 			if (((jack_connection_internal_t *) node->data)->source == port)
