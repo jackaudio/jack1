@@ -758,7 +758,9 @@ alsa_driver_audio_stop (alsa_driver_t *driver)
 		}
 	}
 	
-	driver->hw->set_input_monitor_mask (driver->hw, 0);
+	if (driver->hw_monitoring) {
+		driver->hw->set_input_monitor_mask (driver->hw, 0);
+	}
 
 	return 0;
 }
@@ -1208,19 +1210,7 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 			
 			buf = jack_port_get_buffer (port, contiguous);
 
-			if (driver->all_monitor_in || (driver->input_monitor_mask & (1<<chn))) {
-				if (!driver->hw_monitoring) {
-					alsa_driver_copy_channel (driver, chn, chn, contiguous);
-				} else {
-					/* allow systems with mixdown for monitoring to playback
-					   the stream even if monitoring is enabled (e.g. ice1712, hdsp)
-					*/
-					alsa_driver_write_to_channel (driver, chn, buf + nwritten, contiguous);
-				}
-			} else {
-				alsa_driver_write_to_channel (driver, chn, buf + nwritten, contiguous);
-			}
-
+			alsa_driver_write_to_channel (driver, chn, buf + nwritten, contiguous);
 		}
 
 		if (driver->channels_not_done) {
@@ -1472,7 +1462,7 @@ alsa_driver_new (char *name, char *playback_alsa_device, char *capture_alsa_devi
 
 	printf ("creating alsa driver ... %s|%s|%lu|%lu|%lu|%s|%s|%s\n", 
 		playback_alsa_device, capture_alsa_device, frames_per_cycle, user_nperiods, rate,
-		hw_monitoring ? "hwmon":"swmon", hw_metering ? "hwmeter":"swmeter", soft_mode ? "soft-mode":"rt");
+		hw_monitoring ? "hwmon":"nomon", hw_metering ? "hwmeter":"swmeter", soft_mode ? "soft-mode":"rt");
 
 	driver = (alsa_driver_t *) calloc (1, sizeof (alsa_driver_t));
 
