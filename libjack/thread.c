@@ -137,6 +137,7 @@ jack_create_thread (pthread_t* thread,
 		
 		int current_policy;
 		struct sched_param current_param;
+		pthread_attr_t inherit_attr;
 		
 		current_policy = sched_getscheduler (0);
 		sched_getparam (0, &current_param);
@@ -144,13 +145,15 @@ jack_create_thread (pthread_t* thread,
 		result = sched_setscheduler (0, policy, &param);
 		log_result("switching current thread to rt for inheritance");
 		
-		pthread_attr_t inherit_attr;
 		pthread_attr_init (&inherit_attr);
-		result = pthread_attr_setscope (&inherit_attr, PTHREAD_SCOPE_SYSTEM);
+		result = pthread_attr_setscope (&inherit_attr,
+						PTHREAD_SCOPE_SYSTEM);
 		log_result("requesting system scheduling scope for inheritance");
-		result = pthread_attr_setinheritsched (&inherit_attr, PTHREAD_INHERIT_SCHED);
+		result = pthread_attr_setinheritsched (&inherit_attr,
+						       PTHREAD_INHERIT_SCHED);
 		log_result("requesting inheritance of scheduling parameters");
-		result = pthread_create (thread, &inherit_attr, start_routine, arg);
+		result = pthread_create (thread, &inherit_attr, start_routine,
+					 arg);
 		log_result_nonfatal("creating real-time thread by inheritance");
 		
 		sched_setscheduler (0, current_policy, &current_param);
@@ -164,7 +167,8 @@ jack_create_thread (pthread_t* thread,
 	result = pthread_getschedparam (*thread, &actual_policy, &actual_param);
 	log_result ("verifying scheduler parameters");
 
-	if (actual_policy == policy && actual_param.sched_priority == param.sched_priority) {
+	if (actual_policy == policy &&
+	    actual_param.sched_priority == param.sched_priority) {
 
 		/* everything worked OK */
 
@@ -203,7 +207,8 @@ jack_drop_real_time_scheduling (pthread_t thread)
 }
 
 int
-jack_acquire_real_time_scheduling (pthread_t thread, int priority) //priority is unused
+jack_acquire_real_time_scheduling (pthread_t thread, int priority)
+	//priority is unused
 {
 	setThreadToPriority(thread, 96, TRUE, 10000000);
 	return 0;
@@ -221,7 +226,8 @@ jack_drop_real_time_scheduling (pthread_t thread)
 	rtparam.sched_priority = 0;
 	
 	if ((x = pthread_setschedparam (thread, SCHED_OTHER, &rtparam)) != 0) {
-		jack_error ("cannot switch to normal scheduling priority(%s)\n", strerror (errno));
+		jack_error ("cannot switch to normal scheduling priority(%s)\n",
+			    strerror (errno));
 		return -1;
 	}
         return 0;
