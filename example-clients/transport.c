@@ -31,38 +31,50 @@
 
 char *package;				/* program name */
 int done = 0;
-
 jack_client_t *client;
+
+/* Time and tempo variables.  These are global to the entire,
+ * transport timeline.  There is no attempt to keep a true tempo map.
+ * The default time signature is: "march time", 4/4, 120bpm
+ */
+float time_beats_per_bar = 4.0;
+float time_beat_type = 0.25;
+double time_ticks_per_beat = 1920.0;
+double time_beats_per_minute = 120.0;
+volatile int time_reset = 1;		/* true when time values change */
 
 /* JACK timebase callback.
  *
- * Runs in the process realtime thread.  Must not wait.
+ * Runs in the process thread.  Realtime, must not wait.
  */
 void timebase(jack_transport_state_t state, jack_nframes_t nframes, 
 	      jack_position_t *pos, int new_pos, void *arg)
 {
+    double min;				/* minutes since frame 0 */
+    long abs_tick;			/* ticks since frame 0 */
+    long abs_beat;			/* beats since frame 0 */
+
     if (state == JackTransportRolling)
 	pos->frame += nframes;
 
-    if ((pos->valid & JackPositionBBT) == 0) {
+    if (new_pos || time_reset) {
 
-	/* set "march time" parameters: 4/4, 120bpm */
 	pos->valid |= JackPositionBBT;
-	pos->beats_per_bar = 4.0;
-	pos->beat_type = 0.25;
-	pos->ticks_per_beat = 1920.0;
-	pos->beats_per_minute = 120.0;
-    }
+	pos->beats_per_bar = time_beats_per_bar;
+	pos->beat_type = time_beat_type;
+	pos->ticks_per_beat = time_ticks_per_beat;
+	pos->beats_per_minute = time_beats_per_minute;
 
-    if (new_pos) {
+	time_reset = 0;			/* time change complete */
 
 	/* Compute BBT info from frame number.  This is relatively
-	 * simple here, but could become complex if there were tempo
-	 * or time signature changes. */
+	 * simple here, but would become complex if we supported tempo
+	 * or time signature changes at specific locations in the
+	 * transport timeline. */
 
-	double min = (double) pos->frame / ((double) pos->frame_rate * 60.0);
-	long abs_tick = min * pos->beats_per_minute * pos->ticks_per_beat;
-	long abs_beat = abs_tick / pos->ticks_per_beat;
+	min = (double) pos->frame / ((double) pos->frame_rate * 60.0);
+	abs_tick = min * pos->beats_per_minute * pos->ticks_per_beat;
+	abs_beat = abs_tick / pos->ticks_per_beat;
 
 	pos->bar = abs_beat / pos->beats_per_bar;
 	pos->beat = abs_beat - (pos->bar * pos->beats_per_bar) + 1;
@@ -103,7 +115,7 @@ void signal_handler(int sig)
 }
 
 
-/* command functions in alphabetical order */
+/* Command functions: see commands[] table following. */
 
 void com_exit(char *arg)
 {
@@ -112,19 +124,49 @@ void com_exit(char *arg)
 
 void com_help(char *);			/* forward declaration */
 
+void com_locate(char *arg)
+{
+    jack_nframes_t frame = 0;
+
+    if (*arg != '\0')
+	frame = atoi(arg);
+
+    jack_transport_goto_frame(client, frame);
+}
+
+void com_master(char *arg)
+{
+    int cond = (*arg != '\0');
+    if (jack_set_timebase_callback(client, cond, timebase, NULL) != 0)
+	fprintf(stderr, "Unable to take over timebase.\n");
+}
+
 void com_play(char *arg)
 {
     jack_transport_start(client);
 }
 
-void com_rewind(char *arg)
+void com_release(char *arg)
 {
-    jack_transport_goto_frame(client, 0);
+    jack_release_timebase(client);
 }
 
 void com_stop(char *arg)
 {
     jack_transport_stop(client);
+}
+
+/* Change the tempo for the entire timeline, not just from the current
+ * location. */
+void com_tempo(char *arg)
+{
+    float tempo = 120.0;
+
+    if (*arg != '\0')
+	tempo = atof(arg);
+
+    time_beats_per_minute = tempo;
+    time_reset = 1;
 }
 
 
@@ -139,14 +181,17 @@ typedef struct {
     char *doc;			/* Documentation for this function.  */
 } command_t;
 
-/* command list, must be in order */
+/* command table must be in alphabetical order */
 command_t commands[] = {
     { "exit",	com_exit,	"Exit transport program" },
-    { "help",	com_help,	"Display help text" },
+    { "help",	com_help,	"Display help text [<command>]" },
+    { "locate",	com_locate,	"Locate to frame <position>" },
+    { "master",	com_master,	"Become timebase master [<conditionally>]" },
     { "play",	com_play,	"Start transport rolling" },
     { "quit",	com_exit,	"Synonym for `exit'"},
-    { "rewind",	com_rewind,	"Reset transport position to beginning" },
+    { "release", com_release,	"Release timebase" },
     { "stop",	com_stop,	"Stop transport" },
+    { "tempo",	com_tempo,	"Set beat tempo <beats_per_min>" },
     { "?",	com_help,	"Synonym for `help'" },
     { (char *)NULL, (cmd_function_t *)NULL, (char *)NULL }
 };
@@ -354,9 +399,6 @@ int main(int argc, char *argv[])
     signal(SIGTERM, signal_handler);
     signal(SIGHUP, signal_handler);
     signal(SIGINT, signal_handler);
-
-    if (jack_set_timebase_callback(client, 1, timebase, NULL) != 0)
-	fprintf(stderr, "Unable to take over timebase.\n");
 
     jack_on_shutdown(client, jack_shutdown, 0);
 

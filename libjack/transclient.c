@@ -91,6 +91,9 @@ jack_transport_request_new_pos (jack_client_t *client, jack_position_t *pos)
 	return 0;
 }
 
+
+/******************** Callback invocations ********************/
+
 void
 jack_call_sync_client (jack_client_t *client)
 {
@@ -114,21 +117,32 @@ jack_call_timebase_master (jack_client_t *client)
 {
 	jack_client_control_t *control = client->control;
 	jack_control_t *eng = client->engine;
-	int new_pos;
+	int new_pos = eng->new_pos;
 
-	if (client->new_timebase) {	/* first time after being set? */
+	/* make sure we're still the master */
+	if (control->is_timebase) { 
+
+		if (client->new_timebase) {	/* first callback? */
+			client->new_timebase = 0;
+			new_pos = 1;
+		}
+
+		if ((eng->transport_state == JackTransportRolling) ||
+		    new_pos) {
+
+			control->timebase_cb (eng->transport_state,
+					      control->nframes,
+					      &eng->pending_time,
+					      new_pos,
+					      control->timebase_arg);
+		}
+
+	} else {
+
+		/* another master took over, so resign */
 		client->new_timebase = 0;
-		new_pos = 1;
-	} else
-		new_pos = eng->new_pos;
-
-	if ((eng->transport_state == JackTransportRolling) || new_pos) {
-
-		control->timebase_cb (eng->transport_state,
-				      control->nframes,
-				      &eng->pending_time,
-				      new_pos,
-				      control->timebase_arg);
+		control->timebase_cb = NULL;
+		control->timebase_arg = NULL;
 	}
 }
 
@@ -200,6 +214,7 @@ jack_release_timebase (jack_client_t *client)
 
 	rc = jack_client_deliver_request (client, &req);
 	if (rc == 0) {
+		client->new_timebase = 0;
 		ctl->timebase_cb = NULL;
 		ctl->timebase_arg = NULL;
 	}
@@ -316,6 +331,12 @@ jack_get_transport_info (jack_client_t *client,
 {
 	jack_control_t *eng = client->engine;
 
+	/* check that this is the process thread */
+	if (client->thread_id != pthread_self()) {
+		jack_error("Invalid thread for jack_get_transport_info().");
+		abort();		/* kill this client */
+	}
+
 	info->usecs = eng->current_time.usecs;
 	info->frame_rate = eng->current_time.frame_rate;
 	info->transport_state = eng->transport_state;
@@ -335,14 +356,30 @@ jack_get_transport_info (jack_client_t *client,
 	}
 }
 
+static int first_error = 1;
+
 void
 jack_set_transport_info (jack_client_t *client,
 			 jack_transport_info_t *info)
 {
 	jack_control_t *eng = client->engine;
 
-	//JOQ: check that this is the timebase master?
-	//JOQ: check that this is the process thread?
+	if (!client->control->is_timebase) { /* not timebase master? */
+		if (first_error)
+			jack_error ("Called jack_set_transport_info(), but not timebase master.");
+		first_error = 0;
+
+		/* JOQ: I would prefer to ignore this request, but if
+		 * I do, it breaks ardour 0.9-beta2.  So, let's allow
+		 * it for now. */
+		// return;
+	}
+
+	/* check that this is the process thread */
+	if (client->thread_id != pthread_self()) {
+		jack_error ("Invalid thread for jack_set_transport_info().");
+		abort();		/* kill this client */
+	}
 
 	/* is there a new state? */
 	if ((info->valid & JackTransportState) &&

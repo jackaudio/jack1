@@ -178,6 +178,7 @@ typedef volatile struct {
     volatile char       dead : 1;         /* r/w: engine */
     volatile char       timed_out : 1;    /* r/w: engine */
     volatile char       sync_ready : 1;   /* w: engine and client, r: engine */
+    volatile char       is_timebase : 1;  /* w: engine, r: engine and client */
     volatile pid_t      pid;              /* w: client r: engine; client pid */
     volatile unsigned long long signalled_at;
     volatile unsigned long long awake_at;

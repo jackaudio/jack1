@@ -26,7 +26,7 @@
 #include "transengine.h"
 
 
-/*********************** driver functions ***********************/
+/*********************** driver callbacks ***********************/
 
 int
 jack_set_sample_rate (jack_engine_t *engine, jack_nframes_t nframes)
@@ -76,14 +76,16 @@ int
 jack_timebase_reset (jack_engine_t *engine, jack_client_id_t client)
 {
 	int ret;
+	struct _jack_client_internal *clint;
+	jack_control_t *ectl = engine->control;
 
 	jack_lock_graph (engine);
 
-	if ((engine->timebase_client =
-	     jack_client_internal_by_id (engine, client)) != 0) {
-
-		engine->timebase_client = 0;
-		engine->control->pending_time.valid = 0;
+	clint = jack_client_internal_by_id (engine, client);
+	if (clint && (clint == engine->timebase_client)) {
+		clint->control->is_timebase = 0;
+		engine->timebase_client = NULL;
+		ectl->pending_time.valid = 0;
 		ret = 0;
 	}  else
 		ret = EINVAL;
@@ -98,17 +100,30 @@ int
 jack_timebase_set (jack_engine_t *engine,
 		   jack_client_id_t client, int conditional)
 {
-	int ret;
+	int ret = 0;
+	struct _jack_client_internal *clint;
 
 	jack_lock_graph (engine);
 
-	if (conditional && engine->timebase_client)
-		ret = EBUSY;
-	else if ((engine->timebase_client =
-		  jack_client_internal_by_id (engine, client)) != 0)
-		ret = 0;
-	else
-		ret = -1;
+	clint = jack_client_internal_by_id (engine, client);
+
+	if (conditional && engine->timebase_client) {
+
+		/* see if timebase master is someone else */
+		if (clint && (clint != engine->timebase_client))
+			ret = EBUSY;
+
+	} else {
+
+		if (clint) {
+			if (engine->timebase_client)
+				engine->timebase_client->
+					control->is_timebase = 0;
+			engine->timebase_client = clint;
+			clint->control->is_timebase = 1;
+		}  else
+			ret = EINVAL;
+	}
 
 	jack_unlock_graph (engine);
 
@@ -149,6 +164,8 @@ jack_timebase_exit (jack_engine_t *engine)
 {
 	jack_control_t *ectl = engine->control;
 
+	engine->timebase_client->control->is_timebase = 0;
+	engine->timebase_client = NULL;
 	ectl->current_time.valid = 0;
 	ectl->pending_time.valid = 0;
 }
@@ -159,6 +176,7 @@ jack_timebase_init (jack_engine_t *engine)
 {
 	jack_control_t *ectl = engine->control;
 
+	engine->timebase_client = NULL;
 	ectl->transport_state = JackTransportStopped;
 	ectl->transport_cmd = TransportCommandNone;
 	memset (&ectl->current_time, 0, sizeof(ectl->current_time));
@@ -170,18 +188,17 @@ jack_timebase_init (jack_engine_t *engine)
 	ectl->sync_clients = 0;
 }
 
-/* This is the heart of the transport control.  It runs at the end of
- * every process cycle.
+/* This runs at the end of every process cycle.  It determines the
+ * transport parameters for the next cycle.
  */
 void
 jack_transport_cycle_end (jack_engine_t *engine)
 {
 	jack_control_t *ectl = engine->control;
 	transport_command_t cmd;	/* latest transport command */
-	jack_time_t repos;		/* nonzero if reposition requested */
 
 	/* update timebase, if needed */
-	if ((engine->timebase_client == 0) &&
+	if ((engine->timebase_client == NULL) &&
 	    (ectl->transport_state == JackTransportRolling)) {
 		ectl->pending_time.frame =
 			ectl->current_time.frame + ectl->buffer_size;
@@ -198,8 +215,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 	cmd = ectl->transport_cmd;
 	ectl->transport_cmd = TransportCommandNone;
 
-	repos = ectl->request_time.usecs;
-	if (repos) {
+	if (ectl->request_time.usecs) {
 		/* request_time could change during this copy */
 		jack_transport_copy_position(&ectl->request_time,
 					     &ectl->pending_time);
@@ -242,7 +258,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 		if (cmd == TransportCommandStop) {
 			ectl->transport_state = JackTransportStopped;
 			ectl->sync_remain = 0;	/* halt polling */
-		} else if (repos) {
+		} else if (ectl->new_pos) {
 			if (ectl->sync_clients) {
 				ectl->transport_state = JackTransportStarting;
 				jack_start_sync_poll(engine);

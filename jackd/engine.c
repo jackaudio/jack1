@@ -1321,10 +1321,8 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 	        	JSList *portnode;
 			jack_port_internal_t *port;
 
-			if (client == engine->timebase_client) {
-				engine->timebase_client = 0;
+			if (client == engine->timebase_client)
 				jack_timebase_exit (engine);
-			}
 			
 			for (portnode = client->ports; portnode; portnode = jack_slist_next (portnode)) {
 				port = (jack_port_internal_t *) portnode->data;
@@ -1678,7 +1676,6 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 	engine->client_timeout_msecs = client_timeout;
 
 	engine->next_client_id = 1;
-	engine->timebase_client = 0;
 	engine->port_max = 128;
 	engine->rtpriority = rtpriority;
 	engine->silent_buffer = 0;
@@ -2289,10 +2286,8 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	client->control->dead = TRUE;
 	
-	if (client == engine->timebase_client) {
-		engine->timebase_client = 0;
+	if (client == engine->timebase_client)
 		jack_timebase_exit (engine);
-	}
 
 	jack_client_disconnect (engine, client);
 	jack_client_do_deactivate (engine, client, FALSE);
