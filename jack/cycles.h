@@ -55,7 +55,8 @@ static inline cycles_t get_cycles (void)
 
 #else  /* !i386 */
 
-#ifdef __ppc__
+#ifdef __powerpc__
+#define CPU_FTR_601			0x00000100
 
 typedef unsigned long cycles_t;
 

@@ -1817,7 +1817,11 @@ jack_get_mhz (void)
 			exit(1);
 		}
 
+#ifdef __powerpc__
+		ret = sscanf(buf, "clock\t: %dMHz", &mhz);
+#else
 		ret = sscanf(buf, "cpu MHz         : %d", &mhz);
+#endif /* __powerpc__ */
 
 		if (ret == 1)
 		{

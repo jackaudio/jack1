@@ -453,6 +453,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 	switch (driver->sample_format) {
 	case SND_PCM_FORMAT_S32_LE:
 	case SND_PCM_FORMAT_S16_LE:
+	case SND_PCM_FORMAT_S32_BE:
+	case SND_PCM_FORMAT_S16_BE:
 		break;
 
 	default:
