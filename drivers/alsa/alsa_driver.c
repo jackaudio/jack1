@@ -674,7 +674,8 @@ alsa_driver_audio_start (alsa_driver_t *driver)
 		}
 	}
 
-	if (driver->capture_handle && driver->capture_and_playback_not_synced) {
+	if ((driver->capture_handle && driver->capture_and_playback_not_synced) ||
+	    !driver->playback_handle) {
 		if ((err = snd_pcm_prepare (driver->capture_handle)) < 0) {
 			jack_error ("ALSA: prepare error for capture on \"%s\" (%s)", driver->alsa_name_capture, snd_strerror(err));
 			return -1;
@@ -720,7 +721,8 @@ alsa_driver_audio_start (alsa_driver_t *driver)
 		}
 	}
 
-	if (driver->capture_handle && driver->capture_and_playback_not_synced) {
+	if (driver->capture_handle && driver->capture_and_playback_not_synced ||
+	    !driver->playback_handle) {
 		if ((err = snd_pcm_start (driver->capture_handle)) < 0) {
 			jack_error ("could not start capture (%s)", snd_strerror (err));
 			return -1;
@@ -809,7 +811,7 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver)
 		gettimeofday(&now, 0);
 		snd_pcm_status_get_trigger_tstamp(status, &tstamp);
 		timersub(&now, &tstamp, &diff);
-		fprintf(stderr, "\n\n**** alsa_pcm: xrun of at least %.3f msecs\n\n", diff.tv_sec * 1000 + diff.tv_usec / 1000.0);
+		fprintf(stderr, "\n\n**** alsa_pcm: xrun of at least %.3f msecs, iter=%d\n\n", diff.tv_sec * 1000 + diff.tv_usec / 1000.0, frame_ith);
 	}
 
 	if (alsa_driver_audio_stop (driver) || alsa_driver_audio_start (driver)) {
@@ -1040,6 +1042,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 	} else {
 		playback_avail = INT_MAX; /* odd, but see min() computation below */
 	}
+
+	frame_ith++;
 
 	if (xrun_detected) {
 		*status = alsa_driver_xrun_recovery (driver);
@@ -1821,7 +1825,7 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 		{ "period",	1, NULL, 'p' },
 		{ "rate",	1, NULL, 'r' },
 		{ "nperiods",	1, NULL, 'n' },
-		{ "softmode",	1, NULL, 's' },
+		{ "softmode",	0, NULL, 's' },
 		{ "dither",	2, NULL, 'z' },
 		{ "monitor",    0, NULL, 'm' },
 		{ 0, 0, 0, 0 }
