@@ -30,6 +30,9 @@ bin_PROGRAMS = jack_simple_client \
 	       jack_cache_killer \
 	       jack_connect \
 	       jack_disconnect \
+	       jack_metro \
+	       jack_showtime \
+	       jack_lsp \
 	       $(FLTK_CLIENT) $(JACKREC)
 
 AM_CFLAGS = -I.. $(JACK_CFLAGS) $(GLIB_CFLAGS)
@@ -54,6 +57,19 @@ jack_monitor_client_LDADD = ../libjack/libjack.la
 jack_cache_killer_SOURCES = cache_killer.c
 jack_cache_killer_LDFLAGS = -ldl -lpthread
 jack_cache_killer_LDADD = ../libjack/libjack.la
+
+jack_metro_SOURCES = metro.c
+jack_metro_LDFLAGS = -ldl -lpthread
+jack_metro_LDADD = ../libjack/libjack.la
+
+jack_lsp_SOURCES = lsp.c
+jack_lsp_LDFLAGS = -ldl -lpthread
+jack_lsp_LDADD = ../libjack/libjack.la
+
+jack_showtime_SOURCES = showtime.c
+jack_showtime_LDFLAGS = -ldl -lpthread
+jack_showtime_LDADD = ../libjack/libjack.la
+
 
 if HAVE_FLTK
 jack_fltk_client_SOURCES = fltk_client.cc

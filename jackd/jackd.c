@@ -214,6 +214,8 @@ jack_engine_waiter_thread (void *arg)
 	}
 
 	if (warg->argc) {
+
+		fprintf (stderr, "loading driver ..\n");
 		
 		if ((driver = jack_driver_load (warg->argc, warg->argv)) == 0) {
 			fprintf (stderr, "cannot load driver module %s\n", warg->argv[0]);
@@ -227,6 +229,8 @@ jack_engine_waiter_thread (void *arg)
 	if (asio_mode) {
 		jack_set_asio_mode (engine, TRUE);
 	} 
+
+	fprintf (stderr, "starting engine\n");
 
 	if (jack_run (engine)) {
 		fprintf (stderr, "cannot start main JACK thread\n");

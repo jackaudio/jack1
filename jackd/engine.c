@@ -411,9 +411,9 @@ jack_set_buffer_size (jack_engine_t *engine, jack_nframes_t nframes)
 
 static int
 jack_set_sample_rate (jack_engine_t *engine, jack_nframes_t nframes)
-
 {
-	engine->control->time.frame_rate = nframes;
+	engine->control->current_time.frame_rate = nframes;
+	engine->control->pending_time.frame_rate = nframes;
 	return 0;
 }
 
@@ -593,6 +593,11 @@ jack_engine_post_process (jack_engine_t *engine)
 	
 	jack_lock_graph (engine);
 	
+	/* update timebase */
+
+	engine->control->pending_time.cycles = engine->control->current_time.cycles;
+	engine->control->current_time = engine->control->pending_time;
+
 	/* find any clients that need removal due to timeouts, etc. */
 		
 	for (node = engine->clients; node; node = g_slist_next (node) ) {
@@ -600,7 +605,7 @@ jack_engine_post_process (jack_engine_t *engine)
 		client = (jack_client_internal_t *) node->data;
 		ctl = client->control;
 		
-		if  (ctl->timed_out || (ctl->state > NotTriggered && ctl->state != Finished)) {
+		if (ctl->state > NotTriggered && ctl->state != Finished && ctl->timed_out++) {
 			client->error = TRUE;
 		}
 
@@ -625,8 +630,9 @@ jack_engine_post_process (jack_engine_t *engine)
 			if (client->error) {
 				
 				if (engine->verbose) {
-					fprintf (stderr, "removing failed client %s state = %s\n", 
-						 client->control->name, client_state_names[client->control->state]);
+					fprintf (stderr, "removing failed client %s state = %s errors = %d\n", 
+						 client->control->name, client_state_names[client->control->state],
+						 client->error);
 				}
 				
 				jack_remove_client (engine, (jack_client_internal_t *) node->data);
@@ -1039,7 +1045,10 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 
 			if (client == engine->timebase_client) {
 				engine->timebase_client = 0;
-				engine->control->time.frame = 0;
+				engine->control->current_time.frame = 0;
+				engine->control->pending_time.frame = 0;
+				engine->control->current_time.transport_state = JackTransportStopped;
+				engine->control->pending_time.transport_state = JackTransportStopped;
 			}
 			
 			for (portnode = client->ports; portnode; portnode = g_slist_next (portnode)) {
@@ -1408,8 +1417,10 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine->control->cpu_load = 0;
  
 	engine->control->buffer_size = 0;
-	engine->control->time.frame_rate = 0;
-	engine->control->time.frame = 0;
+	engine->control->current_time.frame_rate = 0;
+	engine->control->current_time.frame = 0;
+	engine->control->pending_time.frame_rate = 0;
+	engine->control->pending_time.frame = 0;
 	engine->control->in_process = 0;
 
 	engine->control->has_capabilities = 0;
@@ -1675,7 +1686,7 @@ jack_main_thread (void *arg)
 		/* store the execution time for later averaging */
 		
 		engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = 
-			(float) (cycle_end - engine->control->time.cycles) / engine->cpu_mhz;
+			(float) (cycle_end - engine->control->current_time.cycles) / engine->cpu_mhz;
 		
 		if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
 			engine->rolling_client_usecs_index = 0;
@@ -1882,7 +1893,10 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	if (client == engine->timebase_client) {
 		engine->timebase_client = 0;
-		engine->control->time.frame = 0;
+		engine->control->current_time.frame = 0;
+		engine->control->pending_time.frame = 0;
+		engine->control->current_time.transport_state = JackTransportStopped;
+		engine->control->pending_time.transport_state = JackTransportStopped;
 	}
 
 	jack_client_disconnect (engine, client);

@@ -1100,7 +1100,7 @@ unsigned long jack_get_buffer_size (jack_client_t *client)
 unsigned long jack_get_sample_rate (jack_client_t *client)
 
 {
-	return client->engine->time.frame_rate;
+	return client->engine->current_time.frame_rate;
 }
 
 static jack_port_t *
@@ -1513,7 +1513,7 @@ jack_set_sample_rate_callback (jack_client_t *client, JackSampleRateCallback cal
 
 	/* Now invoke it */
 
-	callback (client->engine->time.frame_rate, arg);
+	callback (client->engine->current_time.frame_rate, arg);
 
 	return 0;
 }
@@ -1780,8 +1780,8 @@ jack_frames_since_cycle_start (const jack_client_t *client)
 {
 	float usecs;
 
-	usecs = (float) (get_cycles() - client->engine->time.cycles) / client->cpu_mhz;
-	return (jack_nframes_t) floor ((((float) client->engine->time.frame_rate) / 1000000.0f) * usecs);
+	usecs = (float) (get_cycles() - client->engine->current_time.cycles) / client->cpu_mhz;
+	return (jack_nframes_t) floor ((((float) client->engine->current_time.frame_rate) / 1000000.0f) * usecs);
 }
 
 jack_nframes_t
@@ -1794,7 +1794,7 @@ jack_frame_time (const jack_client_t *client)
 	jack_read_frame_time (client, &current);
 	
 	usecs = (float) (get_cycles() - current.stamp) / client->cpu_mhz;
-	elapsed = (jack_nframes_t) floor ((((float) client->engine->time.frame_rate) / 1000000.0f) * usecs);
+	elapsed = (jack_nframes_t) floor ((((float) client->engine->current_time.frame_rate) / 1000000.0f) * usecs);
 	
 	return current.frames + elapsed;
 }
@@ -1940,8 +1940,8 @@ int
 jack_get_transport_info (jack_client_t *client,
 			 jack_transport_info_t *info)
 {
-	jack_time_info_t *time_info = &client->engine->time;
-	
+	jack_time_info_t *time_info = &client->engine->current_time;
+
 	if (info->valid & JackTransportState) {
 		info->state = time_info->transport_state;
 	}
@@ -1962,7 +1962,7 @@ int
 jack_set_transport_info (jack_client_t *client,
 			 jack_transport_info_t *info)
 {
-	jack_time_info_t *time_info = &client->engine->time;
+	jack_time_info_t *time_info = &client->engine->pending_time;
 	
 	if (info->valid & JackTransportState) {
 		time_info->transport_state = info->state;

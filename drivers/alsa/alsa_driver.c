@@ -867,7 +867,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 			} 
 			driver->poll_last = poll_ret;
 			driver->poll_next = poll_ret + (unsigned long long) floor ((driver->period_usecs * driver->cpu_mhz));
-			driver->engine->control->time.cycles = get_cycles();
+			driver->engine->control->current_time.cycles = get_cycles();
 		}
 
 		/* check to see if it was the extra FD that caused us to return from poll

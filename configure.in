@@ -4,8 +4,8 @@ AC_INIT(jackd/jackd.c)
 AC_CONFIG_AUX_DIR(.)
 
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=37
-JACK_MICRO_VERSION=2
+JACK_MINOR_VERSION=38
+JACK_MICRO_VERSION=0
 
 BETA=
 
@@ -162,15 +162,10 @@ if test $HAVE_FLTK = "false"; then
              AC_MSG_WARN([*** no fltk found, the fltk example client will not be built])
 fi
 
-AC_CHECK_LIB(sndfile,main,
-             [AC_CHECK_HEADER(sndfile.h,
-                              [HAVE_SNDFILE=true],
-                              [HAVE_SNDFILE=false]
-              )],
-	     [HAVE_SNDFILE=false]
-)
-if test $HAVE_SNDFILE = "false"; then
-             AC_MSG_WARN([*** no libsndfile found, the jackrec example client will not be built])
+HAVE_SNDFILE=
+PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
+if test x$HAVE_SNDFILE = x; then
+             AC_MSG_WARN([*** the jackrec example client will not be built])
 fi
 
 # you need doxygen to make dist.

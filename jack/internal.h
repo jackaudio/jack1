@@ -92,10 +92,11 @@ typedef struct {
 
 typedef struct {
 
-    jack_time_info_t    time;
+    jack_time_info_t    current_time;
+    jack_time_info_t    pending_time;
     jack_frame_timer_t  frame_timer;
     int                 in_process;
-    jack_nframes_t           frames_at_cycle_start;
+    jack_nframes_t      frames_at_cycle_start;
     pid_t               engine_pid;
     unsigned long       buffer_size;
     char                real_time;
@@ -103,8 +104,9 @@ typedef struct {
     int                 has_capabilities;
     float               cpu_load;
     unsigned long       port_max;
-    jack_port_shared_t ports[0];
     int                 engine_ok;
+    jack_port_shared_t  ports[0];
+
 } jack_control_t;
 
 typedef enum  {
