@@ -29,10 +29,10 @@
 #include <jack/memops.h>
 #include <jack/jack.h>
 
-typedef void (*ReadCopyFunction)  (sample_t *dst, char *src,
+typedef void (*ReadCopyFunction)  (jack_default_audio_sample_t *dst, char *src,
 				   unsigned long src_bytes,
 				   unsigned long src_skip_bytes);
-typedef void (*WriteCopyFunction) (char *dst, sample_t *src,
+typedef void (*WriteCopyFunction) (char *dst, jack_default_audio_sample_t *src,
 				   unsigned long src_bytes,
 				   unsigned long dst_skip_bytes,
 				   dither_state_t *state);
@@ -63,11 +63,11 @@ typedef struct {
     unsigned long                 capture_nchannels;
     unsigned long                 sample_bytes;
 
-    nframes_t                     frame_rate;
-    nframes_t                     frames_per_cycle;
+    jack_nframes_t                     frame_rate;
+    jack_nframes_t                     frames_per_cycle;
     float                         cpu_mhz;
-    nframes_t                     capture_frame_latency;
-    nframes_t                     playback_frame_latency;
+    jack_nframes_t                     capture_frame_latency;
+    jack_nframes_t                     playback_frame_latency;
 
     unsigned long                *silent;
     char                         *alsa_name;
@@ -122,7 +122,7 @@ static __inline__ void alsa_driver_mark_channel_done (alsa_driver_t *driver, cha
 	driver->silent[chn] = 0;
 }
 
-static __inline__ void alsa_driver_silence_on_channel (alsa_driver_t *driver, channel_t chn, nframes_t nframes) {
+static __inline__ void alsa_driver_silence_on_channel (alsa_driver_t *driver, channel_t chn, jack_nframes_t nframes) {
 	if (driver->interleaved) {
 		memset_interleave 
 			(driver->playback_addr[chn],
@@ -135,7 +135,7 @@ static __inline__ void alsa_driver_silence_on_channel (alsa_driver_t *driver, ch
 	alsa_driver_mark_channel_done (driver,chn);
 }
 
-static __inline__ void alsa_driver_silence_on_channel_no_mark (alsa_driver_t *driver, channel_t chn, nframes_t nframes) {
+static __inline__ void alsa_driver_silence_on_channel_no_mark (alsa_driver_t *driver, channel_t chn, jack_nframes_t nframes) {
 	if (driver->interleaved) {
 		memset_interleave 
 			(driver->playback_addr[chn],
@@ -148,8 +148,8 @@ static __inline__ void alsa_driver_silence_on_channel_no_mark (alsa_driver_t *dr
 }
 
 static __inline__ void alsa_driver_read_from_channel (alsa_driver_t *driver, 
-					   channel_t channel, sample_t *buf, 
-					   nframes_t nsamples)
+					   channel_t channel, jack_default_audio_sample_t *buf, 
+					   jack_nframes_t nsamples)
 {
 	driver->read_via_copy (buf, 
 			       driver->capture_addr[channel],
@@ -159,8 +159,8 @@ static __inline__ void alsa_driver_read_from_channel (alsa_driver_t *driver,
 
 static __inline__ void alsa_driver_write_to_channel (alsa_driver_t *driver,
 				   channel_t channel, 
-				   sample_t *buf, 
-				   nframes_t nsamples)
+				   jack_default_audio_sample_t *buf, 
+				   jack_nframes_t nsamples)
 {
 	driver->write_via_copy (driver->playback_addr[channel],
 				buf, 
@@ -173,7 +173,7 @@ static __inline__ void alsa_driver_write_to_channel (alsa_driver_t *driver,
 static __inline__ void alsa_driver_copy_channel (alsa_driver_t *driver, 
 			       channel_t input_channel, 
 			       channel_t output_channel,
-			       nframes_t nsamples) {
+			       jack_nframes_t nsamples) {
 
 	driver->channel_copy (driver->playback_addr[output_channel],
 			      driver->capture_addr[input_channel],

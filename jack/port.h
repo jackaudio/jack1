@@ -24,20 +24,27 @@
 #include <pthread.h>
 #include <jack/types.h>
 
-typedef struct _jack_port_type_info {
-    const char type_name[32];                     /* what do you think ? */
+#define JACK_PORT_NAME_SIZE 32
+#define JACK_PORT_TYPE_SIZE 32
 
-    void (*mixdown)(jack_port_t *, nframes_t);   /* function to mixdown multiple inputs to a buffer. can be
+/* these should probably go somewhere else */
+#define JACK_CLIENT_NAME_SIZE 32
+typedef unsigned long jack_client_id_t;
+
+typedef struct _jack_port_type_info {
+    const char type_name[JACK_PORT_TYPE_SIZE];   /* what do you think ? */
+
+    void (*mixdown)(jack_port_t *, jack_nframes_t);   /* function to mixdown multiple inputs to a buffer. can be
 						    NULL, indicating that multiple input connections
 						    are not legal for this data type.
 						 */
 
     long buffer_scale_factor;                    /* If == 1, then a buffer to handle nframes worth of
-						    data is sizeof(sample_t) * nframes bytes large.
+						    data is sizeof(jack_default_audio_sample_t) * nframes bytes large.
 						    
 						    If anything other than 1, the buffer allocated
 						    for input mixing will be this value times
-						    sizeof (sample_t) * nframes bytes in size.
+						    sizeof (jack_default_audio_sample_t) * nframes bytes in size.
 
 						    Obviously, for non-audio data types, it may have
 						    a different value.
@@ -62,8 +69,8 @@ typedef struct _jack_port_shared {
     jack_port_type_info_t  type_info;
     jack_client_id_t       client_id;
 
-    volatile nframes_t     latency;
-    volatile nframes_t     total_latency;
+    volatile jack_nframes_t     latency;
+    volatile jack_nframes_t     total_latency;
     volatile unsigned char monitor_requests;
 
     char                  in_use     : 1;

@@ -54,7 +54,7 @@ static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
 void *jack_zero_filled_buffer = 0;
 
-static void jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes);
+static void jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes);
 
 jack_port_type_info_t builtin_port_types[] = {
 	{ JACK_DEFAULT_AUDIO_TYPE, jack_audio_port_mixdown, 1 },
@@ -128,18 +128,15 @@ jack_client_alloc ()
 	return client;
 }
 
-static jack_port_t *
+jack_port_t *
 jack_port_by_id (jack_client_t *client, jack_port_id_t id)
-
 {
-	GSList *node;
+        if (id >= client->engine->port_max)
+                return NULL;
 
-	for (node = client->ports; node; node = g_slist_next (node)) {
-		if (((jack_port_t *) node->data)->shared->id == id) {
-			return (jack_port_t *) node->data;
-		}
-	}
-
+        if (client->engine->ports[id].in_use)
+                return jack_port_new (client, id, client->engine);
+        
 	return NULL;
 }
 
@@ -1165,20 +1162,20 @@ jack_set_error_function (void (*func) (const char *, ...))
 	jack_error = func;
 }
 
-nframes_t
+jack_nframes_t
 jack_port_get_latency (jack_port_t *port)
 {
 	return port->shared->latency;
 }
 
 void
-jack_port_set_latency (jack_port_t *port, nframes_t nframes)
+jack_port_set_latency (jack_port_t *port, jack_nframes_t nframes)
 {
 	port->shared->latency = nframes;
 }
 
 void *
-jack_port_get_buffer (jack_port_t *port, nframes_t nframes)
+jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 
 {
 	GSList *node, *next;
@@ -1233,12 +1230,12 @@ jack_port_get_buffer (jack_port_t *port, nframes_t nframes)
 
 	if (port->shared->offset == 0) {
 		port->shared->offset = (size_t) jack_pool_alloc (port->shared->type_info.buffer_scale_factor * 
-								 sizeof (sample_t) * nframes);
+								 sizeof (jack_default_audio_sample_t) * nframes);
 		port->client_segment_base = 0;
 	}
 
 	port->shared->type_info.mixdown (port, nframes);
-	return (sample_t *) port->shared->offset;
+	return (jack_default_audio_sample_t *) port->shared->offset;
 }
 
 int
@@ -1584,26 +1581,26 @@ jack_read_frame_time (const jack_client_t *client, jack_frame_timer_t *copy)
 	} while (copy->guard1 != copy->guard2);
 }
 
-nframes_t
+jack_nframes_t
 jack_frames_since_cycle_start (const jack_client_t *client)
 {
 	float usecs;
 
 	usecs = (float) (get_cycles() - client->engine->time.cycles) / client->cpu_mhz;
-	return (nframes_t) floor ((((float) client->engine->time.frame_rate) / 1000000.0f) * usecs);
+	return (jack_nframes_t) floor ((((float) client->engine->time.frame_rate) / 1000000.0f) * usecs);
 }
 
-nframes_t
+jack_nframes_t
 jack_frame_time (const jack_client_t *client)
 {
 	jack_frame_timer_t current;
 	float usecs;
-	nframes_t elapsed;
+	jack_nframes_t elapsed;
 
 	jack_read_frame_time (client, &current);
 	
 	usecs = (float) (get_cycles() - current.stamp) / client->cpu_mhz;
-	elapsed = (nframes_t) floor ((((float) client->engine->time.frame_rate) / 1000000.0f) * usecs);
+	elapsed = (jack_nframes_t) floor ((((float) client->engine->time.frame_rate) / 1000000.0f) * usecs);
 	
 	return current.frames + elapsed;
 }
@@ -1629,13 +1626,13 @@ jack_port_unlock (jack_client_t *client, jack_port_t *port)
 }
 
 static void 
-jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
+jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 {
 	GSList *node;
 	jack_port_t *input;
-	nframes_t n;
-	sample_t *buffer;
-	sample_t *dst, *src;
+	jack_nframes_t n;
+	jack_default_audio_sample_t *buffer;
+	jack_default_audio_sample_t *dst, *src;
 
 	/* by the time we've called this, we've already established
 	   the existence of more than 1 connection to this input port.
@@ -1651,7 +1648,7 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 	input = (jack_port_t *) node->data;
 	buffer = jack_port_buffer (port);
 
-	memcpy (buffer, jack_port_buffer (input), sizeof (sample_t) * nframes);
+	memcpy (buffer, jack_port_buffer (input), sizeof (jack_default_audio_sample_t) * nframes);
 
 	for (node = g_slist_next (node); node; node = g_slist_next (node)) {
 
@@ -1789,7 +1786,7 @@ jack_set_transport_info (jack_client_t *client,
 	return 0;
 }	
 
-nframes_t
+jack_nframes_t
 jack_port_get_total_latency (jack_client_t *client, jack_port_t *port)
 {
 	return port->shared->total_latency;

@@ -44,6 +44,8 @@
 
 #define MAX_SHM_ID 256 /* likely use is more like 16 */
 
+#define NoPort    -1
+
 typedef struct {
 
     jack_port_internal_t *source;
@@ -320,7 +322,7 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 	size_t step;
 
 	key = random();
-	size = nports * sizeof (sample_t) * engine->control->buffer_size;
+	size = nports * sizeof (jack_default_audio_sample_t) * engine->control->buffer_size;
 
 	if ((id = shmget (key, size, IPC_CREAT|0666)) < 0) {
 		jack_error ("cannot create new port segment of %d bytes, key = 0x%x (%s)", size, key, strerror (errno));
@@ -347,7 +349,7 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 
 	offset = 0;
 
-	step = engine->control->buffer_size * sizeof (sample_t);
+	step = engine->control->buffer_size * sizeof (jack_default_audio_sample_t);
 
 	while (offset < size) {
 		jack_port_buffer_info_t *bi;
@@ -371,7 +373,7 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 		engine->port_buffer_freelist = g_slist_remove_link (engine->port_buffer_freelist, engine->port_buffer_freelist);
 
 		memset (engine->port_segment_address + engine->silent_buffer->offset, 0, 
-			sizeof (sample_t) * engine->control->buffer_size);
+			sizeof (jack_default_audio_sample_t) * engine->control->buffer_size);
 	}
 
 	pthread_mutex_unlock (&engine->buffer_lock);
@@ -382,7 +384,7 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 }
 
 static int
-jack_set_buffer_size (jack_engine_t *engine, nframes_t nframes)
+jack_set_buffer_size (jack_engine_t *engine, jack_nframes_t nframes)
 {
 	/* XXX this is not really right, since it only works for
 	   audio ports. it also doesn't resize the zero filled
@@ -395,7 +397,7 @@ jack_set_buffer_size (jack_engine_t *engine, nframes_t nframes)
 }
 
 static int
-jack_set_sample_rate (jack_engine_t *engine, nframes_t nframes)
+jack_set_sample_rate (jack_engine_t *engine, jack_nframes_t nframes)
 
 {
 	engine->control->time.frame_rate = nframes;
@@ -415,7 +417,7 @@ jack_engine_process_unlock (jack_engine_t *engine)
 }
 
 static int
-jack_process (jack_engine_t *engine, nframes_t nframes)
+jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 {
 	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
@@ -1339,7 +1341,7 @@ jack_engine_notify_clients_about_delay (jack_engine_t *engine)
 }
 
 static inline void
-jack_inc_frame_time (jack_engine_t *engine, nframes_t amount)
+jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
 {
 	jack_frame_timer_t *time = &engine->control->frame_timer;
 	
@@ -1363,7 +1365,7 @@ jack_main_thread (void *arg)
 	jack_driver_t *driver = engine->driver;
 	int consecutive_excessive_delays;
 	unsigned long long cycle_end;
-	nframes_t nframes;
+	jack_nframes_t nframes;
 
 	if (engine->control->real_time) {
 
@@ -2069,12 +2071,12 @@ jack_client_feeds (jack_client_internal_t *might, jack_client_internal_t *target
 	return 0;
 }
 
-static nframes_t
+static jack_nframes_t
 jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port, int hop_count)
 {
 	GSList *node;
-	nframes_t latency;
-	nframes_t max_latency = 0;
+	jack_nframes_t latency;
+	jack_nframes_t max_latency = 0;
 
 	/* call tree must hold engine->client_lock. */
 	
@@ -2090,7 +2092,7 @@ jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port, 
 
 	for (node = port->connections; node; node = g_slist_next (node)) {
 
-		nframes_t this_latency;
+		jack_nframes_t this_latency;
 		jack_connection_internal_t *connection;
 
 		connection = (jack_connection_internal_t *) node->data;
@@ -2541,7 +2543,7 @@ jack_use_driver (jack_engine_t *engine, jack_driver_t *driver)
 /* PORT RELATED FUNCTIONS */
 
 
-jack_port_id_t
+static jack_port_id_t
 jack_get_free_port (jack_engine_t *engine)
 
 {

@@ -339,7 +339,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 }
 
 static int 
-alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, nframes_t user_nperiods, nframes_t rate)
+alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cycle, jack_nframes_t user_nperiods, jack_nframes_t rate)
 
 {
 	int p_noninterleaved = 0;
@@ -532,7 +532,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 }	
 
 static int
-alsa_driver_reset_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, nframes_t user_nperiods, nframes_t rate)
+alsa_driver_reset_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cycle, jack_nframes_t user_nperiods, jack_nframes_t rate)
 {
 	/* XXX unregister old ports ? */
 	alsa_driver_release_channel_dependent_memory (driver);
@@ -742,7 +742,7 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver)
 }	
 
 static void
-alsa_driver_silence_untouched_channels (alsa_driver_t *driver, nframes_t nframes)
+alsa_driver_silence_untouched_channels (alsa_driver_t *driver, jack_nframes_t nframes)
 	
 {
 	channel_t chn;
@@ -767,7 +767,7 @@ alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn, ClockSy
 
 static int under_gdb = FALSE;
 
-static nframes_t 
+static jack_nframes_t 
 alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delayed_usecs)
 {
 	snd_pcm_sframes_t avail = 0;
@@ -964,7 +964,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 }
 
 static int
-alsa_driver_process (alsa_driver_t *driver, nframes_t nframes)
+alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 {
 	snd_pcm_sframes_t contiguous = 0;
 	snd_pcm_sframes_t capture_avail = 0;
@@ -1070,7 +1070,7 @@ alsa_driver_process (alsa_driver_t *driver, nframes_t nframes)
 				/* now move data from ports to channels */
 				
 				for (chn = 0, node = driver->playback_ports; node; node = g_slist_next (node), chn++) {
-					sample_t *buf;
+					jack_default_audio_sample_t *buf;
 
 					jack_port_t *port = (jack_port_t *) node->data;
 					
@@ -1331,9 +1331,9 @@ alsa_driver_delete (alsa_driver_t *driver)
 
 static jack_driver_t *
 alsa_driver_new (char *name, char *alsa_device,
-		 nframes_t frames_per_cycle,
-		 nframes_t user_nperiods,
-		 nframes_t rate,
+		 jack_nframes_t frames_per_cycle,
+		 jack_nframes_t user_nperiods,
+		 jack_nframes_t rate,
 		 int hw_monitoring,
 		 int capturing,
 		 int playing,
@@ -1545,8 +1545,8 @@ alsa PCM driver args:
 jack_driver_t *
 driver_initialize (int argc, char **argv)
 {
-	nframes_t srate = 48000;
-	nframes_t frames_per_interrupt = 1024;
+	jack_nframes_t srate = 48000;
+	jack_nframes_t frames_per_interrupt = 1024;
 	unsigned long user_nperiods = 2;
 	char *pcm_name = "default";
 	int hw_monitoring = FALSE;

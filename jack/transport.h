@@ -47,9 +47,9 @@ typedef struct {
 
     jack_transport_bits_t  valid;
     jack_transport_state_t state;
-    nframes_t              position;
-    nframes_t              loop_start;
-    nframes_t              loop_end;
+    jack_nframes_t              position;
+    jack_nframes_t              loop_start;
+    jack_nframes_t              loop_end;
 
 } jack_transport_info_t;
 

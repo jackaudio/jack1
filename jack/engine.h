@@ -31,9 +31,9 @@ struct _jack_port_internal;
 struct _jack_engine {
     jack_control_t        *control;
     struct _jack_driver   *driver;
-    int  (*process)(struct _jack_engine *, nframes_t frames);
-    int  (*set_buffer_size)(struct _jack_engine *, nframes_t frames);
-    int  (*set_sample_rate)(struct _jack_engine *, nframes_t frames);
+    int  (*process)(struct _jack_engine *, jack_nframes_t frames);
+    int  (*set_buffer_size)(struct _jack_engine *, jack_nframes_t frames);
+    int  (*set_sample_rate)(struct _jack_engine *, jack_nframes_t frames);
     int  (*process_lock)(struct _jack_engine *);
     void (*process_unlock)(struct _jack_engine *);
     int  (*post_process)(struct _jack_engine *);

@@ -37,11 +37,11 @@ unsigned long response_pos;
 int grab_finished = 0;
 
 int
-process (nframes_t nframes, void *arg)
+process (jack_nframes_t nframes, void *arg)
 
 {
-	sample_t *out = (sample_t *) jack_port_get_buffer (output_port, nframes);
-	sample_t *in = (sample_t *) jack_port_get_buffer (input_port, nframes);
+	jack_default_audio_sample_t *out = (jack_default_audio_sample_t *) jack_port_get_buffer (output_port, nframes);
+	jack_default_audio_sample_t *in = (jack_default_audio_sample_t *) jack_port_get_buffer (input_port, nframes);
 	unsigned int i;
 
 	if (grab_finished) {

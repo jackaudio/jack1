@@ -36,6 +36,8 @@
 #include <jack/transport.h>
 #include <jack/cycles.h>
 
+typedef struct _jack_engine  jack_engine_t;
+
 typedef void * dlhandle;
 
 typedef struct {
@@ -50,12 +52,12 @@ typedef struct {
 
 typedef struct _time_info
 {
-    nframes_t frame;
-    nframes_t frame_rate;
+    jack_nframes_t frame;
+    jack_nframes_t frame_rate;
     cycles_t  cycles;
     jack_transport_state_t transport_state;
-    nframes_t loop_start;
-    nframes_t loop_end;
+    jack_nframes_t loop_start;
+    jack_nframes_t loop_end;
 
 #if 0
     double ppqPos;        // 1 ppq
@@ -76,7 +78,7 @@ typedef struct _time_info
 
 typedef struct {
     volatile unsigned long long guard1;
-    volatile nframes_t frames;
+    volatile jack_nframes_t frames;
     volatile cycles_t  stamp;
     volatile unsigned long long guard2;
 } jack_frame_timer_t;
@@ -86,7 +88,7 @@ typedef struct {
     jack_time_info_t    time;
     jack_frame_timer_t  frame_timer;
     int                 in_process;
-    nframes_t           frames_at_cycle_start;
+    jack_nframes_t           frames_at_cycle_start;
     pid_t               engine_pid;
     unsigned long       buffer_size;
     char                real_time;
@@ -137,9 +139,9 @@ typedef enum {
 
 typedef volatile struct {
 
-    volatile nframes_t  frame_time;       /* w: client r: engine (if client is timebase) */
+    volatile jack_nframes_t  frame_time;       /* w: client r: engine (if client is timebase) */
     volatile int        id;               /* w: engine r: engine and client */
-    volatile nframes_t  nframes;          /* w: engine r: client */
+    volatile jack_nframes_t  nframes;          /* w: engine r: client */
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
     volatile char       name[JACK_CLIENT_NAME_SIZE+1];
     volatile ClientType type;             /* w: engine r: engine and client */
@@ -240,7 +242,7 @@ typedef struct {
 	    char destination_port[JACK_PORT_NAME_SIZE+1];
 	} connect;
 	jack_client_id_t client_id;
-	nframes_t nframes;
+	jack_nframes_t nframes;
     } x;
     int status;
 }  jack_request_t;

@@ -18,74 +18,110 @@
     $Id$
 */
 
-#ifndef __jack_engine_types_h__
-#define __jack_engine_types_h__
+#ifndef __jack_types_h__
+#define __jack_types_h__
 
 #include <limits.h>
 
-typedef float         sample_t;
-typedef unsigned long nframes_t;
-typedef long          jack_port_id_t;
-typedef unsigned long jack_client_id_t;
-typedef float         gain_t;
-typedef long          channel_t;
 
-static  const nframes_t max_frames = ULONG_MAX;
+typedef unsigned long        jack_nframes_t;
 
-typedef int  (*JackProcessCallback)(nframes_t, void *);
-typedef int  (*JackGraphOrderCallback)(void *);
-typedef int  (*JackXRunCallback)(void *);
-typedef int  (*JackBufferSizeCallback)(nframes_t, void *);
-typedef int  (*JackSampleRateCallback)(nframes_t, void *);
-typedef void (*JackPortRegistrationCallback)(jack_port_id_t,int,void*);
+#define JACK_MAX_FRAMES ULONG_MAX;
 
-#define NoChannel -1
-#define NoPort    -1
 
-typedef struct _jack_engine  jack_engine_t;
+/**
+ *  jack_port_t is an opaque type. You may only access it using the API provided.
+ */
 typedef struct _jack_port    jack_port_t;
+
+/**
+ *  jack_client_t is an opaque type. You may only access it using the API provided.
+ */
 typedef struct _jack_client  jack_client_t;
 
-#define JACK_PORT_NAME_SIZE 32
-#define JACK_PORT_TYPE_SIZE 32
-#define JACK_CLIENT_NAME_SIZE 32
+/**
+ *  Ports have unique ids. You will very rarely need to know them, however,
+ *  except in the case of the port registration callback.
+ */
+typedef long                 jack_port_id_t;
 
-typedef enum {
-	Cap_HardwareMonitoring = 0x1,
-	Cap_AutoSync = 0x2,
-	Cap_WordClock = 0x4,
-	Cap_ClockMaster = 0x8,
-	Cap_ClockLockReporting = 0x10
-} Capabilities;
+typedef int  (*JackProcessCallback)(jack_nframes_t, void *);
+typedef int  (*JackGraphOrderCallback)(void *);
+typedef int  (*JackXRunCallback)(void *);
+typedef int  (*JackBufferSizeCallback)(jack_nframes_t, void *);
+typedef int  (*JackSampleRateCallback)(jack_nframes_t, void *);
+typedef void (*JackPortRegistrationCallback)(jack_port_id_t,int,void*);
 
-typedef	enum  {
-	AutoSync,
-	WordClock,
-	ClockMaster
-} SampleClockMode;
+/**
+ * Used for the type argument of jack_port_register().
+ */
+#define JACK_DEFAULT_AUDIO_TYPE "32 bit float mono audio"
 
-typedef	enum  {
-	Lock = 0x1,
-	NoLock = 0x2,
-	Sync = 0x4,
-	NoSync = 0x8
-} ClockSyncStatus;
+/**
+ * For convenience, use this typedef if you want to be able to change
+ * between float and double. You may want to typedef sample_t to
+ * jack_default_audio_sample_t in your application.
+ */
+typedef float jack_default_audio_sample_t;
 
-typedef	enum  {
-	None,
-	Rectangular,
-	Triangular,
-	Shaped
-} DitherAlgorithm;
 
-#define DITHER_BUF_SIZE 8
-#define DITHER_BUF_MASK 7
+/**
+ *  A port has a set of flags that are formed by AND-ing together the
+ *  desired values from the list below. The flags "JackPortIsInput" and
+ *  "JackPortIsOutput" are mutually exclusive and it is an error to use
+ *  them both.
+ */
+enum JackPortFlags {
 
-typedef struct {
-    unsigned int depth;
-    float rm1;
-    unsigned int idx;
-    float e[DITHER_BUF_SIZE];
-} dither_state_t;
+     /**
+      * if JackPortIsInput is set, then the port can receive
+      * data.
+      */
+     JackPortIsInput = 0x1,
 
-#endif /* __jack_engine_types_h__ */
+     /**
+      * if JackPortIsOutput is set, then data can be read from
+      * the port.
+      */
+     JackPortIsOutput = 0x2,
+
+     /**
+      * if JackPortIsPhysical is set, then the port corresponds
+      * to some kind of physical I/O connector.
+      */
+     JackPortIsPhysical = 0x4, 
+
+     /**
+      * if JackPortCanMonitor is set, then a call to
+      * jack_port_request_monitor() makes sense.
+      *
+      * Precisely what this means is dependent on the client. A typical
+      * result of it being called with TRUE as the second argument is
+      * that data that would be available from an output port (with
+      * JackPortIsPhysical set) is sent to a physical output connector
+      * as well, so that it can be heard/seen/whatever.
+      * 
+      * Clients that do not control physical interfaces
+      * should never create ports with this bit set.
+      */
+     JackPortCanMonitor = 0x8,
+
+     /**
+      * JackPortIsTerminal means:
+      *
+      *	for an input port: the data received by the port
+      *                    will not be passed on or made
+      *		           available at any other port
+      *
+      * for an output port: the data available at the port
+      *                    does not originate from any other port
+      *
+      * Audio synthesizers, i/o h/w interface clients, HDR
+      * systems are examples of things that would set this
+      * flag for their ports.  
+      */
+     JackPortIsTerminal = 0x10
+};	    
+
+
+#endif /* __jack_types_h__ */

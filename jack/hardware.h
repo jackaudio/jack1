@@ -23,6 +23,20 @@
 
 #include <jack/types.h>
 
+typedef	enum  {
+	AutoSync,
+	WordClock,
+	ClockMaster
+} SampleClockMode;
+
+typedef enum {
+	Cap_HardwareMonitoring = 0x1,
+	Cap_AutoSync = 0x2,
+	Cap_WordClock = 0x4,
+	Cap_ClockMaster = 0x8,
+	Cap_ClockLockReporting = 0x10
+} Capabilities;
+
 struct _jack_hardware;
 
 typedef void (*JackHardwareReleaseFunction)(struct _jack_hardware *);

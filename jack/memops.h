@@ -23,24 +23,42 @@
 
 #include <jack/types.h>
 
-void sample_move_d32u24_sS           (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_d16_sS              (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+typedef	enum  {
+	None,
+	Rectangular,
+	Triangular,
+	Shaped
+} DitherAlgorithm;
 
-void sample_move_dither_rect_d32u24_sS   (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_tri_d32u24_sS    (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_shaped_d32u24_sS (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_rect_d16_sS      (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_tri_d16_sS       (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_shaped_d16_sS    (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+#define DITHER_BUF_SIZE 8
+#define DITHER_BUF_MASK 7
 
-void sample_move_dS_s32u24           (sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
-void sample_move_dS_s16              (sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
+typedef struct {
+    unsigned int depth;
+    float rm1;
+    unsigned int idx;
+    float e[DITHER_BUF_SIZE];
+} dither_state_t;
 
-void sample_merge_d16_sS             (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_merge_d32u24_sS          (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+
+void sample_move_d32u24_sS           (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_d16_sS              (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+
+void sample_move_dither_rect_d32u24_sS   (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_dither_tri_d32u24_sS    (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_dither_shaped_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_dither_rect_d16_sS      (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_dither_tri_d16_sS       (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_dither_shaped_d16_sS    (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+
+void sample_move_dS_s32u24           (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
+void sample_move_dS_s16              (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
+
+void sample_merge_d16_sS             (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_merge_d32u24_sS          (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 
 static __inline__ void
-sample_merge (sample_t *dst, sample_t *src, unsigned long cnt)
+sample_merge (jack_default_audio_sample_t *dst, jack_default_audio_sample_t *src, unsigned long cnt)
 
 {
 	while (cnt--) {
@@ -51,10 +69,10 @@ sample_merge (sample_t *dst, sample_t *src, unsigned long cnt)
 }
 
 static __inline__ void
-sample_memcpy (sample_t *dst, sample_t *src, unsigned long cnt)
+sample_memcpy (jack_default_audio_sample_t *dst, jack_default_audio_sample_t *src, unsigned long cnt)
 
 {
-	memcpy (dst, src, cnt * sizeof (sample_t));
+	memcpy (dst, src, cnt * sizeof (jack_default_audio_sample_t));
 }
 
 void memset_interleave               (char *dst, char val, unsigned long bytes, unsigned long unit_bytes, unsigned long skip_bytes);

@@ -18,14 +18,14 @@ int do_stomp = 0;
 pthread_mutex_t foolock = PTHREAD_MUTEX_INITIALIZER;
 
 int
-process (nframes_t nframes, void *arg)
+process (jack_nframes_t nframes, void *arg)
 
 {
 	unsigned long i;
 	unsigned long long now, then;
 
-	sample_t *out = (sample_t *) jack_port_get_buffer (output_port, nframes);
-	sample_t *in = (sample_t *) jack_port_get_buffer (input_port, nframes);
+	jack_default_audio_sample_t *out = (jack_default_audio_sample_t *) jack_port_get_buffer (output_port, nframes);
+	jack_default_audio_sample_t *in = (jack_default_audio_sample_t *) jack_port_get_buffer (input_port, nframes);
 
 	now = get_cycles ();
 	if (pthread_mutex_trylock (&foolock) == 0) {
@@ -43,12 +43,12 @@ process (nframes_t nframes, void *arg)
 		pthread_mutex_unlock (&foolock);
 	} 
 
-	memcpy (out, in, sizeof (sample_t) * nframes);
+	memcpy (out, in, sizeof (jack_default_audio_sample_t) * nframes);
 	return 0;      
 }
 
 int
-bufsize (nframes_t nframes, void *arg)
+bufsize (jack_nframes_t nframes, void *arg)
 
 {
 	printf ("the maximum buffer size is now %lu\n", nframes);
@@ -56,7 +56,7 @@ bufsize (nframes_t nframes, void *arg)
 }
 
 int
-srate (nframes_t nframes, void *arg)
+srate (jack_nframes_t nframes, void *arg)
 
 {
 	printf ("the sample rate is now %lu/sec\n", nframes);

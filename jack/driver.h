@@ -26,6 +26,16 @@
 #include <jack/types.h>
 #include <jack/port.h>
 
+typedef float         gain_t;
+typedef long          channel_t;
+
+typedef	enum  {
+	Lock = 0x1,
+	NoLock = 0x2,
+	Sync = 0x4,
+	NoSync = 0x8
+} ClockSyncStatus;
+
 typedef void (*ClockSyncListenerFunction)(channel_t,ClockSyncStatus,void*);
 
 typedef struct {
@@ -39,13 +49,13 @@ struct _jack_driver;
 
 typedef int       (*JackDriverAttachFunction)(struct _jack_driver *, struct _jack_engine *);
 typedef int       (*JackDriverDetachFunction)(struct _jack_driver *, struct _jack_engine *);
-typedef nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, int *status, float *delayed_usecs);
-typedef int       (*JackDriverProcessFunction)(struct _jack_driver *, nframes_t);
+typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, int *status, float *delayed_usecs);
+typedef int       (*JackDriverProcessFunction)(struct _jack_driver *, jack_nframes_t);
 typedef int       (*JackDriverStopFunction)(struct _jack_driver *);
 typedef int       (*JackDriverStartFunction)(struct _jack_driver *);
 
 #define JACK_DRIVER_DECL \
-    nframes_t period_usecs; \
+    jack_nframes_t period_usecs; \
     void *handle; \
     void (*finish)(struct _jack_driver *);\
     JackDriverAttachFunction attach; \

@@ -31,7 +31,7 @@
 typedef struct _thread_info {
     pthread_t thread_id;
     SNDFILE *sf;
-    nframes_t duration;
+    jack_nframes_t duration;
     jack_client_t *client;
     unsigned int channels;
     int bitdepth;
@@ -48,22 +48,22 @@ pthread_mutex_t buffer_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  data_ready = PTHREAD_COND_INITIALIZER;
 
 typedef struct _sample_buffer {
-    nframes_t nframes;
-    sample_t **data;
+    jack_nframes_t nframes;
+    jack_default_audio_sample_t **data;
 } sample_buffer_t;
 
 sample_buffer_t *
-sample_buffer_new (nframes_t nframes, unsigned int nchans)
+sample_buffer_new (jack_nframes_t nframes, unsigned int nchans)
 {
 	sample_buffer_t *buf;
 	unsigned int i;
 
 	buf = (sample_buffer_t *) malloc (sizeof (sample_buffer_t));
 	buf->nframes = nframes;
-	buf->data = (sample_t **) malloc (sizeof (sample_t *) * nchans);
+	buf->data = (jack_default_audio_sample_t **) malloc (sizeof (jack_default_audio_sample_t *) * nchans);
 
 	for (i = 0; i < nchans; i++) {
-		buf->data[i] = (sample_t *) malloc (sizeof (sample_t) * nframes);
+		buf->data[i] = (jack_default_audio_sample_t *) malloc (sizeof (jack_default_audio_sample_t) * nframes);
 	}
 
 	return buf;
@@ -73,7 +73,7 @@ GSList *pending_writes = NULL;
 GSList *free_buffers = NULL;
 
 sample_buffer_t *
-get_free_buffer (nframes_t nframes, unsigned int nchans)
+get_free_buffer (jack_nframes_t nframes, unsigned int nchans)
 {
 	sample_buffer_t *buf;
 
@@ -121,7 +121,7 @@ disk_thread (void *arg)
 	thread_info_t *info = (thread_info_t *) arg;
 	int i;
 	unsigned int chn;
-	nframes_t total_captured = 0;
+	jack_nframes_t total_captured = 0;
 	int done = 0;
 	double *fbuf;
 
@@ -184,11 +184,11 @@ disk_thread (void *arg)
 }
 	
 int
-process (nframes_t nframes, void *arg)
+process (jack_nframes_t nframes, void *arg)
 
 {
 	thread_info_t *info = (thread_info_t *) arg;
-	sample_t *in;
+	jack_default_audio_sample_t *in;
 	sample_buffer_t *buf;
 	unsigned int i;
 
@@ -205,8 +205,8 @@ process (nframes_t nframes, void *arg)
 	buf = get_free_buffer (nframes, nports);
 
 	for (i = 0; i < nports; i++) {
-		in = (sample_t *) jack_port_get_buffer (ports[i], nframes);
-		memcpy (buf->data[i], in, sizeof (sample_t) * nframes);
+		in = (jack_default_audio_sample_t *) jack_port_get_buffer (ports[i], nframes);
+		memcpy (buf->data[i], in, sizeof (jack_default_audio_sample_t) * nframes);
 	}
 
 	put_write_buffer (buf);
