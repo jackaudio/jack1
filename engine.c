@@ -1150,10 +1150,12 @@ jack_become_real_time (pthread_t thread, int priority)
 
 	if ((x = pthread_setschedparam (thread, SCHED_FIFO, &rtparam)) != 0) {
 		jack_error ("cannot set thread to real-time priority (FIFO/%d) (%d: %s)", rtparam.sched_priority, x, strerror (errno));
+		return -1;
 	}
 
 	if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
 	    jack_error ("cannot lock down memory for RT thread (%s)", strerror (errno));
+	    return -1;
 	}
 
 	return 0;
@@ -1186,7 +1188,9 @@ jack_main_thread (void *arg)
 //	unsigned long start, end;
 
 	if (engine->control->real_time) {
-		jack_become_real_time (pthread_self(), engine->rtpriority);
+		if (jack_become_real_time (pthread_self(), engine->rtpriority)) {
+			engine->control->real_time = 0;
+		}
 	}
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);

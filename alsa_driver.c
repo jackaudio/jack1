@@ -718,11 +718,6 @@ alsa_driver_wait (alsa_driver_t *driver)
 			nfds += driver->capture_nfds;
 		}
 
-		if (need_capture != need_playback) {
-			fprintf (stderr, "poll needs capture: %s playback: %s\n", need_capture ? "yes":"no",
-				 need_playback ? "yes":"no");
-		}
-		
 		/* ALSA doesn't set POLLERR in some versions of 0.9.X */
 		
 		for (i = 0; i < nfds; i++) {

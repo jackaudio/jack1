@@ -16,7 +16,7 @@ AM_CFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" @GLIB_CFLAGS@
 AM_CXXFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\"
 
 jackd_SOURCES = jackd.c engine.c
-jackd_LDFLAGS = -ldl -lpthread $(GLIB_LIBS)
+jackd_LDFLAGS = -lm -ldl -lpthread $(GLIB_LIBS)
 jackd_LDADD = libjack.la
 
 jack_simple_client_SOURCES = simple_client.c
@@ -42,11 +42,11 @@ jack_impulse_grabber_LDADD = libjack.la
 lib_LTLIBRARIES    = libjack.la jack_alsa.la
 
 libjack_la_SOURCES = client.c pool.c driver.c
-libjack_la_LDFLAGS = $(GLIB_LIBS)
+libjack_la_LDFLAGS = $(GLIB_LIBS) -lm
 
 jack_alsa_la_LDFLAGS = -module
 jack_alsa_la_SOURCES = alsa_driver.c hammerfall.c generic_hw.c memops.c 
-jack_alsa_la_LIBADD = -lasound $(GLIB_LIBS)
+jack_alsa_la_LIBADD = -lasound $(GLIB_LIBS) -lm
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = jack.pc
