@@ -15,5 +15,6 @@ jack_lsp
 jack_metro
 jack_unload
 jack_load
+jack_transport
 inprocess.la
 inprocess.lo
