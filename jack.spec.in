@@ -5,19 +5,21 @@
 # mounted as tmpfs
 %define enable_tmpdir 1
 %if %{enable_tmpdir}
-%define jack_tmpdir /var/lib/tmp
+%define jack_tmpdir /var/lib/jack/tmp
 %endif
 # use port audio
 %define port_audio 0
 # use oss
-%define oss 0
+%define oss 1
 # strip binaries 
 %define strip_jackd 1
+# use premmption check
+%define preemption_check 1
 
 
 Summary:	the Jack Audio Connection Kit
-Name:		jack-audio-connection-kit
-Version:	@JACK_VERSION@
+Name:		@PACKAGE@
+Version:	@VERSION@
 Release:	1
 License:	GPL
 Group:		System Environment/Daemons
@@ -70,6 +72,9 @@ Small example clients that use the Jack Audio Connection Kit.
 %endif
 %if %{enable_capabilities}
                  --enable-capabilities \
+%endif
+%if %{preemption_check}
+                 --enable-preemption-check \
 %endif
 %if ! %{port_audio}
 		--disable-portaudio \
@@ -167,7 +172,7 @@ fi
 
 %files 
 %defattr(-,root,root)
-%doc AUTHORS TODO COPYING* doc/reference
+%doc AUTHORS TODO COPYING*
 %if %{enable_capabilities}
 %attr(4755, root, root) %{_bindir}/jackstart
 %endif
@@ -198,6 +203,7 @@ fi
 
 %files devel
 %defattr(-,root,root)
+%doc doc/reference
 %{_libdir}/libjack.la
 %{_libdir}/jack/inprocess.la
 %{_libdir}/jack/intime.la
@@ -214,6 +220,8 @@ fi
 %{_includedir}/jack/timestamps.h
 %{_includedir}/jack/transport.h
 %{_includedir}/jack/types.h
+%{_includedir}/jack/thread.h
+%{_includedir}/jack/intclient.h
 %{_libdir}/pkgconfig/jack.pc
 
 
@@ -231,6 +239,15 @@ fi
 
 
 %changelog
+
+* Thu Dec 28 2004 Rui Nuno Capela <rncbc@rncbc.org> - 0.99.41-1
+- merge integration of usx2y (rawusb) driver into alsa backend
+- enable preemption check feature of 2.6 RT kernels
+- add jack/intclient.h to devel package
+- add jack/thread.h to devel package
+- moved doc/reference to devel package
+- set default tmpdir to /var/tmp/jack/tmp
+- include oss backend driver if available
 
 * Sat May 22 2004 Pete Bessman <ninjadroid@gazuga.net> - 0.98.1-1
 - changes to accomodate jack_oss and RPM's fascist build policy
