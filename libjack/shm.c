@@ -337,6 +337,9 @@ jack_initialize_shm (void)
 void
 jack_destroy_shm (jack_shm_info_t* si)
 {
+	if (si->index == -1)
+		return;			/* segment not allocated */
+
 	shm_unlink (jack_shm_registry[si->index].id);
 	jack_release_shm_info (si->index);
 }
@@ -522,6 +525,9 @@ jack_initialize_shm (void)
 void
 jack_destroy_shm (jack_shm_info_t* si)
 {
+	if (si->index == -1)
+		return;			/* segment not allocated */
+
 	shmctl (jack_shm_registry[si->index].id, IPC_RMID, NULL);
 	jack_release_shm_info (si->index);
 }
