@@ -39,6 +39,7 @@ static nframes_t frames_per_interrupt = 64;
 static nframes_t srate = 48000;
 static int realtime = 0;
 static int realtime_priority = 10;
+static int with_fork = 0;
 
 static void
 cleanup ()
@@ -69,9 +70,9 @@ static void
 signal_handler (int sig)
 {
 	fprintf (stderr, "killing jackd at %d\n", jackd_pid);
-	kill (jackd_pid, SIGKILL);
+	kill (jackd_pid, SIGTERM);
 	cleanup ();
-	exit (-1);
+	exit (1);
 }
 
 static void
@@ -103,7 +104,10 @@ signal_thread (void *arg)
 	err = sigwait (&signals, &sig);
 	fprintf (stderr, "exiting due to signal %d\n", sig);
 	jack_engine_delete (engine);
-	cleanup ();
+	if (!with_fork) {
+		/* parent cleans up if we forked */
+		cleanup ();
+	}
 	exit (err);
 
 	/*NOTREACHED*/
@@ -236,7 +240,6 @@ main (int argc, char *argv[])
 	};
 	int option_index;
 	int opt;
-	int no_fork = 0;
 	
 	opterr = 0;
 	while ((opt = getopt_long (argc, argv, options, long_options, &option_index)) != EOF) {
@@ -254,7 +257,7 @@ main (int argc, char *argv[])
 			break;
 
 		case 'F':
-			no_fork = 1;
+			with_fork = 0;
 			break;
 
 		case 'P':
@@ -273,7 +276,7 @@ main (int argc, char *argv[])
 		}
 	}
 
-	if (no_fork) {
+	if (with_fork) {
 		jack_main ();
 		cleanup ();
 
