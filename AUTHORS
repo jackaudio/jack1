@@ -11,10 +11,10 @@ Many other members of LAD contributed ideas to JACK, particularly
 Richard Guenther.
 
 Paul Davis was the principal author of the JACK API and of the sample
-implementation contained here. Andy Wingo provided many small patches
-Fernando Pablo Lopez-Lezcano contributed the capabilities-based code.
-Jeremy Hall, Steve Harris, and Martin Boer contributed sample clients
-and utilities.  Jack O'Quin contributed new transport interfaces and
-documentation.
+implementation contained here. Andy Wingo and Kai Vehmanen provided 
+many small patches and documentation. Fernando Pablo Lopez-Lezcano 
+contributed the capabilities-based code. Jeremy Hall, Steve Harris, 
+and Martin Boer contributed sample clients and utilities. 
+Jack O'Quin contributed new transport interfaces and documentation.
 
 Many others have contributed patches and/or test results.
