@@ -59,7 +59,7 @@
  * Time to wait for clients in msecs. Used when jackd is 
  * run in non-ASIO mode and without realtime priority enabled.
  */
-#define JACKD_SOFT_MODE_TIMEOUT 5000
+#define JACKD_SOFT_MODE_TIMEOUT 500
 
 typedef struct {
 
@@ -744,6 +744,10 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 			res.status = -1;
 		}
 	}
+
+	/* we do this to avoid sending replies to some random client if 
+	 * creation of a new client fails */
+	client = NULL;
 
 	if (res.status == 0) {
 
