@@ -1,0 +1,59 @@
+
+ Quick Install Guide
+---------------------
+
+1) in /usr/src/linux/include/linux/capability.h find these lines
+
+#define CAP_INIT_EFF_SET    to_cap_t(~0 & ~CAP_TO_MASK(CAP_SETPCAP))
+#define CAP_INIT_INH_SET    to_cap_t(0)
+
+   and change them to
+
+#define CAP_INIT_EFF_SET    to_cap_t(~0)
+#define CAP_INIT_INH_SET    to_cap_t(~0)
+
+   then recompile your kernel and boot it.  (Note that the above lines
+   are from linux 2.4.19; it may be different if you're using a
+   different version)
+
+   NB: This may expose your system to local denial of service attacks.
+   If it is a shared system or server, you should assess the impact of
+   enabling capabilities in the context of your overall system security
+   requirements.
+
+2) install libcap from
+   ftp://ftp.kernel.org/pub/linux/libs/security/linux-privs/kernel-2.4/
+
+3) if you're using a journalling filesystem, mount some directory with
+   -t tmpfs and tell configure about it with --with-default-tmpdir
+
+4) configure with --enable-optimize --enable-capabilities and
+   --with-default-tmpdir=/where/ever
+
+5) make
+
+6) as root, do 
+
+       make install
+
+7) create a .asoundrc file in your home directory like this:
+
+------ 8< ----------- 8< ------
+
+pcm.SOMENAME {
+    type hw
+    card 0
+}
+
+ctl.SOMENAME {
+    type hw
+    card 0
+}
+
+------ 8< ----------- 8< ------
+
+8) run the jack server with:
+
+      jackstart -R -d alsa -d SOMENAME
+
+
