@@ -63,8 +63,8 @@ jack_sync_poll_exit (jack_engine_t *engine, jack_client_internal_t *client)
 		client->control->sync_poll = 0;
 		client->control->sync_new = 0;
 		engine->control->sync_remain--;
-		VERBOSE (engine, "sync poll interrupted for client %" PRIu32 "\n",
-			 client->control->id);
+		VERBOSE (engine, "sync poll interrupted for client %"
+			 PRIu32 "\n", client->control->id);
 	}
 	client->control->is_slowsync = 0;
 	engine->control->sync_clients--;
