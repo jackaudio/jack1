@@ -155,9 +155,9 @@ portaudio_driver_read (portaudio_driver_t *driver, jack_nframes_t nframes)
                 port = (jack_port_t *)node->data;
                 
                 if (jack_port_connected (port) && (driver->inPortAudio != NULL)) {
-                    buf = jack_port_get_buffer (port, nframes); 
                     int channels = driver->capture_nchannels;
                     float* in = driver->inPortAudio;
+                    buf = jack_port_get_buffer (port, nframes); 
                     for (i = 0; i< nframes; i++) buf[i] = in[channels*i+chn];
                 }
     
@@ -186,9 +186,9 @@ portaudio_driver_write (portaudio_driver_t *driver, jack_nframes_t nframes)
                 port = (jack_port_t *)node->data;
                 
                 if (jack_port_connected (port) && (driver->outPortAudio != NULL)) {
-                        buf = jack_port_get_buffer (port, nframes);
                         int channels = driver->playback_nchannels;
                         float* out = driver->outPortAudio;
+                        buf = jack_port_get_buffer (port, nframes);
                         for (i = 0; i< nframes; i++) out[channels*i+chn] = buf[i];
                 }
         }
@@ -304,8 +304,8 @@ portaudio_driver_new (char *name,
      
         if(err != paNoError) goto error;
         
-        printf("Pa_GetDefaultOutputDeviceID()  %ld\n", Pa_GetDefaultOutputDeviceID());
-	printf("Pa_GetDefaultInputDeviceID()  %ld\n", Pa_GetDefaultInputDeviceID());
+        printf("Pa_GetDefaultOutputDeviceID()  %d\n", Pa_GetDefaultOutputDeviceID());
+	printf("Pa_GetDefaultInputDeviceID()  %d\n", Pa_GetDefaultInputDeviceID());
         
         if (chan > 0) {
             driver->capture_nchannels = (driver->capture_nchannels < chan) ? driver->capture_nchannels : chan;

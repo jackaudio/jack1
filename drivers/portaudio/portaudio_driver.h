@@ -23,35 +23,40 @@
 #define __jack_portaudio_driver_h__
 
 
+#if defined(__APPLE__) && defined(__POWERPC__) 
+#include <jack/memops.h>
+#include <PortAudio.h>
+#else
+#include "../alsa/memops.h"
+#include <portaudio.h>
+#endif
+
 #include <jack/types.h>
 #include <jack/hardware.h>
 #include <jack/driver.h>
-#include <jack/memops.h>
 #include <jack/jack.h>
 #include <jack/internal.h>
-
-#include <PortAudio.h>
 
 typedef struct {
 
         JACK_DRIVER_DECL
 
         struct _jack_engine *engine;
-        
+
         jack_nframes_t    frame_rate;
         jack_nframes_t    frames_per_cycle;
         unsigned long     user_nperiods;
-        
+
         channel_t    playback_nchannels;
         channel_t    capture_nchannels;
-        
+
         jack_client_t *client;
         JSList   *capture_ports;
         JSList   *playback_ports;
 
         float *inPortAudio;
 	float *outPortAudio;
-         
+
         PortAudioStream*   stream;
 
 } portaudio_driver_t;

@@ -6,6 +6,12 @@ else
 ALSA_DIR =
 endif
 
-SUBDIRS = dummy $(ALSA_DIR)
+if HAVE_PA
+PA_DIR = portaudio
+else
+PA_DIR =
+endif
 
-DIST_SUBDIRS = dummy alsa 
+SUBDIRS = dummy $(ALSA_DIR) $(PA_DIR)
+
+DIST_SUBDIRS = dummy alsa portaudio
