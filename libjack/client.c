@@ -1994,6 +1994,18 @@ jack_get_xrun_delayed_usecs (jack_client_t *client)
 	return client->engine->xrun_delayed_usecs;
 }
 
+float
+jack_get_max_delayed_usecs (jack_client_t *client)
+{
+	return client->engine->max_delayed_usecs;
+}
+
+void
+jack_reset_max_delayed_usecs (jack_client_t *client)
+{
+	client->engine->max_delayed_usecs =  0.0f;
+}
+
 pthread_t
 jack_client_thread_id (jack_client_t *client)
 {

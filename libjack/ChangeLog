@@ -1,3 +1,10 @@
+2004-12-27  Jack O'Quin  <joq@io.com>
+
+	* new API functions jack_get_max_delayed_usecs() and
+	jack_reset_max_delayed_usecs()
+
+	* add US-X2Y USB device support to ALSA backend
+
 2004-11-28  Jack O'Quin  <joq@io.com>
 
 	* removed deprecated function jack_set_server_dir().

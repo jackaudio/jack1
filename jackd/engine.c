@@ -1685,6 +1685,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->control->do_munlock = do_unlock;
 	engine->control->cpu_load = 0;
 	engine->control->xrun_delayed_usecs = 0;
+	engine->control->max_delayed_usecs = 0;
 
 	engine->control->frame_timer.frames = 0;
 	engine->control->frame_timer.reset_pending = 0;
@@ -1771,6 +1772,9 @@ jack_engine_delay (jack_engine_t *engine, float delayed_usecs)
 	engine->control->frame_timer.reset_pending = 1;
 
 	engine->control->xrun_delayed_usecs = delayed_usecs;
+
+	if (delayed_usecs > engine->control->max_delayed_usecs)
+		engine->control->max_delayed_usecs = delayed_usecs;
 
 	event.type = XRun;
 
@@ -2004,6 +2008,8 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	}
 
 	jack_engine_post_process (engine);
+	if (delayed_usecs > engine->control->max_delayed_usecs)
+		engine->control->max_delayed_usecs = delayed_usecs;
 	ret = 0;
 
   unlock:
@@ -2150,6 +2156,8 @@ jack_engine_delete (jack_engine_t *engine)
 
 	VERBOSE (engine, "last xrun delay: %.3f usecs\n",
 		engine->control->xrun_delayed_usecs);
+	VERBOSE (engine, "max delay reported by backend: %.3f usecs\n",
+		engine->control->max_delayed_usecs);
 
 	/* free engine control shm segment */
 	engine->control = NULL;
