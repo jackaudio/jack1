@@ -21,6 +21,7 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include <jack/engine.h>
 #include "portaudio_driver.h"
 

@@ -613,40 +613,6 @@ jack_port_set_name (jack_port_t *port, const char *new_name)
 	return 0;
 }
 
-void
-jack_port_set_peak_function (jack_port_t *port,
-			     double (*func)(jack_port_t* port, jack_nframes_t))
-{
-	port->shared->type_info.peak = func;
-}
-
-void
-jack_port_set_power_function (jack_port_t *port,
-			      double (*func)(jack_port_t* port, jack_nframes_t))
-{
-	port->shared->type_info.power = func;
-}
-
-double
-jack_port_get_peak (jack_port_t* port, jack_nframes_t nframes)
-{
-	if (port->shared->type_info.peak (port, nframes)) {
-		return port->shared->type_info.peak (port, nframes);
-	} else {
-		return 0;
-	}
-}
-
-double
-jack_port_get_power (jack_port_t* port, jack_nframes_t nframes)
-{
-	if (port->shared->type_info.power) {
-		return port->shared->type_info.power (port, nframes);
-	} else {
-		return 0;
-	}
-}
-
 /* AUDIO PORT SUPPORT */
 
 static inline float f_max(float x, float a)

@@ -386,26 +386,6 @@ void jack_port_set_latency (jack_port_t *, jack_nframes_t);
 int jack_port_set_name (jack_port_t *port, const char *name);
 
 /**
- */
-
-double jack_port_get_peak (jack_port_t*, jack_nframes_t);
-
-/**
- */
-
-double jack_port_get_power (jack_port_t*, jack_nframes_t);
-
-/**
- */
-
-void jack_port_set_peak_function (jack_port_t *, double (*func)(jack_port_t*, jack_nframes_t));
-
-/**
- */
-
-void jack_port_set_power_function (jack_port_t *, double (*func)(jack_port_t*, jack_nframes_t));
-
-/**
  * If JackPortCanMonitor is set for a port, then these 2 functions will
  * turn on/off input monitoring for the port. If JackPortCanMonitor
  * is not set, then these functions will have no effect.

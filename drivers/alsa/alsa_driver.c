@@ -1347,14 +1347,8 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 			break;
 		}
 
-		if (driver->hw_metering) {
-			jack_port_set_peak_function(port, driver->hw->get_hardware_peak);
-			jack_port_set_power_function(port, driver->hw->get_hardware_power);
-		}
-		
 		/* XXX fix this so that it can handle: systemic (external) latency
 		*/
-
 		jack_port_set_latency (port, driver->frames_per_cycle);
 
 		driver->capture_ports = jack_slist_append (driver->capture_ports, port);
@@ -1372,14 +1366,8 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 			break;
 		}
 		
-		if (driver->hw_metering) {
-			jack_port_set_peak_function(port, driver->hw->get_hardware_peak);
-			jack_port_set_power_function(port, driver->hw->get_hardware_power);
-		}
-		
 		/* XXX fix this so that it can handle: systemic (external) latency
 		*/
-
 		jack_port_set_latency (port, driver->frames_per_cycle * driver->nfragments);
 
 		driver->playback_ports = jack_slist_append (driver->playback_ports, port);
