@@ -2385,11 +2385,11 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			break;
 
 		case 'm':
-			monitor = param->value.i;
+			monitor = TRUE;
 			break;
 
 		case 'M':
-			hw_metering = param->value.i;
+			hw_metering = TRUE;
 			break;
 
 		case 'r':
@@ -2405,7 +2405,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			break;
 				
 		case 's':
-			soft_mode = param->value.i;
+			soft_mode = TRUE;
 			break;
 
 		case 'z':
@@ -2422,7 +2422,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			break;
 
 		case 'S':
-			shorts_first = param->value.i;
+			shorts_first = TRUE;
 			break;
 
 		}

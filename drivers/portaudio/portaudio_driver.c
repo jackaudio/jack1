@@ -567,11 +567,11 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			break;
     
 		case 'C':
-			capture = param->value.i;
+			capture = TRUE;
 			break;
     
 		case 'P':
-			playback = param->value.i;
+			playback = TRUE;
 			break;
 
 		case 'r':
