@@ -32,7 +32,7 @@ cleanup ()
 	*/
 
 	if ((dir = opendir ("/tmp")) == NULL) {
-		fprintf (stderr, "jackd: cleanup - cannot open scratch directory\n");
+		fprintf (stderr, "jackd: cleanup - cannot open scratch directory (%s)\n", getpid(), strerror (errno));
 		return;
 	}
 
