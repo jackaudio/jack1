@@ -553,11 +553,11 @@ dnl
 echo
 echo $PACKAGE $VERSION :
 echo
-echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with ALSA support............................... : $HAVE_ALSA
-echo \| Build with PortAudio support.......................... : $HAVE_PA
+echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
+echo \| Build with PortAudio support.......................... : $HAVE_PA
 echo \|
-echo \| Default driver is..................................... : $JACK_DEFAULT_DRIVER
+echo \| Default driver backend................................ : $JACK_DEFAULT_DRIVER
 echo
 
