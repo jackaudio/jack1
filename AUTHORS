@@ -21,6 +21,8 @@ releases.  Melanie Thielker contributed significantly to JACK's
 interaction with aspects of both POSIX and System V APIs.  Stephane
 Letz ported JACK to Mac OS X.  Jussi Laako wrote the OSS driver
 interface.  Tilman Linneweh ported JACK to FreeBSD.  Johnny Petrantoni
-wrote the Mac OS X CoreAudio driver interface.
+wrote the Mac OS X CoreAudio driver interface.  Rui Nuno Capela
+designed and implemented several JACK improvements to go with his
+excellent QJackCtl graphical interface for JACK.
 
 Many others have contributed patches and/or test results.
