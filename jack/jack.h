@@ -177,16 +177,17 @@ const char ** jack_port_get_connections (const jack_port_t *port);
 int jack_port_set_name (jack_port_t *port, const char *name);
 
 /* This returns a pointer to the memory area associated with the
-   specified port. It can only be called from within the client's
-   "process" callback. For an output port, it will be a memory area
+   specified port. For an output port, it will be a memory area
    that can be written to; for an input port, it will be an area
    containing the data from the port's connection(s), or
    zero-filled. if there are multiple inbound connections, the data
    will be mixed appropriately.  
 
-   You may not cache the values returned across process() callbacks.
-   There is no guarantee that the values will not change from
-   process() callback to process() callback.
+   You may cache the value returned, but only between calls to
+   your "blocksize" callback. For this reason alone, you should
+   either never cache the return value or ensure you have
+   a "blocksize" callback and be sure to invalidate the cached
+   address from there.
 */
 
 void *jack_port_get_buffer (jack_port_t *, nframes_t);
