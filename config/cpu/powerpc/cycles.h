@@ -28,10 +28,7 @@
 
 typedef unsigned long cycles_t;
 
-/*
- * For the "cycle" counter we use the timebase lower half.
- * Currently only used on SMP.
- */
+/* For the "cycle" counter we use the timebase lower half. */
 
 extern cycles_t cacheflush_time;
 
