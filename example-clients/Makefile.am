@@ -42,7 +42,7 @@ sndfile_cflags = @SNDFILE_CFLAGS@
 endif
 
 AM_CFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
-AM_CXXFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
+AM_CXXFLAGS = -I.. $(FLTK_CXXFLAGS) $(JACK_CFLAGS) $(sndfile_cflags)
 
 jack_simple_client_SOURCES = simple_client.c
 jack_simple_client_LDFLAGS = -lrt -ldl -lpthread
@@ -75,7 +75,7 @@ jack_showtime_LDADD = ../libjack/libjack.la
 
 if HAVE_FLTK
 jack_fltk_client_SOURCES = fltk_client.cc
-jack_fltk_client_LDFLAGS = -L/usr/X11R6/lib -lfltk -lX11 -lXext -lrt -ldl -lpthread
+jack_fltk_client_LDFLAGS = -lrt $(FLTK_LDFLAGS)
 jack_fltk_client_LDADD = ../libjack/libjack.la
 endif
 

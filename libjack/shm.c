@@ -240,21 +240,24 @@ jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot, i
 	   begin with one (as per POSIX shm API).
 	*/
 
-	if (mkdir ("/tmp/jack", 0775)) {
+	
+	snprintf (path, sizeof(path), "%s/jack", jack_server_dir);
+	if (mkdir (path, 0775)) {
 		if (errno != EEXIST) {
 			jack_error ("cannot create JACK directory (%s)", strerror (errno));
 			return MAP_FAILED;
 		}
 	}
 
-	if (mkdir ("/tmp/jack/shm", 0775)) {
+	snprintf (path, sizeof(path), "%s/jack/shm", jack_server_dir);
+	if (mkdir (path, 0775)) {
 		if (errno != EEXIST) {
 			jack_error ("cannot create JACK shm directory (%s)", strerror (errno));
 			return MAP_FAILED;
 		}
 	}
 
-	snprintf (path, sizeof(path), "/tmp/jack/shm%s", shm_name);
+	snprintf (path, sizeof(path), "%s/jack/shm%s", jack_server_dir, shm_name);
 	if ((status = stat (path, &statbuf)) < 0) {
 		int fd;
 

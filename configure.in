@@ -13,8 +13,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=70
-JACK_MICRO_VERSION=5
+JACK_MINOR_VERSION=71
+JACK_MICRO_VERSION=1
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -200,6 +200,23 @@ fi
 
 AC_SUBST(HTML_DIR)
 
+
+# allow specifying default tmpdir
+AC_ARG_WITH(default-tmpdir,
+            [  --with-default-tmpdir=PATH    where jackd and clients will put tmp files (/tmp)])
+
+if test "x$with_default_tmpdir" = "x" ; then
+	DEFAULT_TMP_DIR=/tmp
+else
+	DEFAULT_TMP_DIR=$with_default_tmpdir
+fi
+
+AC_SUBST(DEFAULT_TMP_DIR)
+AC_DEFINE_UNQUOTED(DEFAULT_TMP_DIR,"$DEFAULT_TMP_DIR",[Default tmp directory])
+
+
+
+
 # jack depends on alsa 0.9. some example apps depend on libsndfile and fltk.
 
 AC_CHECK_LIB(asound,snd_pcm_drop,
@@ -224,19 +241,35 @@ if test "x$HAVE_ALSA" != "xtrue"; then
    fi
 fi
 
-AC_LANG_SAVE
-AC_LANG_CPLUSPLUS
-AC_CHECK_LIB(fltk,main,
-             [AC_CHECK_HEADER(FL/Fl.H,
-                              [HAVE_FLTK=true],
-                              [HAVE_FLTK=false]
-              )],
-             [HAVE_FLTK=false],
-             [-L/usr/X11R6/lib -lX11 -lXext]
-)
-AC_LANG_RESTORE
-if test $HAVE_FLTK = "false"; then
-             AC_MSG_WARN([*** no fltk found, the fltk example client will not be built])
+#
+# FLTK
+#
+jack_enable_fltk="yes"
+AC_ARG_ENABLE(fltk, [  --disable-fltk          disable fltk-dependant code],[
+  case "$enableval" in
+    "yes")
+      ;;
+    "no")
+      jack_enable_fltk="no"
+      ;;
+    *)
+      AC_MSG_ERROR([must use --enable-fltk(=yes/no) or --disable-fltk])
+      ;;
+  esac
+])
+                                                                                                                                                       
+if test "$jack_enable_fltk" = "yes"; then
+  AC_LIB_FLTK
+  if test "$FLTK_FOUND" = "yes"; then
+    HAVE_FLTK=true
+    AC_DEFINE(HAVE_FLTK, 1, [whether or not we have fltk])
+  else
+    HAVE_FLTK=false
+    AC_MSG_WARN([*** no fltk found, the fltk example client will not be built])
+  fi
+else
+  FLTK_FOUND="no"
+  HAVE_FLTK=false
 fi
 
 HAVE_SNDFILE=false

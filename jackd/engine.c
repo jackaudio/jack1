@@ -1368,6 +1368,36 @@ handle_client_socket_error (jack_engine_t *engine, int fd)
 	jack_client_internal_t *client = 0;
 	JSList *node;
 
+#ifndef DEFER_CLIENT_REMOVE_TO_AUDIO_THREAD
+
+        jack_lock_graph (engine);
+
+        for (node = engine->clients; node; node = jack_slist_next (node)) {
+
+                if (jack_client_is_internal((jack_client_internal_t *) node->data)) {
+                        continue;
+                }
+
+                if (((jack_client_internal_t *) node->data)->request_fd == fd) {
+                        client = (jack_client_internal_t *) node->data;
+                        break;
+                }
+        }
+
+        if (client) {
+		if (engine->verbose) {
+			fprintf (stderr, "removing failed client %s state = %s errors = %d\n", 
+				 client->control->name, client_state_names[client->control->state],
+				 client->error);
+		}
+		jack_remove_client(engine, client);
+		jack_sort_graph (engine);
+	}
+
+        jack_unlock_graph (engine);
+
+#else
+
 	jack_lock_graph (engine);
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
@@ -1386,6 +1416,7 @@ handle_client_socket_error (jack_engine_t *engine, int fd)
 	}
 
 	jack_unlock_graph (engine);
+#endif
 
 	return 0;
 }
@@ -2148,6 +2179,8 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	client->control->bufsize_arg = NULL;
 	client->control->srate = NULL;
 	client->control->srate_arg = NULL;
+	client->control->xrun = NULL;
+	client->control->xrun_arg = NULL;
 	client->control->port_register = NULL;
 	client->control->port_register_arg = NULL;
 	client->control->graph_order = NULL;

@@ -52,7 +52,12 @@
 
 jack_time_t __jack_cpu_mhz;
 
+
+#ifdef DEFAULT_TMP_DIR
+char *jack_server_dir = DEFAULT_TMP_DIR;
+#else
 char *jack_server_dir = "/tmp";
+#endif
 
 void
 jack_set_server_dir (const char *path)

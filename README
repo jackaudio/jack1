@@ -1,3 +1,31 @@
 Welcome to JACK, the Jack Audio Connection Kit.
 
 Please see the website (http://jackit.sf.net/) for more information.
+
+NOTE: If you are using reiserfs or ext3fs or anything except ext2fs
+for the directory where JACK puts its temporary files (/tmp by
+default), then the JACK team recommends that you do the following:
+
+----------------------------
+
+# mkdir /mnt/ramfs
+
+[edit /etc/fstab and add the following line]
+none       /mnt/ramfs      ramfs      defaults  0 0
+
+[add the following command to one of your bootup scripts,
+  eg /etc/rc.d/rc.local (redhat) or /etc/conf.d/local.start 
+  (gentoo), etc]:
+
+chmod 777 /mnt/ramfs
+
+Then add --with-default-tmpdir=/mnt/ramfs to the JACK configure 
+line when you build it.
+
+------------------------------
+
+Failure to do this will lead to extremely poor performance from JACK,
+since its normal operation will cause bursts of disk I/O that are
+completely unnecessary. This suggestion can also be used by ext2fs
+users if they wish.
+
