@@ -104,7 +104,9 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
 
 void jack_shutdown(void *arg)
 {
+#if defined(RL_READLINE_VERSION) && RL_READLINE_VERSION >= 0x0400
     rl_cleanup_after_signal();
+#endif
     fprintf(stderr, "JACK shut down, exiting ...\n");
     exit(1);
 }
