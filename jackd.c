@@ -227,6 +227,7 @@ static void usage ()
 usage: jackd [ --asio OR -a ]
 	     [ --realtime OR -R [ --realtime-priority OR -P priority ] ]
              [ --verbose OR -v ]
+             [ --getcap OR -g capability-program-name ]
              [ --tmpdir OR -D directory-for-temporary-files ]
          -d driver [ ... driver args ... ]
 ");
@@ -242,6 +243,7 @@ main (int argc, char *argv[])
 		{ "asio", 0, 0, 'a' },
 		{ "driver", 1, 0, 'd' },
 		{ "tmpdir", 1, 0, 'D' },
+		{ "getcap", 1, 0, 'g' },
 		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
 		{ "realtime", 0, 0, 'R' },
@@ -253,6 +255,7 @@ main (int argc, char *argv[])
 	int opt;
 	int seen_driver = 0;
 	char *driver_name = 0;
+	char *getcap_name = 0;
 	char **driver_args = 0;
 	int driver_nargs = 1;
 	int i;
@@ -271,6 +274,10 @@ main (int argc, char *argv[])
 		case 'd':
 			seen_driver = 1;
 			driver_name = optarg;
+			break;
+
+		case 'g':
+			getcap_name = optarg;
 			break;
 
 		case 'v':
@@ -321,6 +328,9 @@ main (int argc, char *argv[])
 		 "jackd comes with ABSOLUTELY NO WARRANTY\n"
 		 "This is free software, and you are welcome to redistribute it\n"
 		 "under certain conditions; see the file COPYING for details\n\n");
+
+	/* get real-time capabilities for this process, we should check for errors */
+	if (getcap_name) system (getcap_name);
 
 	if (!with_fork) {
 
