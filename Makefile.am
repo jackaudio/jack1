@@ -6,22 +6,40 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure config.h.in \
 
 if HAVE_DOXYGEN
 SUBDIRS = . jack doc
+dist-check-doxygen:
 else
 SUBDIRS = . jack
+dist-check-doxygen:
+	@echo
+	@echo ' ******' You need doxygen installed to make dist.' ******'
+	@echo
+	@false
 endif
 
 DIST_SUBDIRS = jack doc
 
 if HAVE_FLTK
 FLTK_CLIENT = jack_fltk_client
+dist-check-fltk:
 else
 FLTK_CLIENT =
+dist-check-fltk:
+	@echo
+	@echo ' ******' You need fltk installed to make dist.' ******'
+	@echo
+	@false
 endif
 
 if HAVE_SNDFILE
 JACKREC = jackrec
+dist-check-sndfile:
 else
 JACKREC =
+dist-check-sndfile:
+	@echo
+	@echo ' ******' You need sndfile installed to make dist.' ******'
+	@echo
+	@false
 endif
 
 EXTRA_DIST = jack.spec.in
@@ -90,3 +108,5 @@ pkgconfig_DATA = jack.pc
 
 rpm: dist
 	rpm -ta $(distdir).tar.gz
+
+dist-hook: dist-check-doxygen dist-check-fltk dist-check-sndfile

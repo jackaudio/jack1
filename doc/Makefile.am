@@ -46,18 +46,7 @@ uninstall-local: doxygen-build.stamp
 	  done; \
 	fi)
 
-#
-# Require doxygen when making dist
-#
-if HAVE_DOXYGEN
-dist-check-doxygen:
-else
-dist-check-doxygen:
-	@echo "*** doxygen must be installed and enabled in order to make dist"
-	@false
-endif
-
-dist-hook: dist-hook-local dist-check-doxygen
+dist-hook: dist-hook-local
 	mkdir $(distdir)/reference
 	mkdir $(distdir)/reference/html
 	-cp reference/html/*.html reference/html/*.css \
