@@ -1,0 +1,16 @@
+config.log
+aclocal.m4
+config.status
+*.lo
+*.o
+libtool
+jackd
+jack_simple_client
+jack_monitor_client
+*.la
+*.pc
+Makefile
+Makefile.in
+jack_fltk_client
+configure
+
