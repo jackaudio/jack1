@@ -1244,10 +1244,11 @@ static void *
 watchdog_thread (void *arg)
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
-
+	int watchdog_priority = (engine->rtpriority) > 89 ? 99 : engine->rtpriority + 10;
+	
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
-	if (jack_become_real_time (pthread_self(), engine->rtpriority + 10)) {
+	if (jack_become_real_time (pthread_self(), watchdog_priority)) {
 		return 0;
 	}
 
