@@ -56,7 +56,7 @@ main (int argc, char *argv[])
 					printf ("   %s\n", connections[j]);
 				}
 				free (connections);
-			}
+			} 
 		}
 		if (show_latency) {
 			jack_port_t *port = jack_port_by_name (client, ports[i]);

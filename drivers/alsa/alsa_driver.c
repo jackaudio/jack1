@@ -1147,7 +1147,8 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 			/* oh well, the engine can't run, so we'll just throw away this 
 			   cycle's data ...
 			*/
-			snd_pcm_mmap_commit (driver->capture_handle, capture_offset, contiguous);
+			if (driver->capture_handle)
+				snd_pcm_mmap_commit (driver->capture_handle, capture_offset, contiguous);
 		}
 
 		/* Now handle input monitoring */
@@ -1453,19 +1454,50 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->clock_sync_listeners = 0;
 
 	if (playing) {
-		if ((err = snd_pcm_open (&driver->playback_handle, alsa_device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
-			jack_error ("ALSA: Cannot open PCM device %s/%s", name, alsa_device);
-			free (driver);
-			return 0;
+		if (snd_pcm_open (&driver->playback_handle, alsa_device, SND_PCM_STREAM_PLAYBACK, 0) < 0) {
+			driver->playback_handle = NULL;
 		}
 	} 
 
 	if (capturing) {
-		if ((err = snd_pcm_open (&driver->capture_handle, alsa_device, SND_PCM_STREAM_CAPTURE, 0)) < 0) {
-			snd_pcm_close (driver->playback_handle);
-			jack_error ("ALSA: Cannot open PCM device %s", name);
-			free (driver);
-			return 0;
+		if (snd_pcm_open (&driver->capture_handle, alsa_device, SND_PCM_STREAM_CAPTURE, 0) < 0) {
+			driver->capture_handle = NULL;
+		}
+	}
+
+	if (driver->playback_handle == NULL) {
+		if (playing) {
+
+			/* they asked for playback, but we can't do it */
+
+			jack_error ("ALSA: Cannot open PCM device %s for playback. Falling back to capture-only mode",
+				    name);
+
+			if (driver->capture_handle == NULL) {
+				/* can't do anything */
+				free (driver);
+				return 0;
+			}
+			
+			playing = FALSE;
+		}
+	}
+
+	if (driver->capture_handle == NULL) {
+		if (capturing) {
+
+			/* they asked for capture, but we can't do it */
+			
+			jack_error ("ALSA: Cannot open PCM device %s for capture. Falling back to playback-only mode",
+				    name);
+			
+			if (driver->playback_handle == NULL) {
+				/* can't do anything */
+				free (driver);
+				return 0;
+			}
+
+			capturing = FALSE;
 		}
 	}
 

@@ -17,7 +17,7 @@ process (jack_nframes_t nframes, void *arg)
 	jack_default_audio_sample_t *in = (jack_default_audio_sample_t *) jack_port_get_buffer (input_port, nframes);
 
 	memcpy (out, in, sizeof (jack_default_audio_sample_t) * nframes);
-
+	
 	return 0;      
 }
 
@@ -32,7 +32,7 @@ srate (jack_nframes_t nframes, void *arg)
 void
 error (const char *desc)
 {
-	printf ("JACK experienced an error: %s\n", desc);
+	fprintf (stderr, "JACK error: %s\n", desc);
 }
 
 void
@@ -115,7 +115,7 @@ main (int argc, char *argv[])
 
 
 	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsOutput)) == NULL) {
-		fprintf(stderr, "Cannot find any physical capture ports");
+		fprintf(stderr, "Cannot find any physical capture ports\n");
 		exit(1);
 	}
 
@@ -126,7 +126,7 @@ main (int argc, char *argv[])
 	free (ports);
 	
 	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsInput)) == NULL) {
-		fprintf(stderr, "Cannot find any physical playback ports");
+		fprintf(stderr, "Cannot find any physical playback ports\n");
 		exit(1);
 	}
 

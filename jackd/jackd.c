@@ -140,6 +140,10 @@ jack_main (int argc, char **argv)
 	sigset_t allsignals;
 	struct sigaction action;
 
+	/* remove any existing files from a previous instance */
+	
+	jack_cleanup_files ();
+
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
 	/* what's this for?
@@ -251,7 +255,7 @@ jack_main (int argc, char **argv)
 
 	if (sig != SIGSEGV) {
 
-	/* unblock signals so we can see them during shutdown.
+		/* unblock signals so we can see them during shutdown.
 		   this will help prod developers not to lose sight
 		   of bugs that cause segfaults etc. during shutdown.
 		*/

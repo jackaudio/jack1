@@ -44,8 +44,8 @@ typedef struct _jack_port    jack_port_t;
 typedef struct _jack_client  jack_client_t;
 
 /**
- *  Ports have unique ids. You will very rarely need to know them, however,
- *  except in the case of the port registration callback.
+ *  Ports have unique ids. A port registration callback is the only
+ *  place you ever need to know their value.
  */
 typedef unsigned long        jack_port_id_t;
 

@@ -79,7 +79,7 @@ void jack_internal_client_close (const char *client_name);
  *
  * NOTE: clients do not need to call this.  It exists only
  * to help more complex clients understand what is going
- * on.  If called, it must be called before jack_client_activate().
+ * on.  If called, it should be called before jack_client_activate().
  */
 void jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg);
 
@@ -101,7 +101,11 @@ void jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void 
 int jack_set_process_callback (jack_client_t *, JackProcessCallback process_callback, void *arg);
 
 /**
- * <b>Note!</b> This function is deprecated.
+ * Tell the Jack server to call 'bufsize_callback' whenever the size of the
+ * the buffer that will be passed to the process callback changes, 
+ * passing 'arg' as the second argument.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback bufsize_callback, void *arg);
 
@@ -191,6 +195,22 @@ jack_port_t *jack_port_register (jack_client_t *,
 int jack_port_unregister (jack_client_t *, jack_port_t *);
 
 /**
+ * This returns a pointer to the memory area associated with the
+ * specified port. For an output port, it will be a memory area
+ * that can be written to; for an input port, it will be an area
+ * containing the data from the port's connection(s), or
+ * zero-filled. if there are multiple inbound connections, the data
+ * will be mixed appropriately.  
+ *
+ * You may cache the value returned, but only between calls to
+ * your "blocksize" callback. For this reason alone, you should
+ * either never cache the return value or ensure you have
+ * a "blocksize" callback and be sure to invalidate the cached
+ * address from there.
+ */
+void *jack_port_get_buffer (jack_port_t *, jack_nframes_t);
+
+/**
  * Returns the name of the jack_port_t.
  */
 const char * jack_port_name (const jack_port_t *port);
@@ -264,82 +284,6 @@ const char ** jack_port_get_connections (const jack_port_t *port);
  *          about its connections. 
  */   
 const char ** jack_port_get_all_connections (const jack_client_t *client, const jack_port_t *port);
-
-/**
- * This modifies a port's name, and may be called at any time.
- *
- * @return 0 on success, otherwise a non-zero error code
- */
-int jack_port_set_name (jack_port_t *port, const char *name);
-
-/**
- * This returns a pointer to the memory area associated with the
- * specified port. For an output port, it will be a memory area
- * that can be written to; for an input port, it will be an area
- * containing the data from the port's connection(s), or
- * zero-filled. if there are multiple inbound connections, the data
- * will be mixed appropriately.  
- *
- * You may cache the value returned, but only between calls to
- * your "blocksize" callback. For this reason alone, you should
- * either never cache the return value or ensure you have
- * a "blocksize" callback and be sure to invalidate the cached
- * address from there.
- */
-void *jack_port_get_buffer (jack_port_t *, jack_nframes_t);
-
-/**
- * Establishes a connection between two ports.
- *
- * When a connection exists, data written to the source port will
- * be available to be read at the destination port.
- *
- * @pre The types of both ports must be identical to establish a connection.
- * @pre The flags of the source port must include PortIsOutput.
- * @pre The flags of the destination port must include PortIsInput.
- *
- * @return 0 on success, otherwise a non-zero error code
- */
-int jack_connect (jack_client_t *,
-		  const char *source_port,
-		  const char *destination_port);
-
-/**
- * Removes a connection between two ports.
- *
- * @pre The types of both ports must be identical to establish a connection.
- * @pre The flags of the source port must include PortIsOutput.
- * @pre The flags of the destination port must include PortIsInput.
- *
- * @return 0 on success, otherwise a non-zero error code
- */
-int jack_disconnect (jack_client_t *,
-		     const char *source_port,
-		     const char *destination_port);
-
-/**
- * Performs the exact same function as jack_connect(), but it uses
- * port handles rather than names, which avoids the name lookup inherent
- * in the name-based version.
- *
- * It is envisaged that clients connecting their own ports will use these
- * two, whereas generic connection clients (e.g. patchbays) will use the
- * name-based versions.
- *
- * @return 0 on success, otherwise a non-zero error code
- */
-int jack_port_connect (jack_client_t *, jack_port_t *src, jack_port_t *dst);
-
-/**
- * Performs the exact same function as jack_disconnect(), but it uses
- * port handles rather than names, which avoids the name lookup inherent
- * in the name-based version.
- *
- * It is envisaged that clients disconnecting their own ports will use these
- * two, whereas generic connection clients (e.g. patchbays) will use the
- * name-based versions.
- */
-int jack_port_disconnect (jack_client_t *, jack_port_t *);
 
 /**
  * A client may call this on a pair of its own ports to 
@@ -416,6 +360,33 @@ jack_nframes_t jack_port_get_total_latency (jack_client_t *, jack_port_t *port);
 void jack_port_set_latency (jack_port_t *, jack_nframes_t);
 
 /**
+ * This modifies a port's name, and may be called at any time.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+int jack_port_set_name (jack_port_t *port, const char *name);
+
+/**
+ */
+
+double jack_port_get_peak (jack_port_t*, jack_nframes_t);
+
+/**
+ */
+
+double jack_port_get_power (jack_port_t*, jack_nframes_t);
+
+/**
+ */
+
+void jack_port_set_peak_function (jack_port_t *, double (*func)(jack_port_t*, jack_nframes_t));
+
+/**
+ */
+
+void jack_port_set_power_function (jack_port_t *, double (*func)(jack_port_t*, jack_nframes_t));
+
+/**
  * If JackPortCanMonitor is set for a port, then these 2 functions will
  * turn on/off input monitoring for the port. If JackPortCanMonitor
  * is not set, then these functions will have no effect.
@@ -446,6 +417,59 @@ int jack_port_ensure_monitor (jack_port_t *port, int onoff);
  * input monitoring has been requested for 'port'.
  */
 int jack_port_monitoring_input (jack_port_t *port);
+
+/**
+ * Establishes a connection between two ports.
+ *
+ * When a connection exists, data written to the source port will
+ * be available to be read at the destination port.
+ *
+ * @pre The types of both ports must be identical to establish a connection.
+ * @pre The flags of the source port must include PortIsOutput.
+ * @pre The flags of the destination port must include PortIsInput.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+int jack_connect (jack_client_t *,
+		  const char *source_port,
+		  const char *destination_port);
+
+/**
+ * Removes a connection between two ports.
+ *
+ * @pre The types of both ports must be identical to establish a connection.
+ * @pre The flags of the source port must include PortIsOutput.
+ * @pre The flags of the destination port must include PortIsInput.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+int jack_disconnect (jack_client_t *,
+		     const char *source_port,
+		     const char *destination_port);
+
+/**
+ * Performs the exact same function as jack_connect(), but it uses
+ * port handles rather than names, which avoids the name lookup inherent
+ * in the name-based version.
+ *
+ * It is envisaged that clients connecting their own ports will use these
+ * two, whereas generic connection clients (e.g. patchbays) will use the
+ * name-based versions.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+int jack_port_connect (jack_client_t *, jack_port_t *src, jack_port_t *dst);
+
+/**
+ * Performs the exact same function as jack_disconnect(), but it uses
+ * port handles rather than names, which avoids the name lookup inherent
+ * in the name-based version.
+ *
+ * It is envisaged that clients disconnecting their own ports will use these
+ * two, whereas generic connection clients (e.g. patchbays) will use the
+ * name-based versions.
+ */
+int jack_port_disconnect (jack_client_t *, jack_port_t *);
 
 /**
  * This returns the sample rate of the jack system, as set by the user when
@@ -543,28 +567,6 @@ float jack_cpu_load (jack_client_t *client);
 void jack_set_server_dir (const char *path);
 
 /**
- * Create an alias for a port. Returns zero if
- * successful, non-zero otherwise. After a successful
- * return, `alias' may be used to refer to a port
- * instead of the port's actual name. the naming
- * scheme is "alias:<alias>", so if the port alias
- * was "left", and the port name was "foo:out1",
- * then "alias:left" will refer to "foo:out1".
- *
- * @return 0 on success, otherwise a non-zero error code
- */
-int jack_add_alias    (jack_client_t *, const char *portname, const char *alias);
-
-/**
- * Remove `alias' from a JACK system.
- *
- * @return zero if successful, less than zero if the alias
- * did not exist, greater than zero if the alias could not
- * be removed.
- */
-int jack_remove_alias (jack_client_t *, const char *alias);
-
-/**
  * Return the pthread ID of the thread running the JACK client
  * side code.
  */
@@ -575,3 +577,5 @@ pthread_t jack_client_thread_id (jack_client_t *);
 #endif
 
 #endif /* __jack_h__ */
+
+

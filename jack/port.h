@@ -33,26 +33,38 @@
 typedef unsigned long jack_client_id_t;
 
 typedef struct _jack_port_type_info {
-    const char type_name[JACK_PORT_TYPE_SIZE];   /* what do you think ? */
+    const char type_name[JACK_PORT_TYPE_SIZE];      
 
-    void (*mixdown)(jack_port_t *, jack_nframes_t);   /* function to mixdown multiple inputs to a buffer. can be
-						    NULL, indicating that multiple input connections
-						    are not legal for this data type.
-						 */
+    void (*mixdown)(jack_port_t *, jack_nframes_t); /* function to mixdown multiple inputs to a buffer. can be
+						       NULL, indicating that multiple input connections
+						       are not legal for this data type.
+						    */
+    
+    double (*peak)(jack_port_t *, jack_nframes_t);   /* function to compute a peak value for a buffer. can be
+							NULL, indicating that the computation has no meaning.
+							
+							the return value is normalized to a [0..1] range.
+						     */
 
-    long buffer_scale_factor;                    /* If == 1, then a buffer to handle nframes worth of
-						    data is sizeof(jack_default_audio_sample_t) * nframes bytes large.
-						    
-						    If anything other than 1, the buffer allocated
-						    for input mixing will be this value times
-						    sizeof (jack_default_audio_sample_t) * nframes bytes in size.
+    double (*power)(jack_port_t *, jack_nframes_t);  /* function to compute a power value for a buffer. can be
+							NULL, indicating that the computation has no meaning.
 
-						    Obviously, for non-audio data types, it may have
-						    a different value.
-
-						    if < 0, then the value should be ignored, and
-						    port->shared->buffer_size should be used.
-						 */
+							the return value is normalized to a [0..1] range.
+						     */
+    
+    long buffer_scale_factor;                       /* If == 1, then a buffer to handle nframes worth of
+						       data is sizeof(jack_default_audio_sample_t) * nframes bytes large.
+						       
+						       If anything other than 1, the buffer allocated
+						       for input mixing will be this value times
+						       sizeof (jack_default_audio_sample_t) * nframes bytes in size.
+						       
+						       Obviously, for non-audio data types, it may have
+						       a different value.
+						       
+						       if < 0, then the value should be ignored, and
+						       port->shared->buffer_size should be used.
+						    */
 } jack_port_type_info_t;
 
 /* This is the data structure allocated in shared memory
@@ -73,6 +85,9 @@ typedef struct _jack_port_shared {
     volatile jack_nframes_t  latency;
     volatile jack_nframes_t  total_latency;
     volatile unsigned char   monitor_requests;
+
+    double (*peak)(jack_port_t*,jack_nframes_t);
+    double (*power)(jack_port_t*,jack_nframes_t);
 
     char                     in_use     : 1;
     char                     locked     : 1;

@@ -66,7 +66,6 @@ struct _jack_engine {
 
     JSList *clients;
     JSList *clients_waiting;
-    JSList *aliases;
 
     struct _jack_port_internal *internal_ports;
 

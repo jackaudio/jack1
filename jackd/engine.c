@@ -60,6 +60,8 @@
  */
 #define JACKD_SOFT_MODE_TIMEOUT 500
 
+#define JACK_ERROR_WITH_SOCKETS 10000000
+
 typedef struct {
 
     jack_port_internal_t *source;
@@ -98,8 +100,9 @@ typedef struct _jack_driver_info {
 static int                    jack_port_assign_buffer (jack_engine_t *, jack_port_internal_t *);
 static jack_port_internal_t *jack_get_port_by_name (jack_engine_t *, const char *name);
 
-static void jack_client_delete (jack_engine_t *, jack_client_internal_t *);
+static void jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client);
 static void jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client);
+static void jack_client_delete (jack_engine_t *, jack_client_internal_t *);
 
 static jack_client_internal_t *jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_request_t *);
 static jack_client_internal_t *jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
@@ -112,9 +115,6 @@ static void jack_clear_fifos (jack_engine_t *engine);
 static int  jack_port_do_connect (jack_engine_t *engine, const char *source_port, const char *destination_port);
 static int  jack_port_do_disconnect (jack_engine_t *engine, const char *source_port, const char *destination_port);
 static int  jack_port_do_disconnect_all (jack_engine_t *engine, jack_port_id_t);
-
-static int  jack_do_add_alias (jack_engine_t *engine, jack_request_t *);
-static int  jack_do_remove_alias (jack_engine_t *engine, jack_request_t *);
 
 static int  jack_port_do_unregister (jack_engine_t *engine, jack_request_t *);
 static int  jack_port_do_register (jack_engine_t *engine, jack_request_t *);
@@ -134,8 +134,6 @@ static void jack_engine_process_unlock (jack_engine_t *);
 static int  jack_engine_post_process (jack_engine_t *);
 
 static int  internal_client_request (void*, jack_request_t *);
-
-static const char *jack_lookup_alias (jack_engine_t *engine, const char *alias);
 
 static int  jack_use_driver (jack_engine_t *engine, jack_driver_t *driver);
 
@@ -333,7 +331,7 @@ jack_cleanup_files ()
 	while ((dirent = readdir (dir)) != NULL) {
 		if (strncmp (dirent->d_name, "jack-", 5) == 0 || strncmp (dirent->d_name, "jack_", 5) == 0) {
 			char fullpath[PATH_MAX+1];
-			sprintf (fullpath, "%s/%s", jack_server_dir, dirent->d_name);
+			snprintf (fullpath, sizeof (fullpath), "%s/%s", jack_server_dir, dirent->d_name);
 			unlink (fullpath);
 		} 
 	}
@@ -646,7 +644,12 @@ jack_engine_post_process (jack_engine_t *engine)
 
 		if (!jack_client_is_internal (client) && ctl->process) {
 			if (ctl->awake_at != 0 && ctl->state > NotTriggered && ctl->state != Finished && ctl->timed_out++) {
-				client->error = TRUE;
+				fprintf (stderr, "client %s error: awake_at = %Lu state = %d timed_out = %d\n",
+					 ctl->name,
+					 ctl->awake_at,
+					 ctl->state,
+					 ctl->timed_out);
+				client->error++;
 			}
 		}
 
@@ -669,14 +672,31 @@ jack_engine_post_process (jack_engine_t *engine)
 			client = (jack_client_internal_t *) node->data;
 			
 			if (client->error) {
-				
-				if (engine->verbose) {
-					fprintf (stderr, "removing failed client %s state = %s errors = %d\n", 
-						 client->control->name, client_state_names[client->control->state],
-						 client->error);
+
+				/* if we have a communication problem with the client,
+				   remove it. otherwise, turn it into a zombie. the client
+				   will/should realize this and will close it sockets.
+				   then we'll end up back here again and will finally
+				   remove the client.
+				*/
+
+				if (client->error >= JACK_ERROR_WITH_SOCKETS) {
+					if (engine->verbose) {
+						fprintf (stderr, "removing failed client %s state = %s errors = %d\n", 
+							 client->control->name, client_state_names[client->control->state],
+							 client->error);
+					}
+					jack_remove_client (engine, (jack_client_internal_t *) node->data);
+				} else {
+					if (engine->verbose) {
+						fprintf (stderr, "zombifying failed client %s state = %s errors = %d\n", 
+							 client->control->name, client_state_names[client->control->state],
+							 client->error);
+					}
+					jack_zombify_client (engine, (jack_client_internal_t *) node->data);
+					client->error = 0;
 				}
-				
-				jack_remove_client (engine, (jack_client_internal_t *) node->data);
+
 				need_sort = TRUE;
 			}
 			
@@ -1301,7 +1321,7 @@ jack_set_timebase (jack_engine_t *engine, jack_client_id_t client)
 }
 
 static int
-handle_client_jack_error (jack_engine_t *engine, int fd)
+handle_client_socket_error (jack_engine_t *engine, int fd)
 {
 	jack_client_internal_t *client = 0;
 	JSList *node;
@@ -1316,7 +1336,9 @@ handle_client_jack_error (jack_engine_t *engine, int fd)
 
 		if (((jack_client_internal_t *) node->data)->request_fd == fd) {
 			client = (jack_client_internal_t *) node->data;
-			client->error++;
+			if (client->error < JACK_ERROR_WITH_SOCKETS) {
+				client->error += JACK_ERROR_WITH_SOCKETS;
+			}
 			break;
 		}
 	}
@@ -1374,22 +1396,10 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		
 	case GetPortConnections:
 	case GetPortNConnections:
-		if (reply_fd) {
-			req->status = jack_do_get_port_connections (engine, req, *reply_fd);
-			if (req->status != 0) {
-				*reply_fd = -1;
-			}
-		} else {
-			req->status = -1;
+		if ((req->status = jack_do_get_port_connections (engine, req, *reply_fd)) == 0) {
+			/* we have already replied, don't do it again */
+			*reply_fd = -1;
 		}
-		break;
-
-	case AddAlias:
-		req->status = jack_do_add_alias (engine, req);
-		break;
-
-	case RemoveAlias:
-		req->status = jack_do_remove_alias (engine, req);
 		break;
 
 	default:
@@ -1557,7 +1567,7 @@ jack_server_thread (void *arg)
 			}
 
 			if (pfd[i].revents & ~POLLIN) {
-				handle_client_jack_error (engine, pfd[i].fd);
+				handle_client_socket_error (engine, pfd[i].fd);
 			} else if (pfd[i].revents & POLLIN) {
 				if (handle_external_client_request (engine, pfd[i].fd)) {
 					jack_error ("bad hci\n");
@@ -1608,8 +1618,6 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	pthread_mutex_init (&engine->request_lock, 0);
 
 	engine->clients = 0;
-	engine->aliases = 0;
-
 	engine->port_segments = 0;
 	engine->port_buffer_freelist = 0;
 
@@ -1902,7 +1910,7 @@ jack_main_thread (void *arg)
 
 		if (engine->control->real_time != 0 && engine->spare_usecs && ((WORK_SCALE * engine->spare_usecs) <= delayed_usecs)) {
 			
-			printf ("delay of %.3f usecs exceeds estimated spare time of %.3f; restart ...\n",
+			fprintf (stderr, "delay of %.3f usecs exceeds estimated spare time of %.3f; restart ...\n",
 				delayed_usecs, WORK_SCALE * engine->spare_usecs);
 
 			if (++consecutive_excessive_delays > 10) {
@@ -2099,7 +2107,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 
 	client->control->type = req->type;
 	client->control->active = 0;
-	client->control->dead = 0;
+	client->control->dead = FALSE;
 	client->control->timed_out = 0;
 	client->control->id = engine->next_client_id++;
 	strcpy ((char *) client->control->name, req->name);
@@ -2147,13 +2155,10 @@ jack_port_clear_connections (jack_engine_t *engine, jack_port_internal_t *port)
 }
 
 static void
-jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
+jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
-	JSList *node;
-	unsigned int i;
-
 	if (engine->verbose) {
-		fprintf (stderr, "adios senor %s\n", client->control->name);
+		fprintf (stderr, "senor %s - you are a zombie\n", client->control->name);
 	}
 
 	/* caller must hold the client_lock */
@@ -2161,7 +2166,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	/* this stops jack_deliver_event() from doing anything */
 
 	client->control->dead = TRUE;
-
+	
 	if (client == engine->timebase_client) {
 		engine->timebase_client = 0;
 		engine->control->current_time.frame = 0;
@@ -2171,33 +2176,32 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	}
 
 	jack_client_disconnect (engine, client);
+	jack_client_do_deactivate (engine, client, FALSE);
+}
+
+static void
+jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
+{
+	unsigned int i;
+	JSList *node;
+
+	/* caller must hold the client_lock */
+
+	if (engine->verbose) {
+		fprintf (stderr, "adios senor %s\n", client->control->name);
+	}
+
+	/* if its not already a zombie, make it so */
+
+	if (!client->control->dead) {
+		jack_zombify_client (engine, client);
+	}
 
 	/* try to force the server thread to return from poll */
 
 	close (client->event_fd);
 	close (client->request_fd);
-
-	/* if the client is stuck in its process() callback, its not going to 
-	   notice that we closed the pipes. give it a little help ... though
-	   this could prove fatal to some clients.
-	*/
-
-	if (client->control->pid > 0) {
-		if (engine->verbose) {
-			fprintf (stderr, "sending SIGHUP to client %s at %d\n", client->control->name, client->control->pid);
-		}
-		kill (client->control->pid, SIGHUP);
-	}
-
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		if (((jack_client_internal_t *) node->data)->control->id == client->control->id) {
-			engine->clients = jack_slist_remove_link (engine->clients, node);
-			jack_slist_free_1 (node);
-			break;
-		}
-	}
 	
-	jack_client_do_deactivate (engine, client, FALSE);
 
 	if (client->control->type == ClientExternal) {
 
@@ -2215,8 +2219,17 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 		}
 	}
 
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		if (((jack_client_internal_t *) node->data)->control->id == client->control->id) {
+			engine->clients = jack_slist_remove_link (engine->clients, node);
+			jack_slist_free_1 (node);
+			break;
+		}
+	}
+	
 	jack_client_delete (engine, client);
 }
+
 
 static void
 jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
@@ -2226,6 +2239,7 @@ jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 		free ((char *) client->control);
 	} else {
 		shmdt ((void *) client->control);
+		shmctl(client->shm_id,IPC_RMID,0);
 	}
 
 	free (client);
@@ -3022,7 +3036,7 @@ jack_get_fifo_fd (jack_engine_t *engine, unsigned int which_fifo)
 	char path[PATH_MAX+1];
 	struct stat statbuf;
 
-	sprintf (path, "%s-%d", engine->fifo_prefix, which_fifo);
+	snprintf (path, sizeof (path), "%s-%d", engine->fifo_prefix, which_fifo);
 
 	DEBUG ("%s", path);
 
@@ -3272,7 +3286,9 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int re
 {
 	jack_port_internal_t *port;
 	JSList *node;
+	unsigned int i;
 	int ret = -1;
+	int internal = FALSE;
 
 	jack_lock_graph (engine);
 
@@ -3280,30 +3296,57 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int re
 
 	DEBUG ("Getting connections for port '%s'.", port->shared->name);
 
-	req->x.nports = jack_slist_length (port->connections);
+	req->x.port_connections.nports = jack_slist_length (port->connections);
+	req->status = 0;
 
-	if (write (reply_fd, req, sizeof (*req)) < (ssize_t) sizeof (req)) {
-		jack_error ("cannot write GetPortConnections result to client");
-		goto out;
+	/* figure out if this is an internal or external client */
+
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		
+		if (((jack_client_internal_t *) node->data)->request_fd == reply_fd) {
+			internal = jack_client_is_internal((jack_client_internal_t *) node->data);
+			break;
+		}
 	}
 
-	if (req->type == GetPortConnections)
-	{
-		for (node = port->connections; node; node = jack_slist_next (node) ) {
+	if (!internal) {
+		if (write (reply_fd, req, sizeof (*req)) < (ssize_t) sizeof (req)) {
+			jack_error ("cannot write GetPortConnections result to client via fd = %d (%s)", 
+				    reply_fd, strerror (errno));
+			goto out;
+		}
+	} else {
+		req->x.port_connections.ports = (const char **) malloc (sizeof (char *) * req->x.port_connections.nports);
+	}
+
+	if (req->type == GetPortConnections) {
+		
+		for (i = 0, node = port->connections; node; node = jack_slist_next (node), ++i) {
+
 			jack_port_id_t port_id;
 			
-			if (((jack_connection_internal_t *) node->data)->source == port)
-			{
+			if (((jack_connection_internal_t *) node->data)->source == port) {
 				port_id = ((jack_connection_internal_t *) node->data)->destination->shared->id;
-			}
-			else
-			{
+			} else {
 				port_id = ((jack_connection_internal_t *) node->data)->source->shared->id;
 			}
 			
-			if (write (reply_fd, &port_id, sizeof (port_id)) < (ssize_t) sizeof (port_id)) {
-				jack_error ("cannot write port id to client");
-				goto out;
+			if (internal) {
+
+				/* internal client asking for names. store in malloc'ed space, client frees
+				 */
+
+				req->x.port_connections.ports[i] = engine->control->ports[port_id].name;
+
+			} else {
+
+				/* external client asking for names. we write the port id's to the reply fd.
+				 */
+
+				if (write (reply_fd, &port_id, sizeof (port_id)) < (ssize_t) sizeof (port_id)) {
+					jack_error ("cannot write port id to client");
+					goto out;
+				}
 			}
 		}
 	}
@@ -3457,84 +3500,4 @@ jack_set_asio_mode (jack_engine_t *engine, int yn)
 	engine->asio_mode = yn;
 }
 
-int
-jack_do_add_alias (jack_engine_t *engine, jack_request_t *req)
-{
-	JSList *list;
-	jack_port_alias_t *alias;
-	int ret = -1;
 
-	jack_lock_graph (engine);
-
-	for (list = engine->aliases; list; list = jack_slist_next (list)) {
-
-		alias = (jack_port_alias_t *) list->data;
-
-		if (strcmp (alias->port, req->x.alias.port) == 0 && strcmp (alias->alias, req->x.alias.alias) == 0) {
-			break;
-		}
-	}
-	
-	if (list == NULL) {
-		alias = (jack_port_alias_t *) malloc (sizeof (jack_port_alias_t));
-		strcpy (alias->port, req->x.alias.port);
-		strcpy (alias->alias, req->x.alias.alias);
-		
-		engine->aliases = jack_slist_append (engine->aliases, alias);
-		ret = 0;
-	}
-
-	jack_unlock_graph (engine);
-	return ret;
-}
-
-int
-jack_do_remove_alias (jack_engine_t *engine, jack_request_t *req)
-{
-	JSList *list;
-	jack_port_alias_t *alias;
-	int ret = -1;
-
-	jack_lock_graph (engine);
-
-	for (list = engine->aliases; list; list = jack_slist_next (list)) {
-
-		alias = (jack_port_alias_t *) list->data;
-
-		if (strcmp (alias->port, req->x.alias.port) == 0 && strcmp (alias->alias, req->x.alias.alias) == 0) {
-			engine->aliases = jack_slist_remove_link (engine->aliases, list);
-			jack_slist_free_1 (list);
-			free (alias);
-			ret = 0;
-		}
-	}
-
-	jack_unlock_graph (engine);
-	return ret;
-}
-
-const char *
-jack_lookup_alias (jack_engine_t *engine, const char *alias_name)
-{
-	JSList *list;
-	jack_port_alias_t *alias;
-
-	jack_lock_graph (engine);
-
-	for (list = engine->aliases; list; list = jack_slist_next (list)) {
-
-		alias = (jack_port_alias_t *) list->data;
-
-		if (strcmp (alias->alias, alias_name) == 0) {
-			break;
-		}
-	}
-
-	jack_unlock_graph (engine);
-
-	if (list) {
-		return ((jack_port_alias_t *) list->data)->port;
-	} else {
-		return 0;
-	}
-}
