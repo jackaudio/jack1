@@ -465,13 +465,12 @@ jack_access_registry (jack_shm_info_t *ri)
 	int shm_fd;
 	int new_registry = 0;
 	int rc = -1;
-	int perm;
+	int perm = O_RDWR;
 	jack_shmsize_t size = JACK_SHM_REGISTRY_SIZE;
 
 	/* grab a chunk of memory to store shm ids in. this is 
 	   to allow clean up of all segments whenever JACK
 	   starts (or stops). */
-	perm = O_RDWR;
 	strncpy (registry_id, "/jack-shm-registry", sizeof (registry_id));
 
 	/* try without O_CREAT to see if it already exists */
@@ -497,14 +496,12 @@ jack_access_registry (jack_shm_info_t *ri)
 		}
 	}
 
-	if (perm & O_CREAT) {
-		if (ftruncate (shm_fd, size) < 0) {
-			jack_error ("cannot set size of engine shm registry 1"
-			"(%s)", strerror (errno));
-			jack_remove_shm (&registry_id);
-			rc = -2;
-			goto error;
-		}
+	/* force the correct segment size */
+	if (ftruncate (shm_fd, size) < 0) {
+		jack_error ("cannot set registry size (%s)", strerror (errno));
+		jack_remove_shm (&registry_id);
+		rc = -2;
+		goto error;
 	}
   
 	if ((ri->attached_at = mmap (0, size, PROT_READ|PROT_WRITE,
