@@ -8,7 +8,9 @@
 %define jack_tmpdir /var/lib/tmp
 %endif
 # use port audio
-%define port_audio 1
+%define port_audio 0
+# use oss
+%define oss 0
 # strip binaries 
 %define strip_jackd 1
 
@@ -71,6 +73,9 @@ Small example clients that use the Jack Audio Connection Kit.
 %endif
 %if ! %{port_audio}
 		--disable-portaudio \
+%endif
+%if ! %{oss}
+		--disable-oss \
 %endif
 %if %{strip_jackd}
                  --enable-stripped-jackd
@@ -182,6 +187,9 @@ fi
 %if %{port_audio}
 %{_libdir}/jack/jack_portaudio.so
 %endif
+%if %{oss}
+%{_libdir}/jack/jack_oss.so
+%endif
 %{_mandir}/man1/*
 %if %{enable_tmpdir}
 %dir %{jack_tmpdir}
@@ -197,6 +205,9 @@ fi
 %{_libdir}/jack/jack_dummy.la
 %if %{port_audio}
 %{_libdir}/jack/jack_portaudio.la
+%endif
+%if %{oss}
+%{_libdir}/jack/jack_oss.la
 %endif
 %{_includedir}/jack/jack.h
 %{_includedir}/jack/ringbuffer.h
@@ -220,6 +231,9 @@ fi
 
 
 %changelog
+
+* Sat May 22 2004 Pete Bessman <ninjadroid@gazuga.net> - 0.98.1-1
+- changes to accomodate jack_oss and RPM's fascist build policy
 
 * Mon Nov 13  2003 Lawrie Abbott <lawrieabbott@iinet.net.au>      
 - update based on Planet CCRMA 0.80.0 release
