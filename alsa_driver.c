@@ -823,7 +823,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 
 		poll_enter = get_cycles ();
 
-		if (poll (driver->pfd, nfds, (int) floor (driver->period_usecs / 1000.0f)) < 0) {
+		if (poll (driver->pfd, nfds, (int) floor ((1.5f * driver->period_usecs) / 1000.0f)) < 0) {
 			if (errno == EINTR) {
 				printf ("poll interrupt\n");
 				// this happens mostly when run
@@ -919,7 +919,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 		
 		if ((p_timed_out && (p_timed_out == driver->playback_nfds)) &&
 		    (c_timed_out && (c_timed_out == driver->capture_nfds))){
-			jack_error ("ALSA: poll time out");
+			jack_error ("ALSA: poll time out polled for %.6f", ((float) (poll_ret - poll_enter) / driver->cpu_mhz));
 			*status = -5;
 			return 0;
 		}		
