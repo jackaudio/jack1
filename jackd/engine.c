@@ -22,11 +22,11 @@
 #include <unistd.h>
 #include <sys/socket.h>
 
-#if defined(linux) 
-    #include <sys/poll.h>
-#elif defined(__APPLE__) && defined(__POWERPC__) 
+#if defined(__APPLE__) && defined(__POWERPC__) 
     #include "fakepoll.h"
     #include "ipc.h"
+#else
+    #include <sys/poll.h>
 #endif
 
 #include <sys/un.h>
@@ -299,11 +299,11 @@ jack_resize_port_segment (jack_engine_t *engine, jack_port_type_info_t *port_typ
 
 	size = nports * one_buffer;
     
-#if defined(linux) 
-        perm = O_RDWR|O_CREAT|O_TRUNC;
-#elif defined(__APPLE__) && defined(__POWERPC__) 
+#if defined(__APPLE__) && defined(__POWERPC__) 
         /* using O_TRUNC option does not work on Darwin */
         perm = O_RDWR|O_CREAT;
+#else
+        perm = O_RDWR|O_CREAT|O_TRUNC;
 #endif
 
 	if (port_type->shm_info.size == 0) {
@@ -441,7 +441,28 @@ jack_process_internal(jack_engine_t *engine, JSList *node, jack_nframes_t nframe
        return jack_slist_next (node);
 }
 
-#if defined(linux)
+#if defined(__APPLE__) && defined(__POWERPC__) 
+static JSList * 
+jack_process_external(jack_engine_t *engine, JSList *node)
+{
+        jack_client_internal_t * client = (jack_client_internal_t *) node->data;
+        jack_client_control_t *ctl;
+        
+        client = (jack_client_internal_t *) node->data;
+        ctl = client->control;
+        
+        engine->current_client = client;
+        
+        ctl->state = Triggered; // a race exists if we do this after the write(2) 
+        ctl->signalled_at = jack_get_microseconds();
+        ctl->awake_at = 0;
+        ctl->finished_at = 0;
+        
+        jack_client_resume(client);
+        
+        return jack_slist_next (node);
+}
+#else
 static JSList * 
 jack_process_external(jack_engine_t *engine, JSList *node)
 {
@@ -555,28 +576,6 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	return node;
 }
 
-#elif defined(__APPLE__) && defined(__POWERPC__) 
-
-static JSList * 
-jack_process_external(jack_engine_t *engine, JSList *node)
-{
-        jack_client_internal_t * client = (jack_client_internal_t *) node->data;
-        jack_client_control_t *ctl;
-        
-        client = (jack_client_internal_t *) node->data;
-        ctl = client->control;
-        
-        engine->current_client = client;
-        
-        ctl->state = Triggered; // a race exists if we do this after the write(2) 
-        ctl->signalled_at = jack_get_microseconds();
-        ctl->awake_at = 0;
-        ctl->finished_at = 0;
-        
-        jack_client_resume(client);
-        
-        return jack_slist_next (node);
-}
 #endif
 
 
@@ -1752,11 +1751,11 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 		return 0;
 	}
         
-#if defined(linux) 
-        perm = O_RDWR|O_CREAT|O_TRUNC;
-#elif defined(__APPLE__) && defined(__POWERPC__) 
+#if defined(__APPLE__) && defined(__POWERPC__) 
         /* using O_TRUNC option does not work on Darwin */
         perm = O_RDWR|O_CREAT;
+#else
+        perm = O_RDWR|O_CREAT|O_TRUNC;
 #endif
 
 	if ((addr = jack_get_shm (engine->control_shm_name, engine->control_size, 
@@ -1888,13 +1887,13 @@ jack_become_real_time (pthread_t thread, int priority)
 		return -1;
 	}
         
-#if defined(linux) 
+#if defined(__APPLE__) && defined(__POWERPC__) 
+        // To be implemented
+#else
         if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
 	    jack_error ("cannot lock down memory for RT thread (%s)", strerror (errno));
 	    return -1;
 	}
-#elif defined(__APPLE__) && defined(__POWERPC__) 
-        // To be implemented
 #endif
 	return 0;
 }
@@ -2149,16 +2148,22 @@ jack_run (jack_engine_t *engine)
                 return -1;
         }
         
-#if defined(linux)
-        return pthread_create (&engine->main_thread, 0, jack_main_thread, engine);
-#elif defined(__APPLE__) && defined(__POWERPC__) 
+#if defined(__APPLE__) && defined(__POWERPC__) 
         return 0;
+#else
+        return pthread_create (&engine->main_thread, 0, jack_main_thread, engine);
 #endif
 
 }
 
 
-#if defined(linux)
+#if defined(__APPLE__) && defined(__POWERPC__) 
+int
+jack_wait (jack_engine_t *engine)
+{
+        while(1) sleep(1);
+}
+#else
 int
 jack_wait (jack_engine_t *engine)
 {
@@ -2182,15 +2187,6 @@ jack_wait (jack_engine_t *engine)
 	}
 	return (int) ((intptr_t)ret);
 }
-
-#elif defined(__APPLE__) && defined(__POWERPC__) 
-
-int
-jack_wait (jack_engine_t *engine)
-{
-        while(1) sleep(1);
-}
-
 #endif
 
 int 
@@ -2198,11 +2194,11 @@ jack_engine_delete (jack_engine_t *engine)
 {
 	if (engine) {
 
-    #if defined(linux)
-            return pthread_cancel (engine->main_thread);
-    #elif defined(__APPLE__) && defined(__POWERPC__) 
+    #if defined(__APPLE__) && defined(__POWERPC__) 
             /* the jack_run_cycle function is directly called from the CoreAudo audio callback */
             return 0;
+    #else
+            return pthread_cancel (engine->main_thread);
     #endif
 	}
 
@@ -2225,11 +2221,11 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 
 	case ClientExternal:
                 
-        #if defined(linux) 
-                perm = O_RDWR|O_CREAT|O_TRUNC;
-        #elif defined(__APPLE__) && defined(__POWERPC__) 
+        #if defined(__APPLE__) && defined(__POWERPC__) 
                 /* using O_TRUNC option does not work on Darwin */
                 perm = O_RDWR|O_CREAT;
+        #else
+                perm = O_RDWR|O_CREAT|O_TRUNC;
         #endif
                 snprintf (shm_name, sizeof (shm_name), "/jack-c-%s", req->name);
                 
@@ -3229,10 +3225,10 @@ jack_get_fifo_fd (jack_engine_t *engine, unsigned int which_fifo)
 	if (stat (path, &statbuf)) {
 		if (errno == ENOENT) {
        
-                #if defined(linux) 
-                        if (mknod (path, 0666|S_IFIFO, 0) < 0) {
-                #elif defined(__APPLE__) && defined(__POWERPC__) 
+                #if defined(__APPLE__) && defined(__POWERPC__) 
                         if (mkfifo(path,0666) < 0){
+                #else
+                        if (mknod (path, 0666|S_IFIFO, 0) < 0) {
                 #endif
 				jack_error ("cannot create inter-client FIFO [%s] (%s)\n", path, strerror (errno));
 				return -1;

@@ -18,12 +18,12 @@
     $Id$
 */
 
-#if defined(linux) 
-    #include <sys/poll.h>
-#elif defined(__APPLE__) && defined(__POWERPC__) 
+#if defined(__APPLE__) && defined(__POWERPC__) 
     #include "pThreadUtilities.h"
     #include "ipc.h"
     #include "fakepoll.h"
+#else
+    #include <sys/poll.h>
 #endif
 
 #include <sys/socket.h>
@@ -984,13 +984,13 @@ jack_start_thread (jack_client_t *client)
 			return -1;
 		}
                 
-        #if defined(linux) 
+        #if defined(__APPLE__) && defined(__POWERPC__) 
+                // To be implemented
+        #else
                 if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
                     jack_error ("cannot lock down memory for RT thread (%s)", strerror (errno));
                     return -1;
                 }
-        #elif defined(__APPLE__) && defined(__POWERPC__) 
-                // To be implemented
         #endif
         
 	}
@@ -1122,10 +1122,10 @@ jack_activate (jack_client_t *client)
 	 * jack_start_thread()) 
 	 */
          
-#if defined(linux) 
-       #define BIG_ENOUGH_STACK 1048576
-#elif defined(__APPLE__) && defined(__POWERPC__) 
+#if defined(__APPLE__) && defined(__POWERPC__) 
        #define BIG_ENOUGH_STACK 10000 // a bigger stack make the application crash...
+#else
+       #define BIG_ENOUGH_STACK 1048576
 #endif
 
 	char buf[BIG_ENOUGH_STACK];
@@ -1597,7 +1597,17 @@ jack_client_thread_id (jack_client_t *client)
 	return client->thread_id;
 }
 
-#if defined(linux)
+#if defined(__APPLE__) && defined(__POWERPC__) 
+
+double __jack_time_ratio;
+
+void jack_init_time ()
+{
+        mach_timebase_info_data_t info; 
+        mach_timebase_info(&info);
+        __jack_time_ratio = ((float)info.numer/info.denom) / 1000;
+}
+#else
 
 jack_time_t
 jack_get_mhz (void)
@@ -1640,17 +1650,6 @@ jack_time_t __jack_cpu_mhz;
 void jack_init_time ()
 {
 	__jack_cpu_mhz = jack_get_mhz ();
-}
-
-#elif defined(__APPLE__) && defined(__POWERPC__) 
-
-double __jack_time_ratio;
-
-void jack_init_time ()
-{
-        mach_timebase_info_data_t info; 
-        mach_timebase_info(&info);
-        __jack_time_ratio = ((float)info.numer/info.denom) / 1000;
 }
 
 #endif

@@ -83,11 +83,11 @@ jack_initialize_shm ()
 	   or debugger driven exits.
 	*/
         
-#if defined(linux) 
-        perm = O_RDWR|O_CREAT|O_TRUNC;
-#elif defined(__APPLE__) && defined(__POWERPC__)
+#if defined(__APPLE__) && defined(__POWERPC__)
         /* using O_TRUNC option does not work on Darwin */
         perm = O_RDWR|O_CREAT;
+#else
+        perm = O_RDWR|O_CREAT|O_TRUNC;
 #endif
 	
 	if ((addr = jack_get_shm ("/jack-shm-registry", sizeof (jack_shm_registry_entry_t) * MAX_SHM_ID, 
