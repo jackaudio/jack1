@@ -406,15 +406,9 @@ jack_resize_port_segment (jack_engine_t *engine,
 	if (port_type->buffer_scale_factor < 0) {
 		one_buffer = port_type->buffer_size;
 	} else {
-		// steph
-		/*
 		one_buffer = sizeof (jack_default_audio_sample_t)
 			* port_type->buffer_scale_factor
 			* engine->control->buffer_size;
-		*/
-		one_buffer = sizeof (jack_default_audio_sample_t)
-			* port_type->buffer_scale_factor
-			* 8192;
 	}
 
 	size = nports * one_buffer;
@@ -447,14 +441,12 @@ jack_resize_port_segment (jack_engine_t *engine,
 	} else {
 
 		/* resize existing buffer segment */
-		/*
 		if (jack_resize_shm (shm_info, size)) {
 			jack_error ("cannot resize port segment to %d bytes,"
 				    " (%s)", size,
 				    strerror (errno));
 			return;
 		}
-		*/
 	}
 
 	jack_engine_place_port_buffers (engine, ptid, one_buffer, size, nports);
@@ -806,8 +798,9 @@ jack_calc_cpu_load(jack_engine_t *engine)
 
 	engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = 
 		cycle_end - engine->control->current_time.usecs;
-		
-	//printf("cycle_end - engine->control->current_time.usecs %ld\n", (long) (cycle_end - engine->control->current_time.usecs));
+
+	//printf ("cycle_end - engine->control->current_time.usecs %ld\n",
+	//	(long) (cycle_end - engine->control->current_time.usecs));
 
 	if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
 		engine->rolling_client_usecs_index = 0;

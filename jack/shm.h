@@ -9,12 +9,14 @@
 #define MAX_SHM_ID 256			/* generally about 16 per server */
 #define JACK_SERVER_NAME_SIZE PATH_MAX	/* maximum length of server name */
 #define JACK_SHM_MAGIC 0x4a41434b	/* shm magic number: "JACK" */
+#define JACK_SHM_NULL_INDEX -1		/* NULL SHM index */
+#define JACK_SHM_REGISTRY_INDEX -2	/* pseudo SHM index for registry */
 
 #ifdef USE_POSIX_SHM
 typedef shm_name_t jack_shm_id_t;
-#else
+#else /* System V SHM */
 typedef int jack_shm_id_t;
-#endif /* !USE_POSIX_SHM */
+#endif
 
 /* shared memory type */
 typedef enum {
@@ -67,7 +69,7 @@ typedef struct _jack_shm_registry {
  */
 typedef struct _jack_shm_info {
     jack_shm_registry_index_t index;       /* offset into the registry */
-    char*                     attached_at; /* address where attached */
+    void		     *attached_at; /* address where attached */
 } jack_shm_info_t;
 
 /* utility functions used only within JACK */

@@ -30,11 +30,42 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/shm.h>
+#include <sysdeps/ipc.h>
 
 #include <jack/shm.h>
 #include <jack/internal.h>
 #include <jack/version.h>
 
+#ifdef USE_POSIX_SHM
+static jack_shmtype_t jack_shmtype = shm_POSIX;
+#else
+static jack_shmtype_t jack_shmtype = shm_SYSV;
+#endif
+
+/* interface-dependent forward declarations */
+static int	jack_access_registry (jack_shm_info_t *ri);
+static void	jack_remove_shm (jack_shm_id_t *id);
+
+/* This module supports both System V and POSIX shared memory
+ * interfaces.  The code is divided into three sections:
+ *
+ *	- common (interface-independent) code
+ *	- POSIX implementation
+ *	- System V implementation
+ */
+
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * common interface-independent section
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+/* global data */
+jack_shm_id_t registry_id;		/* SHM id for the registry */
+jack_shm_info_t registry_info = {	/* SHM info for the registry */
+	.index = JACK_SHM_NULL_INDEX,
+	.attached_at = MAP_FAILED
+};
+
+/* pointers to registry header and array */
 static jack_shm_header_t* jack_shm_header = NULL;
 static jack_shm_registry_t* jack_shm_registry = NULL;
 
@@ -52,8 +83,8 @@ jack_shm_unlock_registry (void)
 	//JOQ: this is really needed now with multiple servers
 }
 
-static int
-jack_shm_create_registry (jack_shmtype_t type)
+static void
+jack_shm_init_registry ()
 {
 	/* registry must be locked */
 	int i;
@@ -62,7 +93,7 @@ jack_shm_create_registry (jack_shmtype_t type)
 
 	jack_shm_header->magic = JACK_SHM_MAGIC;
 	jack_shm_header->protocol = jack_protocol_version;
-	jack_shm_header->type = type;
+	jack_shm_header->type = jack_shmtype;
 	jack_shm_header->size = JACK_SHM_REGISTRY_SIZE;
 	jack_shm_header->hdr_len = sizeof (jack_shm_header_t);
 	jack_shm_header->entry_len = sizeof (jack_shm_registry_t);
@@ -70,18 +101,16 @@ jack_shm_create_registry (jack_shmtype_t type)
 	for (i = 0; i < MAX_SHM_ID; ++i) {
 		jack_shm_registry[i].index = i;
 	}
-
-	return 0;			/* success */
 }
 
 static int
-jack_shm_validate_registry (jack_shmtype_t type)
+jack_shm_validate_registry ()
 {
 	/* registry must be locked */
 
 	if ((jack_shm_header->magic == JACK_SHM_MAGIC)
 	    && (jack_shm_header->protocol == jack_protocol_version)
-	    && (jack_shm_header->type == type)
+	    && (jack_shm_header->type == jack_shmtype)
 	    && (jack_shm_header->size == JACK_SHM_REGISTRY_SIZE)
 	    && (jack_shm_header->hdr_len == sizeof (jack_shm_header_t))
 	    && (jack_shm_header->entry_len == sizeof (jack_shm_registry_t))) {
@@ -89,8 +118,74 @@ jack_shm_validate_registry (jack_shmtype_t type)
 		return 0;		/* registry OK */
 	}
 
-	jack_error ("incompatible JACK shm registry");
+	jack_error ("incompatible shm registry (%s)", strerror (errno));
+
+	/* Apparently, this registry was created by an older JACK
+	 * version.  Delete it and try again. */
+	jack_release_shm (&registry_info);
+	jack_remove_shm (&registry_id);
+
 	return -1;
+}
+
+/* gain addressibility to shared memory registration segment
+ *
+ * returns: 0 if successful
+ */
+int
+jack_initialize_shm (void)
+{
+	int rc;
+
+	if (jack_shm_header)
+		return 0;		/* already initialized */
+
+	jack_shm_lock_registry ();
+
+	rc = jack_access_registry (&registry_info);
+
+	switch (rc) {
+	case 1:				/* newly-created registry */
+		jack_shm_init_registry ();
+		rc = 0;			/* success */
+		break;
+	case 0:				/* existing registry */
+		if (jack_shm_validate_registry () == 0)
+			break;
+		/* else it was invalid, so fall through */
+	case -2:			/* bad registry */
+		/* it's gone now, so try again */
+		rc = jack_access_registry (&registry_info);
+		if (rc == 1) {		/* new registry created? */
+			jack_shm_init_registry ();
+			rc = 0;		/* problem solved */
+		} else {
+
+			jack_error ("incompatible shm registry (%s)",
+				    strerror (errno));
+#ifndef USE_POSIX_SHM
+			jack_error ("to delete, use `ipcrm -M 0x%0.8x'",
+				    JACK_SHM_REGISTRY_KEY);
+#endif
+			rc = -1;	/* FUBAR */
+		}
+		break;
+	default:			/* failure return code */
+	}
+
+	jack_shm_unlock_registry ();
+	return rc;
+}
+
+void
+jack_destroy_shm (jack_shm_info_t* si)
+{
+	/* must NOT have the registry locked */
+	if (si->index == JACK_SHM_NULL_INDEX)
+		return;			/* segment not allocated */
+
+	jack_remove_shm (&jack_shm_registry[si->index].id);
+	jack_release_shm_info (si->index);
 }
 
 jack_shm_registry_t *
@@ -119,6 +214,7 @@ jack_get_free_shm_info ()
 void
 jack_release_shm_info (jack_shm_registry_index_t index)
 {
+	/* must NOT have the registry locked */
 	if (jack_shm_registry[index].allocator == getpid()) {
 		jack_shm_lock_registry ();
 		jack_shm_registry[index].size = 0;
@@ -244,8 +340,12 @@ jack_cleanup_shm ()
 		
 		if (destroy) {
 
-			if (copy.index >= 0  && copy.index < MAX_SHM_ID) {
-				jack_destroy_shm (&copy);
+			int index = copy.index;
+
+			if ((index >= 0)  && (index < MAX_SHM_ID)) {
+				jack_remove_shm (&jack_shm_registry[index].id);
+				jack_shm_registry[index].size = 0;
+				jack_shm_registry[index].allocator = 0;
 			}
 			r->size = 0;
 			r->allocator = 0;
@@ -259,46 +359,55 @@ jack_cleanup_shm ()
 
 #ifdef USE_POSIX_SHM
 
-/* gain addressibility to shared memory registration segment */
-int
-jack_initialize_shm (void)
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * POSIX interface-dependent functions
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+/* gain addressibility to SHM registry segment
+ *
+ * sets up global registry pointers, if successful
+ *
+ * returns: 1 if newly created
+ *          0 if existing registry
+ *         -1 if unsuccessful
+ *         -2 if registry existed, but was the wrong size
+ */
+static int
+jack_access_registry (jack_shm_info_t *ri)
 {
+	/* registry must be locked */
 	int shm_fd;
-	int new_registry = FALSE;
-	int ret = -1;
+	int new_registry = 0;
+	int rc = -1;
 	int perm;
 	jack_shmsize_t size = JACK_SHM_REGISTRY_SIZE;
-
-	if (jack_shm_header) {
-		return 0;
-	}
 
 	/* grab a chunk of memory to store shm ids in. this is 
 	   to allow clean up of all segments whenever JACK
 	   starts (or stops). */
-	jack_shm_lock_registry ();
 	perm = O_RDWR;
+	strncpy (registry_id, "/jack-shm-registry", sizeof (registry_id));
 
 	/* try without O_CREAT to see if it already exists */
-	if ((shm_fd = shm_open ("/jack-shm-registry", perm, 0666)) < 0) {
+	if ((shm_fd = shm_open (registry_id, perm, 0666)) < 0) {
 
 		if (errno == ENOENT) {
 			
 			/* it doesn't exist, so create it */
 			perm = O_RDWR|O_CREAT;
 			if ((shm_fd =
-			     shm_open ("/jack-shm-registry", perm, 0666)) < 0) {
+			     shm_open (registry_id, perm, 0666)) < 0) {
 				jack_error ("cannot create shm registry segment"
 					    " (%s)", strerror (errno));
-				goto out;
+				goto error;
 			}
-			new_registry = TRUE;
+			new_registry = 1;
 
 		} else {
 
 			jack_error ("cannot open existing shm registry segment"
 				    " (%s)", strerror (errno));
-			goto out;
+			goto error;
 		}
 	}
 
@@ -306,51 +415,43 @@ jack_initialize_shm (void)
 		if (ftruncate (shm_fd, size) < 0) {
 			jack_error ("cannot set size of engine shm registry 1"
 			"(%s)", strerror (errno));
-			goto out;
+			jack_remove_shm (&registry_id);
+			rc = -2;
+			goto error;
 		}
 	}
   
-	if ((jack_shm_header = mmap (0, size, PROT_READ|PROT_WRITE,
-				       MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
+	if ((ri->attached_at = mmap (0, size, PROT_READ|PROT_WRITE,
+				     MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
 		jack_error ("cannot mmap shm registry segment (%s)",
 			    strerror (errno));
-		goto out;
+		goto error;
 	}
 
+	/* set up global pointers */
+	ri->index = JACK_SHM_REGISTRY_INDEX;
+	jack_shm_header = ri->attached_at;
 	jack_shm_registry = (jack_shm_registry_t *) (jack_shm_header + 1);
 
-	if (new_registry) {
+	rc = new_registry;
 
-		ret = jack_shm_create_registry (shm_POSIX);
-		fprintf (stderr, "JACK compiled with POSIX SHM support\n");
-
-	} else {
-		ret = jack_shm_validate_registry (shm_POSIX);
-	}
-
-  out:
+ error:
 	close (shm_fd);
-	jack_shm_unlock_registry ();
-	return ret;
+	return rc;
 }
 
-void
-jack_destroy_shm (jack_shm_info_t* si)
+static void
+jack_remove_shm (jack_shm_id_t *id)
 {
-	if (si->index == -1)
-		return;			/* segment not allocated */
-
-	shm_unlink (jack_shm_registry[si->index].id);
-	jack_release_shm_info (si->index);
+	shm_unlink (*id);
 }
 
 void
 jack_release_shm (jack_shm_info_t* si)
 {
-	printf("client->jack_release_shm \n");
-	
+	//printf("client->jack_release_shm \n");
 	if (si->attached_at != MAP_FAILED) {
-		printf("client->jack_release_shm 1 \n");
+		//printf("client->jack_release_shm 1 \n");
 		munmap (si->attached_at, jack_shm_registry[si->index].size);
 	}
 }
@@ -423,29 +524,7 @@ jack_attach_shm (jack_shm_info_t* si)
 int
 jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 {
-	/* There is no way to resize a System V shm segment.  So, we
-	 * delete it and allocate a new one.  This is tricky, because
-	 * the old segment will not disappear until all the clients
-	 * have released it. We can only do what we can from here.
-	 */
-
-	jack_release_shm (si);
-	jack_destroy_shm (si);
-
-	if (jack_shmalloc ("not used", size, si)) {
-		return -1;
-	}
-
-	return jack_attach_shm (si);
-}
-
-/*
-int
-jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
-{
 	int shm_fd;
-	//steph
-	int res;
 	jack_shm_registry_t *registry = &jack_shm_registry[si->index];
 
 	if ((shm_fd = shm_open (registry->id, O_RDWR, 0666)) < 0) {
@@ -454,17 +533,13 @@ jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 		return -1;
 	}
 
-	res = munmap (si->attached_at, registry->size);
-	printf("munmap %ld\n", res);
-	
-		
-	if ((res = ftruncate (shm_fd, size)) < 0) {
+	munmap (si->attached_at, registry->size);
+
+	if (ftruncate (shm_fd, size) < 0) {
 		jack_error ("cannot set size of shm segment %s "
 			    "(%s)", registry->id, strerror (errno));
-		printf("ftruncate %ld\n", res);
 		return -1;
 	}
-	
 		
 	if ((si->attached_at = mmap (0, size, PROT_READ|PROT_WRITE,
 				     MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
@@ -477,24 +552,31 @@ jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 	close (shm_fd);
 	return 0;
 }
-*/
 
-#else /* USE_POSIX_SHM */
+#else
 
-/* gain addressibility to shared memory registration segment */
-int
-jack_initialize_shm (void)
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * System V interface-dependent functions
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
+/* gain addressibility to SHM registry segment
+ *
+ * sets up global registry pointers, if successful
+ *
+ * returns: 1 if newly created
+ *          0 if existing registry
+ *         -1 if unsuccessful
+ *         -2 if registry existed, but was the wrong size
+ */
+static int
+jack_access_registry (jack_shm_info_t *ri)
 {
-	int shmflags;
+	/* registry must be locked */
+	int shmflags = 0666;
 	int shmid;
-	key_t key;
-	int new_registry = FALSE;
-	int ret = -1;
+	int new_registry = 0;		/* true if new segment created */
+	key_t key = JACK_SHM_REGISTRY_KEY;
 	jack_shmsize_t size = JACK_SHM_REGISTRY_SIZE;
-
-	if (jack_shm_header) {
-		return 0;
-	}
 
 	/* grab a chunk of memory to store shm ids in. this is 
 	   to allow our parent to clean up all such ids when
@@ -502,62 +584,53 @@ jack_initialize_shm (void)
 	   or debugger driven exits.
 	*/
 
-	shmflags = 0666;
-	key = JACK_SHM_REGISTRY_KEY;
-
-	jack_shm_lock_registry ();
-
 	/* try without IPC_CREAT to check if it already exists */
-
 	if ((shmid = shmget (key, size, shmflags)) < 0) {
-		if (errno == ENOENT) {
+		switch (errno) {
+		case ENOENT:		/* did not exist */
 			if ((shmid = shmget (key, size,
 					     shmflags|IPC_CREAT)) < 0) {
 				jack_error ("cannot create shm registry segment"
 					    " (%s)", strerror (errno));
-				goto out;
+				return -1;
 			}
-			new_registry = TRUE;
-			
-		} else {		/* probably different size */
+			new_registry = 1;
+			break;
 
-			jack_error ("incompatible shm registry (%s)\n"
-				    "to delete, use `ipcrm -M 0x%0.8x'",
-				    strerror (errno), key);
-			goto out;
+		case EINVAL:		/* exists, but too small */
+
+			/* try to remove it */
+			if ((shmid = shmget (key, 1, shmflags)) >= 0) {
+				shmctl (shmid, IPC_RMID, NULL);
+				return -2;
+			}
+
+		default:
+			jack_error ("unable to access shm registry (%s)",
+				    strerror (errno));
+			return -1;
 		}
 	}
 
-	if ((jack_shm_header = shmat (shmid, 0, 0)) < 0) {
+	if ((ri->attached_at = shmat (shmid, 0, 0)) < 0) {
 		jack_error ("cannot attach shm registry segment (%s)",
 			    strerror (errno));
-		goto out;
+		return -1;
 	}
 
+	/* set up global pointers */
+	ri->index = JACK_SHM_REGISTRY_INDEX;
+	jack_shm_header = ri->attached_at;
 	jack_shm_registry = (jack_shm_registry_t *) (jack_shm_header + 1);
+	registry_id = shmid;
 
-	if (new_registry) {
-
-		ret = jack_shm_create_registry (shm_SYSV);
-		fprintf (stderr, "JACK compiled with System V SHM support\n");
-
-	} else {
-		ret = jack_shm_validate_registry (shm_SYSV);
-	}
-
-  out:
-	jack_shm_unlock_registry ();
-	return ret;
+	return new_registry;
 }
 
-void
-jack_destroy_shm (jack_shm_info_t* si)
+static void
+jack_remove_shm (jack_shm_id_t *id)
 {
-	if (si->index == -1)
-		return;			/* segment not allocated */
-
-	shmctl (jack_shm_registry[si->index].id, IPC_RMID, NULL);
-	jack_release_shm_info (si->index);
+	shmctl (*id, IPC_RMID, NULL);
 }
 
 void
