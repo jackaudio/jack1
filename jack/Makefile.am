@@ -15,6 +15,7 @@ noinst_HEADERS = 		\
 	engine.h		\
 	generic.h 		\
 	hammerfall.h 		\
+	ice1712.h		\
 	hardware.h 		\
 	internal.h 		\
 	memops.h 		\

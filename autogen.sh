@@ -1,6 +1,6 @@
 #!/bin/sh
 
-libtoolize --force | sed '/ou should update/d' || {
+libtoolize --force 2>&1 | sed '/^You should/d' || {
     echo "libtool failed, exiting..."
     exit 1
 }
