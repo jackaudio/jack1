@@ -77,6 +77,7 @@ typedef struct _jack_port_shared {
 struct _jack_port {
     char                     *client_segment_base;
     struct _jack_port_shared *shared;
+    pthread_mutex_t           connection_lock;
     GSList                   *connections;
     struct _jack_port        *tied;
 };

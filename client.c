@@ -216,11 +216,15 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 	case PortConnected:
 		other = jack_port_new (client, event->y.other_id, client->engine);
 		control_port = jack_port_by_id (client, event->x.self_id);
+		pthread_mutex_lock (&control_port->connection_lock);
 		control_port->connections = g_slist_prepend (control_port->connections, other);
+		pthread_mutex_unlock (&control_port->connection_lock);
 		break;
 
 	case PortDisconnected:
 		control_port = jack_port_by_id (client, event->x.self_id);
+
+		pthread_mutex_lock (&control_port->connection_lock);
 
 		for (node = control_port->connections; node; node = g_slist_next (node)) {
 
@@ -233,6 +237,8 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 				break;
 			}
 		}
+
+		pthread_mutex_unlock (&control_port->connection_lock);
 		break;
 
 	default:
@@ -922,6 +928,7 @@ jack_port_new (jack_client_t *client, jack_port_id_t port_id, jack_control_t *co
 
 	port->client_segment_base = 0;
 	port->shared = shared;
+	pthread_mutex_init (&port->connection_lock, NULL);
 	port->connections = 0;
 	port->tied = NULL;
 
@@ -1070,9 +1077,14 @@ jack_port_disconnect (jack_client_t *client, jack_port_t *port)
 {
 	jack_request_t req;
 
+	pthread_mutex_lock (&port->connection_lock);
+
 	if (port->connections == NULL) {
+		pthread_mutex_unlock (&port->connection_lock);
 		return 0;
 	}
+
+	pthread_mutex_unlock (&port->connection_lock);
 
 	req.type = DisconnectPort;
 	req.x.port_info.port_id = port->shared->id;
@@ -1180,6 +1192,12 @@ jack_port_get_buffer (jack_port_t *port, nframes_t nframes)
 	}
 
 	/* Input port. 
+	*/
+
+	/* since this can only be called from the process() callback,
+	   and since no connections can be made/broken during this
+	   phase (enforced by the jack server), there is no need
+	   to take the connection lock here
 	*/
 
 	if ((node = port->connections) == NULL) {
@@ -1538,6 +1556,12 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 	   the existence of more than 1 connection to this input port.
 	*/
 
+	/* no need to take connection lock, since this is called
+	   from the process() callback, and the jack server
+	   ensures that no changes to connections happen
+	   during this time.
+	*/
+
 	node = port->connections;
 	input = (jack_port_t *) node->data;
 	buffer = jack_port_buffer (port);
@@ -1556,4 +1580,31 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 			*dst++ += *src++;
 		}
 	}
+}
+
+int
+jack_port_connected (const jack_port_t *port)
+{
+	return port->connections != NULL;
+}
+
+int
+jack_port_connected_to (const jack_port_t *port, const char *portname)
+{
+	GSList *node;
+	int ret = FALSE;
+
+	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
+
+	for (node = port->connections; node; node = g_slist_next (node)) {
+		jack_port_t *other_port = (jack_port_t *) node->data;
+		
+		if (strcmp (other_port->shared->name, portname) == 0) {
+			ret = TRUE;
+			break;
+		}
+	}
+
+	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
+	return ret;
 }

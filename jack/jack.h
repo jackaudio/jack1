@@ -126,6 +126,7 @@ const char * jack_port_short_name (const jack_port_t *port);
 int          jack_port_flags (const jack_port_t *port);
 const char * jack_port_type (const jack_port_t *port);
 int          jack_port_connected (const jack_port_t *port);
+int          jack_port_connected_to (const jack_port_t *port, const char *portname);
 int          jack_port_equal (const jack_port_t *a, const jack_port_t *b);
 
 int jack_port_set_name (jack_port_t *port, const char *name);
