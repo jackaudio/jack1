@@ -1377,6 +1377,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	client->control->port_register = NULL;
 	client->control->port_register_arg = NULL;
 	client->control->graph_order = NULL;
+	client->control->graph_order_arg = NULL;
 
 	if (req->type == ClientDynamic) {
 		if (jack_load_client (engine, client, req->object_path)) {
@@ -1658,7 +1659,7 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 				}
 
 				if (client->control->graph_order) {
-					client->control->graph_order ();
+					client->control->graph_order (client->control->graph_order_arg);
 				}
 				
 				subgraph_client = 0;

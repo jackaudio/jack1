@@ -54,7 +54,7 @@ int jack_set_process_callback (jack_client_t *, JackProcessCallback, void *arg);
 int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback, void *arg);
 int jack_set_sample_rate_callback (jack_client_t *, JackSampleRateCallback, void *arg);
 int jack_set_port_registration_callback (jack_client_t *, JackPortRegistrationCallback, void *);
-int jack_set_graph_order_callback (jack_client_t *, JackGraphOrderCallback);
+int jack_set_graph_order_callback (jack_client_t *, JackGraphOrderCallback, void *);
 
 int jack_activate (jack_client_t *client);
 int jack_deactivate (jack_client_t *client);

@@ -264,7 +264,7 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 	*/
 
 	if (client->control->graph_order) {
-		client->control->graph_order ();
+		client->control->graph_order (client->control->graph_order_arg);
 	}
 
 	return 0;
@@ -1259,12 +1259,13 @@ jack_port_untie (jack_port_t *port)
 }
 
 int 
-jack_set_graph_order_callback (jack_client_t *client, JackGraphOrderCallback callback)
+jack_set_graph_order_callback (jack_client_t *client, JackGraphOrderCallback callback, void *arg)
 {
 	if (client->control->active) {
 		return -1;
 	}
 	client->control->graph_order = callback;
+	client->control->graph_order_arg = arg;
 	return 0;
 }
 

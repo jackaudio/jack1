@@ -33,7 +33,7 @@ typedef long          channel_t;
 static  const nframes_t max_frames = ULONG_MAX;
 
 typedef int  (*JackProcessCallback)(nframes_t, void *);
-typedef int  (*JackGraphOrderCallback)(void);
+typedef int  (*JackGraphOrderCallback)(void *);
 typedef int  (*JackBufferSizeCallback)(nframes_t, void *);
 typedef int  (*JackSampleRateCallback)(nframes_t, void *);
 typedef void (*JackPortRegistrationCallback)(jack_port_id_t,int,void*);
