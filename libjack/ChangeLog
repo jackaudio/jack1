@@ -1,3 +1,7 @@
+2004-07-08  Jack O'Quin  <joq@io.com>
+
+	* add jack_ringbuffer_peek()
+
 2004-02-19  Jack O'Quin  <joq@io.com>
 
 	* new API functions:
