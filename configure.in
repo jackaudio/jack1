@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=98
-JACK_MICRO_VERSION=0
+JACK_MICRO_VERSION=1
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -504,11 +504,12 @@ fi
 
 # on some systems, readline depends on termcap or ncurses, respectively
 READLINE_DEPS=""
-AC_CHECK_LIB(termcap, tgetent, [READLINE_DEPS="$READLINE_DEPS -ltermcap"])
-AC_CHECK_LIB(ncurses, tgetent, [READLINE_DEPS="$READLINE_DEPS -lncurses"])
-AC_CHECK_LIB(readline, readline,
-             [HAVE_READLINE=true], [HAVE_READLINE=false], [$READLINE_DEPS]
-)
+HAVE_READLINE=true
+AC_CHECK_LIB(readline, readline, [],
+    [AC_CHECK_LIB(readline, readline, [READLINE_DEPS="-ltermcap"],
+	[AC_CHECK_LIB(readline, readline,
+	    [READLINE_DEPS="-lncurses"], [HAVE_READLINE=false], "-lncurses")],
+	"-ltermcap")])
 if test x$HAVE_READLINE = xfalse; then
 	AC_MSG_WARN([*** the jack_transport example client will not be built])
 fi
