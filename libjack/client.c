@@ -1235,6 +1235,9 @@ jack_client_thread (void *arg)
 
 			control->state = Running;
 
+			/* begin preemption checking */
+			CHECK_PREEMPTION (client->engine, TRUE);
+			
 			if (control->sync_cb)
 				jack_call_sync_client (client);
 
@@ -1250,6 +1253,9 @@ jack_client_thread (void *arg)
 
 			if (control->timebase_cb)
 				jack_call_timebase_master (client);
+
+			/* end preemption checking */
+			CHECK_PREEMPTION (client->engine, FALSE);
 
 			control->finished_at = jack_get_microseconds();
 

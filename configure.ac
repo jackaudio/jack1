@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=99
-JACK_MICRO_VERSION=20
+JACK_MICRO_VERSION=21
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -317,6 +317,17 @@ AC_ARG_ENABLE(timestamps,
           fi
         ]		
 )
+
+AC_ARG_ENABLE(preemption-check,
+	AC_HELP_STRING([--enable-preemption-check],
+		[check for inappropriate realtime preemption]),
+		[
+		  if test x$enable_preemption_check != xno ; then
+			echo checking for realtime preemption bugs
+			AC_DEFINE(DO_PREEMPTION_CHECKING,,
+				[check realtime preemption])
+		  fi
+		])
 
 USE_CAPABILITIES=false
 
