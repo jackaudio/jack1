@@ -1801,6 +1801,26 @@ jack_client_feeds (jack_client_internal_t *might, jack_client_internal_t *target
 	return 0;
 }
 
+/**
+ * Sorts the network of clients using the following 
+ * algorithm:
+ *
+ * 1) figure out who is connected to whom:
+ *    
+ *    foreach client1
+ *       foreach input port
+ *           foreach client2
+ *              foreach output port
+ *                 if client1->input port connected to client2->output port
+ *                     mark client1 fed by client 2
+ *
+ * 2) trace the connections as terminal arcs in the graph so that
+ *    if client A feeds client B who feeds client C, mark client C
+ *    as fed by client A as well as client B, and so forth.
+ *
+ * 3) now sort according to whether or not client1->fed_by (client2) is true.
+ *    if the condition is true, client2 must execute before client1
+ */
 static void
 jack_sort_graph (jack_engine_t *engine, int take_lock)
 {
