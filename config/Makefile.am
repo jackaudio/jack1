@@ -4,11 +4,8 @@
 # get distributed as a side-effect.
 
 EXTRA_DIST = configure.host depcomp cpu os
-MAINTAINERCLEANFILES = Makefile.in aclocal.m4 config.guess config.sub \
+MAINTAINERCLEANFILES = Makefile.in config.guess config.sub \
                        install-sh ltmain.sh missing mkinstalldirs 
-
-# Link all relevant headers into the `sysdeps' directory.  The order
-# of these loops determines header file precedence.
 
 SUBDIRS =	sysdeps
 DIST_SUBDIRS =	sysdeps

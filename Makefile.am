@@ -1,6 +1,5 @@
-MAINTAINERCLEANFILES = Makefile.in configure config.h.in \
-                       stamp-h.in config.log config.cache \
-                       config.status
+MAINTAINERCLEANFILES = Makefile.in aclocal.m4 configure config.h.in \
+                       stamp-h.in config.log config.cache config.status
 
 if HAVE_DOXYGEN
 DOC_DIR = doc
