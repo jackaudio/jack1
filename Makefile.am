@@ -23,3 +23,5 @@ pkgconfig_DATA = jack.pc
 
 rpm: dist
 	rpm -ta $(distdir).tar.gz
+
+dist-hook: dist-check-doxygen
