@@ -19,6 +19,7 @@
     $Id$
 */
 
+#include <math.h>
 #include <stdio.h>
 #include <memory.h>
 #include <unistd.h>
@@ -50,22 +51,25 @@ dummy_driver_audio_stop (dummy_driver_t *driver)
 }
 
 static jack_nframes_t 
-dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status, float *delayed_usecs)
+dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
+		   float *delayed_usecs)
 {
-  jack_time_t processing_time;
+  jack_time_t starting_time = jack_get_microseconds();
+  jack_time_t processing_time = (driver->last_wait_ust?
+				 starting_time - driver->last_wait_ust: 0);
+  jack_time_t sleeping_time = driver->wait_time - processing_time;
 
-  processing_time = driver->last_wait_ust
-    ? jack_get_microseconds() - driver->last_wait_ust
-    : 0;
-
-  if (processing_time < driver->wait_time)
-    usleep (driver->wait_time - processing_time);
-
+  /* JOQ: usleep() is inaccurate for small buffer sizes with Linux
+   * 2.4.  I suspect it can't wait for less than one (or maybe even
+   * two) scheduler timeslices.  Linux 2.6 is probably better. */
+  if (sleeping_time > 0)
+    usleep (sleeping_time);
 
   driver->last_wait_ust = jack_get_microseconds ();
+  driver->engine->transport_cycle_start (driver->engine, driver->last_wait_ust);
 
   *status = 0;
-  *delayed_usecs = 0.0;
+  *delayed_usecs = driver->last_wait_ust - starting_time - sleeping_time;
 
   return driver->period_size;
 }
@@ -198,8 +202,8 @@ dummy_driver_new (jack_client_t * client,
   driver->start      = (JackDriverStartFunction)     dummy_driver_audio_start;
   driver->stop       = (JackDriverStopFunction)      dummy_driver_audio_stop;
 
-  driver->period_usecs = (((float)period_size) / ((float)sample_rate)) / 1000000.0;
-
+  driver->period_usecs =
+    (jack_time_t) floor ((((float) period_size) / sample_rate) * 1000000.0f);
   driver->sample_rate = sample_rate;
   driver->period_size = period_size;
   driver->wait_time   = wait_time;
@@ -321,8 +325,9 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
         if (!wait_time_set)
 	  wait_time = (((float)period_size) / ((float)sample_rate)) * 1000000.0;
 
-	return dummy_driver_new (client, "dummy_pcm", capture_ports, playback_ports,
-				 sample_rate, period_size, wait_time);
+	return dummy_driver_new (client, "dummy_pcm", capture_ports,
+				 playback_ports, sample_rate, period_size,
+				 wait_time);
 }
 
 void
