@@ -811,7 +811,7 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver)
 		gettimeofday(&now, 0);
 		snd_pcm_status_get_trigger_tstamp(status, &tstamp);
 		timersub(&now, &tstamp, &diff);
-		fprintf(stderr, "\n\n**** alsa_pcm: xrun of at least %.3f msecs, iter=%d\n\n", diff.tv_sec * 1000 + diff.tv_usec / 1000.0, frame_ith);
+		fprintf(stderr, "\n\n**** alsa_pcm: xrun of at least %.3f msecs\n\n", diff.tv_sec * 1000 + diff.tv_usec / 1000.0);
 	}
 
 	if (alsa_driver_audio_stop (driver) || alsa_driver_audio_start (driver)) {
@@ -1042,8 +1042,6 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 	} else {
 		playback_avail = INT_MAX; /* odd, but see min() computation below */
 	}
-
-	frame_ith++;
 
 	if (xrun_detected) {
 		*status = alsa_driver_xrun_recovery (driver);
