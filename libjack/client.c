@@ -774,6 +774,7 @@ jack_client_new (const char *client_name)
 	for (ptid = 0; ptid < client->n_port_types; ++ptid) {
 		client->port_segment[ptid].index =
 			client->engine->port_types[ptid].shm_registry_index;
+		client->port_segment[ptid].attached_at = MAP_FAILED;
 		jack_attach_port_segment (client, ptid);
 	}
 
@@ -911,7 +912,7 @@ jack_client_thread (void *arg)
 	jack_client_control_t *control = client->control;
 	jack_event_t event;
 	char status = 0;
-	char c;
+	char c = 0;
 	int err = 0;
 
 	pthread_mutex_lock (&client_lock);
@@ -969,7 +970,8 @@ jack_client_thread (void *arg)
 
 		pthread_testcancel();
 		
-		if (client->graph_wait_fd >= 0 && (client->pollfd[WAIT_POLL_INDEX].revents & ~POLLIN)) {
+		if (client->graph_wait_fd >= 0 &&
+		    (client->pollfd[WAIT_POLL_INDEX].revents & ~POLLIN)) {
 			
 			DEBUG ("\n\n\n\n\n\n\n\nWAITFD ERROR, ZOMBIE\n\n\n\n\n");
 			
@@ -1799,6 +1801,12 @@ jack_get_ports (jack_client_t *client,
 		if (matching) {
 			matching_ports[match_cnt++] = psp[i].name;
 		}
+	}
+	if (port_name_pattern && port_name_pattern[0]) {
+		regfree (&port_regex);
+	}
+	if (type_name_pattern && type_name_pattern[0]) {
+		regfree (&type_regex);
 	}
 
 	matching_ports[match_cnt] = 0;
