@@ -28,9 +28,9 @@
 #ifndef __jack_coreaudio_driver_h__
 #define __jack_coreaudio_driver_h__
 
+#include <CoreAudio/CoreAudio.h>
 #include <AudioToolbox/AudioConverter.h>
 #include <AudioUnit/AudioUnit.h>
-#include <CoreAudio/CoreAudio.h>
 
 #include <jack/types.h>
 #include <jack/hardware.h>

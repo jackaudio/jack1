@@ -463,10 +463,8 @@ then
 	# check for coreaudio
 	AC_CHECK_HEADERS(CoreAudio/CoreAudio.h,
 		[ HAVE_COREAUDIO="true"
-		  CA_LIBS="-framework CoreAudio"
 		  JACK_DEFAULT_DRIVER=\"coreaudio\"
 		])
-	AC_SUBST(CA_LIBS)
 fi
 AM_CONDITIONAL(HAVE_COREAUDIO, $HAVE_COREAUDIO)
 
