@@ -3,6 +3,7 @@ MAINTAINERCLEANFILES    = Makefile.in
 libjackincludedir = $(includedir)/jack
 libjackinclude_HEADERS = jack.h \
 		         error.h \
+			 transport.h \
 		         driver.h \
 			 port.h \
 			 types.h \
