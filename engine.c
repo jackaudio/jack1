@@ -573,6 +573,7 @@ static int
 handle_new_client (jack_engine_t *engine, int client_fd)
 
 {
+	GSList *node;
 	jack_client_internal_t *client;
 	jack_client_connect_request_t req;
 	jack_client_connect_result_t res;
@@ -583,40 +584,47 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 	}
 
 	res.status = 0;
-	
-	if ((client = jack_client_internal_new (engine, client_fd, &req)) == 0) {
-		jack_error ("cannot create new client object");
-		return -1;
+
+	for (node = engine->clients; node; node = g_slist_next (node)) {
+	        client = (jack_client_internal_t *) node->data;
+		if (strncmp(req.name, (char*)client->control->name, sizeof(req.name)) == 0) {
+		        jack_error ("cannot create new client; %s already exists", client->control->name);
+
+			res.status = -1;
+		}
 	}
 
-	printf ("new client: %s, type %d @ %p\n", client->control->name, req.type, client->control);
+	if (res.status == 0) {
 
-	res.status = 0;
-	res.client_key = client->shm_key;
-	res.control_key = engine->control_key;
-	res.port_segment_key = engine->port_segment_key;
-	res.realtime = engine->control->real_time;
-	res.realtime_priority = engine->rtpriority - 1;
+	        if ((client = jack_client_internal_new (engine, client_fd, &req)) == 0) {
+		        jack_error ("cannot create new client object");
+			return -1;
+		}
 
-	if (jack_client_is_inprocess (client)) {
+		printf ("new client: %s, type %d @ %p\n", client->control->name, req.type, client->control);
 
-		res.client_control = client->control;
-		res.engine_control = engine->control;
-
-	} else {
-		strcpy (res.fifo_prefix, engine->fifo_prefix);
+		res.client_key = client->shm_key;
+		res.control_key = engine->control_key;
+		res.port_segment_key = engine->port_segment_key;
+		res.realtime = engine->control->real_time;
+		res.realtime_priority = engine->rtpriority - 1;
+		
+		if (jack_client_is_inprocess (client)) {
+		        res.client_control = client->control;
+			res.engine_control = engine->control;
+		} else {
+		        strcpy (res.fifo_prefix, engine->fifo_prefix);
+		}
 	}
-
-	res.status = 0;
 
 	if (write (client->request_fd, &res, sizeof (res)) != sizeof (res)) {
-		jack_error ("cannot write connection response to client");
+	        jack_error ("cannot write connection response to client");
 		jack_client_delete (engine, client);
 		return -1;
 	}
 
 	if (res.status) {
-		return res.status;
+	        return res.status;
 	}
 
 	pthread_mutex_lock (&engine->graph_lock);
