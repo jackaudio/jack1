@@ -138,7 +138,7 @@ main (int argc, char *argv[])
 		return 1;
 	}
 
-	if ((driver = jack_driver_load ("/usr/local/lib/jack_alsa.so", alsa_pcm_name, frames_per_interrupt, srate)) == 0) {
+	if ((driver = jack_driver_load (ADDON_DIR "/jack_alsa.so", alsa_pcm_name, frames_per_interrupt, srate)) == 0) {
 		fprintf (stderr, "cannot load ALSA driver module\n");
 		return 1;
 	}

@@ -54,6 +54,10 @@ AC_PROG_CXX
 AC_PROG_LD
 AM_PROG_LIBTOOL
 
+ADDON_DIR=${libdir}
+
+AC_SUBST(ADDON_DIR)
+
 dnl check for the libraries we need
 
 AC_OUTPUT(Makefile

@@ -209,7 +209,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 			return -1;
 		}
 	}
-
+	
 	if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S32_LE)) < 0) {
 		if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S16_LE)) < 0) {
 			jack_error ("Sorry. The audio interface \"%s\""
@@ -226,21 +226,31 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 
 	*nchns = snd_pcm_hw_params_get_channels_max (hw_params);
 
+	if (*nchns > 1024) { 
+		/* the hapless user is an unwitting victim of the "default"
+		   ALSA PCM device, which can support up to 16 million
+		   channels. since they can't be bothered to set up
+		   a proper default device, limit the number of channels
+		   for them to a sane default.
+		*/
+		*nchns = 2;  
+	}				
+
 	if ((err = snd_pcm_hw_params_set_channels (handle, hw_params, *nchns)) < 0) {
 		jack_error ("ALSA: cannot set channel count to %u for %s", *nchns, stream_name);
 		return -1;
 	}
+	
+	if ((err = snd_pcm_hw_params_set_period_size (handle, hw_params, driver->frames_per_cycle, 0)) < 0) {
+		jack_error ("ALSA: cannot set period size to %u frames for %s", driver->frames_per_cycle, stream_name);
+		return -1;
+	}
 
 	if ((err = snd_pcm_hw_params_set_periods (handle, hw_params, 2, 0)) < 0) {
-		jack_error ("ALSA: cannot set fragment count minimum to 2 for %s", stream_name);
+		jack_error ("ALSA: cannot set number of periods to 2 for %s", stream_name);
 		return -1;
 	}
-
-	if ((err = snd_pcm_hw_params_set_period_size (handle, hw_params, driver->frames_per_cycle, 0)) < 0) {
-		jack_error ("ALSA: cannot set fragment length to %u for %s", stream_name);
-		return -1;
-	}
-
+	
 	if ((err = snd_pcm_hw_params_set_buffer_size (handle, hw_params, 2 * driver->frames_per_cycle)) < 0) {
 		jack_error ("ALSA: cannot set buffer length to %u for %s", 2 * driver->frames_per_cycle, stream_name);
 		return -1;
@@ -300,22 +310,22 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 
 	driver->frame_rate = rate;
 	driver->frames_per_cycle = frames_per_cycle;
-
+	
 	if (alsa_driver_configure_stream (driver, "capture",
 					  driver->capture_handle,
 					  driver->capture_hw_params,
 					  driver->capture_sw_params,
 					  &driver->capture_nchannels)) {
-		jack_error ("ALSA-MCD: cannot configure capture channel");
+		jack_error ("ALSA: cannot configure capture channel");
 		return -1;
 	}
-
+	
 	if (alsa_driver_configure_stream (driver, "playback",
 					  driver->playback_handle,
 					  driver->playback_hw_params,
 					  driver->playback_sw_params,
 					  &driver->playback_nchannels)) {
-		jack_error ("ALSA-MCD: cannot configure playback channel");
+		jack_error ("ALSA: cannot configure playback channel");
 		return -1;
 	}
 	
@@ -708,7 +718,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 	driver->time_at_interrupt = current_usecs();
 	
 	if (driver->pfd.revents & POLLERR) {
-		jack_error ("ALSA-MCD: poll reports error.");
+		jack_error ("ALSA: poll reports error.");
 		return -1;
 	}
 	
@@ -1139,7 +1149,7 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->playback_ports = 0;
 	
 	if ((err = snd_pcm_open (&driver->playback_handle, alsa_device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
-		jack_error ("ALSA-MCD: Cannot open PCM device %s/%s", name, alsa_device);
+		jack_error ("ALSA: Cannot open PCM device %s/%s", name, alsa_device);
 		free (driver);
 		return 0;
 	}
@@ -1147,7 +1157,7 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->alsa_name = strdup (alsa_device);
 
 	if ((err = snd_pcm_open (&driver->capture_handle, alsa_device, SND_PCM_STREAM_CAPTURE, 0)) < 0) {
-		jack_error ("ALSA-MCD: Cannot open PCM device %s", name);
+		jack_error ("ALSA: Cannot open PCM device %s", name);
 		free (driver);
 		return 0;
 	}

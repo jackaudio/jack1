@@ -10,6 +10,10 @@ EXTRA_PROGRAMS = jack_fltk_client
 
 bin_PROGRAMS = jackd jack_simple_client jack_monitor_client @XTRA@
 
+EXTRA_CFLAGS = -DADDON_DIR=\"$(ADDON_DIR)\" @GLIB_CFLAGS@
+
+CFLAGS += $(EXTRA_CFLAGS)
+
 jackd_SOURCES = jackd.c
 jackd_LDFLAGS = -L. -ljack -lltdl -lpthread
 
