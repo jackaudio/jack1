@@ -738,7 +738,7 @@
 				HEADER_SEARCH_PATHS = "../../../ ../../";
 				LIBRARY_STYLE = BUNDLE;
 				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = "-ljack  -framework CoreAudio -framework AudioUnit -framework CoreServices";
+				OTHER_LDFLAGS = "-ljack  -framework CoreAudio  -framework AudioUnit  -framework CoreServices";
 				OTHER_LIBTOOL_FLAGS = "";
 				OTHER_REZFLAGS = "";
 				PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/Carbon.framework/Headers/Carbon.h";
@@ -916,7 +916,7 @@
 	<key>CFBundleExecutable</key>
 	<string>Jack</string>
 	<key>CFBundleGetInfoString</key>
-	<string>Jack Server 0.99.45, @03-04 Paul Davis, Grame</string>
+	<string>Jack Server 0.99.54, @03-05 Paul Davis, Grame</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -932,7 +932,7 @@
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>0.99.45</string>
+	<string>0.99.54</string>
 </dict>
 </plist>
 ";
@@ -1250,6 +1250,7 @@
 				LIBRARY_SEARCH_PATHS = "";
 				LIBRARY_STYLE = BUNDLE;
 				OPTIMIZATION_CFLAGS = "-O3";
+				OTHER_CFLAGS = "-DJACK_USE_MACH_THREADS";
 				OTHER_LDFLAGS = "-ljack -framework CoreAudio -framework AudioToolbox PortAudioLib ";
 				OTHER_LIBTOOL_FLAGS = "";
 				OTHER_REZFLAGS = "";
