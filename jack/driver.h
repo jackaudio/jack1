@@ -170,7 +170,7 @@ typedef int       (*JackDriverStartFunction)(struct _jack_driver *);
 
     JackDriverStopFunction start;
 
-#endif _ANNOTATED_DRIVER_DECLARATION_
+#else
 
 #define JACK_DRIVER_DECL \
     jack_nframes_t period_usecs; \
@@ -182,6 +182,8 @@ typedef int       (*JackDriverStartFunction)(struct _jack_driver *);
     JackDriverProcessFunction process; \
     JackDriverStartFunction stop; \
     JackDriverStopFunction start;
+
+#endif /* _ANNOTATED_DRIVER_DECLARATION_ */
 
 typedef struct _jack_driver {
 
@@ -196,11 +198,3 @@ jack_driver_t *jack_driver_load (int argc, char **argv);
 void jack_driver_unload (jack_driver_t *);
 
 #endif /* __jack_driver_h__ */
-
-
-
-
-
-
-
-
