@@ -4,14 +4,30 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure config.h.in \
                           missing install-sh config.sub ltconfig \
                           ltmain.sh acinclude.m4
 
-SUBDIRS = jack
+if HAVE_DOXYGEN
+SUBDIRS = . jack doc
+else
+SUBDIRS = . jack doc
+endif
 
-EXTRA_PROGRAMS = jack_fltk_client jackrec
+DIST_SUBDIRS = jack doc
+
+if HAVE_FLTK
+FLTK_CLIENT = jack_fltk_client
+else
+FLTK_CLIENT =
+endif
+
+if HAVE_SNDFILE
+JACKREC = jackrec
+else
+JACKREC =
+endif
 
 bin_PROGRAMS = jackd jack_simple_client jack_monitor_client \
-	jack_impulse_grabber jack_connect jack_disconnect @XTRA@
+	jack_impulse_grabber jack_connect jack_disconnect $(FLTK_CLIENT) $(JACKREC)
 
-AM_CFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" @GLIB_CFLAGS@
+AM_CFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" $(GLIB_CFLAGS)
 
 AM_CXXFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\"
 
@@ -35,13 +51,17 @@ jack_monitor_client_SOURCES = monitor_client.c
 jack_monitor_client_LDFLAGS = -ldl -lpthread
 jack_monitor_client_LDADD = libjack.la
 
+if HAVE_FLTK
 jack_fltk_client_SOURCES = fltk_client.cc
 jack_fltk_client_LDFLAGS = -L/usr/X11R6/lib -lfltk -lX11 -lXext -ldl -lpthread
 jack_fltk_client_LDADD = libjack.la
+endif
 
+if HAVE_SNDFILE
 jackrec_SOURCES = capture_client.c
 jackrec_LDFLAGS = -lsndfile -ldl -lpthread
 jackrec_LDADD = libjack.la
+endif
 
 jack_impulse_grabber_SOURCES = impulse_grabber.c
 jack_impulse_grabber_LDFLAGS = -ldl -lpthread -lm

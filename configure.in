@@ -5,7 +5,7 @@ AC_CONFIG_AUX_DIR(.)
 
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=24
-JACK_MICRO_VERSION=0
+JACK_MICRO_VERSION=1
 
 BETA=
 
@@ -25,6 +25,8 @@ AM_INIT_AUTOMAKE(jack,${JACK_VERSION})
 
 AC_PROG_CC
 AC_PROG_CXX
+AC_PROG_LD
+AM_PROG_LIBTOOL
 
 JACK_CFLAGS="-g -Wall -D_REENTRANT"
 JACK_OPT_CFLAGS="-D_REENTRANT -O6 -Wall -fomit-frame-pointer -ffast-math -fstrength-reduce -funroll-loops -fmove-all-movables"
@@ -35,40 +37,57 @@ AC_ARG_ENABLE(optimize,
 
 AC_SUBST(JACK_CFLAGS)
 
-XTRA=""
+# plugins (just jack_alsa.so at the moment) go in the addon dir.
 
-AC_ARG_ENABLE(fltk-client,
-     [  --enable-fltk-client    build the FLTK test client.])
+ADDON_DIR=${libdir}/jack
+AC_SUBST(ADDON_DIR)
 
-if test "x$enable_fltk_client" != "xno" ; then
-     AC_CHECK_LIB(fltk,main,
-         [ XTRA="$XTRA jack_fltk_client" ],
-         [ AC_MSG_ERROR([*** you cannot build the FLTK client without the FLTK library])],
-         [ -L/usr/X11R6/lib -lX11 -lXext ])
-fi	    
+# jack depends on alsa 0.9 and glib. some example apps depend on libsndfile and fltk.
 
-AM_PATH_GLIB(1.0.0,,[AC_MSG_ERROR([*** JACK requires glib, but it does not appear to be installed])])
+AM_PATH_GLIB(1.0.0,
+             [:],
+             [AC_MSG_ERROR([*** JACK requires glib, but it does not appear to be installed])]
+)
 
 AC_CHECK_LIB(asound,snd_pcm_drop,
 	     [:],
              [AC_MSG_ERROR([*** JACK currently requires ALSA (0.9.X) which you don't appear to have])]
 )
 
+AC_LANG_SAVE
+AC_LANG_CPLUSPLUS
+AC_CHECK_LIB(fltk,main,
+             [AC_CHECK_HEADER(FL/Fl.H,
+                              [HAVE_FLTK=true],
+                              [HAVE_FLTK=false]
+              )],
+             [HAVE_FLTK=false],
+             [-L/usr/X11R6/lib -lX11 -lXext]
+)
+AC_LANG_RESTORE
+if test $HAVE_FLTK = "false"; then
+             AC_MSG_WARN([*** no fltk found, the fltk example client will not be built])
+fi
+
 AC_CHECK_LIB(sndfile,main,
-	     [ XTRA="$XTRA jackrec" ],
-             [AC_MSG_WARN([*** the jackrec client will be skipped since you do not see to have libsndfile installed])]
+             [AC_CHECK_HEADER(sndfile.h,
+                              [HAVE_SNDFILE=true],
+                              [HAVE_SNDFILE=false]
+              )],
+	     [HAVE_SNDFILE=false]
+)
+if test $HAVE_SNDFILE = "false"; then
+             AC_MSG_WARN([*** no libsndfile found, the jackrec example client will not be built])
+fi
+
+# you need doxygen to make dist.
+AC_CHECK_PROG(DOXYGEN, doxygen,
+              [HAVE_DOXYGEN=true],
+              [HAVE_DOXYGEN=false; AC_MSG_WARN([*** doxygen not found, docs will not be built])]
 )
 
-AC_SUBST(XTRA)
-
-AC_PROG_LD
-AM_PROG_LIBTOOL
-
-ADDON_DIR=${libdir}/jack
-
-AC_SUBST(ADDON_DIR)
-
-dnl check for the libraries we need
-
-AC_OUTPUT(Makefile jack.pc jack/Makefile)
+AM_CONDITIONAL(HAVE_FLTK, $HAVE_FLTK)
+AM_CONDITIONAL(HAVE_SNDFILE, $HAVE_SNDFILE)
+AM_CONDITIONAL(HAVE_DOXYGEN, $HAVE_DOXYGEN)
+AC_OUTPUT(Makefile jack.pc jack/Makefile doc/Makefile doc/reference.doxygen)
 

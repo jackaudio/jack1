@@ -23,7 +23,7 @@ PROJECT_NAME           = Jack
 # This could be handy for archiving the generated documentation or 
 # if some version control system is used.
 
-PROJECT_NUMBER         = 0.20.5
+PROJECT_NUMBER         = @JACK_VERSION@
 
 # The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute) 
 # base path where the generated documentation will be put. 
@@ -301,7 +301,7 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                  = jack/jack.h
+INPUT                  = @top_srcdir@/jack/jack.h
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
@@ -567,13 +567,13 @@ LATEX_HEADER           =
 # contain links (just like the HTML output) instead of page references 
 # This makes the output suitable for online browsing using a pdf viewer.
 
-PDF_HYPERLINKS         = NO
+PDF_HYPERLINKS         = YES
 
 # If the USE_PDFLATEX tag is set to YES, pdflatex will be used instead of 
 # plain latex in the generated Makefile. Set this option to YES to get a 
 # higher quality PDF documentation.
 
-USE_PDFLATEX           = NO
+USE_PDFLATEX           = YES
 
 # If the LATEX_BATCHMODE tag is set to YES, doxygen will add the \\batchmode. 
 # command to the generated LaTeX files. This will instruct LaTeX to keep 
@@ -779,7 +779,7 @@ PERL_PATH              = /usr/bin/perl
 # option is superceded by the HAVE_DOT option below. This is only a fallback. It is 
 # recommended to install and use dot, since it yield more powerful graphs.
 
-CLASS_DIAGRAMS         = YES
+CLASS_DIAGRAMS         = NO
 
 # If you set the HAVE_DOT tag to YES then doxygen will assume the dot tool is 
 # available from the path. This tool is part of Graphviz, a graph visualization 
