@@ -20,6 +20,7 @@
 
 */
 
+
 #include <config.h>
 
 #include <stdio.h>
@@ -37,10 +38,7 @@
 #include <stdarg.h>
 #include <getopt.h>
 #include <pthread.h>
-
-#ifdef USE_BARRIER
 #include <semaphore.h>
-#endif
 
 #include <jack/types.h>
 #include <jack/internal.h>
@@ -52,15 +50,15 @@
 
 #define OSS_DRIVER_N_PARAMS	9
 const static jack_driver_param_desc_t oss_params[OSS_DRIVER_N_PARAMS] = {
-	{ "samplerate",
-	  's',
+	{ "rate",
+	  'r',
 	  JackDriverParamUInt,
 	  { .ui = OSS_DRIVER_DEF_FS },
 	  "sample rate",
 	  "sample rate"
 	},
-	{ "periodsize",
-	  'b',
+	{ "period",
+	  'p',
 	  JackDriverParamUInt,
 	  { .ui = OSS_DRIVER_DEF_BLKSIZE },
 	  "period size",
@@ -73,36 +71,36 @@ const static jack_driver_param_desc_t oss_params[OSS_DRIVER_N_PARAMS] = {
 	  "word length",
 	  "word length"
 	},
-	{ "capturech",
-	  'c',
+	{ "inchannels",
+	  'i',
 	  JackDriverParamUInt,
 	  { .ui = OSS_DRIVER_DEF_INS },
 	  "capture channels",
 	  "capture channels"
 	},
-	{ "playbackch",
-	  'p',
+	{ "outchannels",
+	  'o',
 	  JackDriverParamUInt,
 	  { .ui = OSS_DRIVER_DEF_OUTS },
 	  "playback channels",
 	  "playback channels"
 	},
-	{ "inputdev",
-	  'i',
+	{ "capture",
+	  'C',
 	  JackDriverParamString,
-	  { .str = "" },
+	  { .str = OSS_DRIVER_DEF_DEV },
 	  "input device",
 	  "input device"
 	},
-	{ "outputdev",
-	  'o',
+	{ "playback",
+	  'P',
 	  JackDriverParamString,
-	  { .str = "" },
+	  { .str = OSS_DRIVER_DEF_DEV },
 	  "output device",
 	  "output device"
 	},
 	{ "ignorehwbuf",
-	  'd',
+	  'b',
 	  JackDriverParamBool,
 	  { },
 	  "ignore hardware period size",
@@ -120,6 +118,34 @@ const static jack_driver_param_desc_t oss_params[OSS_DRIVER_N_PARAMS] = {
 
 
 /* internal functions */
+
+
+static inline void update_times (oss_driver_t *driver)
+{
+	driver->last_periodtime = jack_get_microseconds();
+	if (driver->next_periodtime > 0)
+	{
+		driver->iodelay = (float)
+			((long double) driver->last_periodtime - 
+			(long double) driver->next_periodtime);
+	}
+	else driver->iodelay = 0.0F;
+	driver->next_periodtime = 
+		driver->last_periodtime +
+		driver->period_usecs;
+}
+
+
+static inline void driver_cycle (oss_driver_t *driver)
+{
+	update_times(driver);
+	driver->engine->transport_cycle_start(driver->engine,
+		driver->last_periodtime);
+
+	driver->last_wait_ust = driver->last_periodtime;
+	driver->engine->run_cycle(driver->engine, 
+		driver->period_size, driver->iodelay);
+}
 
 
 static void copy_and_convert_in (jack_sample_t *dst, void *src, 
@@ -587,8 +613,8 @@ static int oss_driver_start (oss_driver_t *driver)
 	pthread_mutex_init(&driver->mutex_out, NULL);
 #	ifdef USE_BARRIER
 	pthread_barrier_init(&driver->barrier, NULL, 2);
-	sem_init(&driver->sem_start, 0, 0);
 #	endif
+	sem_init(&driver->sem_start, 0, 0);
 	driver->run = 1;
 	driver->threads = 0;
 	if (infd >= 0)
@@ -604,9 +630,6 @@ static int oss_driver_start (oss_driver_t *driver)
 	}
 #	ifdef USE_BARRIER
 	if (outfd >= 0)
-#	else
-	if (outfd >= 0 && infd != outfd)
-#	endif
 	{
 		if (pthread_create(&driver->thread_out, NULL, io_thread,
 			driver) < 0)
@@ -617,11 +640,14 @@ static int oss_driver_start (oss_driver_t *driver)
 		}
 		driver->threads |= 2;
 	}
-
-#	ifdef USE_BARRIER
-	sem_post(&driver->sem_start);
-	sem_post(&driver->sem_start);
 #	endif
+
+	if (driver->threads & 1) sem_post(&driver->sem_start);
+	if (driver->threads & 2) sem_post(&driver->sem_start);
+
+	driver->last_periodtime = jack_get_microseconds();
+	driver->next_periodtime = 0;
+	driver->iodelay = 0.0F;
 
 	return 0;
 }
@@ -650,8 +676,8 @@ static int oss_driver_stop (oss_driver_t *driver)
 			return -1;
 		}
 	}
-#	ifdef USE_BARRIER
 	sem_destroy(&driver->sem_start);
+#	ifdef USE_BARRIER
 	pthread_barrier_destroy(&driver->barrier);
 #	endif
 	pthread_mutex_destroy(&driver->mutex_in);
@@ -799,15 +825,6 @@ static int oss_driver_bufsize (oss_driver_t *driver, jack_nframes_t nframes)
 
 /* internal driver thread */
 
-static inline void start_process_cycle (oss_driver_t *driver)
-{
-	driver->last_wait_ust = jack_get_microseconds();
-	driver->engine->transport_cycle_start(driver->engine, 
-					      driver->last_wait_ust);
-	/* what is the actual delay value? (not zero) */
-	driver->engine->run_cycle(driver->engine,
-				  driver->period_size, 0);
-}
 
 #ifdef USE_BARRIER
 static inline void synchronize (oss_driver_t *driver)
@@ -817,12 +834,12 @@ static inline void synchronize (oss_driver_t *driver)
 		if (pthread_barrier_wait(&driver->barrier) ==
 			PTHREAD_BARRIER_SERIAL_THREAD)
 		{
-			start_process_cycle(driver);
+			driver_cycle(driver);
 		}
 	}
 	else
 	{
-		start_process_cycle(driver);
+		driver_cycle(driver);
 	}
 }
 #endif
@@ -841,7 +858,7 @@ static void *io_thread (void *param)
 		schedpol = SCHED_FIFO;
 		schedp.sched_priority = sched_get_priority_max(SCHED_FIFO) - 1;
 		if (pthread_setschedparam(pthread_self(), schedpol, 
-			&schedp) < 0)
+			&schedp) != 0)
 		{
 			puts("oss_driver: pthread_setschedparam() failed\n");
 		}
@@ -851,9 +868,9 @@ static void *io_thread (void *param)
 		puts("oss_driver: pthread_getschedparam() failed\n");
 	}
 
-#	ifdef USE_BARRIER
 	sem_wait(&driver->sem_start);
 
+#	ifdef USE_BARRIER
 	if (pthread_self() == driver->thread_in)
 	{
 		localsize = driver->indevbufsize;
@@ -870,8 +887,8 @@ static void *io_thread (void *param)
 			if (read(driver->infd, localbuf, localsize) <
 				(ssize_t) localsize)
 			{
-				/*jack_error("OSS: read() failed: %s@%i", 
-					__FILE__, __LINE__);*/
+				jack_error("OSS: read() failed: %s@%i", 
+					__FILE__, __LINE__);
 				break;
 			}
 
@@ -904,8 +921,8 @@ static void *io_thread (void *param)
 			if (write(driver->outfd, localbuf, localsize) < 
 				(ssize_t) localsize)
 			{
-				/*jack_error("OSS: write() failed: %s@%i", 
-					__FILE__, __LINE__);*/
+				jack_error("OSS: write() failed: %s@%i", 
+					__FILE__, __LINE__);
 				break;
 			}
 
@@ -960,7 +977,7 @@ static void *io_thread (void *param)
 			pthread_mutex_unlock(&driver->mutex_in);
 		}
 
-		start_process_cycle(driver);
+		driver_cycle(driver);
 	}
 
 	free(localbuf);
@@ -1044,38 +1061,39 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 
 		switch (param->character)
 		{
-			case 's':
+			case 'r':
 				sample_rate = param->value.ui;
 				break;
-			case 'b':
+			case 'p':
 				period_size = param->value.ui;
 				break;
 			case 'w':
 				bits = param->value.i;
 				break;
-			case 'c':
+			case 'i':
 				capture_channels = param->value.ui;
 				break;
-			case 'p':
+			case 'o':
 				playback_channels = param->value.ui;
 				break;
-			case 'i':
+			case 'C':
 				driver->indev = strdup(param->value.str);
 				break;
-			case 'o':
+			case 'P':
 				driver->outdev = strdup(param->value.str);
 				break;
-			case 'd':
+			case 'b':
 				driver->ignorehwbuf = 1;
 				break;
 			case 'h':
-				puts("-s <fs>\tsample rate");
-				puts("-b <size>\tperiod size");
+				puts("-r <fs>\tsample rate");
+				puts("-p <size>\tperiod size");
 				puts("-w <bits>\tword length");
-				puts("-c <chs>\tcapture channels");
-				puts("-p <chs>\tplayback channels");
-				puts("-i <dev>\tcapture device");
-				puts("-o <dev>\tplayback device");
+				puts("-i <chs>\tcapture channels");
+				puts("-o <chs>\tplayback channels");
+				puts("-C <dev>\tcapture device");
+				puts("-P <dev>\tplayback device");
+				puts("-b\tignore hardware buffer size");
 				puts("-h\tthis help");
 				break;
 		}
@@ -1091,6 +1109,9 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	driver->period_usecs = 
 		((double) period_size / (double) sample_rate) * 1e6;
 	driver->last_wait_ust = 0;
+	driver->last_periodtime = jack_get_microseconds();
+	driver->next_periodtime = 0;
+	driver->iodelay = 0.0F;
 	
 	driver->finish = driver_finish;
 

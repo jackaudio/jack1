@@ -25,17 +25,17 @@
 #define __JACK_OSS_DRIVER_H__
 
 #include <pthread.h>
-#ifdef USE_BARRIER
 #include <semaphore.h>
-#endif
 
 #include <jack/types.h>
 #include <jack/jslist.h>
 #include <jack/driver.h>
+#include <jack/time.h>
 #include <jack/jack.h>
 
 
-#define OSS_DRIVER_DEF_FS	44100
+#define OSS_DRIVER_DEF_DEV	"/dev/dsp"
+#define OSS_DRIVER_DEF_FS	48000
 #define OSS_DRIVER_DEF_BLKSIZE	1024
 #define OSS_DRIVER_DEF_BITS	16
 #define OSS_DRIVER_DEF_INS	2
@@ -67,6 +67,10 @@ typedef struct _oss_driver
 	void *indevbuf;
 	void *outdevbuf;
 
+	float iodelay;
+	jack_time_t last_periodtime;
+	jack_time_t next_periodtime;
+
 	JSList *capture_ports;
 	JSList *playback_ports;
 
@@ -81,8 +85,8 @@ typedef struct _oss_driver
 	pthread_mutex_t mutex_out;
 #	ifdef USE_BARRIER
 	pthread_barrier_t barrier;
-	sem_t sem_start;
 #	endif
+	sem_t sem_start;
 } oss_driver_t;
 
 
