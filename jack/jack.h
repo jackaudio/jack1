@@ -105,7 +105,8 @@ void jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void 
  * for more information.
  * 
  *
- * @return 0 on success, otherwise a non-zero error code
+ * @return 0 on success, otherwise a non-zero error code, causing JACK
+ * to remove that client from the process() graph.
  */
 int jack_set_process_callback (jack_client_t *, JackProcessCallback process_callback, void *arg);
 

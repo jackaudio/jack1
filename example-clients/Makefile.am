@@ -62,7 +62,7 @@ jack_showtime_LDADD = ../libjack/libjack.la
 
 
 if HAVE_SNDFILE
-jackrec_SOURCES = capture_client.c
+jackrec_SOURCES = capture_client.c ringbuffer.c ringbuffer.h
 jackrec_LDFLAGS = @SNDFILE_LIBS@ -lrt -ldl -lpthread
 jackrec_LDADD = ../libjack/libjack.la
 endif
