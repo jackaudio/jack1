@@ -219,7 +219,7 @@ jack_destroy_shm (jack_shm_info_t* si)
 void
 jack_release_shm (jack_shm_info_t* si)
 {
-	if (si->attached_at >= 0) {
+	if (si->attached_at != MAP_FAILED) {
 		munmap (si->attached_at, jack_shm_registry[si->index].size);
 	}
 }
@@ -400,7 +400,7 @@ jack_destroy_shm (jack_shm_info_t* si)
 void
 jack_release_shm (jack_shm_info_t* si)
 {
-	if (si->attached_at >= 0) {
+	if (si->attached_at != MAP_FAILED) {
 		shmdt (si->attached_at);
 	}
 }
