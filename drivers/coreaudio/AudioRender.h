@@ -53,8 +53,8 @@ class AudioRender {
     AudioDeviceID vDevice;
     float vSampleRate;
     long vBufferSize;
-    int vOutChannels;		//output channels
-    int vInChannels;		//input chennels
+    int vOutChannels;	// output channels
+    int vInChannels;	// input channels
     static float **getADC();
     static float **getDAC();
     static float gSampleRate;

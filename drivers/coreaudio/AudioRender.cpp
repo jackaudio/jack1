@@ -135,8 +135,8 @@ static void printError(OSStatus err)
 
 
 AudioRender::AudioRender(float sampleRate, long bufferSize, int inChannels,
-			 int outChannels,
-			 char *device):vSampleRate(sampleRate),
+						int outChannels,
+						char *device):vSampleRate(sampleRate),
 vBufferSize(bufferSize)
 {
     inBuffers = NULL;
@@ -175,13 +175,14 @@ AudioRender::~AudioRender()
 }
 
 bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
-				     int channels, int inChannels,
-				     char *device)
+									int outChannels, int inChannels,
+									char *device)
 {
 
     OSStatus err;
     UInt32 size;
     Boolean isWritable;
+	AudioStreamBasicDescription SR;
 
     JCALog("Wanted DEVICE: %s\n", device);
 
@@ -201,13 +202,11 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
     for (int i = 0; i < manyDevices; i++) {
 		size = sizeof(char) * 256;
 		char name[256];
-		err =
-			AudioDeviceGetProperty(devices[i], 0, false,
-					   kAudioDevicePropertyDeviceName, &size,
-					   &name);
+		err = AudioDeviceGetProperty(devices[i], 0, false,
+									kAudioDevicePropertyDeviceName, &size,
+									&name);
 		JCALog("Read DEVICE: %s\n", name);
-		if (err != noErr)
-			return false;
+		if (err != noErr) return false;
 		if (strncmp(device, name, strlen(device)) == 0) {	// steph : name seems to be limited to 32 character, thus compare the common part only 
 			JCALog("Found DEVICE: %s %ld\n", name, devices[i]);
 			vDevice = devices[i];
@@ -225,74 +224,87 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 								kAudioDevicePropertyDeviceName, &size,
 								&deviceName);
     if (err != noErr) return false;
-
     JCALog("DEVICE: %s.\n", deviceName);
-
-    size = sizeof(AudioStreamBasicDescription);
-    AudioStreamBasicDescription SR;
-    err = AudioDeviceGetProperty(vDevice, 0, false,
-								kAudioDevicePropertyStreamFormat, &size,
-								&SR);
-    if (err != noErr) {
-		JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamFormat error: %ld\n",err);
-		printError(err);
-		return false;
-	}
-	JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamFormat: OK\n");
-
-    err = AudioDeviceGetPropertyInfo(vDevice, 0, false,
-									kAudioDevicePropertyStreams, &size,
-									&isWritable);
-    if (err != noErr) {
-		JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreams error: %ld\n",err);
-		printError(err);
-		return false;
-	}
-	JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreams: OK\n");
-
-	err = GetTotalChannels(vDevice,(UInt32*)&vOutChannels,false);
-	if (err != noErr) return false;
 	
-    n_out_streams = size / sizeof(AudioStreamID);
-
-    if (channels > vOutChannels) {
-		JCALog("cannot find requested output channels\n");
-		return false;
-    }
-
-    if (vOutChannels >= channels)
-		vOutChannels = channels;
-
-    JCALog("OUTPUT CHANNELS: %d.\n", vOutChannels);
-
-    err = AudioDeviceGetPropertyInfo(vDevice, 0, true,
+	JCALog("WANTED OUTPUT CHANNELS: %d.\n", outChannels);
+	err = AudioDeviceGetPropertyInfo(vDevice, 0, false,
 									kAudioDevicePropertyStreamFormat, &size,
 									&isWritable);
     if (err != noErr) {
-		vInChannels = 0;
-		goto endInChan;
-    }
+		vOutChannels = 0;
+	}else{
+		size = sizeof(AudioStreamBasicDescription);
+		err = AudioDeviceGetProperty(vDevice, 0, false,
+									kAudioDevicePropertyStreamFormat, &size,
+									&SR);
+		if (err != noErr) {
+			JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamFormat error: %ld\n",err);
+			printError(err);
+			return false;
+		}
+		JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamFormat: OK\n");
 
-    size = sizeof(AudioStreamBasicDescription);
-    AudioStreamBasicDescription inSR;
-    err = AudioDeviceGetProperty(vDevice, 0, true,
-								kAudioDevicePropertyStreamFormat, &size,
-								&inSR);
-    if (err != noErr) return false;
-	JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamFormat: OK\n");
+		err = AudioDeviceGetPropertyInfo(vDevice, 0, false,
+										kAudioDevicePropertyStreams, &size,
+										&isWritable);
+		if (err != noErr) {
+			JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreams error: %ld\n",err);
+			printError(err);
+			return false;
+		}
+		JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreams: OK\n");
+
+		err = GetTotalChannels(vDevice,(UInt32*)&vOutChannels,false);
+		if (err != noErr) return false;
+		
+		n_out_streams = size / sizeof(AudioStreamID);
+	}	
 	
-    err = AudioDeviceGetPropertyInfo(vDevice, 0, true,
-									kAudioDevicePropertyStreams, &size,
+	if (outChannels > vOutChannels) {
+		JCALog("cannot find requested output channels\n");
+		return false;
+	}
+
+	if (vOutChannels >= outChannels)
+		vOutChannels = outChannels;
+
+	JCALog("OUTPUT CHANNELS: %d.\n", vOutChannels);
+	
+	JCALog("WANTED INPUT CHANNELS: %d.\n", inChannels);
+	err = AudioDeviceGetPropertyInfo(vDevice, 0, true,
+									kAudioDevicePropertyStreamFormat, &size,
 									&isWritable);
-    if (err != noErr) return false;
-	JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreams: OK\n");
+			
+    if (err != noErr) {
+		vInChannels = 0;
+	}else{
 
-	err = GetTotalChannels(vDevice,(UInt32*)&vInChannels,true);
-	if (err != noErr) return false;
+		size = sizeof(AudioStreamBasicDescription);
+		err = AudioDeviceGetProperty(vDevice, 0, true,
+									kAudioDevicePropertyStreamFormat, &size,
+									&SR);
+		if (err != noErr) {
+			JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamForma terror: %ld\n",err);
+			printError(err);
+			return false;
+		}
+		JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamFormat: OK\n");
+		
+		err = AudioDeviceGetPropertyInfo(vDevice, 0, true,
+										kAudioDevicePropertyStreams, &size,
+										&isWritable);
+		if (err != noErr) {
+			JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreams error: %ld\n",err);
+			printError(err);
+			return false;
+		}
+		JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreams: OK\n");
+		
+		err = GetTotalChannels(vDevice,(UInt32*)&vInChannels,true);
+		if (err != noErr) return false;
 
-    n_in_streams = size / sizeof(AudioStreamID);
-
-  endInChan:
+		n_in_streams = size / sizeof(AudioStreamID);
+	}
 
     if (inChannels > vInChannels) {
 		JCALog("cannot find requested input channels\n");
@@ -300,7 +312,7 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
     }
 
     if (vInChannels >= inChannels)
-	vInChannels = inChannels;
+		vInChannels = inChannels;
 
     JCALog("INPUT CHANNELS: %d.\n", vInChannels);
 
