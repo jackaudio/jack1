@@ -504,8 +504,8 @@ fi
 
 # on some systems, readline depends on termcap or ncurses, respectively
 READLINE_DEPS=""
-##AC_CHECK_LIB(termcap, tgetent, [READLINE_DEPS="$READLINE_DEPS -ltermcap"])
-##AC_CHECK_LIB(ncurses, tgetent, [READLINE_DEPS="$READLINE_DEPS -lncurses"])
+AC_CHECK_LIB(termcap, tgetent, [READLINE_DEPS="$READLINE_DEPS -ltermcap"])
+AC_CHECK_LIB(ncurses, tgetent, [READLINE_DEPS="$READLINE_DEPS -lncurses"])
 AC_CHECK_LIB(readline, readline,
              [HAVE_READLINE=true], [HAVE_READLINE=false], [$READLINE_DEPS]
 )
