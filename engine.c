@@ -1675,9 +1675,9 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 				
 				if (subgraph_client == NULL) {
 					
-				/* start a new subgraph. the engine will start the chain
-				   by writing to the nth FIFO.
-				*/
+				        /* start a new subgraph. the engine will start the chain
+					   by writing to the nth FIFO.
+					*/
 					
 					subgraph_client = client;
 					subgraph_client->subgraph_start_fd = jack_get_fifo_fd (engine, n);

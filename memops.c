@@ -30,6 +30,13 @@
 #define SAMPLE_MAX_24BIT  8388608.0f
 #define SAMPLE_MAX_16BIT  32767.0f
 
+/* Round float to int (can't go in memops.h otherwise it gets multiply
+   defined) */
+inline int f_round(float f) {
+        f += (3<<22);
+        return *((int*)&f) - 0x4b400000;
+}
+
 /* XXX we could use rint(), but for now we'll accept whatever default
    floating-point => int conversion the compiler provides.  
 */
@@ -80,7 +87,30 @@ void sample_move_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsi
 		dst += dst_skip;
 		src++;
 	}
-}	
+}
+
+void sample_move_dither_rect_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip)
+	
+{
+	sample_t val;
+	int      tmp;
+
+	while (nsamples--) {
+		val = *src * (float)SAMPLE_MAX_16BIT;
+		val -= (float)rand() / (float)RAND_MAX;
+		/* swh: This could be some inline asm on x86 */
+		tmp = f_round(val);
+		if (tmp > SHRT_MAX) {
+			*((short *)dst) = SHRT_MAX;
+		} else if (tmp < SHRT_MIN) {
+			*((short *)dst) = SHRT_MIN;
+		} else {
+			*((short *) dst) = (short)tmp;
+		}
+		dst += dst_skip;
+		src++;
+	}
+}
 
 void sample_move_dS_s16 (sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip) 
 	

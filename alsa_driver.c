@@ -149,8 +149,13 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 		} else {
 			driver->channel_copy = memcpy_fake;
 		}
-		
-		driver->write_via_copy = sample_move_d16_sS;
+
+		if (driver->dither) {		
+			printf("Rectangular dithering at 16 bits\n");
+			driver->write_via_copy = sample_move_dither_rect_d16_sS;
+		} else {
+			driver->write_via_copy = sample_move_d16_sS;
+		}
 		driver->read_via_copy = sample_move_dS_s16;
 		break;
 
@@ -1243,7 +1248,8 @@ alsa_driver_new (char *name, char *alsa_device,
 		 nframes_t rate,
 		 int hw_monitoring,
 		 int capturing,
-		 int playing)
+		 int playing,
+		 int dither)
 {
 	int err;
 
@@ -1288,6 +1294,8 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->pfd = 0;
 	driver->playback_nfds = 0;
 	driver->capture_nfds = 0;
+
+	driver->dither = dither;
 
 	pthread_mutex_init (&driver->clock_sync_lock, 0);
 	driver->clock_sync_listeners = 0;
@@ -1454,6 +1462,7 @@ driver_initialize (int argc, char **argv)
 	int hw_monitoring = FALSE;
 	int capture = FALSE;
 	int playback = FALSE;
+	int dither = FALSE;
 	int i;
 
 	/* grrrr ... getopt() cannot be called in more than one "loop"
@@ -1500,6 +1509,10 @@ driver_initialize (int argc, char **argv)
 			case 'H':
 				hw_monitoring = 1;
 				break;
+
+			case 'z':
+				dither = TRUE;
+				break;
 				
 			default:
 				alsa_usage ();
@@ -1519,7 +1532,8 @@ driver_initialize (int argc, char **argv)
 	}
 
 	return alsa_driver_new ("alsa_pcm", pcm_name, frames_per_interrupt, 
-				user_nperiods, srate, hw_monitoring, capture, playback);
+				user_nperiods, srate, hw_monitoring, capture,
+			        playback, dither);
 }
 
 void

@@ -26,8 +26,11 @@
 void sample_move_d32u24_sS           (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip);
 void sample_move_d16_sS              (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip);
 
+void sample_move_dither_rect_d16_sS  (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip);
+
 void sample_move_dS_s32u24           (sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
 void sample_move_dS_s16              (sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
+
 
 void sample_merge_d16_sS             (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip);
 void sample_merge_d32u24_sS          (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip);
@@ -63,11 +66,3 @@ void merge_memcpy_d16_s16            (char *dst, char *src, unsigned long src_by
 void merge_memcpy_d32_s32            (char *dst, char *src, unsigned long src_bytes, unsigned long foo, unsigned long bar);
 
 #endif /* __jack_memops_h__ */
-
-
-
-
-
-
-
-

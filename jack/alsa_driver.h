@@ -102,6 +102,8 @@ typedef struct {
     WriteCopyFunction write_via_copy;
     CopyCopyFunction channel_copy;
 
+    int dither;
+
     SampleClockMode clock_mode;
     GSList *clock_sync_listeners;
     pthread_mutex_t clock_sync_lock;
