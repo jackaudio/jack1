@@ -6,7 +6,7 @@ else
 bin_PROGRAMS = jackd
 endif
 
-AM_CFLAGS = -I.. $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" $(GLIB_CFLAGS)
+AM_CFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" $(GLIB_CFLAGS)
 
 jackd_SOURCES = jackd.c engine.c
 jackd_LDADD = ../libjack/libjack.la

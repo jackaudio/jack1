@@ -33,6 +33,7 @@
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <jack/hammerfall.h>
+#include <jack/ice1712.h>
 #include <jack/generic.h>
 #include <jack/cycles.h>
 
@@ -107,6 +108,14 @@ alsa_driver_hammerfall_hardware (alsa_driver_t *driver)
 }
 
 static int
+alsa_driver_ice1712_hardware (alsa_driver_t *driver)
+
+{
+        driver->hw = jack_alsa_ice1712_hw_new (driver);
+        return 0;
+}
+
+static int
 alsa_driver_generic_hardware (alsa_driver_t *driver)
 
 {
@@ -124,8 +133,12 @@ alsa_driver_hw_specific (alsa_driver_t *driver, int hw_monitoring)
 		if ((err = alsa_driver_hammerfall_hardware (driver)) != 0) {
 			return err;
 		}
+	} else if (!strcmp(driver->alsa_driver, "ICE1712")) {
+                if ((err = alsa_driver_ice1712_hardware (driver)) !=0) {
+                        return err;
+                }
 	} else {
-		if ((err = alsa_driver_generic_hardware (driver)) != 0) {
+	        if ((err = alsa_driver_generic_hardware (driver)) != 0) {
 			return err;
 		}
 	}
