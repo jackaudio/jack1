@@ -39,7 +39,7 @@ static nframes_t frames_per_interrupt = 64;
 static nframes_t srate = 48000;
 static int realtime = 0;
 static int realtime_priority = 10;
-static int with_fork = 0;
+static int with_fork = 1;
 
 static void
 cleanup ()
