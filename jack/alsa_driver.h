@@ -96,6 +96,7 @@ typedef struct {
 
     unsigned long input_monitor_mask;
 
+    char   soft_mode : 1;
     char   hw_monitoring : 1;
     char   all_monitor_in : 1;
     char   capture_and_playback_not_synced : 1;
