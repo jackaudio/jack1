@@ -14,7 +14,12 @@ void
 showtime ()
 {
 	jack_transport_info_t current = now;
-	printf ("frame: %lu state: %d loop: %lu-%lu\n", current.position, current.state, current.loop_start, current.loop_end);
+	printf ("frame: %lu state: %d loop: %lu-%lu "
+		"BBT: %d|%d|%d\n",
+		current.frame, current.transport_state, current.loop_start, current.loop_end,
+		current.bar,
+		current.beat,
+		current.tick);
 }
 
 int

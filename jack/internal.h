@@ -66,32 +66,6 @@ typedef struct {
     size_t        size;
 } jack_port_segment_info_t;
 
-typedef struct _time_info
-{
-    jack_nframes_t frame;
-    jack_nframes_t frame_rate;
-    jack_time_t    usecs;
-    jack_transport_state_t transport_state;
-    jack_nframes_t loop_start;
-    jack_nframes_t loop_end;
-
-#if 0
-    double ppqPos;        // 1 ppq
-    double tempo;         // in bpm
-    double barStartPos;   // last bar start, in 1 ppq
-    double cycleStartPos; // 1 ppq
-    double cycleEndPos;   // 1 ppq
-
-    float timeSigNumerator;  // time signature
-    float timeSigDenominator;
-    long smpteOffset;
-    long smpteFrameRate;  // 0:24, 1:25, 2:29.97, 3:30, 4:29.97 df, 5:30 df
-    long samplesToNextClock; // midi clock resolution (24 ppq), can be negative
-    long flags;     // see below
-#endif
-    
-} jack_time_info_t;
-
 typedef struct {
     volatile unsigned long long guard1;
     volatile jack_nframes_t frames;
@@ -101,8 +75,8 @@ typedef struct {
 
 typedef struct {
 
-    jack_time_info_t    current_time;
-    jack_time_info_t    pending_time;
+    jack_transport_info_t current_time;
+    jack_transport_info_t pending_time;
     jack_frame_timer_t  frame_timer;
     int                 internal;
     jack_nframes_t      frames_at_cycle_start;

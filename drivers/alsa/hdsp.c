@@ -74,7 +74,7 @@ set_control_id (snd_ctl_elem_id_t *ctl, const char *name)
 {
 	snd_ctl_elem_id_set_name (ctl, name);
 	snd_ctl_elem_id_set_numid (ctl, 0);
-	snd_ctl_elem_id_set_interface (ctl, SND_CTL_ELEM_IFACE_PCM);
+	snd_ctl_elem_id_set_interface (ctl, SND_CTL_ELEM_IFACE_HWDEP);
 	snd_ctl_elem_id_set_device (ctl, 0);
 	snd_ctl_elem_id_set_subdevice (ctl, 0);
 	snd_ctl_elem_id_set_index (ctl, 0);
@@ -86,7 +86,8 @@ set_control_id (snd_ctl_elem_id_t *ctl, const char *name)
 /* input_channel to output_channel (see hdsp_physical_input_index */
 /* etc. above. */
 /* gain is an int from 0 to 65535, with 0 being -inf gain, and */
-/* 65535 being about 2dB. */
+/* 65535 being about +2dB. */
+
 static int hdsp_set_mixer_gain(jack_hardware_t *hw, int input_channel,
 			       int output_channel, int gain)
 {
@@ -133,11 +134,14 @@ static int hdsp_set_input_monitor_mask (jack_hardware_t *hw, unsigned long mask)
 		/* Monitoring requested for this channel? */
 		if(mask & (1<<i)) {
 			/* Yes.  Connect physical input to output */
+
 			if(hdsp_set_mixer_gain (hw, hdsp_physical_input_index[i],
 						hdsp_physical_output_index[i],
 						HDSP_UNITY_GAIN) != 0) {
 			  return -1;
 			}
+
+#ifdef CANNOT_HEAR_SOFTWARE_STREAM_WHEN_MONITORING
 			/* ...and disconnect the corresponding software */
 			/* channel */
 			if(hdsp_set_mixer_gain (hw, hdsp_audio_stream_index[i],
@@ -145,6 +149,8 @@ static int hdsp_set_input_monitor_mask (jack_hardware_t *hw, unsigned long mask)
 						HDSP_MINUS_INFINITY_GAIN) != 0) {
 			  return -1;
 			}
+#endif
+
 		} else {
 			/* No.  Disconnect physical input from output */
 			if(hdsp_set_mixer_gain (hw, hdsp_physical_input_index[i],
@@ -152,6 +158,8 @@ static int hdsp_set_input_monitor_mask (jack_hardware_t *hw, unsigned long mask)
 						HDSP_MINUS_INFINITY_GAIN) != 0) {
 			  return -1;
 			}
+
+#ifdef CANNOT_HEAR_SOFTWARE_STREAM_WHEN_MONITORING
 			/* ...and connect the corresponding software */
 			/* channel */
 			if(hdsp_set_mixer_gain (hw, hdsp_audio_stream_index[i],
@@ -159,6 +167,7 @@ static int hdsp_set_input_monitor_mask (jack_hardware_t *hw, unsigned long mask)
 						HDSP_UNITY_GAIN) != 0) {
 			  return -1;
 			}
+#endif
 		}
 	}
 	/* Cache the monitor mask */

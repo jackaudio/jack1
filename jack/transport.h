@@ -48,20 +48,42 @@ typedef enum {
 
         JackTransportState =    0x1,
         JackTransportPosition = 0x2,
-        JackTransportLoop =     0x4
+        JackTransportLoop =     0x4,
+	JackTransportSMPTE =    0x8,
+	JackTransportBBT =      0x10,
 
 } jack_transport_bits_t;
+
+#define EXTENDED_TIME_INFO \
 
 /**
  * Struct for transport status information.
  */
 typedef struct {
+    
+    /* these two cannot be set from clients: the server sets them */
 
-    jack_transport_bits_t  valid;
-    jack_transport_state_t state;
-    jack_nframes_t         position;
+    jack_nframes_t frame_rate;               // current frame rate (per second)
+    jack_time_t    usecs;                    // monotonic, free-rolling
+
+    jack_transport_bits_t  valid;            // which fields are legal to read
+    jack_transport_state_t transport_state;         
+    jack_nframes_t         frame;
     jack_nframes_t         loop_start;
     jack_nframes_t         loop_end;
+
+    long           smpte_offset;             // SMPTE offset (SMPTE frame when frame = 0)
+    float          smpte_frame_rate;         // 29.97, 30, 24 etc.
+
+    int            bar;                      // current bar
+    int            beat;                     // current beat-within-bar
+    int            tick;                     // current tick-within-beat
+    double         bar_start_tick;           // 
+
+    float          beats_per_bar;
+    float          beat_type;
+    double         ticks_per_beat;
+    double         beats_per_minute;
 
 } jack_transport_info_t;
 
@@ -70,27 +92,25 @@ typedef struct {
  * cycle.
  *
  * The 'valid' field of the tinfo struct should contain 
- * a bitmask of all transport info fields that should 
- * be set with this call.
+ * a bitmask of all transport info fields that are set
+ * in tinfo.
  *
  * @pre Caller must be the current timebase master.
  *
- * @return 0 on success, otherwise a non-zero error code
  */
-int jack_set_transport_info (jack_client_t *client,
-			     jack_transport_info_t *tinfo);
-
+void jack_set_transport_info (jack_client_t *client,
+			      jack_transport_info_t *tinfo);
+	
 /**
  * Gets the current transport state. 
  *
- * The 'valid' field of the tinfo struct should contain 
- * a bitmask of all transport info fields that the 
- * client is interested in.
+ * On return, the 'valid' field of the tinfo struct will contain 
+ * a bitmask of all transport info fields that are legal to
+ * use.
  *
- * @return 0 on success, otherwise a non-zero error code
  */
-int jack_get_transport_info (jack_client_t *client,
-			     jack_transport_info_t *tinfo);
+void jack_get_transport_info (jack_client_t *client,
+			      jack_transport_info_t *tinfo);
 
 #ifdef __cplusplus
 }

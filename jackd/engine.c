@@ -288,7 +288,7 @@ static void
 jack_register_shm (char *shm_name)
 {
 	if (jack_shm_id_cnt < MAX_SHM_ID) {
-		snprintf (jack_shm_registry[jack_shm_id_cnt++], sizeof (shm_name_t), shm_name);
+		snprintf (jack_shm_registry[jack_shm_id_cnt++], sizeof (shm_name_t), "%s", shm_name);
 	}
 }
 
@@ -615,9 +615,14 @@ jack_engine_post_process (jack_engine_t *engine)
 	JSList *node;
 	int need_remove = FALSE;
 	
-	engine->control->pending_time.usecs = engine->control->current_time.usecs;
-	engine->control->current_time = engine->control->pending_time;
+	/* maintain the current_time.usecs and frame_rate values, since clients
+	   are not permitted to set these.
+	*/
 
+	engine->control->pending_time.usecs = engine->control->current_time.usecs;
+	engine->control->pending_time.frame_rate = engine->control->current_time.frame_rate;
+	engine->control->current_time = engine->control->pending_time;
+	
 	/* find any clients that need removal due to timeouts, etc. */
 		
 	for (node = engine->clients; node; node = jack_slist_next (node) ) {
@@ -1276,6 +1281,8 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 				engine->control->pending_time.frame = 0;
 				engine->control->current_time.transport_state = JackTransportStopped;
 				engine->control->pending_time.transport_state = JackTransportStopped;
+				engine->control->current_time.valid = JackTransportState|JackTransportPosition;
+				engine->control->pending_time.valid = JackTransportState|JackTransportPosition;
 			}
 			
 			for (portnode = client->ports; portnode; portnode = jack_slist_next (portnode)) {
@@ -2150,6 +2157,8 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 		engine->control->pending_time.frame = 0;
 		engine->control->current_time.transport_state = JackTransportStopped;
 		engine->control->pending_time.transport_state = JackTransportStopped;
+		engine->control->current_time.valid = JackTransportState|JackTransportPosition;
+		engine->control->pending_time.valid = JackTransportState|JackTransportPosition;
 	}
 
 	jack_client_disconnect (engine, client);
@@ -2819,6 +2828,7 @@ jack_port_do_connect (jack_engine_t *engine,
 	jack_connection_internal_t *connection;
 	jack_port_internal_t *srcport, *dstport;
 	jack_port_id_t src_id, dst_id;
+	jack_client_internal_t *client;
 
 	if ((srcport = jack_get_port_by_name (engine, source_port)) == NULL) {
 		jack_error ("unknown source port in attempted connection [%s]", source_port);
@@ -2852,9 +2862,28 @@ jack_port_do_connect (jack_engine_t *engine,
 		return -1;
 	}
 
-	if (strcmp (srcport->shared->type_info.type_name,
-		    dstport->shared->type_info.type_name) != 0) {
+	if (strcmp (srcport->shared->type_info.type_name, dstport->shared->type_info.type_name) != 0) {
 		jack_error ("ports used in attemped connection are not of the same data type");
+		return -1;
+	}
+
+	if ((client = jack_client_internal_by_id (engine, srcport->shared->client_id)) == 0) {
+		jack_error ("unknown client set as owner of port - cannot connect");
+		return -1;
+	}
+	
+	if (!client->control->active) {
+		jack_error ("cannot connect ports owned by inactive clients; \"%s\" is not active", client->control->name);
+		return -1;
+	}
+
+	if ((client = jack_client_internal_by_id (engine, dstport->shared->client_id)) == 0) {
+		jack_error ("unknown client set as owner of port - cannot connect");
+		return -1;
+	}
+	
+	if (!client->control->active) {
+		jack_error ("cannot connect ports owned by inactive clients; \"%s\" is not active", client->control->name);
 		return -1;
 	}
 
