@@ -365,7 +365,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 	if (p_format != c_format) {
 		jack_error ("Sorry. The audio interface \"%s\""
 			  "doesn't support the same sample format for capture and playback."
-			  "Ardour cannot use this hardware.", driver->alsa_name);
+			  "this JACK/ALSA driver cannot use this hardware.", driver->alsa_name);
 		return -1;
 	}
 
