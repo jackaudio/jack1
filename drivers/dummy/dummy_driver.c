@@ -57,19 +57,17 @@ dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
   jack_time_t starting_time = jack_get_microseconds();
   jack_time_t processing_time = (driver->last_wait_ust?
 				 starting_time - driver->last_wait_ust: 0);
-  jack_time_t sleeping_time = driver->wait_time - processing_time;
 
-  /* JOQ: usleep() is inaccurate for small buffer sizes with Linux
-   * 2.4.  I suspect it can't wait for less than one (or maybe even
-   * two) scheduler timeslices.  Linux 2.6 is probably better. */
-  if (sleeping_time > 0)
-    usleep (sleeping_time);
+  /* wait until time for next cycle */
+  if (driver->wait_time > processing_time)
+    usleep (driver->wait_time - processing_time);
 
   driver->last_wait_ust = jack_get_microseconds ();
   driver->engine->transport_cycle_start (driver->engine, driver->last_wait_ust);
 
+  /* this driver doesn't work so well if we report a delay */
+  *delayed_usecs = 0;		/* lie about it */
   *status = 0;
-  *delayed_usecs = driver->last_wait_ust - starting_time - sleeping_time;
 
   return driver->period_size;
 }
@@ -85,8 +83,11 @@ dummy_driver_bufsize (dummy_driver_t* driver, jack_nframes_t nframes)
 {
   int rc;
 
-  /* these are arbitrary size restrictions */
-  if ((nframes < 4) || (nframes > 65536))
+  /* This is a somewhat arbitrary size restriction.  The dummy driver
+   * doesn't work well with smaller buffer sizes, apparantly due to
+   * usleep() inaccuracy under Linux 2.4.  If you can get it working
+   * with smaller buffers, lower the limit.  (JOQ) */
+  if (nframes < 128)
     return EINVAL;
 
   /* no need to stop and start the dummy driver */
