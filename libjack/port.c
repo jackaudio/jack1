@@ -116,13 +116,13 @@ jack_port_register (jack_client_t *client,
 
 	req.type = RegisterPort;
 
-	length = strlen ( (const char *) client->control->name )
-		+ 1 + strlen ( port_name ) ;
+	length = strlen ((const char *) client->control->name)
+		+ 1 + strlen (port_name);
 	if ( length >= sizeof (req.x.port_info.name) ) {
 	  jack_error ("\"%s:%s\" is too long to be used as a JACK port name.\n"
 		      "Please use %lu characters or less.",
 		      client->control->name , 
-		      port_name , 
+		      port_name,
 		      sizeof (req.x.port_info.name) - 1);
 	  return NULL ;
 	}

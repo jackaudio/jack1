@@ -164,7 +164,7 @@ typedef volatile struct {
     volatile jack_client_id_t id;         /* w: engine r: engine and client */
     volatile jack_nframes_t  nframes;     /* w: engine r: client */
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
-    volatile int8_t     name[JACK_CLIENT_NAME_SIZE+1];
+    volatile int8_t     name[JACK_CLIENT_NAME_SIZE];
     volatile ClientType type;             /* w: engine r: engine and client */
     volatile int8_t     active;           /* w: engine r: engine and client */
     volatile int8_t     dead;             /* r/w: engine */
@@ -221,7 +221,7 @@ typedef struct {
     int32_t    load;
     ClientType type;
 
-    char name[JACK_CLIENT_NAME_SIZE+1];
+    char name[JACK_CLIENT_NAME_SIZE];
     char object_path[PATH_MAX+1];
     char object_data[1024];
 
@@ -289,16 +289,16 @@ struct _jack_request {
     RequestType type;
     union {
 	struct {
-	    char name[JACK_PORT_NAME_SIZE+1];
-	    char type[JACK_PORT_TYPE_SIZE+1];
+	    char name[JACK_PORT_NAME_SIZE];
+	    char type[JACK_PORT_TYPE_SIZE];
 	    uint32_t         flags;
 	    jack_shmsize_t   buffer_size;
 	    jack_port_id_t   port_id;
 	    jack_client_id_t client_id;
 	} port_info;
 	struct {
-	    char source_port[JACK_PORT_NAME_SIZE+1];
-	    char destination_port[JACK_PORT_NAME_SIZE+1];
+	    char source_port[JACK_PORT_NAME_SIZE];
+	    char destination_port[JACK_PORT_NAME_SIZE];
 	} connect;
 	struct {
 	    int32_t nports;

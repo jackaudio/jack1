@@ -211,9 +211,9 @@ enum JackPortFlags {
       * for an output port: the data available at the port
       *                    does not originate from any other port
       *
-      * Audio synthesizers, i/o h/w interface clients, HDR
-      * systems are examples of things that would set this
-      * flag for their ports.  
+      * Audio synthesizers, I/O hardware interface clients, HDR
+      * systems are examples of clients that would set this flag for
+      * their ports.
       */
      JackPortIsTerminal = 0x10
 };	    

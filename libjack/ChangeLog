@@ -1,3 +1,11 @@
+2004-02-19  Jack O'Quin  <joq@io.com>
+
+	* new API functions:
+
+	  int jack_client_name_size(void);
+	  int jack_port_name_size(void);
+	  int jack_port_type_size(void);
+
 2003-10-15  Paul Davis <paul@linuxaudiosystems.com>
 
 	* new ring buffer interface: <jack/ringbuffer.h>

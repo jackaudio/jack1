@@ -393,8 +393,9 @@ server_event_connect (jack_client_t *client)
 }
 
 static int
-jack_request_client (ClientType type, const char* client_name, const char* so_name, 
-		     const char* so_data, jack_client_connect_result_t *res, int *req_fd)
+jack_request_client (ClientType type, const char* client_name,
+		     const char* so_name, const char* so_data,
+		     jack_client_connect_result_t *res, int *req_fd)
 {
 	jack_client_connect_request_t req;
 
@@ -402,11 +403,11 @@ jack_request_client (ClientType type, const char* client_name, const char* so_na
 
 	memset (&req, 0, sizeof (req));
 
-	if (strlen (client_name) > sizeof (req.name) - 1) {
+	if (strlen (client_name) >= sizeof (req.name)) {
 		jack_error ("\"%s\" is too long to be used as a JACK client"
 			    " name.\n"
 			    "Please use %lu characters or less.",
-			    client_name, sizeof (req.name) - 1);
+			    client_name, sizeof (req.name));
 		return -1;
 	}
 
@@ -1759,6 +1760,24 @@ pthread_t
 jack_client_thread_id (jack_client_t *client)
 {
 	return client->thread_id;
+}
+
+int
+jack_client_name_size(void)
+{
+	return JACK_CLIENT_NAME_SIZE;
+}
+
+int
+jack_port_name_size(void)
+{
+	return JACK_PORT_NAME_SIZE;
+}
+
+int
+jack_port_type_size(void)
+{
+	return JACK_PORT_TYPE_SIZE;
 }
 
 #if defined(__APPLE__) && defined(__POWERPC__) 

@@ -21,7 +21,7 @@ are in <jack/transport.h>
   - @ref issues
 
 
-@subsection requirements Requirements
+@section requirements Requirements
 
   - We need sample-level accuracy for transport control.  This implies
   that the transport client logic has to be part of the realtime
@@ -45,7 +45,7 @@ are in <jack/transport.h>
   transport design evolves.
 
 
-@subsection overview Overview
+@section overview Overview
 
 The former transport master role has been divided into two layers:
 
@@ -56,7 +56,7 @@ Existing transport clients continue to work in compatibility mode.
 But, old-style timebase masters will no longer control the transport.
 
 
-@subsection timebase Timebase Master
+@section timebase Timebase Master
 
 The timebase master continuously updates extended position
 information, counting beats, timecode, etc.  Without this extended
@@ -102,7 +102,7 @@ continues to play, with frame numbers as the only available position
 information.
 
 
-@subsection transportcontrol Transport Control
+@section transportcontrol Transport Control
 
 The JACK engine itself manages stopping and starting of the transport.
 Any client can make transport control requests at any time.  These
@@ -174,7 +174,7 @@ sync_callbacks until ready.
 @image latex    fsm.eps "Transport State Transition Diagram"
 
 
-@subsection transportclients Transport Clients
+@section transportclients Transport Clients
 
 Transport clients were formerly known as "transport slaves".  We want
 to make it easy for almost every JACK client to be a transport client.
@@ -189,7 +189,7 @@ process thread, @a pos corresponds to the first frame of the current
 cycle and the state returned is valid for the entire cycle.
 
 
-@subsection compatibility Compatibility
+@section compatibility Compatibility
 
 During the transition period we will support the old-style interfaces
 in compatibility mode as deprecated interfaces.  This compatibility is
@@ -233,7 +233,7 @@ currently forced to zero.  That allows the structure size and offsets
 to remain constant.
 
 
-@subsection issues Issues Not Addressed
+@section issues Issues Not Addressed
 
 This design currently does not address several issues. This means they
 will probably not be included in JACK release 1.0.
