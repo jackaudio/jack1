@@ -79,7 +79,7 @@ Exit once all clients have closed their connections.
 .TP
 \fB\-t, \-\-timeout \fIint\fR
 .br
-Set client timeout limit in microseconds.  The default is 500 msec
+Set client timeout limit in milliseconds.  The default is 500 msec
 when not in realtime mode (see: \-R).
 .TP
 \fB\-u, \-\-unlock\fR
