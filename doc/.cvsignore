@@ -2,5 +2,4 @@ Makefile
 Makefile.in
 doxygen-build.stamp
 reference.doxygen
-html
-latex
+reference
