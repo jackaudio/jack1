@@ -3368,7 +3368,7 @@ jack_port_do_connect (jack_engine_t *engine,
 
 	for (it = srcport->connections; it; it = it->next) {
 		if (((jack_connection_internal_t *)it->data)->destination == dstport) {
-			return 0;
+			return EEXIST;
 		}
 	}
 

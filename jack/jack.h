@@ -447,7 +447,8 @@ int jack_port_monitoring_input (jack_port_t *port);
  * @pre The flags of the source port must include PortIsOutput.
  * @pre The flags of the destination port must include PortIsInput.
  *
- * @return 0 on success, otherwise a non-zero error code
+ * @return 0 on success, EEXIST if the connection is allready made, otherwise
+ * a non-zero error code
  */
 int jack_connect (jack_client_t *,
 		  const char *source_port,
