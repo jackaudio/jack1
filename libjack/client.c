@@ -1426,12 +1426,17 @@ jack_get_buffer_size (jack_client_t *client)
 int
 jack_set_buffer_size (jack_client_t *client, jack_nframes_t nframes)
 {
+#ifdef DO_BUFFER_RESIZE
 	jack_request_t req;
 
 	req.type = SetBufferSize;
 	req.x.nframes = nframes;
 
 	return jack_client_deliver_request (client, &req);
+#else
+	return ENOSYS;
+
+#endif /* DO_BUFFER_RESIZE */
 }
 
 int 
