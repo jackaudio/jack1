@@ -419,7 +419,7 @@ server_event_connect (jack_client_t *client, const char *server_name)
 
 /* Exec the JACK server in this process.  Does not return. */
 static void
-_start_server (void)
+_start_server (const char *server_name)
 {
 	FILE* fp = 0;
 	char filename[255];
@@ -473,12 +473,19 @@ _start_server (void)
 	argv = (char **) malloc (255);
   
 	while(1) {
-		/* insert -T into arguments */
+		/* insert -T and -nserver_name in front of arguments */
 		if (i == 1) {
-			argv[i] = (char*)malloc(3);
-			strncpy(argv[i], "-T", 2); 
-			argv[i][2] = '\0';
-			++i;
+			argv[i] = (char *) malloc(strlen ("-T") + 1);
+			strcpy (argv[i++], "-T"); 
+			if (server_name) {
+				size_t optlen = strlen ("-n");
+				char *buf =
+					malloc (optlen
+						+ strlen (server_name) + 1);
+				strcpy (buf, "-n");
+				strcpy (buf+optlen, server_name);
+				argv[i++] = buf;
+			}
 		}
 
 		result = strcspn(arguments+pos, " ");
@@ -503,7 +510,7 @@ _start_server (void)
 }
 
 int
-start_server (jack_options_t options)
+start_server (const char *server_name, jack_options_t options)
 {
 	if ((options & JackNoStartServer)
 	    || getenv("JACK_NO_START_SERVER")) {
@@ -523,7 +530,7 @@ start_server (jack_options_t options)
 	case 0:				/* child process */
 		switch (fork()) {
 		case 0:			/* grandchild process */
-			_start_server();
+			_start_server(server_name);
 			_exit (99);	/* exec failed */
 		case -1:
 			_exit (98);
@@ -578,7 +585,7 @@ jack_request_client (ClientType type,
 
 	if ((*req_fd = server_connect (va->server_name)) < 0) {
 		int trys;
-		if (start_server(options)) {
+		if (start_server(va->server_name, options)) {
 			*status |= (JackFailure|JackServerFailed);
 			goto fail;
 		}

@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=99
-JACK_MICRO_VERSION=32
+JACK_MICRO_VERSION=33
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -148,11 +148,15 @@ if test "x$TRY_POSIX_SHM" = "xyes"
 then
 	AC_MSG_RESULT([POSIX shm_open().])
 	AC_DEFINE(USE_POSIX_SHM,1,[Use POSIX shared memory interface])
+	JACK_SHM_TYPE='"POSIX"'
 	USE_POSIX_SHM="true"
 else
 	AC_MSG_RESULT([System V shmget().])
+	JACK_SHM_TYPE='"System V"'
 	USE_POSIX_SHM="false"
 fi
+AC_DEFINE_UNQUOTED(JACK_SHM_TYPE, [$JACK_SHM_TYPE],
+	[JACK shared memory type])
 AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
 
 JACK_CORE_CFLAGS="-I\$(top_builddir)/config -I\$(top_srcdir) \
@@ -576,5 +580,6 @@ echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
 echo \|
 echo \| Default driver backend................................ : $JACK_DEFAULT_DRIVER
+echo \| Shared memory interface............................... : $JACK_SHM_TYPE
 echo
 
