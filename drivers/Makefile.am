@@ -14,4 +14,4 @@ endif
 
 SUBDIRS = dummy iec61883 $(ALSA_DIR) $(PA_DIR)
 
-DIST_SUBDIRS = dummy alsa portaudio
+DIST_SUBDIRS = dummy iec61883 alsa portaudio
