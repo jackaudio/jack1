@@ -262,7 +262,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 	if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S32)) < 0) {
 		if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S16)) < 0) {
 			jack_error ("Sorry. The audio interface \"%s\""
-				    "doesn't support either of the two hardware sample formats that ardour can use.",
+				    "doesn't support either of the two hardware sample formats that jack can use.",
 				    driver->alsa_name);
 			return -1;
 		}
