@@ -441,7 +441,7 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 
 		char shm_name[PATH_MAX+1];
 
-                snprintf (shm_name, sizeof (shm_name), "/jack-c-%s", name);
+                snprintf (shm_name, sizeof (shm_name), "jack-c-%s", name);
                 
                 if (jack_shmalloc (shm_name,
 				   sizeof (jack_client_control_t), 

@@ -784,13 +784,8 @@ jack_client_open (const char *client_name,
 		return NULL;
 	}
 
-	/* don't access shared memory until server connected */
-	if (jack_initialize_shm ()) {
-		jack_error ("Unable to initialize shared memory.");
-		*status |= (JackFailure|JackShmFailure);
-		return NULL;
-	}
-
+	/* Allocate the jack_client_t structure in local memory.
+	 * Shared memory is not accessible yet. */
 	client = jack_client_alloc ();
 	strcpy (client->name, res.name);
 	strcpy (client->fifo_prefix, res.fifo_prefix);
@@ -799,6 +794,13 @@ jack_client_open (const char *client_name,
 		POLLIN|POLLERR|POLLHUP|POLLNVAL;
 	client->pollfd[WAIT_POLL_INDEX].events =
 		POLLIN|POLLERR|POLLHUP|POLLNVAL;
+
+	/* Don't access shared memory until server connected. */
+	if (jack_initialize_shm (va.server_name)) {
+		jack_error ("Unable to initialize shared memory.");
+		*status |= (JackFailure|JackShmFailure);
+		goto fail;
+	}
 
 	/* attach the engine control/info block */
 	client->engine_shm = res.engine_shm;
@@ -821,10 +823,10 @@ jack_client_open (const char *client_name,
 	client->control = (jack_client_control_t *)
 		jack_shm_addr (&client->control_shm);
 
-	/* nobody else needs to access this shared memory any more, so
-	   destroy it. because we have our own attachment to it, it won't
-	   vanish till we exit (and release it).
-	*/
+	/* Nobody else needs to access this shared memory any more, so
+	 * destroy it.  Because we have it attached, it won't vanish
+	 * till we exit (and release it).
+	 */
 	jack_destroy_shm (&client->control_shm);
 
 	client->n_port_types = client->engine->n_port_types;
@@ -882,8 +884,9 @@ jack_client_open (const char *client_name,
 	if (ev_fd >= 0) {
 		close (ev_fd);
 	}
+	free (client);
 
-	return 0;
+	return NULL;
 }
 
 jack_client_t *

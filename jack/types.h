@@ -24,7 +24,6 @@
 
 #include <inttypes.h>
 
-typedef char    shm_name_t[32];
 typedef int32_t jack_shmsize_t;
 
 /**

@@ -7,15 +7,16 @@
 
 #define MAX_SERVERS 8			/* maximum concurrent servers */
 #define MAX_SHM_ID 256			/* generally about 16 per server */
-#define JACK_SERVER_NAME_SIZE PATH_MAX	/* maximum length of server name */
+#define JACK_SERVER_NAME_SIZE 256	/* maximum length of server name */
 #define JACK_SHM_MAGIC 0x4a41434b	/* shm magic number: "JACK" */
 #define JACK_SHM_NULL_INDEX -1		/* NULL SHM index */
 #define JACK_SHM_REGISTRY_INDEX -2	/* pseudo SHM index for registry */
 
 #ifdef USE_POSIX_SHM
+typedef char	   shm_name_t[JACK_SERVER_NAME_SIZE];
 typedef shm_name_t jack_shm_id_t;
 #else /* System V SHM */
-typedef int jack_shm_id_t;
+typedef int	   jack_shm_id_t;
 #endif
 
 /* shared memory type */
@@ -51,9 +52,9 @@ typedef struct _jack_shm_header {
 } jack_shm_header_t;
 
 typedef struct _jack_shm_registry {
+    jack_shm_registry_index_t index;     /* offset into the registry */
     pid_t                     allocator; /* PID that created shm segment */
     jack_shmsize_t            size;      /* for POSIX unattach */
-    jack_shm_registry_index_t index;     /* offset into the registry */
     jack_shm_id_t             id;        /* API specific, see above */
 } jack_shm_registry_t;
 
@@ -89,7 +90,7 @@ static inline char* jack_shm_addr (jack_shm_info_t* si) {
 extern int  jack_register_server (const char *server_name);
 extern void jack_unregister_server (const char *server_name);
 
-extern int  jack_initialize_shm (void);
+extern int  jack_initialize_shm (const char *server_name);
 extern int  jack_cleanup_shm (void);
 
 extern int  jack_shmalloc (const char *shm_name, jack_shmsize_t size,

@@ -74,16 +74,17 @@ static void	jack_remove_shm (jack_shm_id_t *id);
  * cleanup is also done when a new instance of that server starts.
  */
 
-/* global data for the SHM interfaces */
-static jack_shm_id_t registry_id;	/* SHM id for the registry */
+/* per-process global data for the SHM interfaces */
+static jack_shm_id_t   registry_id;	/* SHM id for the registry */
 static jack_shm_info_t registry_info = { /* SHM info for the registry */
 	.index = JACK_SHM_NULL_INDEX,
 	.attached_at = MAP_FAILED
 };
 
 /* pointers to registry header and array */
-static jack_shm_header_t* jack_shm_header = NULL;
-static jack_shm_registry_t* jack_shm_registry = NULL;
+static jack_shm_header_t   *jack_shm_header = NULL;
+static jack_shm_registry_t *jack_shm_registry = NULL;
+static char jack_shm_server_prefix[JACK_SERVER_NAME_SIZE] = "";
 
 /* jack_shm_lock_registry() serializes updates to the shared memory
  * segment JACK uses to keep track of the SHM segements allocated to
@@ -215,6 +216,29 @@ jack_shm_validate_registry ()
 	return -1;
 }
 
+/* set a unique per-user, per-server shm prefix string
+ *
+ * According to the POSIX standard:
+ *
+ *   "The name argument conforms to the construction rules for a
+ *   pathname. If name begins with the slash character, then processes
+ *   calling shm_open() with the same value of name refer to the same
+ *   shared memory object, as long as that name has not been
+ *   removed. If name does not begin with the slash character, the
+ *   effect is implementation-defined. The interpretation of slash
+ *   characters other than the leading slash character in name is
+ *   implementation-defined."
+ *
+ * Since the Linux implementation does not allow slashes *within* the
+ * name, in the interest of portability we use colons instead.
+ */
+static void
+jack_set_server_prefix (const char *server_name)
+{
+	snprintf (jack_shm_server_prefix, sizeof (jack_shm_server_prefix),
+		  "/jack-%d:%s:", getuid (), server_name);
+}
+
 /* gain server addressability to shared memory registration segment
  *
  * returns: 0 if successful
@@ -269,12 +293,14 @@ jack_server_initialize_shm (void)
  * returns: 0 if successful
  */
 int
-jack_initialize_shm (void)
+jack_initialize_shm (const char *server_name)
 {
 	int rc;
 
 	if (jack_shm_header)
 		return 0;		/* already initialized */
+
+	jack_set_server_prefix (server_name);
 
 	jack_shm_lock_registry ();
 	if ((rc = jack_access_registry (&registry_info)) == 0) {
@@ -319,14 +345,23 @@ jack_get_free_shm_info ()
 	return si;
 }
 
+static inline void
+jack_release_shm_entry (jack_shm_registry_index_t index)
+{
+	/* the registry must be locked */
+	jack_shm_registry[index].size = 0;
+	jack_shm_registry[index].allocator = 0;
+	memset (&jack_shm_registry[index].id, 0,
+		sizeof (jack_shm_registry[index].id));
+}
+
 void
 jack_release_shm_info (jack_shm_registry_index_t index)
 {
 	/* must NOT have the registry locked */
 	if (jack_shm_registry[index].allocator == getpid()) {
 		jack_shm_lock_registry ();
-		jack_shm_registry[index].size = 0;
-		jack_shm_registry[index].allocator = 0;
+		jack_release_shm_entry (index);
 		jack_shm_unlock_registry ();
 	}
 }
@@ -343,7 +378,8 @@ jack_register_server (const char *server_name)
 {
 	int i;
 	pid_t my_pid = getpid ();
-	char *server_directory = jack_server_dir (server_name);
+
+	jack_set_server_prefix (server_name);
 
 	fprintf (stderr, "JACK compiled with %s SHM support.\n", JACK_SHM_TYPE);
 
@@ -353,12 +389,12 @@ jack_register_server (const char *server_name)
 	jack_shm_lock_registry ();
 
 	/* See if server_name already registered.  Since server names
-	 * are per-user, we register the server directory path name,
-	 * which must be unique. */
+	 * are per-user, we register the unique server prefix string.
+	 */
 	for (i = 0; i < MAX_SERVERS; i++) {
 
 		if (strncmp (jack_shm_header->server[i].name,
-			     server_directory,
+			     jack_shm_server_prefix,
 			     JACK_SERVER_NAME_SIZE) != 0)
 			continue;	/* no match */
 
@@ -387,7 +423,7 @@ jack_register_server (const char *server_name)
 	/* claim it */
 	jack_shm_header->server[i].pid = my_pid;
 	strncpy (jack_shm_header->server[i].name,
-		 server_directory,
+		 jack_shm_server_prefix,
 		 JACK_SERVER_NAME_SIZE);
 
 	jack_shm_unlock_registry ();
@@ -406,9 +442,8 @@ jack_unregister_server (const char *server_name /* unused */)
 
 	for (i = 0; i < MAX_SERVERS; i++) {
 		if (jack_shm_header->server[i].pid == my_pid) {
-			jack_shm_header->server[i].pid = 0;
-			memset (jack_shm_header->server[i].name, 0,
-				JACK_SERVER_NAME_SIZE);
+			memset (&jack_shm_header->server[i], 0,
+				sizeof (jack_shm_server_t));
 		}
 	}
 
@@ -430,7 +465,7 @@ jack_cleanup_shm ()
 		jack_shm_registry_t* r;
 
 		r = &jack_shm_registry[i];
-		copy.index = r->index;
+		memcpy (&copy, r, sizeof (jack_shm_info_t));
 		destroy = FALSE;
 
 		/* ignore unused entries */
@@ -456,15 +491,14 @@ jack_cleanup_shm ()
 				}
 			}
 		}
-		
+
 		if (destroy) {
 
 			int index = copy.index;
 
 			if ((index >= 0)  && (index < MAX_SHM_ID)) {
 				jack_remove_shm (&jack_shm_registry[index].id);
-				jack_shm_registry[index].size = 0;
-				jack_shm_registry[index].allocator = 0;
+				jack_release_shm_entry (index);
 			}
 			r->size = 0;
 			r->allocator = 0;
@@ -618,38 +652,55 @@ jack_create_registry (jack_shm_info_t *ri)
 static void
 jack_remove_shm (jack_shm_id_t *id)
 {
-	shm_unlink (*id);
+	/* registry may or may not be locked */
+	shm_unlink ((char *) id);
 }
 
 void
 jack_release_shm (jack_shm_info_t* si)
 {
-	//printf("client->jack_release_shm \n");
+	/* registry may or may not be locked */
 	if (si->attached_at != MAP_FAILED) {
-		//printf("client->jack_release_shm 1 \n");
 		munmap (si->attached_at, jack_shm_registry[si->index].size);
 	}
 }
 
+/* allocate a POSIX shared memory segment
+ *
+ * The shm_name should not have a leading slash, that will be provided
+ * here along with a prefix making it unique to this server.
+ */
 int
 jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
 {
 	jack_shm_registry_t* registry;
 	int shm_fd;
 	int rc = -1;
+	char name[NAME_MAX+1];
+
+	/* concatenate jack_shm_server_prefix and shm_name to build a
+	 * unique name per user and per server  */
+	snprintf (name, sizeof (name), "%s%s",
+		  jack_shm_server_prefix, shm_name);
+
+	if (strlen (name) >= sizeof (jack_shm_id_t)) {
+		jack_error ("shm segment name too long %s", name);
+		return -1;
+	}
 
 	jack_shm_lock_registry ();
 
 	if ((registry = jack_get_free_shm_info ())) {
 
-		if ((shm_fd = shm_open (shm_name, O_RDWR|O_CREAT, 0666)) >= 0) {
+		if ((shm_fd = shm_open (name, O_RDWR|O_CREAT, 0666)) >= 0) {
 
 			if (ftruncate (shm_fd, size) >= 0) {
 
 				close (shm_fd);
 				registry->size = size;
+				//JOQ: better to use strncpy() here...
 				snprintf (registry->id, sizeof (registry->id),
-					  "%s", shm_name);
+					  "%s", name);
 				registry->allocator = getpid();
 				si->index = registry->index;
 				si->attached_at = MAP_FAILED; /* not attached */
@@ -663,7 +714,7 @@ jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
 
 		} else {
 			jack_error ("cannot create shm segment %s (%s)",
-				    shm_name, strerror (errno));
+				    name, strerror (errno));
 		}
 	}
 
@@ -792,12 +843,14 @@ jack_create_registry (jack_shm_info_t *ri)
 static void
 jack_remove_shm (jack_shm_id_t *id)
 {
+	/* registry may or may not be locked */
 	shmctl (*id, IPC_RMID, NULL);
 }
 
 void
 jack_release_shm (jack_shm_info_t* si)
 {
+	/* registry may or may not be locked */
 	if (si->attached_at != MAP_FAILED) {
 		shmdt (si->attached_at);
 	}

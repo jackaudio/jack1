@@ -418,7 +418,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 		char name[64];
 
 		/* no segment allocated, yet */
-		snprintf (name, sizeof(name), "/jck-[%s]",
+		snprintf (name, sizeof(name), "jck-[%s]",
 			  port_type->type_name);
 
 		if (jack_shmalloc (name, size, shm_info)) {
@@ -1558,7 +1558,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	srandom (time ((time_t *) 0));
 
-	if (jack_shmalloc ("/jack-engine",
+	if (jack_shmalloc ("jack-engine",
 			   sizeof (jack_control_t)
 			   + ((sizeof (jack_port_shared_t) * engine->port_max)),
 			   &engine->control_shm)) {
