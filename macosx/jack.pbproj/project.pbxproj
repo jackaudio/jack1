@@ -370,9 +370,7 @@
 		};
 		4B6AF278041F4DBC00053105 = {
 			children = (
-				4B90CACE0445A2BE00053105,
 				4B032A3E040AB68E00053105,
-				4BDCF513040CDA7100053105,
 				4BCA2605040B8BC900053105,
 				4BF87132040BDEAE00053105,
 				4BA1E44F0442D89100053105,
@@ -497,13 +495,6 @@
 			isa = PBXFileReference;
 			name = timestamps.c;
 			path = ../libjack/timestamps.c;
-			refType = 4;
-		};
-		4B90CACE0445A2BE00053105 = {
-			fileEncoding = 30;
-			isa = PBXFileReference;
-			name = connection.c;
-			path = "../example-clients/connection.c";
 			refType = 4;
 		};
 		4BA1CAD90470D14500053105 = {
@@ -1367,13 +1358,6 @@
 			isa = PBXBuildFile;
 			settings = {
 			};
-		};
-		4BDCF513040CDA7100053105 = {
-			fileEncoding = 30;
-			isa = PBXFileReference;
-			name = freeverb.cpp;
-			path = "../example-clients/freeverb.cpp";
-			refType = 4;
 		};
 		4BE14029041FB98500053105 = {
 			fileRef = 4B099342041FB67A00053105;
