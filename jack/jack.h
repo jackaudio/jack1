@@ -83,7 +83,7 @@ int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback bufsi
 int jack_set_sample_rate_callback (jack_client_t *, JackSampleRateCallback srate_callback, void *arg);
 
 /**
- * Tell the Jack server to call 'registration_callback' whenever the a Port is registered
+ * Tell the Jack server to call 'registration_callback' whenever a port is registered
  * or unregistered, passing 'arg' as a second argument.
  */
 int jack_set_port_registration_callback (jack_client_t *, JackPortRegistrationCallback registration_callback, void *arg);
