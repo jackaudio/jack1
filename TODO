@@ -15,13 +15,24 @@ TO BE DECIDED (owner)
 - dropping the use of CAP_RESOURCE (nando)
 - whether to default to triangular dithering the at 16bit (swh)
 
-TODO (owner)
+TODO for 1.0 (owner)
+
+- finalize discussion on transport API, and implement
+        - how to support sync (client "synced" bit)
+        - should we separate transport+time?
+- ensure that UST/MSC pairs work for transport API
+- resolve helper thread design question?
+
+TODO post-1.0
+
+- TBD
+
+TODO general (owner)
 
 - define transport info struct contents (paul)
 - don't build static libraries of drivers and ip-clients (kaiv)
 - add explanation of protocol versioning to README.developers (kaiv)
 - add Paul's graph/subgraph explanation to the design doc (kaiv)
-- add support for custom jackd --tmpdir in libjack (paul)
 - add code to enforce the 'bufsize==2^x' rule (kaiv)
 - proper handling of client return values in libjack (kaiv)
 - pool based malloc for rt client-local mem allocation (paul, moved back here)
@@ -36,6 +47,7 @@ TO THINK ABOUT
 
 CLOSED (date,who,comment)
 
+- add support for custom jackd --tmpdir in libjack (2003/05/06,done,jesse)
 - capture_client has pthread_mutex_lock() in its process() (2003/05/30,fixed,joq)
 - update at least the user-visible copyrights with year 2003 (2003/04/05,done,paul)
 - add a sane way handle situations where the unix sockets already 
