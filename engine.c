@@ -63,7 +63,7 @@ typedef struct _jack_client_internal {
     GSList  *fed_by;   /* protected by engine->graph_lock */
     int      shm_id;
     int      shm_key;
-    unsigned long rank;
+    unsigned long execution_order;
     struct _jack_client_internal *next_client; /* not a linked list! */
     dlhandle handle;
     
@@ -509,8 +509,8 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 			}
 
 			if (status != 0) {
-				jack_error ("subgraph starting at %s timed out (status = %d, state = %d)", 
-					    client->control->name, status, client->control->state);
+				jack_error ("subgraph starting at %s timed out (subgraph_wait_fd=%d, status = %d, state = %d)", 
+					    client->control->name, client->subgraph_wait_fd, status, client->control->state);
 				client->control->timed_out = 1;
 				engine->process_errors++;
 				break;
@@ -1343,7 +1343,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	client->event_fd = -1;
 	client->ports = 0;
 	client->fed_by = 0;
-	client->rank = UINT_MAX;
+	client->execution_order = UINT_MAX;
 	client->next_client = NULL;
 	client->handle = NULL;
 
@@ -1575,7 +1575,7 @@ jack_client_set_order (jack_engine_t *engine, jack_client_internal_t *client)
 	jack_event_t event;
 
 	event.type = GraphReordered;
-	event.x.n = client->rank;
+	event.x.n = client->execution_order;
 
 	return jack_deliver_event (engine, client, &event);
 }
@@ -1602,7 +1602,10 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 	*/
 
 	subgraph_client = 0;
-	n = 0;
+
+	if (engine->verbose) {
+		fprintf(stderr, "-- jack_rechain_graph():\n");
+	}
 
 	for (n = 0, node = engine->clients, next = NULL; node; node = next) {
 
@@ -1626,9 +1629,9 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 			} else {
 				next_client = (jack_client_internal_t *) next->data;
 			}
-			
-			if (client->rank != n || client->next_client != next_client) {
-				client->rank = n;
+
+			if (client->execution_order != n || client->next_client != next_client) {
+				client->execution_order = n;
 				client->next_client = next_client;
 				need_to_reset_fifo = TRUE;
 			} else {
@@ -1644,7 +1647,18 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 				
 				if (subgraph_client) {
 					subgraph_client->subgraph_wait_fd = jack_get_fifo_fd (engine, n);
+					if (engine->verbose) {
+						fprintf(stderr, "client %s: wait_fd=%d, execution_order=%lu.\n", 
+							subgraph_client->control->name, subgraph_client->subgraph_wait_fd, n);
+					}
+					n++;
 				}
+
+				if (engine->verbose) {
+					fprintf(stderr, "client %s: inprocess client, execution_order=%lu.\n", 
+						client->control->name, n);
+				}
+
 				
 				subgraph_client = 0;
 				
@@ -1658,20 +1672,38 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 					
 					subgraph_client = client;
 					subgraph_client->subgraph_start_fd = jack_get_fifo_fd (engine, n);
+					if (engine->verbose) {
+						fprintf(stderr, "client %s: start_fd=%d, execution_order=%lu.\n",
+							subgraph_client->control->name, subgraph_client->subgraph_start_fd, n);
+					}
 				} 
+				else {
+					if (engine->verbose) {
+						fprintf(stderr, "client %s: in subgraph after %s, execution_order=%lu.\n",
+							client->control->name, subgraph_client->control->name, n);
+					}
+
+				}
 				
 				if (need_to_reset_fifo) {
+					/* make sure fifo for 'n + 1' exists 
+					 * before issuing client reorder */
+					(void) jack_get_fifo_fd(engine, n + 1);
+
 					jack_client_set_order (engine, client);
 				}
 				
 				n++;
 			}
 		}
-
-	};
+	}
 
 	if (subgraph_client) {
 		subgraph_client->subgraph_wait_fd = jack_get_fifo_fd (engine, n);
+		if (engine->verbose) {
+			fprintf(stderr, "client %s: wait_fd=%d, execution_order=%lu (last client).\n", 
+				subgraph_client->control->name, subgraph_client->subgraph_wait_fd, n);
+		}
 	}
 
 	if (take_lock) {
