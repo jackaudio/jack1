@@ -82,7 +82,7 @@ endif
 
 if HAVE_READLINE
 jack_transport_SOURCES = transport.c
-jack_transport_LDFLAGS = -lhistory -lreadline -lrt -ldl -lpthread
+jack_transport_LDFLAGS = -lhistory -lreadline @READLINE_DEPS@ -lrt -ldl -lpthread
 jack_transport_LDADD = ../libjack/libjack.la
 endif
 

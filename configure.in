@@ -247,10 +247,17 @@ if test x$HAVE_SNDFILE = xfalse; then
              AC_MSG_WARN([*** the jackrec example client will not be built])
 fi
 
-AC_CHECK_LIB(readline, readline, [HAVE_READLINE=true], [HAVE_READLINE=false])
+# on some systems, readline depends on termcap or ncurses, respectively
+READLINE_DEPS=""
+AC_CHECK_LIB(termcap, tgetent, [READLINE_DEPS="$READLINE_DEPS -ltermcap"])
+AC_CHECK_LIB(ncurses, tgetent, [READLINE_DEPS="$READLINE_DEPS -lncurses"])
+AC_CHECK_LIB(readline, readline,
+             [HAVE_READLINE=true], [HAVE_READLINE=false], [$READLINE_DEPS]
+)
 if test x$HAVE_READLINE = xfalse; then
 	AC_MSG_WARN([*** the jack_transport example client will not be built])
 fi
+AC_SUBST(READLINE_DEPS)
 
 # you need doxygen to make dist.
 AC_CHECK_PROG(HAVE_DOXYGEN, doxygen, true, false)
