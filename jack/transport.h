@@ -37,7 +37,7 @@ typedef enum {
 	JackTransportStopped = 0,	/**< Transport halted */
 	JackTransportRolling = 1,	/**< Transport playing */
 	JackTransportLooping = 2,	/**< For OLD_TRANSPORT, now ignored */
-	JackTransportStarting = 3,	/**< Waiting for sync ready */
+	JackTransportStarting = 3	/**< Waiting for sync ready */
 
 } jack_transport_state_t;
 
@@ -49,7 +49,7 @@ typedef uint64_t jack_unique_t;		/**< Unique ID (opaque) */
 typedef enum {
 
 	JackPositionBBT =	0x10,	/**< Bar, Beat, Tick */
-	JackPositionTimecode =	0x20,	/**< External timecode */
+	JackPositionTimecode =	0x20	/**< External timecode */
 
 } jack_position_bits_t;
 
@@ -349,7 +349,7 @@ typedef enum {
 	JackTransportPosition = 0x2,	/**< Frame number */
 	JackTransportLoop =     0x4,	/**< Loop boundaries (ignored) */
 	JackTransportSMPTE =    0x8,	/**< SMPTE (ignored) */
-	JackTransportBBT =      0x10,	/**< Bar, Beat, Tick */
+	JackTransportBBT =      0x10	/**< Bar, Beat, Tick */
 
 } jack_transport_bits_t;
 
