@@ -104,6 +104,7 @@ typedef struct _alsa_driver {
     jack_client_t                *client;
     JSList                       *capture_ports;
     JSList                       *playback_ports;
+    JSList                       *monitor_ports;
 
     unsigned long input_monitor_mask;
 
