@@ -44,10 +44,17 @@ inline int f_round(float f) {
 void sample_move_d32u24_sS (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 
 {
-	/* ALERT: signed sign-extension portability !!! */
+        long long y;
 
 	while (nsamples--) {
-		*((int *) dst) = ((int) (*src * SAMPLE_MAX_24BIT)) << 8;
+		y = (long long)(*src * SAMPLE_MAX_24BIT) << 8;
+		if (y > INT_MAX) {
+			*((int *) dst) = INT_MAX;
+		} else if (y < INT_MIN) {
+			*((int *) dst) = INT_MIN;
+		} else {
+			*((int *) dst) = (int)y;
+		}
 		dst += dst_skip;
 		src++;
 	}
