@@ -34,10 +34,12 @@
 
 #include "local.h"
 
-static void  jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes);
+static void  jack_audio_port_mixdown (jack_port_t *port,
+				      jack_nframes_t nframes);
 
 jack_port_t *
-jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control_t *control)
+jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
+	       jack_control_t *control)
 {
 	jack_port_t *port;
 	jack_port_shared_t *shared;
@@ -61,16 +63,27 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control
 
 		if (client->control->id == port->shared->client_id) {
 			
-			/* its our port, and therefore we need to make sure that the function pointers
-			   in the shared memory object that refer to functions called within the client's
-			   address space point to the location of the correct functions within
-			   the client. without this, they point to those same functions in the server's
-			   address space, and that's a recipe for disaster.
+			/* its our port, and therefore we need to make
+			   sure that the function pointers in the
+			   shared memory object that refer to
+			   functions called within the client's
+			   address space point to the location of the
+			   correct functions within the
+			   client. without this, they point to those
+			   same functions in the server's address
+			   space, and that's a recipe for disaster.
 			*/
 			
-			port->shared->type_info.mixdown = jack_builtin_port_types[port->shared->type_info.type_id].mixdown;
-			port->shared->type_info.peak = jack_builtin_port_types[port->shared->type_info.type_id].peak;
-			port->shared->type_info.power = jack_builtin_port_types[port->shared->type_info.type_id].power;
+			port->shared->type_info.mixdown =
+				jack_builtin_port_types[
+					port->shared->type_info.type_id
+					].mixdown;
+			port->shared->type_info.peak =
+				jack_builtin_port_types[
+					port->shared->type_info.type_id].peak;
+			port->shared->type_info.power =
+				jack_builtin_port_types[
+					port->shared->type_info.type_id].power;
 		}
 		break;
 
@@ -78,19 +91,23 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control
 		break;
 	}
 
-	/* now find the shared memory segment that contains the buffer for this port */
-
-	for (node = client->port_segments; node; node = jack_slist_next (node)) {
+	/* now find the shared memory segment that contains the buffer
+	 * for this port */
+	for (node = client->port_segments; node;
+	     node = jack_slist_next (node)) {
 		
 		si = (jack_port_segment_info_t *) node->data;
 
-		if (strcmp (si->shm_name, port->shared->type_info.shm_info.shm_name) == 0) {
+		if (strcmp (si->shm_name,
+			    port->shared->type_info.shm_info.shm_name) == 0) {
 			break;
 		}
 	}
-	
+
 	if (node == NULL) {
-		jack_error ("cannot find port memory segment [%s] for new port\n", port->shared->type_info.shm_info.shm_name);
+		jack_error ("cannot find port memory segment [%s] for"
+			    " new port\n",
+			    port->shared->type_info.shm_info.shm_name);
 		return NULL;
 	}
 
@@ -98,9 +115,8 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control
 	   compute the correct location. we don't store the location
 	   directly, because port->client_segment_base and/or
 	   port->offset can change if the buffer size or port counts
-	   are changed.  
+	   are changed.
 	*/
-	
 	port->client_segment_base = si->address;
 	
 	return port;
@@ -119,7 +135,8 @@ jack_port_register (jack_client_t *client,
 
 	req.type = RegisterPort;
 
-	length = strlen ( (const char *) client->control->name ) + 1 + strlen ( port_name ) ;
+	length = strlen ( (const char *) client->control->name )
+		+ 1 + strlen ( port_name ) ;
 	if ( length >= sizeof (req.x.port_info.name) ) {
 	  jack_error ("\"%s:%s\" is too long to be used as a JACK port name.\n"
 		      "Please use %lu characters or less.",
@@ -129,11 +146,13 @@ jack_port_register (jack_client_t *client,
 	  return NULL ;
 	}
 
-	strcpy ((char *) req.x.port_info.name, (const char *) client->control->name);
+	strcpy ((char *) req.x.port_info.name,
+		(const char *) client->control->name);
 	strcat ((char *) req.x.port_info.name, ":");
 	strcat ((char *) req.x.port_info.name, port_name);
 
-	snprintf (req.x.port_info.type, sizeof (req.x.port_info.type), "%s", port_type);
+	snprintf (req.x.port_info.type, sizeof (req.x.port_info.type),
+		  "%s", port_type);
 	req.x.port_info.flags = flags;
 	req.x.port_info.buffer_size = buffer_size;
 	req.x.port_info.client_id = client->control->id;
@@ -142,7 +161,8 @@ jack_port_register (jack_client_t *client,
 		return NULL;
 	}
 
-	if ((port = jack_port_new (client, req.x.port_info.port_id, client->engine)) == NULL) {
+	if ((port = jack_port_new (client, req.x.port_info.port_id,
+				   client->engine)) == NULL) {
 		return NULL;
 	}
 
@@ -237,8 +257,11 @@ jack_port_get_connections (const jack_port_t *port)
 
 	if (port->connections != NULL) {
 
-		ret = (const char **) malloc (sizeof (char *) * (jack_slist_length (port->connections) + 1));
-		for (n = 0, node = port->connections; node; node = jack_slist_next (node), ++n) {
+		ret = (const char **)
+			malloc (sizeof (char *)
+				* (jack_slist_length (port->connections) + 1));
+		for (n = 0, node = port->connections; node;
+		     node = jack_slist_next (node), ++n) {
 			ret[n] = ((jack_port_t *) node->data)->shared->name;
 		}
 		ret[n] = NULL;
