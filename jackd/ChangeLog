@@ -1,9 +1,10 @@
-2003-03-05  Taybin Rutkin  <taybin>
+2004-09-08  Taybin Rutkin  <taybin>
+	* jackd.c: Better error reporting if/when dlopen() fails.
 
+2003-03-05  Taybin Rutkin  <taybin>
 	* jackd.c: added version flag.  -V and --version are accepted.
 
 2003-02-21  Paul Davis  <paul>
-
 	* jackd.c: modified signal catching design to actually follow
 	sigwait() specifications (ie. install handlers for all blocked
 	signals). also removed some dead code from benchmarking/debugging.
