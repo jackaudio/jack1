@@ -32,6 +32,7 @@
  * doesn't necessarily mean everything exists.
  */
 #define _POSIX_C_SOURCE 200112L
+#define _BSD_SOURCE
 #endif
 #include <unistd.h>
 #include <pthread.h>
