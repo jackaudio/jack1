@@ -142,11 +142,12 @@ typedef int  (*JackSyncCallback)(jack_transport_state_t state,
  * Register (or unregister) as a slow-sync client, one that cannot
  * respond immediately to transport position changes.
  *
- * The @a sync_callback will be invoked on the first process cycle
- * after its registration is complete.  After that, it runs according
- * to the ::JackSyncCallback rules.  Clients that don't set a @a
- * sync_callback are assumed to be ready immediately any time the
- * transport wants to start.
+ * The @a sync_callback will be invoked in the first process cycle
+ * after its registration is complete, or in the first cycle after
+ * jack_activate() if the client had been inactive.  After that, it
+ * runs according to the ::JackSyncCallback rules.  Clients that don't
+ * set a @a sync_callback are assumed to be ready immediately any time
+ * the transport wants to start.
  *
  * @param client the JACK client structure.
  * @param sync_callback is a realtime function that returns TRUE when
@@ -182,14 +183,15 @@ int  jack_set_sync_timeout (jack_client_t *client,
 
 /**
  * Prototype for the @a timebase_callback used to provide extended
- * position information.
+ * position information.  Its output affects all of the following
+ * process cycle.  This realtime function must not wait.
  *
  * This function is called immediately after process() in the same
  * thread whenever the transport is rolling, or when any client has
  * requested a new position in the previous cycle.  The first cycle
  * after jack_set_timebase_callback() is also treated as a new
- * position.  This realtime function must not wait.  Its output
- * affects all of the following process cycle.
+ * position, or the first cycle after jack_activate() if the client
+ * had been inactive.
  *
  * The timebase master may not use its @a pos argument to set @a
  * pos->frame.  To change position, use jack_transport_reposition() or

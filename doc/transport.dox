@@ -65,12 +65,13 @@ master active at a time.  If no client is registered as timebase
 master, frame numbers will be the only position information available.
 
 The timebase master registers a callback that updates position
-information while the transport is rolling.  This function is called
-immediately after the process callback in the same thread whenever the
-transport is rolling, or when any client has set a new position in the
-previous cycle.  The first cycle after jack_set_timebase_callback() is
-also treated as a new position.  Its output affects the following
-process cycle.
+information while the transport is rolling.  Its output affects the
+following process cycle.  This function is called immediately after
+the process callback in the same thread whenever the transport is
+rolling, or when any client has set a new position in the previous
+cycle.  The first cycle after jack_set_timebase_callback() is also
+treated as a new position, or the first cycle after jack_activate() if
+the client had been inactive.
 
 @code
   typedef int  (*JackTimebaseCallback)(jack_transport_state_t state,
