@@ -82,7 +82,11 @@ jack_transport_request_new_pos (jack_client_t *client, jack_position_t *pos)
 {
 	jack_control_t *eng = client->engine;
 
-	//JOQ: check validity of input
+	// JOQ: I don't think using guard_usecs is good enough.  On
+	// faster machines we could get another request in the same
+	// microsecond.  Better to use something like get_cycles().
+	// SMP further complicates the issue.  It may require a CPU id
+	// in addition to the cycle counter for uniqueness.
 
 	/* carefully copy requested postion into shared memory */
 	pos->guard_usecs = pos->usecs = jack_get_microseconds();
@@ -100,15 +104,21 @@ jack_call_sync_client (jack_client_t *client)
 	jack_client_control_t *control = client->control;
 	jack_control_t *eng = client->engine;
 
-	if (eng->new_pos || !control->sync_ready) {
+	/* Make sure we are still slow-sync; is_slowsync is set in a
+	 * critical section; sync_cb is not. */
+	if ((eng->new_pos || control->sync_poll || control->sync_new) &&
+	    control->is_slowsync) {
 
 		if (control->sync_cb (eng->transport_state,
 				      &eng->current_time,
 				      control->sync_arg)) {
 
-			control->sync_ready = 1;
-			eng->sync_cycle++;
+			if (control->sync_poll) {
+				control->sync_poll = 0;
+				eng->sync_remain--;
+			}
 		}
+		control->sync_new = 0;
 	}
 }
 
@@ -119,7 +129,8 @@ jack_call_timebase_master (jack_client_t *client)
 	jack_control_t *eng = client->engine;
 	int new_pos = eng->new_pos;
 
-	/* make sure we're still the master */
+	/* Make sure we're still the master.  Test is_timebase, which
+	 * is set in a critical section; timebase_cb is not. */
 	if (control->is_timebase) { 
 
 		if (client->new_timebase) {	/* first callback? */
@@ -229,7 +240,10 @@ jack_set_sync_callback (jack_client_t *client,
 	jack_request_t req;
 	int rc;
 
-	req.type = SetSyncClient;
+	if (sync_callback)
+		req.type = SetSyncClient;
+	else
+		req.type = ResetSyncClient;
 	req.x.client_id = ctl->id;
 
 	rc = jack_client_deliver_request (client, &req);
@@ -241,9 +255,14 @@ jack_set_sync_callback (jack_client_t *client,
 }
 
 int  
-jack_set_sync_timeout (jack_client_t *client, jack_nframes_t timeout)
+jack_set_sync_timeout (jack_client_t *client, jack_time_t usecs)
 {
-	return ENOSYS;			/* this is a stub */
+	jack_request_t req;
+
+	req.type = SetSyncTimeout;
+	req.x.timeout = usecs;
+
+	return jack_client_deliver_request (client, &req);
 }
 
 int  
@@ -290,8 +309,12 @@ jack_transport_query (jack_client_t *client, jack_position_t *pos)
 int
 jack_transport_reposition (jack_client_t *client, jack_position_t *pos)
 {
-	/* copy the input, so we don't modify the input argument */
+	/* copy the input, to avoid modifying its contents */
 	jack_position_t tmp = *pos;
+
+	/* validate input */
+	if (tmp.valid & ~JACK_POSITION_MASK) /* unknown field present? */
+		return EINVAL;
 
 	return jack_transport_request_new_pos (client, &tmp);
 }
@@ -299,7 +322,7 @@ jack_transport_reposition (jack_client_t *client, jack_position_t *pos)
 void  
 jack_transport_start (jack_client_t *client)
 {
-	client->engine->transport_cmd = TransportCommandPlay;
+	client->engine->transport_cmd = TransportCommandStart;
 }
 
 void
@@ -344,7 +367,7 @@ jack_get_transport_info (jack_client_t *client,
 	info->valid = (eng->current_time.valid |
 		       JackTransportState | JackTransportPosition);
 
-	if (info->valid & JackPositionBBT) {
+	if (info->valid & JackTransportBBT) {
 		info->bar = eng->current_time.bar;
 		info->beat = eng->current_time.beat;
 		info->tick = eng->current_time.tick;
@@ -366,11 +389,12 @@ jack_set_transport_info (jack_client_t *client,
 
 	if (!client->control->is_timebase) { /* not timebase master? */
 		if (first_error)
-			jack_error ("Called jack_set_transport_info(), but not timebase master.");
+			jack_error ("Called jack_set_transport_info(), "
+				    "but not timebase master.");
 		first_error = 0;
 
-		/* JOQ: I would prefer to ignore this request, but if
-		 * I do, it breaks ardour 0.9-beta2.  So, let's allow
+		/* JOQ: I would prefer to ignore this request, but
+		 * that would break ardour 0.9-beta2.  So, let's allow
 		 * it for now. */
 		// return;
 	}
@@ -387,7 +411,7 @@ jack_set_transport_info (jack_client_t *client,
 		if (info->transport_state == JackTransportStopped)
 			eng->transport_cmd = TransportCommandStop;
 		else if (info->transport_state == JackTransportRolling)
-			eng->transport_cmd = TransportCommandPlay;
+			eng->transport_cmd = TransportCommandStart;
 		/* silently ignore anything else */
 	}
 
@@ -396,7 +420,7 @@ jack_set_transport_info (jack_client_t *client,
 	else
 		eng->pending_time.frame = eng->current_time.frame;
 
-	eng->pending_time.valid = (info->valid & JackTransportBBT);
+	eng->pending_time.valid = (info->valid & JACK_POSITION_MASK);
 
 	if (info->valid & JackTransportBBT) {
 		eng->pending_time.bar = info->bar;

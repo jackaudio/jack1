@@ -75,7 +75,7 @@ typedef struct {
 
 typedef enum {
     TransportCommandNone = 0,
-    TransportCommandPlay = 1,
+    TransportCommandStart = 1,
     TransportCommandStop = 2,
 } transport_command_t;
 
@@ -102,9 +102,10 @@ typedef struct {
     jack_position_t	  pending_time;	/* position for next cycle */
     jack_position_t	  request_time;	/* latest requested position */
     int			  new_pos;	/* new position this cycle */
-    unsigned long	  sync_remain;	/* remaining sync count */
-    unsigned long	  sync_cycle;	/* number ready this cycle */
-    unsigned long	  sync_clients;	/* number of slow-sync clients */
+    unsigned long	  sync_clients;	/* number of is_slowsync clients */
+    unsigned long	  sync_remain;	/* number of them with sync_poll */
+    jack_time_t           sync_timeout;
+    jack_time_t           sync_time_left;
     jack_frame_timer_t    frame_timer;
     int                   internal;
     jack_nframes_t        frames_at_cycle_start;
@@ -177,8 +178,10 @@ typedef volatile struct {
     volatile char       active : 1;       /* w: engine r: engine and client */
     volatile char       dead : 1;         /* r/w: engine */
     volatile char       timed_out : 1;    /* r/w: engine */
-    volatile char       sync_ready : 1;   /* w: engine and client, r: engine */
     volatile char       is_timebase : 1;  /* w: engine, r: engine and client */
+    volatile char       is_slowsync : 1;  /* w: engine, r: engine and client */
+    volatile char       sync_poll : 1;    /* w: engine and client, r: engine */
+    volatile char       sync_new : 1;     /* w: engine and client, r: engine */
     volatile pid_t      pid;              /* w: client r: engine; client pid */
     volatile unsigned long long signalled_at;
     volatile unsigned long long awake_at;
@@ -281,6 +284,8 @@ typedef enum {
 	GetPortNConnections = 11,
 	ResetTimeBaseClient = 12,
 	SetSyncClient = 13,
+	ResetSyncClient = 14,
+	SetSyncTimeout = 15,
 } RequestType;
 
 struct _jack_request {
@@ -309,6 +314,7 @@ struct _jack_request {
 	} timebase;
 	jack_client_id_t client_id;
 	jack_nframes_t nframes;
+	jack_time_t timeout;
     } x;
     int status;
 };

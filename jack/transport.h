@@ -50,6 +50,7 @@ typedef enum {
 
 } jack_position_bits_t;
 
+#define JACK_POSITION_MASK (JackPositionBBT) /**< all valid position bits */
 #define EXTENDED_TIME_INFO
 
 /**
@@ -105,17 +106,18 @@ typedef struct {
 int  jack_release_timebase (jack_client_t *client);
 
 /**
- * Prototype for the sync callback defined by slow-sync clients.
- * Called just before process() in the same thread when some client
- * has requested a new position.  This realtime function must not
- * wait.
+ * Prototype for the @a sync_callback defined by slow-sync clients.
+ * Called just before process() in the same thread on the first cycle
+ * after being registered, whenever some client requests a new
+ * position, or when the transport enters the ::JackTransportStarting
+ * state.  This realtime function must not wait.
  *
  * The transport @a state will be:
  *
- *   - ::JackTransportStopped some client just requested a new position;
- *   - ::JackTransportStarting the transport is waiting to start;
- *   - ::JackTransportRolling the timeout has expired, and the position
- *   is now a moving target.
+ *   - ::JackTransportStopped when a new position is requested;
+ *   - ::JackTransportStarting when the transport is waiting to start;
+ *   - ::JackTransportRolling when the timeout has expired, and the
+ *   position is now a moving target.
  *
  * @param state current transport state.
  * @param pos new transport position.
@@ -131,18 +133,11 @@ typedef int  (*JackSyncCallback)(jack_transport_state_t state,
  * Register (or unregister) as a slow-sync client, one that cannot
  * respond immediately to transport position changes.
  *
- * When there are slow-sync clients and the JACK transport starts
- * playing in a new postion, it first enters the
- * ::JackTransportStarting state.  The @a sync_callback function for
- * each slow-sync client will be invoked in the JACK process thread
- * while the transport is starting.  If it has not already done so,
- * the client needs to initiate a seek to reach the starting position.
- * The @a sync_callback returns false until the seek completes and the
- * client is ready to play.  When all slow-sync clients are ready, the
- * state changes to ::JackTransportRolling.
- *
- * Clients that don't set a @a sync_callback are assumed to be ready
- * immediately, any time the transport wants to start.
+ * The @a sync_callback will be invoked on the first process cycle
+ * after its registration is complete.  After that, it runs according
+ * to the ::JackSyncCallback rules.  Clients that don't set a @a
+ * sync_callback are assumed to be ready immediately any time the
+ * transport wants to start.
  *
  * @param client the JACK client structure.
  * @param sync_callback is a realtime function that returns true when
@@ -162,24 +157,24 @@ int  jack_set_sync_callback (jack_client_t *client,
  * This timeout prevents unresponsive slow-sync clients from
  * completely halting the transport mechanism.  The default is two
  * seconds.  When the timeout expires, the transport starts rolling,
- * even if some slow-sync clients are still unready.  The
- * sync_callbacksof these clients continue being invoked, giving them
+ * even if some slow-sync clients are still unready.  The @a
+ * sync_callbacks of these clients continue being invoked, giving them
  * a chance to catch up.
  *
  * @see jack_set_sync_callback
  *
  * @param client the JACK client structure.
- * @param timeout is delay (in frames) before the timeout expires.
+ * @param timeout is delay (in microseconds) before the timeout expires.
  *
  * @return 0 on success, otherwise a non-zero error code.
  */
 int  jack_set_sync_timeout (jack_client_t *client,
-			    jack_nframes_t timeout);
+			    jack_time_t timeout);
 
 /**
- * Prototype for the timebase master callback used to continuously
- * update position information.  Without extended information, there
- * is no need for this function, JACK can count frames automatically.
+ * Prototype for the @a timebase_callback used to continuously update
+ * position information.  Without extended information, there is no
+ * need for this function, JACK will count frames automatically.
  *
  * This function is called immediately after process() in the same
  * thread whenever the transport is rolling, or when any client has
@@ -252,7 +247,7 @@ int  jack_set_timebase_callback (jack_client_t *client,
  * @param client the JACK client structure.
  * @param frame frame number of new transport position.
  *
- * @return 0 if valid request, otherwise a non-zero error code.
+ * @return 0 if valid request, non-zero otherwise.
  */
 int  jack_transport_locate (jack_client_t *client,
 			    jack_nframes_t frame);
@@ -288,7 +283,7 @@ jack_transport_state_t jack_transport_query (jack_client_t *client,
  * @param client the JACK client structure.
  * @param pos requested new transport position.
  *
- * @return 0 if valid request, otherwise a non-zero error code.
+ * @return 0 if valid request, EINVAL if position structure rejected.
  */
 int  jack_transport_reposition (jack_client_t *client,
 				jack_position_t *pos);

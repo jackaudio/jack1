@@ -1322,8 +1322,7 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 	        	JSList *portnode;
 			jack_port_internal_t *port;
 
-			if (client == engine->timebase_client)
-				jack_timebase_exit (engine);
+			jack_transport_client_exit (engine, client);
 			
 			for (portnode = client->ports; portnode; portnode = jack_slist_next (portnode)) {
 				port = (jack_port_internal_t *) portnode->data;
@@ -1446,7 +1445,20 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		break;
 
 	case SetSyncClient:
-		req->status = jack_set_sync_client (engine, req->x.client_id);
+		req->status =
+			jack_transport_client_set_sync (engine,
+							req->x.client_id);
+		break;
+
+	case ResetSyncClient:
+		req->status =
+			jack_transport_client_reset_sync (engine,
+							  req->x.client_id);
+		break;
+
+	case SetSyncTimeout:
+		req->status = jack_transport_set_sync_timeout (engine,
+							       req->x.timeout);
 		break;
 
 #ifdef USE_CAPABILITIES
@@ -1782,7 +1794,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
  
 	engine->control->buffer_size = 0;
 	jack_set_sample_rate (engine, 0);
-	jack_timebase_init (engine);
+	jack_transport_init (engine);
 	engine->control->internal = 0;
 
 	engine->control->has_capabilities = 0;
@@ -2239,6 +2251,8 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	client->control->port_register_arg = NULL;
 	client->control->graph_order = NULL;
 	client->control->graph_order_arg = NULL;
+
+	jack_transport_client_new (client);
         
 #if defined(__APPLE__) && defined(__POWERPC__) 
         /* specific ressources for server/client real-time thread communication */
@@ -2287,9 +2301,7 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	client->control->dead = TRUE;
 	
-	if (client == engine->timebase_client)
-		jack_timebase_exit (engine);
-
+	jack_transport_client_exit (engine, client);
 	jack_client_disconnect (engine, client);
 	jack_client_do_deactivate (engine, client, FALSE);
 }

@@ -145,7 +145,7 @@ to NULL.
 
 @code
   int  jack_set_sync_timeout (jack_client_t *client,
-                              jack_nframes_t timeout);
+                              jack_time_t usecs);
 @endcode
 
 There must be a @a timeout to prevent unresponsive slow-sync clients
