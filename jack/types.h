@@ -77,6 +77,20 @@ typedef int  (*JackProcessCallback)(jack_nframes_t nframes, void *arg);
 
 /**
  * Prototype for the client supplied function that is called 
+ * once after the creation of the thread in which other
+ * callbacks will be made. Special thread characteristics
+ * can be set from this callback, for example. This is a
+ * highly specialized callback and most clients will not
+ * and should not use it.
+ *
+ * @param arg pointer to a client supplied structure
+ *
+ * @return void
+ */ 
+typedef void  (*JackThreadInitCallback)(void *arg);
+
+/**
+ * Prototype for the client supplied function that is called 
  * whenever the processing graph is reordered.
  *
  * @param arg pointer to a client supplied structure

@@ -194,6 +194,8 @@ typedef volatile struct {
      */
     JackProcessCallback process;
     void *process_arg;
+    JackThreadInitCallback thread_init;
+    void *thread_init_arg;
     JackBufferSizeCallback bufsize;
     void *bufsize_arg;
     JackSampleRateCallback srate;

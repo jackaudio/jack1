@@ -942,6 +942,11 @@ jack_client_thread (void *arg)
 
 	DEBUG ("client thread is now running");
 
+	if (client->control->thread_init) {
+		DEBUG ("calling client thread init callback");
+		client->control->thread_init (client->control->thread_init_arg);
+	}
+
 	while (err == 0) {
 
 	        if (client->engine->engine_ok == 0) {
@@ -1766,6 +1771,20 @@ jack_set_process_callback (jack_client_t *client,
 	}
 	client->control->process_arg = arg;
 	client->control->process = callback;
+	return 0;
+}
+
+int
+jack_set_thread_init_callback (jack_client_t *client,
+			       JackThreadInitCallback callback, void *arg)
+
+{
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+	client->control->thread_init_arg = arg;
+	client->control->thread_init = callback;
 	return 0;
 }
 

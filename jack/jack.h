@@ -135,6 +135,21 @@ int jack_set_process_callback (jack_client_t *client,
 			       void *arg);
 
 /**
+ * Tell JACK to call @a thread_init_callback once just after
+ * the creation of the thread in which all other callbacks 
+ * will be handled.
+ *
+ * The code in the supplied function does not need to be
+ * suitable for real-time execution.
+ *
+ * @return 0 on success, otherwise a non-zero error code, causing JACK
+ * to remove that client from the process() graph.
+ */
+int jack_set_thread_init_callback (jack_client_t *client,
+				   JackThreadInitCallback thread_init_callback,
+				   void *arg);
+
+/**
  * Tell the Jack server to call @a freewheel_callback
  * whenever we enter or leave "freewheel" mode, passing @a
  * arg as the second argument. The first argument to the
