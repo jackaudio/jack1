@@ -18,3 +18,7 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 #define jack_protocol_version @JACK_PROTOCOL_VERSION@
+
+#ifndef USE_POSIX_SHM
+#define JACK_SHM_REGISTRY_KEY @JACK_SHM_REGISTRY_KEY@
+#endif

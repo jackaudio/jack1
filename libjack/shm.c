@@ -451,8 +451,6 @@ jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 
 #else /* USE_POSIX_SHM */
 
-#define JACK_SHM_REGISTRY_KEY 0x282929
-
 /* gain addressibility to shared memory registration segment */
 int
 jack_initialize_shm (void)

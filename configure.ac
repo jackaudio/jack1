@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=99
-JACK_MICRO_VERSION=27
+JACK_MICRO_VERSION=28
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -148,9 +148,14 @@ if test "x$TRY_POSIX_SHM" = "xyes"
 then
 	AC_MSG_RESULT([POSIX shm_open().])
 	AC_DEFINE(USE_POSIX_SHM,1,[Use POSIX shared memory interface])
+	USE_POSIX_SHM="true"
 else
 	AC_MSG_RESULT([System V shmget().])
+	JACK_SHM_REGISTRY_KEY=0x00282929
+	AC_SUBST(JACK_SHM_REGISTRY_KEY)
+	USE_POSIX_SHM="false"
 fi
+AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
 
 JACK_CORE_CFLAGS="-I\$(top_builddir)/config -I\$(top_srcdir) \
 -I\$(top_builddir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
