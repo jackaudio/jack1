@@ -50,7 +50,9 @@ typedef struct {
     const snd_pcm_channel_area_t *capture_areas;
     const snd_pcm_channel_area_t *playback_areas;
     unsigned long long            time_at_interrupt;
-    struct pollfd                 pfd;
+    struct pollfd                *pfd;
+    unsigned int                  playback_nfds;
+    unsigned int                  capture_nfds;
     unsigned long                 interleave_unit;
     unsigned long                 capture_interleave_skip;
     unsigned long                 playback_interleave_skip;

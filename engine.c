@@ -2312,7 +2312,7 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 		n = nframes;
 		dst = port->shared->buffer;
 		src = input->buffer;
-		while (--n) {
+		while (n--) {
 			*dst++ += *src++;
 		}
 	}

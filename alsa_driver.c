@@ -38,10 +38,10 @@
 static int  config_max_level = 0;
 static int  config_min_level = 0;
 
-static unsigned long long current_usecs () {
+static unsigned long long current_cycles () {
 	unsigned long long now;
 	rdtscll (now);
-	return now / 450;
+	return now;
 }
 
 static void
@@ -275,17 +275,17 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 	}
 
 	if ((err = snd_pcm_sw_params_set_stop_threshold (handle, sw_params, ~0U)) < 0) {
-		jack_error ("ALSA: cannot set start mode for %s", stream_name);
+		jack_error ("ALSA: cannot set stop mode for %s", stream_name);
 		return -1;
 	}
 
 	if ((err = snd_pcm_sw_params_set_silence_threshold (handle, sw_params, 0)) < 0) {
-		jack_error ("ALSA: cannot set start mode for %s", stream_name);
+		jack_error ("ALSA: cannot set silence threshold for %s", stream_name);
 		return -1;
 	}
 
 	if ((err = snd_pcm_sw_params_set_silence_size (handle, sw_params, driver->frames_per_cycle * driver->nfragments)) < 0) {
-		jack_error ("ALSA: cannot set start mode for %s", stream_name);
+		jack_error ("ALSA: cannot set silence size for %s", stream_name);
 		return -1;
 	}
 
@@ -605,8 +605,10 @@ alsa_driver_audio_start (alsa_driver_t *driver)
 		}
 	}
 
-	snd_pcm_poll_descriptors (driver->playback_handle, &driver->pfd, 1);
-	driver->pfd.events = POLLOUT | POLLERR;
+	driver->playback_nfds = snd_pcm_poll_descriptors_count (driver->playback_handle);
+	driver->capture_nfds = snd_pcm_poll_descriptors_count (driver->capture_handle);
+	driver->pfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 
+		(driver->playback_nfds + driver->capture_nfds));
 
 	return 0;
 }
@@ -689,6 +691,7 @@ alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn, ClockSy
 }
 
 static int under_gdb = FALSE;
+static unsigned long long last_time;
 
 static int
 alsa_driver_wait (alsa_driver_t *driver)
@@ -704,34 +707,106 @@ alsa_driver_wait (alsa_driver_t *driver)
 	channel_t chn;
 	GSList *node;
 	sample_t *buffer;
-//	unsigned long long end;
+	int need_capture = 1;
+	int need_playback = 1;
+	int i;
+	unsigned long long before;
 
   again:
-	if (poll (&driver->pfd, 1, 1000) < 0) {
-		if (errno == EINTR) {
-			printf ("poll interrupt\n");
-				// this happens mostly when run
-				// under gdb, or when exiting due to a signal
-			if (under_gdb) {
-				goto again;
-			}
-			return 1;
+
+	while (need_playback || need_capture) {
+
+		int p_timed_out, c_timed_out;
+		int ci;
+		int nfds;
+
+		nfds = 0;
+
+		if (need_playback) {
+			snd_pcm_poll_descriptors (driver->playback_handle, &driver->pfd[0], driver->playback_nfds);
+			nfds += driver->playback_nfds;
 		}
 		
-		jack_error ("ALSA::Device: poll call failed (%s)", strerror (errno));
-		return -1;
-	}
-	
-	driver->time_at_interrupt = current_usecs();
-	
-	if (driver->pfd.revents & POLLERR) {
-		jack_error ("ALSA: poll reports error.");
-		return -1;
-	}
-	
-	if (driver->pfd.revents == 0) {
-		// timed out, such as when the device is paused
-		return 0;
+		if (need_capture) {
+			snd_pcm_poll_descriptors (driver->capture_handle, &driver->pfd[nfds], driver->capture_nfds);
+			ci = nfds;
+			nfds += driver->capture_nfds;
+		}
+		
+		/* ALSA doesn't set POLLERR in some versions of 0.9.X */
+		
+		for (i = 0; i < nfds; i++) {
+			driver->pfd[nfds].events |= POLLERR;
+		}
+		
+//		printf ("c? %d p? %d poll on %d fds\n", need_capture, need_playback, nfds);
+		
+		before = current_cycles();
+		
+		if (poll (driver->pfd, nfds, 1000) < 0) {
+			if (errno == EINTR) {
+				printf ("poll interrupt\n");
+				// this happens mostly when run
+				// under gdb, or when exiting due to a signal
+				if (under_gdb) {
+					goto again;
+				}
+				return 1;
+			}
+			
+			jack_error ("ALSA::Device: poll call failed (%s)", strerror (errno));
+			return -1;
+		}
+		
+		driver->time_at_interrupt = current_cycles();
+//		printf ("time in poll: %f usecs since last = %f usecs\n", 
+//			((float) (driver->time_at_interrupt - before)/450.0f),
+//			((float) (driver->time_at_interrupt - last_time)/450.0f));
+//		last_time = driver->time_at_interrupt;
+		
+		p_timed_out = 0;
+		
+		if (need_playback) {
+			for (i = 0; i < driver->playback_nfds; i++) {
+				if (driver->pfd[i].revents & POLLERR) {
+					jack_error ("ALSA: poll reports error on playback stream.");
+					return -1;
+				}
+				
+				if (driver->pfd[i].revents == 0) {
+					p_timed_out++;
+				}
+			}
+
+			if (p_timed_out == 0) {
+				need_playback = 0;
+			}
+		}
+		
+		c_timed_out = 0;
+
+		if (need_capture) {
+			for (i = ci; i < nfds; i++) {
+				if (driver->pfd[i].revents & POLLERR) {
+					jack_error ("ALSA: poll reports error on capture stream.");
+					return -1;
+				}
+				
+				if (driver->pfd[i].revents == 0) {
+					c_timed_out++;
+				}
+			}
+			
+			if (c_timed_out == 0) {
+				need_capture = 0;
+			}
+		}
+		
+		if (p_timed_out == driver->playback_nfds && c_timed_out == driver->capture_nfds) {
+			jack_error ("ALSA: poll time out");
+			return -1;
+		}		
+
 	}
 	
 	xrun_detected = FALSE;
@@ -766,7 +841,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 	   periods.
 	*/
 
-	avail = (avail / driver->frames_per_cycle) * driver->frames_per_cycle;
+	avail = avail - (avail % driver->frames_per_cycle);
 
 	while (avail) {
 		
@@ -782,6 +857,8 @@ alsa_driver_wait (alsa_driver_t *driver)
 
 
 		contiguous = capture_avail < playback_avail ? capture_avail : playback_avail;
+
+//		printf ("\tcontiguous = %lu\n", contiguous);
 
 		/* XXX possible race condition here with silence_pending */
 		
@@ -852,7 +929,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 		avail -= contiguous;
 	}
 
-//	end = current_usecs();
+//	end = current_cycles();
 //	printf ("entire cycle took %f usecs\n", ((float)(end - driver->time_at_interrupt))/450.0f);
 
 	return 0;
@@ -1058,7 +1135,7 @@ alsa_driver_set_hw_monitoring (alsa_driver_t *driver, int yn)
 static nframes_t
 alsa_driver_frames_since_cycle_start (alsa_driver_t *driver)
 {
-	return (nframes_t) ((driver->frame_rate / 1000000.0) * ((float) (current_usecs() - driver->time_at_interrupt)));
+	return (nframes_t) ((driver->frame_rate / 1000000.0) * ((float) (current_cycles() - driver->time_at_interrupt)));
 }
 
 static ClockSyncStatus
@@ -1100,6 +1177,10 @@ alsa_driver_delete (alsa_driver_t *driver)
 	if (driver->playback_sw_params) {
 		snd_pcm_sw_params_free (driver->playback_sw_params);
 		driver->playback_sw_params = 0;
+	}
+
+	if (driver->pfd) {
+		free (driver->pfd);
 	}
 	
 	if (driver->hw) {
@@ -1164,6 +1245,10 @@ alsa_driver_new (char *name, char *alsa_device,
 	
 	driver->capture_ports = 0;
 	driver->playback_ports = 0;
+
+	driver->pfd = 0;
+	driver->playback_nfds = 0;
+	driver->capture_nfds = 0;
 	
 	if ((err = snd_pcm_open (&driver->playback_handle, alsa_device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
 		jack_error ("ALSA: Cannot open PCM device %s/%s", name, alsa_device);

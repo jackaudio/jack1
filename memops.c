@@ -23,6 +23,7 @@
 #include <math.h>
 #include <memory.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #include <jack/memops.h>
 
@@ -67,6 +68,8 @@ void sample_move_dS_s32u24 (sample_t *dst, char *src, unsigned long nsamples, un
 void sample_move_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, gain_t gain)
 	
 {
+	sample_t val;
+
 	/* ALERT: signed sign-extension portability !!! */
 
 	/* XXX good to use x86 assembler here, since float->short
@@ -76,13 +79,27 @@ void sample_move_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsi
 	
 	if (gain == 1.0) {
 		while (nsamples--) {
-			*((short *) dst) = (short) (*src * SAMPLE_MAX_16BIT);
+			val = *src;
+			if (val > 1.0f) {
+				*((short *)dst) = SHRT_MAX;
+			} else if (val < -1.0f) {
+				*((short *)dst) = SHRT_MIN;
+			} else {
+				*((short *) dst) = (short) (val * SAMPLE_MAX_16BIT);
+			}
 			dst += dst_skip;
 			src++;
 		}
 	} else {
 		while (nsamples--) {
-			*((short *) dst) = (short) ((*src * gain) * SAMPLE_MAX_16BIT);
+			val = *src * gain;
+			if (val > 1.0f) {
+				*((short *)dst) = SHRT_MAX;
+			} else if (val < -1.0f) {
+				*((short *)dst) = SHRT_MIN;
+			} else {
+				*((short *) dst) = (short) (val * SAMPLE_MAX_16BIT);
+			}
 			dst += dst_skip;
 			src++;
 		}
@@ -101,19 +118,36 @@ void sample_move_dS_s16 (sample_t *dst, char *src, unsigned long nsamples, unsig
 }	
 
 void sample_merge_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, gain_t gain)
-	
 {
+	short val;
+
 	/* ALERT: signed sign-extension portability !!! */
 	
 	if (gain == 1.0) {
 		while (nsamples--) {
-			*((short *) dst) += (short) (*src * SAMPLE_MAX_16BIT);
+			val = (short) (*src * SAMPLE_MAX_16BIT);
+
+			if (val > SHRT_MAX - *((short *) dst)) {
+				*((short *)dst) = SHRT_MAX;
+			} else if (val < SHRT_MIN - *((short *) dst)) {
+				*((short *)dst) = SHRT_MIN;
+			} else {
+				*((short *) dst) += val;
+			}
 			dst += dst_skip;
 			src++;
 		}
 	} else {
 		while (nsamples--) {
-			*((short *) dst) += (short) ((*src * gain) * SAMPLE_MAX_16BIT);
+			val = (short) (*src * gain * SAMPLE_MAX_16BIT);
+
+			if (val > SHRT_MAX - *((short *) dst)) {
+				*((short *)dst) = SHRT_MAX;
+			} else if (val < SHRT_MIN - *((short *) dst)) {
+				*((short *)dst) = SHRT_MIN;
+			} else {
+				*((short *) dst) += val;
+			}
 			dst += dst_skip;
 			src++;
 		}
