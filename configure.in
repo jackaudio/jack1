@@ -132,6 +132,20 @@ AM_PATH_GLIB(1.0.0,
              [AC_MSG_ERROR([*** JACK requires GLib, but it does not appear to be installed])]
 )
 
+# check for the presence of glib2 and build libjack-glib2
+
+
+PKG_CHECK_MODULES(GLIB2, glib-2.0 >= 2.0.0,
+	[
+		HAVE_GLIB2="true"
+	],
+	[
+		HAVE_GLIB2="false"
+	])	
+AC_SUBST(GLIB2_LIBS)
+AC_SUBST(GLIB2_CFLAGS)
+	
+
 AC_CHECK_LIB(asound,snd_pcm_drop,
 	     [
                HAVE_ALSA="true"
@@ -188,9 +202,11 @@ AM_CONDITIONAL(USE_CAPABILITIES, $USE_CAPABILITIES)
 AM_CONDITIONAL(STRIPPED_JACKD, $STRIPPED_JACKD)
 AM_CONDITIONAL(HAVE_ALSA, $HAVE_ALSA)
 AM_CONDITIONAL(HAVE_SOLARIS, $HAVE_SOLARIS)
+AM_CONDITIONAL(HAVE_GLIB2, $HAVE_GLIB2)
 
 AC_OUTPUT(
 Makefile
+jack-glib2.pc
 jack.pc
 jack.spec
 jack/Makefile

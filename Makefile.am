@@ -21,7 +21,7 @@ SUBDIRS = jack libjack jackd drivers example-clients $(DOC_DIR)
 DIST_SUBDIRS = jack libjack jackd drivers example-clients doc
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = jack.pc
+pkgconfig_DATA = jack.pc jack-glib2.pc
 
 rpm: dist
 	rpm -ta $(distdir).tar.gz
