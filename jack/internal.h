@@ -56,15 +56,9 @@ typedef struct _jack_request jack_request_t;
 typedef void * dlhandle;
 
 typedef struct {
-    shm_name_t shm_name;
+    const char *shm_name;
     size_t offset;
 } jack_port_buffer_info_t;
-
-typedef struct {
-    shm_name_t    shm_name;
-    char         *address;
-    size_t        size;
-} jack_port_segment_info_t;
 
 typedef struct {
     volatile unsigned long long guard1;
@@ -73,22 +67,31 @@ typedef struct {
     volatile unsigned long long guard2;
 } jack_frame_timer_t;
 
+/* the relatively low value of this constant
+ * reflects the fact that JACK currently only
+ * knows about *1* port type.  (March 2003)
+ */              
+
+#define JACK_MAX_PORT_TYPES 4
+
 typedef struct {
 
     jack_transport_info_t current_time;
     jack_transport_info_t pending_time;
-    jack_frame_timer_t  frame_timer;
-    int                 internal;
-    jack_nframes_t      frames_at_cycle_start;
-    pid_t               engine_pid;
-    unsigned long       buffer_size;
-    char                real_time;
-    int                 client_priority;
-    int                 has_capabilities;
-    float               cpu_load;
-    unsigned long       port_max;
-    int                 engine_ok;
-    jack_engine_t      *engine;
+    jack_frame_timer_t    frame_timer;
+    int                   internal;
+    jack_nframes_t        frames_at_cycle_start;
+    pid_t                 engine_pid;
+    unsigned long         buffer_size;
+    char                  real_time;
+    int                   client_priority;
+    int                   has_capabilities;
+    float                 cpu_load;
+    unsigned long         port_max;
+    int                   engine_ok;
+    jack_engine_t        *engine;
+    unsigned long         n_port_types;
+    jack_port_type_info_t port_types[JACK_MAX_PORT_TYPES];
     jack_port_shared_t  ports[0];
 
 } jack_control_t;
@@ -96,7 +99,7 @@ typedef struct {
 typedef enum  {
   BufferSizeChange,
   SampleRateChange,
-  NewPortBufferSegment,
+  NewPortType,
   PortConnected,
   PortDisconnected,
   GraphReordered,
@@ -212,10 +215,11 @@ typedef struct {
     jack_control_t        *engine_control;
     size_t                 control_size;
 
-    /* XXX need to be able to use more than one port segment */
+    /* when we write this response, we deliver n_port_types
+       of jack_port_type_info_t after it.
+    */
 
-    shm_name_t    port_segment_name;
-    size_t        port_segment_size;
+    unsigned long n_port_types;
 
 } jack_client_connect_result_t;
 
@@ -271,7 +275,7 @@ extern void jack_cleanup_shm ();
 extern void jack_cleanup_files ();
 
 extern int  jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event);
-extern void jack_client_handle_new_port_segment (jack_client_t *client, shm_name_t, size_t, void* addr);
+extern void jack_client_handle_new_port_type (jack_client_t *client, shm_name_t, size_t, void* addr);
 
 extern jack_client_t *jack_driver_client_new (jack_engine_t *, const char *client_name);
 jack_client_t *jack_client_alloc_internal (jack_client_control_t*, jack_control_t*);
@@ -285,6 +289,10 @@ extern char *jack_server_dir;
 extern void jack_error (const char *fmt, ...);
 
 extern char *jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot);
+
+extern jack_port_type_info_t jack_builtin_port_types[];
+
+extern void jack_client_invalidate_port_buffers (jack_client_t *client);
 
 #endif /* __jack_internal_h__ */
 

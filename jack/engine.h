@@ -44,7 +44,6 @@ struct _jack_engine {
     /* "private" sections starts here */
 
     pthread_mutex_t client_lock;
-    pthread_mutex_t buffer_lock;
     pthread_mutex_t port_lock;
     pthread_mutex_t request_lock;
     int process_errors;
@@ -59,19 +58,12 @@ struct _jack_engine {
     pthread_t main_thread;
     pthread_t server_thread;
     
-    /* these lists are protected by `buffer_lock' */
-
-    JSList *port_segments;
-    JSList *port_buffer_freelist;
-
     /* these lists are all protected by `client_lock' */
 
     JSList *clients;
     JSList *clients_waiting;
 
     struct _jack_port_internal *internal_ports;
-
-    JSList *port_types; /* holds ptrs to jack_port_type_info_t */
 
     int fds[2];
     jack_client_id_t next_client_id;

@@ -59,14 +59,13 @@ void
 jack_dump_timestamps (FILE *out)
 {
 	unsigned long i;
-	float mhz = (float) jack_get_mhz();
 
 	for (i = 0; i < timestamp_index; ++i) {
-		fprintf (out, "%-.32s %Lu %f", 
+		fprintf (out, "%-.32s %Lu %Lu", 
 			 timestamps[i].what, timestamps[i].when,
-			 ((float) (timestamps[i].when - timestamps[0].when)) / mhz);
+			 timestamps[i].when - timestamps[0].when);
 		if (i > 0) {
-			fprintf (out, " %f", ((float) (timestamps[i].when - timestamps[i-1].when)) / mhz);
+			fprintf (out, " %Lu", timestamps[i].when - timestamps[i-1].when);
 		}
 		fputc ('\n', out);
 	}

@@ -26,7 +26,5 @@ extern int jack_client_deliver_request (const jack_client_t *client, jack_reques
 extern jack_port_t *jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control_t *control);
 
 extern void*                 jack_zero_filled_buffer;
-extern jack_port_type_info_t jack_builtin_port_types[];
-
 
 #endif /* __jack_libjack_local_h__ */

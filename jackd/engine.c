@@ -135,8 +135,13 @@ static int  internal_client_request (void*, jack_request_t *);
 
 static int  jack_use_driver (jack_engine_t *engine, jack_driver_t *driver);
 
-static shm_name_t *jack_shm_registry;
-static int         jack_shm_id_cnt;
+typedef struct {
+    shm_name_t name;
+    char* address;
+} jack_shm_registry_entry_t;
+
+static jack_shm_registry_entry_t *jack_shm_registry;
+static int                        jack_shm_id_cnt;
 
 static char *client_state_names[] = {
 	"Not triggered",
@@ -175,6 +180,20 @@ jack_engine_reset_rolling_usecs (jack_engine_t *engine)
 	}
 
 	engine->spare_usecs = 0;
+}
+
+static inline jack_port_type_info_t *
+jack_global_port_type_info (jack_engine_t *engine, jack_port_internal_t *port)
+{
+	/* this returns a pointer to the engine's private port type
+	   information, rather than the copy that the port uses.
+	   we need it for buffer allocation, because we need
+	   the mutex that protects the free buffer list for
+	   this port type, and that requires accessing the
+	   single copy owned by the engine.
+	*/
+
+	return &engine->control->port_types[port->shared->type_info.type_id];
 }
 
 static int
@@ -271,24 +290,23 @@ jack_initialize_shm ()
 	   or debugger driven exits.
 	*/
 	
-	if ((addr = jack_get_shm ("/jack-shm-registry", sizeof (shm_name_t) * MAX_SHM_ID, 
+	if ((addr = jack_get_shm ("/jack-shm-registry", sizeof (jack_shm_registry_entry_t) * MAX_SHM_ID, 
 				  O_RDWR|O_CREAT|O_TRUNC, 0600, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
 		return -1;
 	}
 
-	jack_shm_registry = (shm_name_t *) addr;
+	jack_shm_registry = (jack_shm_registry_entry_t *) addr;
 	jack_shm_id_cnt = 0;
-
-	sprintf (jack_shm_registry[0], "hello");
 
 	return 0;
 }
 
 static void
-jack_register_shm (char *shm_name)
+jack_register_shm (char *shm_name, char *addr)
 {
 	if (jack_shm_id_cnt < MAX_SHM_ID) {
-		snprintf (jack_shm_registry[jack_shm_id_cnt++], sizeof (shm_name_t), "%s", shm_name);
+		snprintf (jack_shm_registry[jack_shm_id_cnt++].name, sizeof (shm_name_t), "%s", shm_name);
+		jack_shm_registry[jack_shm_id_cnt].address = addr;
 	}
 }
 
@@ -298,8 +316,54 @@ jack_cleanup_shm ()
 	int i;
 
 	for (i = 0; i < jack_shm_id_cnt; i++) {
-		shm_unlink (jack_shm_registry[i]);
+		shm_unlink (jack_shm_registry[i].name);
 	}
+}
+
+static char *
+jack_resize_shm (const char *shm_name, size_t size, int perm, int mode, int prot)
+{
+	int i;
+	int shm_fd;
+	char *addr;
+	struct stat statbuf;
+
+	for (i = 0; i < jack_shm_id_cnt; ++i) {
+		if (strcmp (jack_shm_registry[i].name, shm_name) == 0) {
+			break;
+		}
+	}
+
+	if (i == jack_shm_id_cnt) {
+		jack_error ("attempt to resize unknown shm segment \"%s\"", shm_name);
+		return MAP_FAILED;
+	}
+
+	if ((shm_fd = shm_open (shm_name, perm, mode)) < 0) {
+		jack_error ("cannot create shm segment %s (%s)", shm_name, strerror (errno));
+		return MAP_FAILED;
+	}
+
+	fstat (shm_fd, &statbuf);
+	
+	munmap (jack_shm_registry[i].address, statbuf.st_size);
+
+	if (perm & O_TRUNC) {
+		if (ftruncate (shm_fd, size) < 0) {
+			jack_error ("cannot set size of engine shm registry (%s)", strerror (errno));
+			return MAP_FAILED;
+		}
+	}
+		
+	if ((addr = mmap (0, size, prot, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
+		jack_error ("cannot mmap shm segment %s (%s)", shm_name, strerror (errno));
+		shm_unlink (shm_name);
+		close (shm_fd);
+		return MAP_FAILED;
+	}
+
+	close (shm_fd);
+	return addr;
 }
 
 void
@@ -330,77 +394,74 @@ jack_cleanup_files ()
 }
 
 static int
-jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
+jack_resize_port_segment (jack_engine_t *engine, jack_port_type_info_t *port_type,
+			  jack_nframes_t buffer_size, unsigned long nports)
 {
 	jack_event_t event;
-	jack_port_segment_info_t *si;
 	char *addr;
 	size_t offset;
+	size_t one_buffer;
 	size_t size;
-	size_t step;
-	shm_name_t shm_name;
 
-	snprintf (shm_name, sizeof(shm_name), "/jack-port-segment-%d", jack_slist_length (engine->port_segments));
-	size = nports * sizeof (jack_default_audio_sample_t) * engine->control->buffer_size;
-
-	if ((addr = jack_get_shm (shm_name, size, (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
-		jack_error ("cannot create new port segment of %d bytes, shm_name = %s (%s)", size, shm_name, strerror (errno));
-		return -1;
+	if (port_type->buffer_scale_factor < 0) {
+		one_buffer = port_type->buffer_size;
+	} else {
+		one_buffer = sizeof (jack_default_audio_sample_t) * port_type->buffer_scale_factor * engine->control->buffer_size;
 	}
-	
-	jack_register_shm (shm_name);
+
+	size = nports * one_buffer;
+
+	if (port_type->shm_info.size == 0) {
+
+		snprintf (port_type->shm_info.shm_name, sizeof(port_type->shm_info.shm_name), "/jack-ports-[%s]", port_type->type_name);
+
+		if ((addr = jack_get_shm (port_type->shm_info.shm_name, size, 
+					  (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
+			jack_error ("cannot create new port segment of %d bytes, shm_name = %s (%s)", 
+				    size, port_type->shm_info.shm_name, strerror (errno));
+			return -1;
+		}
 		
-	si = (jack_port_segment_info_t *) malloc (sizeof (jack_port_segment_info_t));
-	strcpy (si->shm_name, shm_name);
-	si->address = addr;
+		jack_register_shm (port_type->shm_info.shm_name, addr);
+		port_type->shm_info.address = addr;
 
-	engine->port_segments = jack_slist_prepend (engine->port_segments, si);
-	
-	/* XXXX this needs fixing so that we can support multiple port segments.
-	   or does it?
-	*/
+	} else {
 
-	strcpy (engine->port_segment_name, shm_name); 
-	engine->port_segment_address = addr;
-	engine->port_segment_size = size;
+		if ((addr = jack_resize_shm (port_type->shm_info.shm_name, size, 
+					     (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
+			jack_error ("cannot resize port segment to %d bytes, shm_name = %s (%s)", 
+				    size, port_type->shm_info.shm_name, strerror (errno));
+			return -1;
+		}
+	}
 
-	pthread_mutex_lock (&engine->buffer_lock);
+	port_type->shm_info.size = size;
+	port_type->shm_info.address = addr;
+
+	pthread_mutex_lock (&port_type->buffer_lock);
 
 	offset = 0;
 
-	step = engine->control->buffer_size * sizeof (jack_default_audio_sample_t);
-
-	while (offset < size) {
+	while (offset < port_type->shm_info.size) {
 		jack_port_buffer_info_t *bi;
 
 		bi = (jack_port_buffer_info_t *) malloc (sizeof (jack_port_buffer_info_t));
-		strcpy (bi->shm_name, si->shm_name);
+		bi->shm_name = port_type->shm_info.shm_name;
 		bi->offset = offset;
 
 		/* we append because we want the list to be in memory-address order */
 
-		engine->port_buffer_freelist = jack_slist_append (engine->port_buffer_freelist, bi);
+		port_type->buffer_freelist = jack_slist_append (port_type->buffer_freelist, bi);
 
-		offset += step;
+		offset += one_buffer;
 	}
 
-	/* convert the first chunk of the segment into a zero-filled area */
-
-	if (engine->silent_buffer == NULL) {
-		engine->silent_buffer = (jack_port_buffer_info_t *) engine->port_buffer_freelist->data;
-
-		engine->port_buffer_freelist = jack_slist_remove_link (engine->port_buffer_freelist, engine->port_buffer_freelist);
-
-		memset (engine->port_segment_address + engine->silent_buffer->offset, 0, 
-			sizeof (jack_default_audio_sample_t) * engine->control->buffer_size);
-	}
-
-	pthread_mutex_unlock (&engine->buffer_lock);
+	pthread_mutex_unlock (&port_type->buffer_lock);
 
 	/* tell everybody about it */
 
-	event.type = NewPortBufferSegment;
-	strcpy (event.x.shm_name, shm_name);
+	event.type = NewPortType;
+	strcpy (event.x.shm_name, port_type->shm_info.shm_name);
 	event.y.addr = addr;
 
 	jack_deliver_event_to_all (engine, &event);
@@ -411,13 +472,31 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 static int
 jack_set_buffer_size (jack_engine_t *engine, jack_nframes_t nframes)
 {
-	/* XXX this is not really right, since it only works for
-	   audio ports. it also doesn't resize the zero filled
-	   area.
-	*/
+	int i;
+	jack_event_t event;
 
 	engine->control->buffer_size = nframes;
-	jack_add_port_segment (engine, engine->control->port_max);
+
+	for (i = 0; i < engine->control->n_port_types; ++i) {
+		jack_resize_port_segment (engine, &engine->control->port_types[i], nframes, engine->control->port_max);
+	}
+
+	/* convert the first chunk of the audio port buffer segment into a zero-filled area */
+	
+	if (engine->silent_buffer == NULL) {
+		jack_port_type_info_t *port_type = &engine->control->port_types[0];
+
+		engine->silent_buffer = (jack_port_buffer_info_t *) port_type->buffer_freelist->data;
+		port_type->buffer_freelist = jack_slist_remove_link (port_type->buffer_freelist, port_type->buffer_freelist);
+
+		memset (port_type->shm_info.address + engine->silent_buffer->offset, 0, 
+			sizeof (jack_default_audio_sample_t) * nframes);
+	}
+
+	event.type = BufferSizeChange;
+	jack_deliver_event_to_all (engine, &event);
+
+
 	return 0;
 }
 
@@ -785,12 +864,11 @@ setup_client (jack_engine_t *engine, int client_fd, jack_client_connect_request_
 	res->protocol_v = jack_protocol_version;
 	strcpy (res->client_shm_name, client->shm_name);
 	strcpy (res->control_shm_name, engine->control_shm_name);
-	strcpy (res->port_segment_name, engine->port_segment_name);
-	res->port_segment_size = engine->port_segment_size;
 	res->control_size = engine->control_size;
 	res->realtime = engine->control->real_time;
 	res->realtime_priority = engine->rtpriority - 1;
-	
+	res->n_port_types = engine->control->n_port_types;
+
 	if (jack_client_is_internal(client)) {
 		
 		/* set up the pointers necessary for the request system
@@ -831,13 +909,16 @@ setup_client (jack_engine_t *engine, int client_fd, jack_client_connect_request_
 		/* call its initialization function */
 
 		if (client->control->type == ClientInternal) {
-			
-			/* tell it about the port segment. XXX fix to work with multiples */
+			unsigned long i;
 
-			jack_client_handle_new_port_segment (client->control->private_client, 
-							     engine->port_segment_name,
-							     engine->port_segment_size,
-							     engine->port_segment_address);
+			/* tell it about current port types and their shared memory information */
+
+			for (i = 0; i < engine->control->n_port_types; ++i) {
+				jack_client_handle_new_port_type (client->control->private_client, 
+								  engine->control->port_types[i].shm_info.shm_name,
+								  engine->control->port_types[i].shm_info.size,
+								  engine->control->port_types[i].shm_info.address);
+			}
 
 			if (client->initialize (client->control->private_client, req->object_data)) {
 				jack_client_delete (engine, client);
@@ -994,6 +1075,7 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 	jack_client_internal_t *client;
 	jack_client_connect_request_t req;
 	jack_client_connect_result_t res;
+	unsigned long i;
 
 	if (read (client_fd, &req, sizeof (req)) != sizeof (req)) {
 		jack_error ("cannot read connection request from client");
@@ -1013,13 +1095,23 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 		jack_client_delete (engine, client);
 		return -1;
 	}
+	
+	/* give external clients a chance to find out about all known port types */
 
 	switch (client->control->type) {
 	case ClientDriver:
 	case ClientInternal:
 		close (client_fd);
 		break;
+
 	default:
+		for (i = 0; i < engine->control->n_port_types; ++i) {
+			if (write (client->request_fd, &engine->control->port_types[i], sizeof (jack_port_type_info_t)) !=
+			    sizeof (jack_port_type_info_t)) {
+				jack_error ("cannot send port type information to new client");
+				jack_client_delete (engine, client);
+			}
+		}
 		break;
 	}
 
@@ -1608,13 +1700,10 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	jack_engine_reset_rolling_usecs (engine);
 
 	pthread_mutex_init (&engine->client_lock, 0);
-	pthread_mutex_init (&engine->buffer_lock, 0);
 	pthread_mutex_init (&engine->port_lock, 0);
 	pthread_mutex_init (&engine->request_lock, 0);
 
 	engine->clients = 0;
-	engine->port_segments = 0;
-	engine->port_buffer_freelist = 0;
 
 	engine->pfd_size = 16;
 	engine->pfd_max = 0;
@@ -1643,10 +1732,33 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 		return 0;
 	}
 
-	jack_register_shm (engine->control_shm_name);
+	jack_register_shm (engine->control_shm_name, addr);
 	
 	engine->control = (jack_control_t *) addr;
 	engine->control->engine = engine;
+
+	/* setup port type information from builtins. buffer space is allocated
+	   whenever we call jack_set_buffer_size()
+	*/
+
+	for (i = 0; jack_builtin_port_types[i].type_name[0]; ++i) {
+
+		memcpy (&engine->control->port_types[i], &jack_builtin_port_types[i], sizeof (jack_port_type_info_t));
+		
+		// set offset into port_types array
+
+		engine->control->port_types[i].type_id = i;
+
+		// be sure to initialize mutex correctly
+
+		pthread_mutex_init (&engine->control->port_types[i].buffer_lock, NULL);
+
+		// indicate no shared memory allocation for this port type
+
+		engine->control->port_types[i].shm_info.size = 0;
+	}
+
+	engine->control->n_port_types = i;
 
 	/* Mark all ports as available */
 
@@ -2062,7 +2174,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 			jack_error ("cannot create client control block for %s", req->name);
 			return 0;
 		}
-		jack_register_shm (shm_name);
+		jack_register_shm (shm_name, addr);
 		break;
 	}
 
@@ -2291,6 +2403,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 	/* caller must hold the graph lock */
 
 	DEBUG ("delivering event (type %d)", event->type);
+	fprintf (stderr, "delivering event %d to client %s\n", event->type, client->control->name);
 
 	if (client->control->dead) {
 		return 0;
@@ -2305,6 +2418,8 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 			break;
 
 		case BufferSizeChange:
+			jack_client_invalidate_port_buffers (client->control->private_client);
+
 			if (client->control->bufsize) {
 				client->control->bufsize (event->x.n, client->control->bufsize_arg);
 			}
@@ -2328,9 +2443,9 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 			}
 			break;
 
-		case NewPortBufferSegment:
-			jack_client_handle_new_port_segment (client->control->private_client, 
-							     event->x.shm_name, event->z.size, event->y.addr);
+		case NewPortType:
+			jack_client_handle_new_port_type (client->control->private_client, 
+							  event->x.shm_name, event->z.size, event->y.addr);
 			break;
 
 		default:
@@ -2862,7 +2977,7 @@ jack_port_do_connect (jack_engine_t *engine,
 		return -1;
 	}
 
-	if (strcmp (srcport->shared->type_info.type_name, dstport->shared->type_info.type_name) != 0) {
+	if (srcport->shared->type_info.type_id != dstport->shared->type_info.type_id) {
 		jack_error ("ports used in attemped connection are not of the same data type");
 		return -1;
 	}
@@ -2898,7 +3013,8 @@ jack_port_do_connect (jack_engine_t *engine,
 	jack_lock_graph (engine);
 
 	if (dstport->connections && dstport->shared->type_info.mixdown == NULL) {
-		jack_error ("cannot make multiple connections to a port of type [%s]", dstport->shared->type_info.type_name);
+		jack_error ("cannot make multiple connections to a port of type [%s]", 
+			    dstport->shared->type_info.type_name);
 		free (connection);
 		jack_unlock_graph (engine);
 		return -1;
@@ -3155,16 +3271,16 @@ jack_get_free_port (jack_engine_t *engine)
 
 static void
 jack_port_release (jack_engine_t *engine, jack_port_internal_t *port)
-
 {
 	pthread_mutex_lock (&engine->port_lock);
 	port->shared->in_use = 0;
 
 	if (port->buffer_info) {
-		pthread_mutex_lock (&engine->buffer_lock);
-		engine->port_buffer_freelist = jack_slist_prepend (engine->port_buffer_freelist, port->buffer_info);
+		jack_port_type_info_t *info = jack_global_port_type_info (engine, port);
+		pthread_mutex_lock (&info->buffer_lock);
+		info->buffer_freelist = jack_slist_prepend (info->buffer_freelist, port->buffer_info);
 		port->buffer_info = NULL;
-		pthread_mutex_unlock (&engine->buffer_lock);
+		pthread_mutex_unlock (&info->buffer_lock);
 	}
 	pthread_mutex_unlock (&engine->port_lock);
 }
@@ -3199,6 +3315,18 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	jack_port_shared_t *shared;
 	jack_port_internal_t *port;
 	jack_client_internal_t *client;
+	unsigned long i;
+
+	for (i = 0; i < engine->control->n_port_types; ++i) {
+		if (strcmp (req->x.port_info.type, engine->control->port_types[i].type_name) == 0) {
+			break;
+		}
+	}
+
+	if (i == engine->control->n_port_types) {
+		jack_error ("cannot register a port of type \"%s\"", req->x.port_info.type);
+		return -1;
+	}
 
 	jack_lock_graph (engine);
 	if ((client = jack_client_internal_by_id (engine, req->x.port_info.client_id)) == NULL) {
@@ -3215,13 +3343,14 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	shared = &engine->control->ports[port_id];
 
 	strcpy (shared->name, req->x.port_info.name);
-
+	memcpy (&shared->type_info, &engine->control->port_types[i], sizeof (jack_port_type_info_t));
 	shared->client_id = req->x.port_info.client_id;
 	shared->flags = req->x.port_info.flags;
-	shared->buffer_size = req->x.port_info.buffer_size;
 	shared->latency = 0;
 	shared->monitor_requests = 0;
 	shared->locked = 0;
+
+	fprintf (stderr, "port %s has mixdown = %p\n", shared->name, shared->type_info.mixdown);
 
 	port = &engine->internal_ports[port_id];
 
@@ -3394,61 +3523,30 @@ jack_port_registration_notify (jack_engine_t *engine, jack_port_id_t port_id, in
 int
 jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 {
-	JSList *node;
-	jack_port_segment_info_t *psi = 0;
+	jack_port_type_info_t *port_type = jack_global_port_type_info (engine, port);
 	jack_port_buffer_info_t *bi;
-
-	port->shared->shm_name[0] = '\0';
 
 	if (port->shared->flags & JackPortIsInput) {
 		port->shared->offset = 0;
 		return 0;
 	}
 	
-	pthread_mutex_lock (&engine->buffer_lock);
+	pthread_mutex_lock (&port_type->buffer_lock);
 
-	if (engine->port_buffer_freelist == NULL) {
-		jack_error ("all port buffers in use!");
-		pthread_mutex_unlock (&engine->buffer_lock);
+	if (port_type->buffer_freelist == NULL) {
+		jack_error ("all %s port buffers in use!", port_type->type_name);
+		pthread_mutex_unlock (&port_type->buffer_lock);
 		return -1;
 	}
 
-	bi = (jack_port_buffer_info_t *) engine->port_buffer_freelist->data;
+	bi = (jack_port_buffer_info_t *) port_type->buffer_freelist->data;
+	port_type->buffer_freelist = jack_slist_remove (port_type->buffer_freelist, bi);
 
-	for (node = engine->port_segments; node; node = jack_slist_next (node)) {
+	port->shared->offset = bi->offset;
+	port->buffer_info = bi;
 
-		psi = (jack_port_segment_info_t *) node->data;
-
-		if (strcmp (bi->shm_name, psi->shm_name) == 0) {
-			strcpy (port->shared->shm_name, psi->shm_name);
-			port->shared->offset = bi->offset;
-			port->buffer_info = bi;
-			break;
-		}
-	}
-
-	if (engine->verbose) {
-		fprintf (stderr, "port %s buf shm name %s at offset %d bi = %p\n", 
-			 port->shared->name,
-			 port->shared->shm_name,
-			 (int)port->shared->offset,
-			 port->buffer_info);
-	}
-
-	if (port->shared->shm_name[0] != '\0') {
-		engine->port_buffer_freelist = jack_slist_remove (engine->port_buffer_freelist, bi);
-		
-	} else {
-		jack_error ("port segment info for %s:%d not found!", bi->shm_name, bi->offset);
-	}
-
-	pthread_mutex_unlock (&engine->buffer_lock);
-
-	if (port->shared->shm_name[0] == '\0') {
-		return -1;
-	} else {
-		return 0;
-	}
+	pthread_mutex_unlock (&port_type->buffer_lock);
+	return 0;
 }
 
 static jack_port_internal_t *

@@ -35,6 +35,8 @@
 
 #include "local.h"
 
+static void  jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes);
+
 jack_port_t *
 jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control_t *control)
 {
@@ -52,24 +54,53 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control
 	pthread_mutex_init (&port->connection_lock, NULL);
 	port->connections = 0;
 	port->shared->tied = NULL;
-	port->shared->peak = port->shared->type_info.peak;
-	port->shared->power = port->shared->type_info.power;
 	
-	si = NULL;
-	
+	/* reset function pointers to be within client address space */
+
+	switch (client->control->type) {
+	case ClientExternal:
+
+		if (client->control->id == port->shared->client_id) {
+			
+			/* its our port, and therefore we need to make sure that the function pointers
+			   in the shared memory object that refer to functions called within the client's
+			   address space point to the location of the correct functions within
+			   the client. without this, they point to those same functions in the server's
+			   address space, and that's a recipe for disaster.
+			*/
+			
+			port->shared->type_info.mixdown = jack_builtin_port_types[port->shared->type_info.type_id].mixdown;
+			port->shared->type_info.peak = jack_builtin_port_types[port->shared->type_info.type_id].peak;
+			port->shared->type_info.power = jack_builtin_port_types[port->shared->type_info.type_id].power;
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	/* now find the shared memory segment that contains the buffer for this port */
+
 	for (node = client->port_segments; node; node = jack_slist_next (node)) {
 		
 		si = (jack_port_segment_info_t *) node->data;
 
-		if (strcmp (si->shm_name, port->shared->shm_name) == 0) {
+		if (strcmp (si->shm_name, port->shared->type_info.shm_info.shm_name) == 0) {
 			break;
 		}
 	}
 	
-	if (si == NULL) {
-		jack_error ("cannot find port segment to match newly registered port\n");
+	if (node == NULL) {
+		jack_error ("cannot find port memory segment [%s] for new port\n", port->shared->type_info.shm_info.shm_name);
 		return NULL;
 	}
+
+	/* set up a base address so that port->offset can be used to
+	   compute the correct location. we don't store the location
+	   directly, because port->client_segment_base and/or
+	   port->offset can change if the buffer size or port counts
+	   are changed.  
+	*/
 	
 	port->client_segment_base = si->address;
 	
@@ -78,15 +109,13 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control
 
 jack_port_t *
 jack_port_register (jack_client_t *client, 
-		     const char *port_name,
-		     const char *port_type,
-		     unsigned long flags,
-		     unsigned long buffer_size)
+		    const char *port_name,
+		    const char *port_type,
+		    unsigned long flags,
+		    unsigned long buffer_size)
 {
 	jack_request_t req;
 	jack_port_t *port = 0;
-	jack_port_type_info_t *type_info;
-	int n;
 
 	req.type = RegisterPort;
 
@@ -103,33 +132,9 @@ jack_port_register (jack_client_t *client,
 		return NULL;
 	}
 
-	port = jack_port_new (client, req.x.port_info.port_id, client->engine);
-
-	type_info = NULL;
-
-	for (n = 0; jack_builtin_port_types[n].type_name[0]; n++) {
-		
-		if (strcmp (req.x.port_info.type, jack_builtin_port_types[n].type_name) == 0) {
-			type_info = &jack_builtin_port_types[n];
-			break;
-		}
+	if ((port = jack_port_new (client, req.x.port_info.port_id, client->engine)) == NULL) {
+		return NULL;
 	}
-
-	if (type_info == NULL) {
-		
-		/* not a builtin type, so allocate a new type_info structure,
-		   and fill it appropriately.
-		*/
-		
-		type_info = (jack_port_type_info_t *) malloc (sizeof (jack_port_type_info_t));
-
-		snprintf ((char *) type_info->type_name, sizeof (type_info->type_name), req.x.port_info.type);
-
-		type_info->mixdown = NULL;            /* we have no idea how to mix this */
-		type_info->buffer_scale_factor = -1;  /* use specified port buffer size */
-	} 
-
-	memcpy (&port->shared->type_info, type_info, sizeof (jack_port_type_info_t));
 
 	client->ports = jack_slist_prepend (client->ports, port);
 
@@ -398,7 +403,6 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 								 sizeof (jack_default_audio_sample_t) * nframes);
 		port->client_segment_base = 0;
 	}
-
 	port->shared->type_info.mixdown (port, nframes);
 	return (jack_default_audio_sample_t *) port->shared->offset;
 }
@@ -564,20 +568,20 @@ jack_port_set_name (jack_port_t *port, const char *new_name)
 void
 jack_port_set_peak_function (jack_port_t *port, double (*func)(jack_port_t* port, jack_nframes_t))
 {
-	port->shared->peak = func;
+	port->shared->type_info.peak = func;
 }
 
 void
 jack_port_set_power_function (jack_port_t *port, double (*func)(jack_port_t* port, jack_nframes_t))
 {
-	port->shared->power = func;
+	port->shared->type_info.power = func;
 }
 
 double
 jack_port_get_peak (jack_port_t* port, jack_nframes_t nframes)
 {
-	if (port->shared->peak (port, nframes)) {
-		return port->shared->peak (port, nframes);
+	if (port->shared->type_info.peak (port, nframes)) {
+		return port->shared->type_info.peak (port, nframes);
 	} else {
 		return 0;
 	}
@@ -586,8 +590,8 @@ jack_port_get_peak (jack_port_t* port, jack_nframes_t nframes)
 double
 jack_port_get_power (jack_port_t* port, jack_nframes_t nframes)
 {
-	if (port->shared->power) {
-		return port->shared->power (port, nframes);
+	if (port->shared->type_info.power) {
+		return port->shared->type_info.power (port, nframes);
 	} else {
 		return 0;
 	}
@@ -663,10 +667,9 @@ jack_port_type_info_t jack_builtin_port_types[] = {
 	  .mixdown = jack_audio_port_mixdown, 
 	  .peak = jack_audio_port_peak,
 	  .power = NULL,
-	  .buffer_scale_factor = 1 
+	  .buffer_scale_factor = 1,
 	},
 	{ .type_name = "", 
-	  .mixdown = NULL 
 	}
 };
 

@@ -32,8 +32,16 @@
 #define JACK_CLIENT_NAME_SIZE 32
 typedef unsigned long jack_client_id_t;
 
+typedef struct {
+    shm_name_t    shm_name;
+    char         *address;
+    size_t        size;
+} jack_port_segment_info_t;
+
 typedef struct _jack_port_type_info {
-    const char type_name[JACK_PORT_TYPE_SIZE];      
+
+    unsigned long type_id;
+    const char    type_name[JACK_PORT_TYPE_SIZE];      
 
     void (*mixdown)(jack_port_t *, jack_nframes_t); /* function to mixdown multiple inputs to a buffer. can be
 						       NULL, indicating that multiple input connections
@@ -63,8 +71,17 @@ typedef struct _jack_port_type_info {
 						       a different value.
 						       
 						       if < 0, then the value should be ignored, and
-						       port->shared->buffer_size should be used.
+						       buffer_size should be used.
 						    */
+
+    size_t buffer_size;                             /* ignored unless buffer_scale_factor is < 0. see above */
+
+    /* these are all run-time information, controlled by the server */
+
+    jack_port_segment_info_t shm_info;
+    pthread_mutex_t buffer_lock;
+    JSList *buffer_freelist;
+
 } jack_port_type_info_t;
 
 /* This is the data structure allocated in shared memory
@@ -72,22 +89,18 @@ typedef struct _jack_port_type_info {
 */
 
 typedef struct _jack_port_shared {
-    shm_name_t               shm_name;
-    size_t                   offset;
-    
-    unsigned long            flags; 
-    unsigned long            buffer_size;
-    jack_port_id_t           id;
+    jack_port_type_info_t    type_info; 
+    size_t                   offset;    // location of buffer as an offset from the
+                                        // start of the port's type-specific shared
+                                        // memory region.
+    jack_port_id_t           id;        // index into engine port array for this port
+    unsigned long            flags;    
     char                     name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
-    jack_port_type_info_t    type_info;
-    jack_client_id_t         client_id;
+    jack_client_id_t         client_id; // who owns me
 
     volatile jack_nframes_t  latency;
     volatile jack_nframes_t  total_latency;
     volatile unsigned char   monitor_requests;
-
-    double (*peak)(jack_port_t*,jack_nframes_t);
-    double (*power)(jack_port_t*,jack_nframes_t);
 
     char                     in_use     : 1;
     char                     locked     : 1;

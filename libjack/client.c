@@ -73,6 +73,12 @@ typedef struct {
     const char *client_name;
 } client_info;
 
+void
+jack_unlink_shm (const char *shm_name)
+{
+	shm_unlink (shm_name);
+}
+
 char *
 jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot)
 {
@@ -84,9 +90,11 @@ jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot)
 		return MAP_FAILED;
 	}
 
-	if (ftruncate (shm_fd, size) < 0) {
-		jack_error ("cannot set size of engine shm registry (%s)", strerror (errno));
-		return MAP_FAILED;
+	if (perm & O_TRUNC) {
+		if (ftruncate (shm_fd, size) < 0) {
+			jack_error ("cannot set size of engine shm registry (%s)", strerror (errno));
+			return MAP_FAILED;
+		}
 	}
 
 	if ((addr = mmap (0, size, prot, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
@@ -96,6 +104,7 @@ jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot)
 		return MAP_FAILED;
 	}
 
+	close (shm_fd);
 	return addr;
 }
 
@@ -192,7 +201,7 @@ jack_client_free (jack_client_t *client)
 	free (client);
 }
 
-static void
+void
 jack_client_invalidate_port_buffers (jack_client_t *client)
 {
 	JSList *node;
@@ -472,6 +481,8 @@ jack_client_new (const char *client_name)
 	jack_client_connect_result_t  res;
 	jack_client_t *client;
 	void *addr;
+	int i;
+	jack_port_type_info_t* type_info;
 
 	/* external clients need this initialized; internal clients
 	   will use the setup in the server's address space.
@@ -498,6 +509,7 @@ jack_client_new (const char *client_name)
 		jack_error ("cannot attached engine control shared memory segment");
 		goto fail;
 	}
+	
 
 	client->engine = (jack_control_t *) addr;
 
@@ -511,7 +523,30 @@ jack_client_new (const char *client_name)
 
 	client->control = (jack_client_control_t *) addr;
 
-	jack_client_handle_new_port_segment (client, res.port_segment_name, res.port_segment_size, 0);
+	/* nobody else needs to access this shared memory any more, so 
+	   unlink it.
+	*/
+
+	jack_unlink_shm (res.client_shm_name);
+
+	/* read incoming port type information so that we can get shared memory
+	   information for each one.
+	*/
+
+	type_info = (jack_port_type_info_t *) malloc (sizeof (jack_port_type_info_t) * res.n_port_types);
+
+	if (read (req_fd, type_info, sizeof (jack_port_type_info_t) * res.n_port_types) != 
+	    sizeof (jack_port_type_info_t) * res.n_port_types) {
+		jack_error ("cannot read port type information during client connection");
+		free (type_info);
+		goto fail;
+	}
+
+	for (i = 0; i < res.n_port_types; ++i) {
+		jack_client_handle_new_port_type (client, type_info[i].shm_info.shm_name, type_info[i].shm_info.size, 0);
+	}
+
+	free (type_info);
 
 	/* set up the client so that it does the right thing for an external client */
 
@@ -578,7 +613,7 @@ jack_internal_client_close (const char *client_name)
 }
 
 void
-jack_client_handle_new_port_segment (jack_client_t *client, shm_name_t shm_name, size_t size, void* addr)
+jack_client_handle_new_port_type (jack_client_t *client, shm_name_t shm_name, size_t size, void* addr)
 {
 	jack_port_segment_info_t *si;
 
@@ -587,7 +622,6 @@ jack_client_handle_new_port_segment (jack_client_t *client, shm_name_t shm_name,
 	*/
 
 	if (client->control->type == ClientExternal) {
-
 		
 		if ((addr = jack_get_shm(shm_name, size, O_RDWR, 0, (PROT_READ|PROT_WRITE))) == MAP_FAILED) {
 			jack_error ("cannot attached port segment shared memory (%s)", strerror (errno));
@@ -728,8 +762,8 @@ jack_client_thread (void *arg)
 				}
 				break;
 
-			case NewPortBufferSegment:
-				jack_client_handle_new_port_segment (client, event.x.shm_name, event.z.size, event.y.addr);
+			case NewPortType:
+				jack_client_handle_new_port_type (client, event.x.shm_name, event.z.size, event.y.addr);
 				break;
 			}
 
