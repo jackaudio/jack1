@@ -350,7 +350,6 @@ static void usage (FILE *file)
 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
 "             [ --verbose OR -v ]\n"
 "             [ --silent OR -s ]\n"
-"             [ --tmpdir OR -D directory-for-temporary-files ]\n"
 "             [ --version OR -V ]\n"
 "         -d driver [ ... driver args ... ]\n");
 }	
@@ -379,12 +378,11 @@ main (int argc, char *argv[])
 
 {
         jack_driver_desc_t * desc;
-	const char *options = "-ad:D:P:vshVRFl:t:";
+	const char *options = "-ad:P:vshVRFl:t:";
 	struct option long_options[] = 
 	{ 
 		{ "asio", 0, 0, 'a' },
 		{ "driver", 1, 0, 'd' },
-		{ "tmpdir", 1, 0, 'D' },
 		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
 		{ "realtime", 0, 0, 'R' },
@@ -451,10 +449,6 @@ main (int argc, char *argv[])
 			asio_mode = TRUE;
 			break;
 
-		case 'D':
-			jack_set_server_dir (optarg);
-			break;
-
 		case 'd':
 			seen_driver = 1;
 			driver_name = optarg;
@@ -485,8 +479,7 @@ main (int argc, char *argv[])
 			break;
 
 		default:
-			fprintf (stderr, "unknown option character %c\n",
-				 optopt);
+			fprintf (stderr, "unknown option character %c\n", optopt);
 			/*fallthru*/
 		case 'h':
 			usage (stdout);
@@ -508,7 +501,6 @@ main (int argc, char *argv[])
 		usage (stderr);
 		exit (1);
 	}
-
 
 	drivers = jack_drivers_load ();
 	if (!drivers)
@@ -559,6 +551,4 @@ main (int argc, char *argv[])
 
 	exit (0);
 }
-
-
 

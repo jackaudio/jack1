@@ -58,21 +58,11 @@
 #include <jack/timestamps.h>
 #endif /* WITH_TIMESTAMPS */
 
-
-
-
 #ifdef DEFAULT_TMP_DIR
 char *jack_server_dir = DEFAULT_TMP_DIR;
 #else
 char *jack_server_dir = "/tmp";
 #endif
-
-void
-jack_set_server_dir (const char *path)
-{
-	jack_server_dir = strdup (path);
-}
-
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
