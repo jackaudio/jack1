@@ -673,7 +673,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 }
 
 static int
-jack_process (jack_engine_t *engine, jack_nframes_t nframes)
+jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
 {
 	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
@@ -1748,12 +1748,8 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine = (jack_engine_t *) malloc (sizeof (jack_engine_t));
 
 	engine->driver = 0;
-	engine->process = jack_process;
 	engine->set_sample_rate = jack_set_sample_rate;
 	engine->set_buffer_size = jack_set_buffer_size;
-	engine->process_lock = jack_engine_process_lock;
-	engine->process_unlock = jack_engine_process_unlock;
-	engine->post_process = jack_engine_post_process;
 
 	engine->next_client_id = 1;
 	engine->timebase_client = 0;
@@ -2071,10 +2067,10 @@ jack_engine_wait (jack_engine_t *engine, jack_nframes_t* nframes)
 static int
 jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes)
 {
-	int ret;
+	int restart = 0;
 	jack_driver_t* driver = engine->driver;
-
-	if (engine->process_lock (engine)) {
+	
+	if (jack_engine_process_lock (engine)) {
 		/* engine can't run. just throw away an entire cycle */
 		driver->null_cycle (driver, nframes);
 		return 0;
@@ -2083,26 +2079,25 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes)
 	if (driver->read (driver, nframes)) {
 		return -1;
 	}
-	
-	if ((ret = engine->process (engine, nframes)) != 0) {
+
+	if (jack_engine_process (engine, nframes)) {
 		driver->stop (driver);
-	} 
-	
-	if (driver->write (driver, nframes)) {
-		return -1;
+		restart = 1;
+		fprintf (stderr, "restart\n");
+	} else {
+		if (driver->write (driver, nframes)) {
+			return -1;
+		}
 	}
 
-	engine->post_process (engine);
+	jack_engine_post_process (engine);
+	jack_engine_process_unlock (engine);
 
-	engine->process_unlock (engine);
-
-	if (ret > 0) {
-		/* driver stopped, restart and return "OK" */
+	if (restart) {
 		driver->start (driver);
-		ret = 0;
 	}
 	
-	return ret;
+	return 0;
 }
 
 static void *

@@ -230,7 +230,7 @@ jack_main (int argc, char **argv)
 	action.sa_mask = allsignals;
 	action.sa_flags = SA_RESTART|SA_RESETHAND;
 
-	for (i = 0; i < NSIG; i++) {
+	for (i = 1; i < NSIG; i++) {
 		if (sigismember (&signals, i)) {
 			sigaction (i, &action, 0);
 		} 

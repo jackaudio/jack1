@@ -32,14 +32,10 @@ struct _jack_engine {
     jack_control_t        *control;
     struct _jack_driver   *driver;
 
-    /* these are all "callbacks" made by the driver */
+    /* these are "callbacks" made by the driver */
 
-    int  (*process)(struct _jack_engine *, jack_nframes_t frames);
     int  (*set_buffer_size)(struct _jack_engine *, jack_nframes_t frames);
     int  (*set_sample_rate)(struct _jack_engine *, jack_nframes_t frames);
-    int  (*process_lock)(struct _jack_engine *);
-    void (*process_unlock)(struct _jack_engine *);
-    int  (*post_process)(struct _jack_engine *);
 
     /* "private" sections starts here */
 

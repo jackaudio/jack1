@@ -590,7 +590,6 @@ alsa_driver_get_channel_addresses (alsa_driver_t *driver,
 				   snd_pcm_uframes_t *playback_avail,
 				   snd_pcm_uframes_t *capture_offset,
 				   snd_pcm_uframes_t *playback_offset)
-
 {
 	unsigned long err;
 	channel_t chn;
@@ -1034,18 +1033,23 @@ static int
 alsa_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 {
 	jack_nframes_t nf;
-	snd_pcm_uframes_t offset = 0;
+	snd_pcm_uframes_t offset;
 	snd_pcm_uframes_t contiguous;
+
+	fprintf (stderr, "C: %p area %p P: %p area %p\n",
+		 driver->capture_handle, driver->capture_areas, 
+		 driver->playback_handle, driver->playback_areas);
 
 	if (driver->capture_handle) {
 		nf = nframes;
+		offset = 0;
 		while (nf) {
 			
 			contiguous = (nf > driver->frames_per_cycle) ? driver->frames_per_cycle : nf;
 			
 			if (snd_pcm_mmap_begin (driver->capture_handle, &driver->capture_areas,
-						(snd_pcm_uframes_t *) offset, 
-						(snd_pcm_uframes_t *) contiguous)) {
+						(snd_pcm_uframes_t *) &offset, 
+						(snd_pcm_uframes_t *) &contiguous)) {
 				return -1;
 			}
 		
@@ -1059,12 +1063,13 @@ alsa_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 
 	if (driver->playback_handle) {
 		nf = nframes;
+		offset = 0;
 		while (nf) {
 			contiguous = (nf > driver->frames_per_cycle) ? driver->frames_per_cycle : nf;
 			
 			if (snd_pcm_mmap_begin (driver->playback_handle, &driver->playback_areas,
-						(snd_pcm_uframes_t *) offset, 
-						(snd_pcm_uframes_t *) contiguous)) {
+						(snd_pcm_uframes_t *) &offset, 
+						(snd_pcm_uframes_t *) &contiguous)) {
 				return -1;
 			}
 			
