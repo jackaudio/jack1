@@ -560,3 +560,16 @@ jackd/Makefile
 jackd/jackd.1
 libjack/Makefile
 )
+
+dnl
+dnl Output summary message
+dnl
+
+echo
+echo $PACKAGE $VERSION :
+echo
+echo \| Build with OSS support................................ : $HAVE_OSS
+echo \| Build with ALSA support............................... : $HAVE_ALSA
+echo \| Build with PortAudio support.......................... : $HAVE_PA
+echo
+

@@ -239,7 +239,7 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 		dlsym (dlhandle, "driver_get_descriptor");
 
 	if ((dlerr = dlerror ()) != NULL) {
-		printf("%s\n", dlerr);
+		fprintf(stderr, "%s\n", dlerr);
 		dlclose (dlhandle);
 		free (filename);
 		return NULL;

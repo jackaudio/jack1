@@ -2372,71 +2372,9 @@ driver_initialize (jack_client_t *client, const JSList * params)
 	int user_capture_nchnls = 0;
 	int user_playback_nchnls = 0;
 	int shorts_first = FALSE;
-	char *envvar;
 	const JSList * node;
 	const jack_driver_param_t * param;
 
-	/* before we do anything else, see if there are environment variables
-	   for each parameter.
-	*/
-	
-	if ((envvar = getenv ("JACK_ALSA_DEVICE")) != NULL) {
-		playback_pcm_name = envvar;
-		capture_pcm_name = envvar;
-	}
-
-	if ((envvar = getenv ("JACK_ALSA_HWMON")) != NULL) {
-		hw_monitoring = TRUE;
-	}
-
-	if ((envvar = getenv ("JACK_ALSA_SOFTMODE")) != NULL) {
-		soft_mode = TRUE;
-	}
-	
-	if ((envvar = getenv ("JACK_ALSA_PERIOD_FRAMES")) != NULL) {
-		frames_per_interrupt = atoi (envvar);
-	}
-
-	if ((envvar = getenv ("JACK_ALSA_PERIODS")) != NULL) {
-		user_nperiods = atoi (envvar);
-	}
-
-	if ((envvar = getenv ("JACK_ALSA_SRATE")) != NULL) {
-		srate = atoi (envvar);
-	}
-
-	if ((envvar = getenv ("JACK_ALSA_DITHER")) != NULL) {
-		if (dither_opt (*envvar, &dither)) {
-			return NULL;
-		}
-	}
-
-	if ((envvar = getenv ("JACK_ALSA_CAPTURE")) != NULL) {
-		capture = atoi (envvar);
-	}
-
-	if ((envvar = getenv ("JACK_ALSA_PLAYBACK")) != NULL) {
-		playback = atoi (envvar);
-	}
-		
-	if ((envvar = getenv ("JACK_ALSA_CAPTURE_NCHANNELS")) != NULL) {
-		monitor = atoi (envvar);
-	}
-
-	if ((envvar = getenv ("JACK_ALSA_PLAYBACK_NCHANNELS")) != NULL) {
-		monitor = atoi (envvar);
-	}
-
-	if ((envvar = getenv ("JACK_ALSA_MONITOR")) != NULL) {
-		monitor = atoi (envvar);
-	}
-
-	if ((envvar = getenv ("JACK_ALSA_SHORTS_FIRST")) != NULL) {
-		shorts_first = TRUE;
-	}
-
-
-		
 	for (node = params; node; node = jack_slist_next (node)) {
   	        param = (const jack_driver_param_t *) node->data;
 
@@ -2513,7 +2451,6 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			break;
 
 		}
-
 	}
 			
 	/* duplex is the default */
