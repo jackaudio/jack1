@@ -1,16 +1,14 @@
 TODO
 
-* call time client before all others
-
-figure out how to have pools of buffers for ports by type
-
-passing args to drivers and clients?
-getting callbacks and args from dynamically loaded clients?
-how do dynamically loaded clients (un)register ports, activate, etc.
-pool based malloc for rt client-local mem allocation
+- figure out how to have pools of buffers for ports by type
+- proper handling of client return values in libjack
+- passing args to drivers and clients?
+- getting callbacks and args from dynamically loaded clients?
+- how do dynamically loaded clients (un)register ports, activate, etc.
+- pool based malloc for rt client-local mem allocation
 
 TO THINK ABOUT:
 
-multiple port buffer shm segments (i.e. dynamically
+- multiple port buffer shm segments (i.e. dynamically
          increase the total number of ports in the system)
 
