@@ -86,7 +86,7 @@ main (int argc, char *argv[])
 		fprintf (stderr, "cannot connect input ports\n");
 	} 
 
-	if (jack_connect (client, jack_port_name (output_port), "alsa_pcm:out_2")) {
+	if (jack_connect (client, jack_port_name (output_port), "alsa_pcm:out_1")) {
 		fprintf (stderr, "cannot connect output ports\n");
 	} 
 
