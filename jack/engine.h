@@ -82,8 +82,8 @@ struct _jack_engine {
     int		    process_errors;
     int		    period_msecs;
 
-    /* Time to wait for clients in msecs. Used when jackd is run in
-     * non-ASIO mode and without realtime priority enabled. */
+    /* Time to wait for clients in msecs.  Used when jackd is run
+     * without realtime priority enabled. */
     int		    client_timeout_msecs;
 
     /* info on the shm segment containing this->control */
@@ -110,7 +110,6 @@ struct _jack_engine {
     unsigned long   fifo_size;
     unsigned long   external_client_cnt;
     int		    rtpriority;
-    char	    asio_mode;
     char	    freewheeling;
     char	    verbose;
     int		    reordered;
@@ -153,8 +152,9 @@ jack_engine_t  *jack_engine_new (int real_time, int real_time_priority,
 int             jack_engine_delete (jack_engine_t *);
 int             jack_run (jack_engine_t *engine);
 int             jack_wait (jack_engine_t *engine);
-int             jack_engine_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc, JSList * driver_params);
-void            jack_set_asio_mode (jack_engine_t *, int yn);
+int             jack_engine_load_driver (jack_engine_t *engine,
+					 jack_driver_desc_t * driver_desc,
+					 JSList * driver_params);
 void            jack_dump_configuration(jack_engine_t *engine, int take_lock);
 
 extern jack_client_internal_t *

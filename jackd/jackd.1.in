@@ -29,21 +29,12 @@ For the latest JACK information, please consult the web site,
 <\fBhttp://jackit.sourceforge.net\fR>.
 .SH OPTIONS
 .TP
-\fB\-a, \-\-asio\fR
-.br
-Force absolute realtime behaviour on the system.  Rather than allowing
-clients to take a time determined by the kernel, they are determined
-to have timed out on receipt of the next interrupt from the audio
-interface.  This only makes sense when used with an ASIO-style
-configuration where there are 2 periods per buffer (see
-\fB\-\-nperiods\fR).  It is safe to omit this parameter, if you don't
-need to enforce strict realtime limits.  It can be useful for testing
-the realtime behavior of a new JACK clients.
-.TP
 \fB\-d, \-\-driver \fI driver \fR [ \fI driver-options \fR ] 
 .br
 Select the output driver.  The only \fIdriver\fR currently documented
-is \fBalsa\fR (see below).
+is \fBalsa\fR (see below).  There are additional drivers named
+\fBdummy\fR and \fBportaudio\fR.  Examples below show how to list
+their parameters.
 .TP
 \fB\-h, \-\-help\fR
 .br
@@ -166,15 +157,19 @@ to disconnect unresponsive ports when running without
 \fB\-\-realtime\fR.
 .SH EXAMPLES
 .PP
-Print usage message for options specific to the \fBalsa\fR driver.
+Print usage message for options specific to each driver.
 .IP
 \fBjackd \-d alsa \-\-help\fR
+.br
+\fBjackd \-d dummy \-\-help\fR
+.br
+\fBjackd \-d portaudio \-\-help\fR
 .PP
 Run the JACK daemon with realtime priority using the first ALSA
 hardware card defined in \fB/etc/modules.conf\fR.  This must be run on
 a kernel with capabilities enabled.
 .IP 
-\fBjackstart \-\-realtime \-\-driver=alsa \-\-device=hw:0\fR
+\fBjackstart \-\-realtime \-\-driver=alsa\fR
 .PP
 Run the JACK daemon with low latency.  A reasonably well-tuned
 current-generation system with a decent sound card and a low-latency
@@ -184,7 +179,7 @@ Tuning a system for low latency is challenging.  The JACK FAQ,
 <\fBhttp://jackit.sourceforge.net/docs/faq.php\fR> has some useful
 suggestions.
 .IP 
-\fBjackstart \-R \-d alsa \-d hw:0 \-p 128 \-n 3 \-r 44100\fR
+\fBjackstart \-R \-d alsa \-p 128 \-n 3 \-r 44100\fR
 .PP
 Run \fBjackd\fR with realtime priority using the "sblive" ALSA device
 defined in ~/.asoundrc.  Apply shaped dithering to playback audio.
@@ -192,16 +187,21 @@ This must be run as root.
 .IP 
 \fBjackd \-R \-d alsa \-d sblive \-\-dither=shaped\fR
 .PP
-Run \fBjackd\fR with no special privileges using the "sblive" ALSA
-device defined in ~/.asoundrc.  Any xruns reported by the ALSA driver
-will be ignored.  The larger buffer helps reduce data loss.
-Rectangular dithering will be used for playback.
+Run \fBjackd\fR with no special privileges using the second ALSA
+hardware card defined in \fB/etc/modules.conf\fR.  Any xruns reported
+by the ALSA driver will be ignored.  The larger buffer helps reduce
+data loss.  Rectangular dithering will be used for playback.
 .IP 
-\fBjackd \-d alsa \-d sblive \-p1024 \-n3 \-\-softmode \-zr\fR
+\fBjackd \-d alsa \-d hw:1 \-p2048 \-n3 \-\-softmode \-zr\fR
 .SH SEE ALSO:
-.BR <\fBhttp://www.alsa-project.org\fR>
+.br
+<\fBjackit-devel@lists.sourceforge.net\fR>
+.br 
+<\fBhttp://www.alsa-project.org\fR>
 .SH BUGS
-Please send bug reports to <\fBjackit-devel@lists.sourceforge.net\fR>.
+Please report bugs to
+.br
+<\fBhttp://jackit.sourceforge.net/mantis/main_page.php\fR>
 .SH AUTHORS
 Paul Davis and others.
 .PP

@@ -1942,7 +1942,6 @@ jack_engine_new (int realtime, int rtpriority, int verbose,
 	engine->rtpriority = rtpriority;
 	engine->silent_buffer = 0;
 	engine->verbose = verbose;
-	engine->asio_mode = FALSE;
 	engine->freewheeling = 0;
 	engine->wait_pid = wait_pid;
 
@@ -4062,10 +4061,4 @@ jack_send_connection_notification (jack_engine_t *engine,
 	}
 
 	return 0;
-}
-
-void
-jack_set_asio_mode (jack_engine_t *engine, int yn)
-{
-	engine->asio_mode = yn;
 }

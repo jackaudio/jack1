@@ -57,7 +57,6 @@ static jack_engine_t *engine = 0;
 static int realtime = 0;
 static int realtime_priority = 10;
 static int verbose = 0;
-static int asio_mode = 0;
 static int client_timeout = 500; /* msecs */
 
 static void 
@@ -146,10 +145,6 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 		fprintf (stderr, "cannot load driver module %s\n", driver_desc->name);
 		return -1;
 	}
-
-	if (asio_mode) {
-		jack_set_asio_mode (engine, TRUE);
-	} 
 
         if (engine->driver->start (engine->driver) != 0) {
                 jack_error ("cannot start driver");
@@ -345,13 +340,15 @@ static void usage (FILE *file)
 {
 	copyright (file);
 	fprintf (file, "\n"
-"usage: jackd [ --asio OR -a ]\n"
-"             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
+"usage: jackd [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
 "             [ --verbose OR -v ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
-"         -d driver [ ... driver args ... ]\n");
+"         -d driver [ ... driver args ... ]\n"
+"             driver can be `alsa', `dummy' or `portaudio'\n\n"
+"       jackd -d driver --help\n"
+"             to display options for each driver\n\n");
 }	
 
 static jack_driver_desc_t *
@@ -381,7 +378,6 @@ main (int argc, char *argv[])
 	const char *options = "-ad:P:vshVRFl:t:";
 	struct option long_options[] = 
 	{ 
-		{ "asio", 0, 0, 'a' },
 		{ "driver", 1, 0, 'd' },
 		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
@@ -445,9 +441,6 @@ main (int argc, char *argv[])
 						   long_options,
 						   &option_index)) != EOF) {
 		switch (opt) {
-		case 'a':
-			asio_mode = TRUE;
-			break;
 
 		case 'd':
 			seen_driver = 1;
