@@ -22,15 +22,9 @@ TODO (owner)
 - add explanation of protocol versioning to README.developers (kaiv)
 - add Paul's graph/subgraph explanation to the design doc (kaiv)
 - add support for custom jackd --tmpdir in libjack (paul)
-- add a sane way handle situations where the unix sockets already 
-  exist when jackd is started (kaiv)
 - add code to enforce the 'bufsize==2^x' rule (kaiv)
-- update at least the user-visible copyrights with year 2003 (kaiv)
 - capture_client has pthread_mutex_lock() in its process() (paul)
-- figure out how to have pools of buffers for ports by type (paul)
 - proper handling of client return values in libjack (kaiv)
-- passing args to drivers and clients? (paul)
-- pool based malloc for rt client-local mem allocation (paul)
 
 TO THINK ABOUT
 
@@ -42,6 +36,13 @@ TO THINK ABOUT
 
 CLOSED (date,who,comment)
 
+- update at least the user-visible copyrights with year 2003 (2003/04/05,done,paul)
+- add a sane way handle situations where the unix sockets already 
+    exist when jackd is started (2003/04/05,sockets removed on startup,paul)
+- pool based malloc for rt client-local mem allocation (2003/04/05, - paul, deemed unnecessary)
+- figure out how to have pools of buffers for ports by type - (2003/04/05, paul, implicit in new shm/port segment system)
+- passing args to drivers and clients? (?,done long ago,paul)
+- pool based malloc for rt client-local mem allocation (paul)
 - getting callbacks and args from dynamically loaded clients? (2003/02/25, paul, see jack/jack.h)
 - how do dynamically loaded clients (un)register ports, activate, etc. (2003/02/25, paul, see example-clients/inprocess.c)
 - server<->libjack interface version handshake (2003/02/11, trutkin, done)

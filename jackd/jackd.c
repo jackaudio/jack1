@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2001 Paul Davis
+    Copyright (C) 2001-2003 Paul Davis
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -400,7 +400,7 @@ main (int argc, char *argv[])
 	}
 
 	printf ( "jackd " VERSION "\n"
-		 "Copyright 2001-2002 Paul Davis and others.\n"
+		 "Copyright 2001-2003 Paul Davis and others.\n"
 		 "jackd comes with ABSOLUTELY NO WARRANTY\n"
 		 "This is free software, and you are welcome to redistribute it\n"
 		 "under certain conditions; see the file COPYING for details\n\n");
