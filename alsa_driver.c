@@ -723,7 +723,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 		for (i = 0; i < nfds; i++) {
 			driver->pfd[nfds].events |= POLLERR;
 		}
-		
+
 		if (poll (driver->pfd, nfds, 1000) < 0) {
 			if (errno == EINTR) {
 				printf ("poll interrupt\n");
@@ -789,7 +789,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 		}		
 
 	}
-	
+
 	xrun_detected = FALSE;
 	
 	if ((capture_avail = snd_pcm_avail_update (driver->capture_handle)) < 0) {

@@ -72,7 +72,7 @@ struct _jack_client {
     GSList *port_segments;
     GSList *ports;
     pthread_t thread;
-    char fifo_prefix[FIFO_NAME_SIZE+1];
+    char fifo_prefix[PATH_MAX+1];
     void (*on_shutdown)(void *arg);
     void *on_shutdown_arg;
     char thread_ok : 1;
@@ -135,25 +135,6 @@ jack_port_by_id (jack_client_t *client, jack_port_id_t id)
 	for (node = client->ports; node; node = g_slist_next (node)) {
 		if (((jack_port_t *) node->data)->shared->id == id) {
 			return (jack_port_t *) node->data;
-		}
-	}
-
-	return NULL;
-}
-
-static jack_port_shared_t *
-jack_shared_port_by_name (jack_client_t *client, const char *port_name)
-
-{
-	unsigned long i, limit;
-	jack_port_shared_t *port;
-
-	limit = client->engine->port_max;
-	port = &client->engine->ports[0];
-	
-	for (i = 0; i < limit; i++) {
-		if (port[i].in_use && strcmp (port[i].name, port_name) == 0) {
-			return &port[i];
 		}
 	}
 
@@ -252,7 +233,7 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 static int 
 jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 {	
-	char path[FIFO_NAME_SIZE+1];
+	char path[PATH_MAX+1];
 
 	if (client->graph_wait_fd >= 0) {
 		close (client->graph_wait_fd);
@@ -1341,16 +1322,13 @@ int
 jack_port_request_monitor_by_name (jack_client_t *client, const char *port_name, int onoff)
 
 {
-	jack_port_shared_t *port;
+	jack_port_t *port;
 
-	if ((port = jack_shared_port_by_name (client, port_name)) != NULL) {
-		if (onoff) {
-			port->monitor_requests++;
-		} else if (port->monitor_requests) {
-			port->monitor_requests--;
-		}
-		return 0;
+	if ((port = jack_port_by_name (client, port_name)) != NULL) {
+		return jack_port_request_monitor (port, onoff);
+		free (port);
 	}
+
 	return -1;
 }
 
@@ -1363,6 +1341,30 @@ jack_port_request_monitor (jack_port_t *port, int onoff)
 	} else if (port->shared->monitor_requests) {
 		port->shared->monitor_requests--;
 	}
+
+	if ((port->shared->flags & JackPortIsOutput) == 0) {
+
+		GSList *node;
+
+		/* this port is for input, so recurse over each of the 
+		   connected ports.
+		 */
+
+		pthread_mutex_lock (&port->connection_lock);
+		for (node = port->connections; node; node = g_slist_next (node)) {
+			
+			/* drop the lock because if there is a feedback loop,
+			   we will deadlock. XXX much worse things will
+			   happen if there is a feedback loop !!!
+			*/
+
+			pthread_mutex_unlock (&port->connection_lock);
+			jack_port_request_monitor ((jack_port_t *) node->data, onoff);
+			pthread_mutex_lock (&port->connection_lock);
+		}
+		pthread_mutex_unlock (&port->connection_lock);
+	}
+
 	return 0;
 }
 	
@@ -1417,12 +1419,6 @@ jack_port_type (const jack_port_t *port)
 }
 
 int
-jack_port_equal (const jack_port_t *a, const jack_port_t *b)
-{
-	return a->shared == b->shared;
-}
-
-int
 jack_port_set_name (jack_port_t *port, const char *new_name)
 {
 	char *colon;
@@ -1442,14 +1438,14 @@ jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg)
 	client->on_shutdown_arg = arg;
 }
 
-char * const *
+const char **
 jack_get_ports (jack_client_t *client,
 		const char *port_name_pattern,
 		const char *type_name_pattern,
 		unsigned long flags)
 {
 	jack_control_t *engine;
-	char **matching_ports;
+	const char **matching_ports;
 	unsigned long match_cnt;
 	jack_port_shared_t *psp;
 	unsigned long i;
@@ -1469,7 +1465,7 @@ jack_get_ports (jack_client_t *client,
 	psp = engine->ports;
 	match_cnt = 0;
 
-	matching_ports = (char **) malloc (sizeof (char *) * engine->port_max);
+	matching_ports = (const char **) malloc (sizeof (char *) * engine->port_max);
 
 	for (i = 0; i < engine->port_max; i++) {
 		matching = 1;
@@ -1582,6 +1578,33 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 	}
 }
 
+const char **
+jack_port_get_connections (const jack_port_t *port)
+{
+	const char **ret;
+	GSList *node;
+	unsigned int n;
+
+	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
+
+	if (port->connections == NULL) {
+		pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
+		return NULL;
+	}
+
+	ret = (const char **) malloc (sizeof (char *) * (g_slist_length (port->connections) + 1));
+
+	for (n = 0, node = port->connections; node; node = g_slist_next (node), n++) {
+		ret[n] = ((jack_port_t *) node->data)->shared->name;
+	}
+
+	ret[n] = NULL;
+
+	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
+	
+	return ret;
+}
+
 int
 jack_port_connected (const jack_port_t *port)
 {
@@ -1600,6 +1623,28 @@ jack_port_connected_to (const jack_port_t *port, const char *portname)
 		jack_port_t *other_port = (jack_port_t *) node->data;
 		
 		if (strcmp (other_port->shared->name, portname) == 0) {
+			ret = TRUE;
+			break;
+		}
+	}
+
+	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
+	return ret;
+}
+
+int
+jack_port_connected_to_port (const jack_port_t *port, const jack_port_t *other_port)
+{
+	GSList *node;
+	int ret = FALSE;
+	
+	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
+	
+	for (node = port->connections; node; node = g_slist_next (node)) {
+
+		jack_port_t *this_port = (jack_port_t *) node->data;
+		
+		if (other_port->shared == this_port->shared) {
 			ret = TRUE;
 			break;
 		}

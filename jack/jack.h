@@ -34,7 +34,7 @@ int            jack_client_close (jack_client_t *client);
 /* register a function (and argument) to be called if and when the
    JACK server shuts down the client thread. the function must
    be written as if it were an asynchonrous POSIX signal
-   handler - use only async functions, and remember that it
+   handler - use only async-safe functions, and remember that it
    is executed from another thread. a typical function might
    set a flag or write to a pipe so that the rest of the
    application knows that the JACK client thread has shut
@@ -45,7 +45,10 @@ int            jack_client_close (jack_client_t *client);
    on. if called, it must be called before jack_client_activate().
 */
 
-void  jack_on_shutdown (jack_client_t *, void (*function)(void *arg), void *arg);
+void jack_on_shutdown (jack_client_t *, void (*function)(void *arg), void *arg);
+
+/* see simple_client.c to understand what these do.
+ */
 
 int jack_set_process_callback (jack_client_t *, JackProcessCallback, void *arg);
 int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback, void *arg);
@@ -97,13 +100,27 @@ enum JackPortFlags {
 	
 	Clients that do not control physical interfaces
 	should never create ports with this bit set.
-
-	Clients that do set this bit must have provided a
-	port_monitor callback before creating any ports with
-	this bit set.  
      */
 
-     JackPortCanMonitor = 0x8
+     JackPortCanMonitor = 0x8,
+
+     /* JackPortIsTerminal means:
+
+	for an input port: the data received by the port
+	                   will not be passed on or made
+			   available at any other port
+
+        for an output port: the data available at the port
+	                   does not originate from any 
+			   other port
+
+        Audio synthesizers, i/o h/w interface clients, HDR
+        systems are examples of things that would set this
+        flag for their ports.  
+     */
+
+     JackPortIsTerminal = 0x10
+     
 };	    
 
 #define JACK_DEFAULT_AUDIO_TYPE "32 bit float mono audio"
@@ -115,7 +132,9 @@ jack_port_register (jack_client_t *,
 		     unsigned long flags,
 		     unsigned long buffer_size);
 
-/* this removes the port from the client */
+/* this removes the port from the client, disconnecting
+   any existing connections at the same time.
+*/
 
 int jack_port_unregister (jack_client_t *, jack_port_t *);
 
@@ -125,9 +144,34 @@ const char * jack_port_name (const jack_port_t *port);
 const char * jack_port_short_name (const jack_port_t *port);
 int          jack_port_flags (const jack_port_t *port);
 const char * jack_port_type (const jack_port_t *port);
-int          jack_port_connected (const jack_port_t *port);
-int          jack_port_connected_to (const jack_port_t *port, const char *portname);
-int          jack_port_equal (const jack_port_t *a, const jack_port_t *b);
+
+/* this returns TRUE or FALSE to indicate if there are
+   any connections to/from the port argument.
+*/
+
+int jack_port_connected (const jack_port_t *port);
+
+/* this returns TRUE or FALSE if the port argument is
+   DIRECTLY connected to the port with the name given in
+   `portname' 
+*/
+
+int jack_port_connected_to (const jack_port_t *port, const char *portname);
+int jack_port_connected_to_port (const jack_port_t *port, const jack_port_t *other_port);
+
+/* this returns a null-terminated array of port names to
+   which the argument port is connected. if there are no
+   connections, it returns NULL.
+
+   the caller is responsible for calling free(3) on any
+   non-NULL returned value.
+*/   
+
+const char ** jack_port_get_connections (const jack_port_t *port);
+
+/* this modifies a port's name, and may be called at any
+   time.
+*/
 
 int jack_port_set_name (jack_port_t *port, const char *name);
 
@@ -138,6 +182,10 @@ int jack_port_set_name (jack_port_t *port, const char *name);
    containing the data from the port's connection(s), or
    zero-filled. if there are multiple inbound connections, the data
    will be mixed appropriately.  
+
+   You may not cache the values returned across process() callbacks.
+   There is no guarantee that the values will not change from
+   process() callback to process() callback.
 */
 
 void *jack_port_get_buffer (jack_port_t *, nframes_t);
@@ -232,9 +280,9 @@ nframes_t jack_port_get_latency (jack_port_t *port);
 
 void jack_port_set_latency (jack_port_t *, nframes_t);
 
-/* if JackPortCanMonitor is set for a port, then this function will
-   turn on/off input monitoring for the port.  if JackPortCanMonitor
-   is not set, then this function will do nothing.  
+/* if JackPortCanMonitor is set for a port, then these 2 functions will
+   turn on/off input monitoring for the port. if JackPortCanMonitor
+   is not set, then these functions will have no effect.
 */
 
 int jack_port_request_monitor (jack_port_t *port, int onoff);
@@ -254,13 +302,15 @@ int jack_port_ensure_monitor (jack_port_t *port, int onoff);
 
 int jack_port_monitoring_input (jack_port_t *port);
 
-/* this returns the sample rate of the jack */
+/* this returns the sample rate of the jack system */
 
 unsigned long jack_get_sample_rate (jack_client_t *);
 
 /* this returns the current maximum size that will
    ever be passed to the "process" callback. it should only
-   be used *before* the client has been activated.
+   be used *before* the client has been activated. after activation,
+   the client will be notified of buffer size changes if it
+   registers a buffer_size callback.
 */
 
 nframes_t jack_get_buffer_size (jack_client_t *);
@@ -278,28 +328,33 @@ nframes_t jack_get_buffer_size (jack_client_t *);
 
    flags:             a value used to select ports by their flags.  if 
                       zero, no selection based on flags will be carried out.
+
+   The caller is responsible for calling free(3) any non-NULL returned
+   value.
 */
 
-char * const * jack_get_ports (jack_client_t *,
+const char ** jack_get_ports (jack_client_t *,
 			       const char *port_name_pattern,
 			       const char *type_name_pattern,
 			       unsigned long flags);
 
 jack_port_t *jack_port_by_name (jack_client_t *, const char *portname);
 
-/* If a client is told to become the timebase for the entire system,
-   it calls this function. If it returns zero, then the client has
-   the responsibility to call jack_update_time() at the end
-   of its process() callback. Whatever time it provides (in frames
-   since its reference zero time) becomes the current timebase
-   for the entire system.
+/* If a client is told (by the user) to become the timebase
+   for the entire system, it calls this function. If it
+   returns zero, then the client has the responsibility to
+   call jack_update_time() at the end of its process()
+   callback. Whatever time it provides (in frames since its
+   reference zero time) becomes the current timebase for the
+   entire system.  
 */
 
 int  jack_engine_takeover_timebase (jack_client_t *);
 void jack_update_time (jack_client_t *, nframes_t);
 
 /* this estimates the time that has passed since the
-   start of the current cycle. 
+   start jack server started calling the process()
+   callbacks of all its clients.
 */
 
 nframes_t jack_frames_since_cycle_start (jack_client_t *);

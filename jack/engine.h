@@ -68,7 +68,7 @@ struct _jack_engine {
     struct pollfd *pfd;
     struct _jack_client_internal *timebase_client;
     jack_port_buffer_info_t *silent_buffer;
-    char fifo_prefix[FIFO_NAME_SIZE+1];
+    char fifo_prefix[PATH_MAX+1];
     int *fifo;
     unsigned long fifo_size;
     unsigned long external_client_cnt;

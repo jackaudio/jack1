@@ -34,8 +34,6 @@
 #include <jack/types.h>
 #include <jack/port.h>
 
-#define FIFO_NAME_SIZE 32
-
 typedef void * dlhandle;
 
 typedef struct {
@@ -161,7 +159,7 @@ typedef struct {
     int client_key;
     int control_key;
 
-    char fifo_prefix[FIFO_NAME_SIZE+1];
+    char fifo_prefix[PATH_MAX+1];
 
     int realtime;
     int realtime_priority;

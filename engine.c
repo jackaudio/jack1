@@ -298,7 +298,7 @@ jack_cleanup_files ()
 			char fullpath[PATH_MAX+1];
 			sprintf (fullpath, "%s/%s", jack_temp_dir, dirent->d_name);
 			unlink (fullpath);
-		}
+		} 
 	}
 
 	closedir (dir);
@@ -1138,7 +1138,7 @@ jack_engine_new (int realtime, int rtpriority)
 	engine->control->time.frame_rate = 0;
 	engine->control->time.frame = 0;
 
-	sprintf (engine->fifo_prefix, "%s/ack_fifo_%d", jack_temp_dir, getpid());
+	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix), "%s/jack-ack-fifo-%d", jack_temp_dir, getpid());
 
 	(void) jack_get_fifo_fd (engine, 0);
 	jack_start_server (engine);
@@ -1810,22 +1810,24 @@ jack_port_do_connect (jack_engine_t *engine,
 	}
 
 	if ((dstport->shared->flags & JackPortIsInput) == 0) {
-		jack_error ("destination port in attempted connection is not an input port");
+		jack_error ("destination port in attempted connection of %s and %s is not an input port", 
+			    source_port, destination_port);
 		return -1;
 	}
 
 	if ((srcport->shared->flags & JackPortIsOutput) == 0) {
-		jack_error ("source port in attempted connection is not an output port");
+		jack_error ("source port in attempted connection of %s and %s is not an output port",
+			    source_port, destination_port);
 		return -1;
 	}
 
 	if (srcport->shared->locked) {
-		jack_error ("source port is locked against connection changes");
+		jack_error ("source port %s is locked against connection changes", source_port);
 		return -1;
 	}
 
 	if (dstport->shared->locked) {
-		jack_error ("destination port is locked against connection changes");
+		jack_error ("destination port %s is locked against connection changes", destination_port);
 		return -1;
 	}
 
@@ -2018,7 +2020,7 @@ static int
 jack_get_fifo_fd (jack_engine_t *engine, int which_fifo)
 
 {
-	char path[FIFO_NAME_SIZE+1];
+	char path[PATH_MAX+1];
 	struct stat statbuf;
 
 	sprintf (path, "%s-%d", engine->fifo_prefix, which_fifo);
