@@ -26,8 +26,8 @@
 #include <stdio.h>
 #include <jack/internal.h>
 #include <jack/engine.h>
+#include <jack/messagebuffer.h>
 #include "transengine.h"
-
 
 /********************** internal functions **********************/
 

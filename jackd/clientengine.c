@@ -30,6 +30,7 @@
 
 #include <jack/internal.h>
 #include <jack/engine.h>
+#include <jack/messagebuffer.h>
 #include <jack/version.h>
 #include <sysdeps/poll.h>
 #include <sysdeps/ipc.h>

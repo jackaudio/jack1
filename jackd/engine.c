@@ -42,6 +42,7 @@
 
 #include <jack/internal.h>
 #include <jack/engine.h>
+#include <jack/messagebuffer.h>
 #include <jack/driver.h>
 #include <jack/shm.h>
 #include <jack/thread.h>
@@ -1951,7 +1952,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	    engine->spare_usecs &&
 	    ((WORK_SCALE * engine->spare_usecs) <= delayed_usecs)) {
 
-		fprintf (stderr, "delay of %.3f usecs exceeds estimated spare"
+		MESSAGE("delay of %.3f usecs exceeds estimated spare"
 			 " time of %.3f; restart ...\n",
 			 delayed_usecs, WORK_SCALE * engine->spare_usecs);
 		
@@ -2134,6 +2135,8 @@ jack_engine_delete (jack_engine_t *engine)
 
 	VERBOSE (engine, "engine deleted\n");
 	free (engine);
+
+	jack_messagebuffer_exit();
 }
 
 void

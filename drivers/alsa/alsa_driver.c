@@ -33,6 +33,7 @@
  
 #include <jack/internal.h>
 #include <jack/engine.h>
+#include <jack/messagebuffer.h>
 
 #include <sysdeps/time.h>
 
@@ -1081,7 +1082,7 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 		snd_pcm_status_get_trigger_tstamp(status, &tstamp);
 		timersub(&now, &tstamp, &diff);
 		*delayed_usecs = diff.tv_sec * 1000000.0 + diff.tv_usec;
-		fprintf(stderr, "\n\n**** alsa_pcm: xrun of at least %.3f "
+		MESSAGE("\n\n**** alsa_pcm: xrun of at least %.3f "
 			"msecs\n\n",
 			*delayed_usecs / 1000.0);
 	}
