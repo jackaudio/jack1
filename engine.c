@@ -206,7 +206,7 @@ jack_cleanup_clients (jack_engine_t *engine)
 		
 		printf ("client %s state = %d\n", ctl->name, ctl->state);
 		
-		if (ctl->state > JACK_CLIENT_STATE_NOT_TRIGGERED) {
+		if (ctl->state > NotTriggered) {
 			remove = g_slist_prepend (remove, node->data);
 			printf ("%d: removing failed client %s\n", x, ctl->name);
 		}
@@ -413,7 +413,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 
 	for (node = engine->clients; node; node = g_slist_next (node)) {
 		ctl = ((jack_client_internal_t *) node->data)->control;
-		ctl->state = JACK_CLIENT_STATE_NOT_TRIGGERED;
+		ctl->state = NotTriggered;
 		ctl->nframes = nframes;
 	}
 
@@ -436,11 +436,12 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 
 			/* in-process client ("plugin") */
 
+			ctl->state = Running;
+
 			if (ctl->process (nframes, ctl->process_arg) == 0) {
-				ctl->state = JACK_CLIENT_STATE_FINISHED;
+				ctl->state = Finished;
 			} else {
 				jack_error ("in-process client %s failed", client->control->name);
-				ctl->state = JACK_CLIENT_STATE_TRIGGERED;
 				err++;
 				break;
 			}
@@ -450,6 +451,8 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 		} else {
 
 			/* out of process subgraph */
+
+			ctl->state = Triggered; // a race exists if we do this after the write(2) 
 
 			if (write (client->subgraph_start_fd, &c, sizeof (c)) != sizeof (c)) {
 				jack_error ("cannot initiate graph processing (%s)", strerror (errno));
@@ -1185,7 +1188,6 @@ jack_main_thread (void *arg)
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
 	jack_driver_t *driver = engine->driver;
-//	unsigned long start, end;
 
 	if (engine->control->real_time) {
 		if (jack_become_real_time (pthread_self(), engine->rtpriority)) {
@@ -1202,12 +1204,9 @@ jack_main_thread (void *arg)
 	}
 
 	while (1) {
-//		start = end;
 		if (driver->wait (driver)) {
 			break;
 		}
-//		rdtscl (end);
-//		printf ("driver cycle time: %.6f usecs\n", ((float) (end - start)) / 450.00f);
 	}
 
 	pthread_exit (0);
@@ -1800,8 +1799,6 @@ jack_port_do_connect (jack_engine_t *engine,
 	jack_port_internal_t *srcport, *dstport;
 	jack_port_id_t src_id, dst_id;
 
-	fprintf (stderr, "trying to connect %s and %s\n", source_port, destination_port);
-
 	if ((srcport = jack_get_port_by_name (engine, source_port)) == 0) {
 		jack_error ("unknown source port in attempted connection [%s]", source_port);
 		return -1;
@@ -1881,8 +1878,6 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 
 	/* call tree **** MUST HOLD **** engine->graph_lock. */
 	
-	printf ("disconnecting %s and %s\n", srcport->shared->name, dstport->shared->name);
-			
 	for (node = srcport->connections; node; node = g_slist_next (node)) {
 
 		connect = (jack_connection_internal_t *) node->data;

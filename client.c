@@ -587,18 +587,18 @@ jack_client_thread (void *arg)
 			   process().
 			*/
 
-			control->state = JACK_CLIENT_STATE_TRIGGERED;
-
 			if (read (client->graph_wait_fd, &c, sizeof (c)) != sizeof (c)) {
 				jack_error ("cannot clean up byte from inter-client pipe (%s)", strerror (errno));
 				err++;
 				break;
 			}
 
+			control->state = Running;
+
                         status = control->process (control->nframes, control->process_arg);
 			
 			if (!status) {
-				control->state = JACK_CLIENT_STATE_FINISHED;
+				control->state = Finished;
 			}
 
 			/* this may fail. if it does, the engine will discover

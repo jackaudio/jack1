@@ -110,16 +110,19 @@ typedef enum {
 	ClientOutOfProcess /* client is in another process */
 } ClientType;
 
-#define JACK_CLIENT_STATE_NOT_TRIGGERED 19
-#define JACK_CLIENT_STATE_TRIGGERED     23
-#define JACK_CLIENT_STATE_FINISHED      24
+typedef enum {
+	NotTriggered,
+	Triggered,
+	Running,
+	Finished
+} jack_client_state_t;
 
 typedef volatile struct {
 
     volatile nframes_t  frame_time;       /* w: client r: engine (if client is timebase) */
     volatile int        id;               /* w: engine r: engine and client */
     volatile nframes_t  nframes;          /* w: engine r: client */
-    volatile char       state;            /* w: engine and client r: engine JACK_CLIENT_STATE_... */
+    volatile jack_client_state_t state;   /* w: engine and client r: engine */
     volatile char       name[JACK_CLIENT_NAME_SIZE+1];
     volatile ClientType type;             /* w: engine r: engine and client */
     volatile char       active : 1;       /* w: engine r: engine and client */
