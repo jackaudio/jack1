@@ -263,7 +263,7 @@ jack_drop_real_time_scheduling (pthread_t thread)
 	
 	memset (&rtparam, 0, sizeof (rtparam));
 	rtparam.sched_priority = 0;
-	
+
 	if ((x = pthread_setschedparam (thread, SCHED_OTHER, &rtparam)) != 0) {
 		jack_error ("cannot switch to normal scheduling priority(%s)\n",
 			    strerror (errno));
@@ -283,8 +283,10 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 	
 	if ((x = pthread_setschedparam (thread, SCHED_FIFO, &rtparam)) != 0) {
 		jack_error ("cannot use real-time scheduling (FIFO/%d) "
-			    "(%d: %s)", rtparam.sched_priority, x,
-			    strerror (x));
+			    "[for thread %d, from thread %d] (%d: %s)", 
+			    rtparam.sched_priority, 
+			    thread, pthread_self(),
+			    x, strerror (x));
 		return -1;
 	}
         return 0;

@@ -69,8 +69,6 @@ cleanup_mlock ()
 		return;
 	}
 
-	fprintf (stderr, "reading map file\n");
-
 	while (!feof (map)) {
 
 		unlock = 0;
@@ -119,7 +117,7 @@ cleanup_mlock ()
 		}
 		
 		if (unlock) {
-			fprintf (stderr, "\tunlocking %s\n", path);
+			fprintf (stderr, "unlocking %s\n", path);
 			munlock ((char *) start, end - start);
 		}
 	}

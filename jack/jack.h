@@ -237,6 +237,12 @@ int jack_set_freewheel_callback (jack_client_t *client,
  * scheduling is dropped when entering freewheel mode, and
  * if appropriate it is reacquired when stopping.
  * 
+ * IMPORTANT: on systems using capabilities to provide real-time
+ * scheduling (i.e. Linux kernel 2.4), if onoff is zero, this function
+ * must be called from the thread that originally called jack_activate(). 
+ * This restriction does not apply to other systems (e.g. Linux kernel 2.6 
+ * or OS X).
+ * 
  * @param client pointer to JACK client structure
  * @param onoff  if non-zero, freewheel mode starts. Otherwise
  *                  freewheel mode ends.

@@ -394,8 +394,8 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			if ((sample_width == 4
 			     ? format++ < NOFORMATS - 1
 			     : format-- > 0)) {
-				jack_error ("Couldn't open %s for %s samples"
-					    " trying %s instead", device_name,
+				jack_error ("Note: audio device %s doesn't support a %s sample format"
+					    " so JACK will try a %s format instead", device_name,
 					    formats[failed_format].Name,
 					    formats[format].Name);
 			} else {

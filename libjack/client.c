@@ -988,8 +988,34 @@ int
 jack_set_freewheel (jack_client_t* client, int onoff)
 {
 	jack_request_t request;
+	int ret;
+
+	/* Note: the thread that initiates and terminates freewheeling must
+	   be the one that called jack_activate(), because that is the only
+	   thread with RT-granting capabilities.
+
+	   XXX horrible design. The RT thread should acquire/drop/reacquire
+	   scheduling all by itself. 
+	*/
+
 	request.type = onoff ? FreeWheel : StopFreeWheel;
-	return jack_client_deliver_request (client, &request);
+
+	if ((ret = jack_client_deliver_request (client, &request)) == 0) {
+		if (onoff == 0 && client->engine->real_time) {
+			/* get the relevant thread back to RT priority */
+#if JACK_USE_MACH_THREADS 
+			jack_acquire_real_time_scheduling (
+				client->process_thread,
+				client->engine->client_priority);
+#else
+			jack_acquire_real_time_scheduling (
+				client->thread,
+				client->engine->client_priority);
+#endif
+		}
+	} 
+
+	return ret;
 }
 
 void
@@ -1017,18 +1043,6 @@ jack_stop_freewheel (jack_client_t* client)
 
 	if (control->freewheel_cb) {
 		control->freewheel_cb (0, control->freewheel_arg);
-	}
-
-	if (client->engine->real_time) {
-#if JACK_USE_MACH_THREADS 
-		jack_acquire_real_time_scheduling (
-			client->process_thread,
-			client->engine->client_priority);
-#else
-		jack_acquire_real_time_scheduling (
-			client->thread,
-			client->engine->client_priority);
-#endif
 	}
 }
 
@@ -1795,7 +1809,6 @@ jack_set_error_function (void (*func) (const char *))
 {
 	jack_error_callback = func;
 }
-
 
 int 
 jack_set_graph_order_callback (jack_client_t *client,
