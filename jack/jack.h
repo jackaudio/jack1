@@ -25,9 +25,7 @@
 extern "C" {
 #endif
 
-#include <glib.h>
 #include <jack/types.h>
-#include <jack/port.h>
 #include <jack/error.h>
 
 jack_client_t *jack_client_new (const char *client_name);
@@ -188,8 +186,8 @@ unsigned long jack_get_sample_rate (jack_client_t *);
 
 nframes_t jack_get_buffer_size (jack_client_t *);
 
-/* This function returns a list of ports that match the specified
-   arguments.
+/* This function returns a NULL-terminated array of ports that match the
+   specified arguments.
    
    port_name_pattern: a regular expression used to select ports by name.
                       if NULL or of zero length, no selection based on
@@ -203,10 +201,10 @@ nframes_t jack_get_buffer_size (jack_client_t *);
                       zero, no selection based on flags will be carried out.
 */
 
-GSList *jack_get_ports (jack_client_t *,
-			 const char *port_name_pattern,
-			 const char *type_name_pattern,
-			 unsigned long flags);
+jack_port_t **jack_get_ports (jack_client_t *,
+                              const char *port_name_pattern,
+                              const char *type_name_pattern,
+                              unsigned long flags);
 
 /* If a client is told to become the timebase for the entire system,
    it calls this function. If it returns zero, then the client has

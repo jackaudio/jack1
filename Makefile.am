@@ -12,7 +12,7 @@ bin_PROGRAMS = jackd jack_simple_client jack_monitor_client @XTRA@
 
 AM_CFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" @GLIB_CFLAGS@
 
-AM_CXXFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" @GLIB_CFLAGS@
+AM_CXXFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\"
 
 jackd_SOURCES = jackd.c engine.c
 jackd_LDFLAGS = -L. -ljack -lltdl -lpthread $(GLIB_LIBS)

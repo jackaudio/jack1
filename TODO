@@ -17,6 +17,4 @@ multiple port buffer shm segments (i.e. dynamically
          increase the total number of ports in the system)
 
 wingo (apwingo@eos.ncsu.edu) adds:
- - remove glib dependency from api. using it internally is one thing,
-   but the return value of one function (list_ports()) should not
-   introduce this dependency.
+ - add helper functions to access _jack_port_shared without requiring glib
