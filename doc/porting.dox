@@ -52,8 +52,8 @@ Compiler Collective, <http://gcc.gnu.org>.
 @section portopsys Operating System Dependencies
 
 JACK is written to conform with C99, as defined in International
-Standard ISO/IEC 9899.  Because many existing compilers do not fully
-support this standard, some new features should be avoided for
+Standard ISO/IEC 9899:1999.  Because many existing compilers do not
+fully support this standard, some new features should be avoided for
 portablility reasons.  For example, variables should not be declared
 in the middle of a compound statement, because many compilers still
 cannot handle that language extension.

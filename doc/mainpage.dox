@@ -82,15 +82,15 @@ internal client "plugin" that runs within the JACK server process.
 
 The JACK programming interfaces are described in several header files:
 
-  - jack.h defines most of the interfaces used by JACK clients.
-  - transport.h provides a simple transport control mechanism for
-  starting, stopping and repositioning clients.  This is described in
-  the @ref transport-design document.
-  - types.h defines most of the data types for JACK.
-  - ringbuffer.h defines a simple API for using lock-free ringbuffers,
-  a very valuable and common data structure in real time streaming
-  media software. It is critical for use in applications that do disk
-  I/O such as audio file players and recording software.
+  - @ref jack.h "<jack/jack.h>" defines most of the JACK interfaces.
+  - @ref ringbuffer.h "<jack/ringbuffer.h>" defines a simple API for
+  using lock-free ringbuffers.  These are a good way to pass data
+  between threads, when streaming realtime data to slower media, like
+  audio file playback or recording.
+  - @ref transport.h "<jack/transport.h>" defines a simple transport
+  control mechanism for starting, stopping and repositioning clients.
+  This is described in the @ref transport-design document.
+  - @ref types.h "<jack/types.h>" defines most of the JACK data types.
 
 In addition, the example-clients directory provides numerous examples
 of simple JACK clients that nevertheless use the API to do something

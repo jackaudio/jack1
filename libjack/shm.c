@@ -100,21 +100,18 @@ jack_cleanup_shm (void)
 		destroy = FALSE;
 
 		if (r->allocator == getpid()) {
-			
+
 			/* allocated by this process, so unattach 
-			   and destroy.
-			*/
-			
+			   and destroy. */
 			jack_release_shm (&copy);
 			destroy = TRUE;
-			
+
 		} else {
-			
+
 			if (kill (r->allocator, 0)) {
 				if (errno == ESRCH) {
-					
-					/* allocator no longer exists, so destroy */
-					
+					/* allocator no longer exists,
+					 * so destroy */
 					destroy = TRUE;
 				}
 			}
@@ -123,7 +120,6 @@ jack_cleanup_shm (void)
 		if (destroy) {
 
 			jack_destroy_shm (&copy);
-			
 			r->size = 0;
 			r->allocator = 0;
 		}
@@ -149,36 +145,30 @@ jack_initialize_shm (void)
 
 	/* grab a chunk of memory to store shm ids in. this is 
 	   to allow clean up of all segments whenever JACK
-	   starts (or stops).
-	*/
-
+	   starts (or stops). */
 	size = sizeof (jack_shm_registry_t) * MAX_SHM_ID;
-
 	jack_shm_lock_registry ();
-	
 	perm = O_RDWR;
 
 	/* try without O_CREAT to see if it already exists */
-	
 	if ((shm_fd = shm_open ("/jack-shm-registry", perm, 0666)) < 0) {
 
 		if (errno == ENOENT) {
-				
-			perm = O_RDWR|O_CREAT;
 			
 			/* it doesn't exist, so create it */
-
-			if ((shm_fd = shm_open ("/jack-shm-registry", perm, 0666)) < 0) {
-				jack_error ("cannot create shm registry segment (%s)",
-					    strerror (errno));
+			perm = O_RDWR|O_CREAT;
+			if ((shm_fd =
+			     shm_open ("/jack-shm-registry", perm, 0666)) < 0) {
+				jack_error ("cannot create shm registry segment"
+					    " (%s)", strerror (errno));
 				goto out;
 			}
 			new_registry = TRUE;
 
 		} else {
 
-			jack_error ("cannot open existing shm registry segment (%s)",
-				    strerror (errno));
+			jack_error ("cannot open existing shm registry segment"
+				    " (%s)", strerror (errno));
 			goto out;
 		}
 	}
@@ -191,7 +181,8 @@ jack_initialize_shm (void)
 		}
 	}
   
-	if ((jack_shm_registry = mmap (0, size, PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
+	if ((jack_shm_registry = mmap (0, size, PROT_READ|PROT_WRITE,
+				       MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
 		jack_error ("cannot mmap shm registry segment (%s)",
 			    strerror (errno));
 		goto out;
@@ -249,8 +240,8 @@ jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
         
 	if (perm & O_CREAT) {
 		if (ftruncate (shm_fd, size) < 0) {
-				jack_error ("cannot set size of engine shm registry 0"
-							"(%s)", strerror (errno));
+				jack_error ("cannot set size of engine shm "
+					    "registry 0 (%s)", strerror (errno));
 				return -1;
 		}
 	}
@@ -315,8 +306,7 @@ jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 	}
 		
 	if ((si->attached_at = mmap (0, size, PROT_READ|PROT_WRITE,
-				     MAP_SHARED, shm_fd, 0))
-	    == MAP_FAILED) {
+				     MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
 		jack_error ("cannot mmap shm segment %s (%s)", registry->id,
 			    strerror (errno));
 		close (shm_fd);
@@ -361,18 +351,18 @@ jack_initialize_shm (void)
 
 	if ((shmid = shmget (key, size, shmflags)) < 0) {
 		if (errno == ENOENT) {
-			if ((shmid = shmget (key, size, shmflags|IPC_CREAT)) < 0) {
-				jack_error ("cannot create shm registry segment (%s)",
-					    strerror (errno));
+			if ((shmid = shmget (key, size,
+					     shmflags|IPC_CREAT)) < 0) {
+				jack_error ("cannot create shm registry segment"
+					    " (%s)", strerror (errno));
 				goto out;
 			}
-			
 			new_registry = TRUE;
 			
 		} else {
 
-			jack_error ("cannot use existing shm registry segment (%s)",
-				    strerror (errno));
+			jack_error ("cannot use existing shm registry segment"
+				    " (%s)", strerror (errno));
 			goto out;
 		}
 	}
@@ -415,7 +405,8 @@ jack_release_shm (jack_shm_info_t* si)
 }
 
 int
-jack_shmalloc (const char* name_not_used, jack_shmsize_t size, jack_shm_info_t* si) 
+jack_shmalloc (const char* name_not_used, jack_shmsize_t size,
+	       jack_shm_info_t* si) 
 {
 	int shmflags;
 	int shmid;
@@ -446,7 +437,8 @@ jack_shmalloc (const char* name_not_used, jack_shmsize_t size, jack_shm_info_t* 
 int
 jack_attach_shm (jack_shm_info_t* si)
 {
-	if ((si->attached_at = shmat (jack_shm_registry[si->index].id, 0, 0)) < 0) {
+	if ((si->attached_at = shmat (jack_shm_registry[si->index].id,
+				      0, 0)) < 0) {
 		jack_error ("cannot attach shm segment (%s)",
 			    strerror (errno));
 		jack_release_shm_info (si->index);
