@@ -275,6 +275,15 @@ make_sockets (int fd[2])
 	return 0;
 }
 
+static void
+jack_register_shm (char *shm_name, char *addr)
+{
+	if (jack_shm_id_cnt < MAX_SHM_ID) {
+		snprintf (jack_shm_registry[jack_shm_id_cnt++].name, sizeof (shm_name_t), "%s", shm_name);
+		jack_shm_registry[jack_shm_id_cnt].address = addr;
+	}
+}
+
 static int
 jack_initialize_shm ()
 {
@@ -297,17 +306,10 @@ jack_initialize_shm ()
 
 	jack_shm_registry = (jack_shm_registry_entry_t *) addr;
 	jack_shm_id_cnt = 0;
+	
+	jack_register_shm("/jack-shm-registry", addr);
 
 	return 0;
-}
-
-static void
-jack_register_shm (char *shm_name, char *addr)
-{
-	if (jack_shm_id_cnt < MAX_SHM_ID) {
-		snprintf (jack_shm_registry[jack_shm_id_cnt++].name, sizeof (shm_name_t), "%s", shm_name);
-		jack_shm_registry[jack_shm_id_cnt].address = addr;
-	}
 }
 
 void
@@ -413,7 +415,7 @@ jack_resize_port_segment (jack_engine_t *engine, jack_port_type_info_t *port_typ
 
 	if (port_type->shm_info.size == 0) {
 
-		snprintf (port_type->shm_info.shm_name, sizeof(port_type->shm_info.shm_name), "/jack-[%s]", port_type->type_name);
+		snprintf (port_type->shm_info.shm_name, sizeof(port_type->shm_info.shm_name), "/jck-[%s]", port_type->type_name);
 
 		if ((addr = jack_get_shm (port_type->shm_info.shm_name, size, 
 					  (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
@@ -2089,21 +2091,6 @@ jack_main_thread (void *arg)
 	}
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-#ifdef HAVE_ON_EXIT
-	on_exit (cancel_cleanup, engine);
-#else
-#ifdef HAVE_ATEXIT
-	global_engine = engine;
-	atexit (cancel_cleanup);
-#else
-#error "Don't know how to install an exit handler"
-#endif /* HAVE_ATEXIT */
-#endif /* HAVE_ON_EXIT */
-
-	if (driver->start (driver)) {
-		jack_error ("cannot start driver");
-		pthread_exit (0);
-	}	
 
 	consecutive_excessive_delays = 0;
 	engine->watchdog_check = 1; /* really needed here ? */
@@ -2147,8 +2134,25 @@ jack_main_thread (void *arg)
 int
 jack_run (jack_engine_t *engine)
 {
+	
+#ifdef HAVE_ON_EXIT
+	on_exit (cancel_cleanup, engine);
+#else
+#ifdef HAVE_ATEXIT
+	global_engine = engine;
+	atexit (cancel_cleanup);
+#else
+#error "Don't know how to install an exit handler"
+#endif /* HAVE_ATEXIT */
+#endif /* HAVE_ON_EXIT */
+
 	if (engine->driver == NULL) {
 		jack_error ("engine driver not set; cannot start");
+		return -1;
+	}
+
+	if (engine->driver->start (engine->driver)) {
+		jack_error ("cannot start driver");
 		return -1;
 	}
 	

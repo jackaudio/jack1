@@ -393,6 +393,8 @@ jack_request_client (ClientType type, const char* client_name, const char* so_na
 
 	*req_fd = -1;
 
+	memset (&req, 0, sizeof (req));
+
 	if (strlen (client_name) > sizeof (req.name) - 1) {
 		jack_error ("\"%s\" is too long to be used as a JACK client name.\n"
 			     "Please use %lu characters or less.",
