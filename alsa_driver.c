@@ -759,8 +759,14 @@ alsa_driver_wait (alsa_driver_t *driver)
 			return 0;
 		}
 	}
-	
+
 	avail = capture_avail < playback_avail ? capture_avail : playback_avail;
+	
+	/* constrain the available count to the nearest (round down) number of
+	   periods.
+	*/
+
+	avail = (avail / driver->frames_per_cycle) * driver->frames_per_cycle;
 
 	while (avail) {
 		
@@ -773,6 +779,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 						       &capture_offset, &playback_offset) < 0) {
 			return -1;
 		}
+
 
 		contiguous = capture_avail < playback_avail ? capture_avail : playback_avail;
 
@@ -1180,7 +1187,7 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->playback_hw_params = 0;
 	driver->capture_hw_params = 0;
 	driver->playback_sw_params = 0;
-	driver->capture_hw_params = 0;
+	driver->capture_sw_params = 0;
 
 	if ((err = snd_pcm_hw_params_malloc (&driver->playback_hw_params)) < 0) {
 		jack_error ("ALSA: could no allocate playback hw params structure");

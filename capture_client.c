@@ -4,6 +4,7 @@
 #include <sndfile.h>
 #include <pthread.h>
 #include <glib.h>
+#include <getopt.h>
 
 #include <jack/jack.h>
 
@@ -13,6 +14,7 @@ typedef struct _thread_info {
     nframes_t duration;
     jack_client_t *client;
     unsigned int channels;
+    int bitdepth;
     int can_capture;
     char *path;
     int status;
@@ -212,8 +214,7 @@ setup_disk_thread (thread_info_t *info)
 	sf_info.samplerate = jack_get_sample_rate (info->client);
 	sf_info.channels = info->channels;
 	sf_info.format = SF_FORMAT_WAV|SF_FORMAT_PCM;
-	sf_info.pcmbitwidth = 16;
-//	sf_info.samples = info->duration * sf_info.samplerate;
+	sf_info.pcmbitwidth = info->bitdepth;
 
 	if ((info->sf = sf_open_write (info->path, &sf_info)) == NULL) {
 		char errstr[256];
@@ -223,7 +224,7 @@ setup_disk_thread (thread_info_t *info)
 		exit (1);
 	}
 
-	info->duration = 2 * 48000;
+	info->duration *= sf_info.samplerate;
 	info->can_capture = 0;
 
 	pthread_create (&info->thread_id, NULL, disk_thread, info);
@@ -241,24 +242,18 @@ run_disk_thread (thread_info_t *info)
 }
 
 void
-setup_ports (int argc, char *argv[], thread_info_t *info)
+setup_ports (int sources, char *source_names[], thread_info_t *info)
 {
-	char **source_names;
 	int i;
 
-	nports = argc - 2;
+	nports = sources;
 
-	source_names = (char **) malloc (sizeof (char **) * nports);
 	ports = (jack_port_t **) malloc (sizeof (jack_port_t *) * nports);
-
-	for (i = 2; i < argc; i++) {
-		source_names[i-2] = argv[i];
-	}
 
 	for (i = 0; i < nports; i++) {
 		char name[64];
 
-		sprintf (name, "input%d\n", i+1);
+		sprintf (name, "input%d", i+1);
 
 		if ((ports[i] = jack_port_register (info->client, name, JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0)) == 0) {
 			fprintf (stderr, "cannot register input port \"%s\"!\n", name);
@@ -276,7 +271,6 @@ setup_ports (int argc, char *argv[], thread_info_t *info)
 	}
 
 	info->process_go = 1;
-	free (source_names);
 }
 
 int
@@ -285,20 +279,59 @@ main (int argc, char *argv[])
 {
 	jack_client_t *client;
 	thread_info_t thread_info;
+	int c;
+	int longopt_index = 0;
+	extern int optind, opterr;
+	int show_usage = 0;
+	char *optstring = "d:f:b:h";
+	struct option long_options[] = {
+		{ "help", 1, 0, 'h' },
+		{ "duration", 1, 0, 'd' },
+		{ "file", 1, 0, 'f' },
+		{ "bitdepth", 1, 0, 'b' },
+		{ 0, 0, 0, 0 }
+	};
 
-	if (argc < 3) {
-		fprintf (stderr, "usage: jackrec filename port1 [ port2 ... ]\n");
-		return 1;
+	memset (&thread_info, 0, sizeof (thread_info));
+	opterr = 0;
+
+	while ((c = getopt_long (argc, argv, optstring, long_options, &longopt_index)) != -1) {
+		switch (c) {
+		case 1:
+			/* getopt signals end of '-' options */
+			break;
+
+		case 'h':
+			show_usage++;
+			break;
+		case 'd':
+			thread_info.duration = atoi (optarg);
+			break;
+		case 'f':
+			thread_info.path = optarg;
+			break;
+		case 'b':
+			thread_info.bitdepth = atoi (optarg);
+			break;
+		default:
+			fprintf (stderr, "error\n");
+			show_usage++;
+			break;
+		}
 	}
-	
+
+	if (show_usage || thread_info.path == NULL || optind == argc) {
+		fprintf (stderr, "usage: jackrec -f filename [ -d second ] [ -b bitdepth ] port1 [ port2 ... ]\n");
+		exit (1);
+	}
+
 	if ((client = jack_client_new ("jackrec")) == 0) {
 		fprintf (stderr, "jack server not running?\n");
-		return 1;
+		exit (1);
 	}
 
 	thread_info.client = client;
-	thread_info.path = argv[1];
-	thread_info.channels = argc - 2;
+	thread_info.channels = argc - optind;
 	thread_info.process_go = 0;
 
 	setup_disk_thread (&thread_info);
@@ -310,7 +343,7 @@ main (int argc, char *argv[])
 		fprintf (stderr, "cannot activate client");
 	}
 
-	setup_ports (argc, argv, &thread_info);
+	setup_ports (argc - optind, &argv[optind], &thread_info);
 
 	run_disk_thread (&thread_info);
 
