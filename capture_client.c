@@ -1,3 +1,23 @@
+/*
+    Copyright (C) 2001 Paul Davis
+    
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+    $Id$
+*/
+
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -18,7 +38,7 @@ typedef struct _thread_info {
     int can_capture;
     char *path;
     int status;
-    int process_go;
+    int can_process;
 } thread_info_t;
 
 unsigned int nports;
@@ -110,7 +130,7 @@ disk_thread (void *arg)
 
 	/* preload the buffer cache */
 
-	for (i = 0; i < 5; i++) {
+	for (i = 0; i < 8; i++) {
 		buf = sample_buffer_new (jack_get_buffer_size (info->client), info->channels);
 		put_free_buffer (buf);
 	}
@@ -172,9 +192,13 @@ process (nframes_t nframes, void *arg)
 	sample_buffer_t *buf;
 	unsigned int i;
 
-	if (!info->process_go) {
+	if (!info->can_process) {
 		return 0;
 	}
+
+	/* we don't like taking locks, but until we have a lock
+	   free ringbuffer written in C, this is what has to be done
+	*/
 
 	pthread_mutex_lock (&buffer_lock);
 
@@ -184,10 +208,6 @@ process (nframes_t nframes, void *arg)
 		in = (sample_t *) jack_port_get_buffer (ports[i], nframes);
 		memcpy (buf->data[i], in, sizeof (sample_t) * nframes);
 	}
-
-	/* we don't like taking locks, but until we have a lock
-	   free ringbuffer written in C, this is what has to be done
-	*/
 
 	put_write_buffer (buf);
 
@@ -270,7 +290,7 @@ setup_ports (int sources, char *source_names[], thread_info_t *info)
 		} 
 	}
 
-	info->process_go = 1;
+	info->can_process = 1;
 }
 
 int
@@ -332,7 +352,7 @@ main (int argc, char *argv[])
 
 	thread_info.client = client;
 	thread_info.channels = argc - optind;
-	thread_info.process_go = 0;
+	thread_info.can_process = 0;
 
 	setup_disk_thread (&thread_info);
 
