@@ -2401,8 +2401,7 @@ jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port, 
 
 		
 		if ((toward_port && (connection->source->shared == port->shared)) ||
-		    /* !toward_port is implicit */
-		    (connection->destination->shared == port->shared)) {
+		    (!toward_port && (connection->destination->shared == port->shared))) {
 			continue;
 		}
 
@@ -2448,10 +2447,10 @@ jack_compute_all_port_total_latencies (jack_engine_t *engine)
 
 	for (i = 0; i < engine->control->port_max; i++) {
 		if (shared[i].in_use) {
-			if (shared->flags & JackPortIsOutput) {
-				toward_port = TRUE;
-			} else {
+			if (shared[i].flags & JackPortIsOutput) {
 				toward_port = FALSE;
+			} else {
+				toward_port = TRUE;
 			}
 			shared[i].total_latency = jack_get_port_total_latency (engine, &engine->internal_ports[i], 0, toward_port);
 		}

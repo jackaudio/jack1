@@ -12,10 +12,14 @@ main (int argc, char *argv[])
 	const char **ports, **connections;
 	unsigned int i, j;
 	int show_con = 0;
+	int show_latency = 0;
 
 	for (i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-c")) {
 			show_con = 1;
+		}
+		if (!strcmp(argv[i], "-l")) {
+			show_latency = 1;
 		}
 	}
 
@@ -36,6 +40,13 @@ main (int argc, char *argv[])
 					printf ("   %s\n", connections[j]);
 				}
 				free (connections);
+			}
+		}
+		if (show_latency) {
+			jack_port_t *port = jack_port_by_name (client, ports[i]);
+			if (port) {
+				printf ("	latency = %lu frames\n", jack_port_get_total_latency (client, port));
+				free (port);
 			}
 		}
 	}
