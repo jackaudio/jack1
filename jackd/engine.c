@@ -116,7 +116,6 @@ static void jack_engine_delay (jack_engine_t *engine,
 static void jack_engine_driver_exit (jack_engine_t* engine);
 static int  jack_start_freewheeling (jack_engine_t* engine);
 static int  jack_stop_freewheeling (jack_engine_t* engine);
-static int  jack_start_watchdog (jack_engine_t *engine);
 static int jack_client_feeds_transitive (jack_client_internal_t *source,
 					 jack_client_internal_t *dest);
 static int jack_client_sort (jack_client_internal_t *a,
@@ -689,7 +688,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 			    "(subgraph_wait_fd=%d, status = %d, state = %s)", 
 			    client->control->name,
 			    client->subgraph_wait_fd, status, 
-			    client_state_names[client->control->state]);
+			    jack_client_state_name (client));
 		status = 1;
 	}
 
@@ -891,6 +890,55 @@ jack_engine_post_process (jack_engine_t *engine)
 
 	jack_calc_cpu_load (engine);
 }
+
+#ifndef JACK_USE_MACH_THREADS
+static void *
+jack_watchdog_thread (void *arg)
+{
+	jack_engine_t *engine = (jack_engine_t *) arg;
+
+	engine->watchdog_check = 0;
+
+	while (1) {
+		sleep (5);
+		if ( engine->watchdog_check == 0) {
+
+			jack_error ("jackd watchdog: timeout - killing jackd");
+
+			/* Kill the current client's process group. */
+			if (engine->current_client) {
+					kill (-engine->current_client->
+					      control->pgrp, SIGKILL);
+			}
+
+			/* kill our process group, try to get a dump */
+			kill (-getpgrp(), SIGABRT);
+			/*NOTREACHED*/
+			exit (1);
+		}
+		engine->watchdog_check = 0;
+	}
+}
+
+static int
+jack_start_watchdog (jack_engine_t *engine)
+{
+	int watchdog_priority = engine->rtpriority + 10;
+	int max_priority = sched_get_priority_max (SCHED_FIFO);
+
+	if ((max_priority != -1) &&
+	    (max_priority < watchdog_priority))
+		watchdog_priority = max_priority;
+	
+	if (jack_create_thread (&engine->watchdog_thread, watchdog_priority,
+				TRUE, jack_watchdog_thread, engine)) {
+		jack_error ("cannot start watchdog thread");
+		return -1;
+	}
+
+	return 0;
+}
+#endif /* !JACK_USE_MACH_THREADS */
 
 static jack_driver_info_t *
 jack_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc)
@@ -1712,53 +1760,6 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 			    &jack_server_thread, engine);
 
 	return engine;
-}
-
-static void *
-jack_watchdog_thread (void *arg)
-{
-	jack_engine_t *engine = (jack_engine_t *) arg;
-
-	engine->watchdog_check = 0;
-
-	while (1) {
-		sleep (5);
-		if ( engine->watchdog_check == 0) {
-
-			jack_error ("jackd watchdog: timeout - killing jackd");
-
-			/* Kill the current client's process group. */
-			if (engine->current_client) {
-					kill (-engine->current_client->
-					      control->pgrp, SIGKILL);
-			}
-
-			/* kill our process group, try to get a dump */
-			kill (-getpgrp(), SIGABRT);
-			/*NOTREACHED*/
-			exit (1);
-		}
-		engine->watchdog_check = 0;
-	}
-}
-
-static int
-jack_start_watchdog (jack_engine_t *engine)
-{
-	int watchdog_priority = engine->rtpriority + 10;
-	int max_priority = sched_get_priority_max (SCHED_FIFO);
-
-	if ((max_priority != -1) &&
-	    (max_priority < watchdog_priority))
-		watchdog_priority = max_priority;
-	
-	if (jack_create_thread (&engine->watchdog_thread, watchdog_priority,
-				TRUE, jack_watchdog_thread, engine)) {
-		jack_error ("cannot start watchdog thread");
-		return -1;
-	}
-
-	return 0;
 }
 
 static void

@@ -19,18 +19,24 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-static char *client_state_names[] = {
-	"Not triggered",
-	"Triggered",
-	"Running",
-	"Finished"
-};
-
 static inline int 
 jack_client_is_internal (jack_client_internal_t *client)
 {
 	return (client->control->type == ClientInternal) ||
 		(client->control->type == ClientDriver);
+}
+
+static inline char *
+jack_client_state_name (jack_client_internal_t *client)
+{
+	static char *client_state_names[] = {
+		"Not triggered",
+		"Triggered",
+		"Running",
+		"Finished"
+	};
+
+	return client_state_names[client->control->state];
 }
 
 int	jack_client_activate (jack_engine_t *engine, jack_client_id_t id);

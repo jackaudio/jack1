@@ -190,9 +190,7 @@ jack_remove_clients (jack_engine_t* engine)
 					 "client %s state = %s errors"
 					 " = %d\n", 
 					 client->control->name,
-					 client_state_names[
-						 client->control->state
-						 ],
+					 jack_client_state_name (client),
 					 client->error);
 				jack_remove_client (engine,
 						    (jack_client_internal_t *)
@@ -202,9 +200,7 @@ jack_remove_clients (jack_engine_t* engine)
 					 "client %s state = %s errors"
 					 " = %d\n", 
 					 client->control->name,
-					 client_state_names[
-						 client->control->state
-						 ],
+					 jack_client_state_name (client),
 					 client->error);
 				jack_zombify_client (engine,
 						     (jack_client_internal_t *)
@@ -827,7 +823,7 @@ jack_client_disconnect (jack_engine_t *engine, int fd)
         if (client) {
 		VERBOSE (engine, "removing disconnected client %s state = "
 			 "%s errors = %d\n", client->control->name,
-			 client_state_names[client->control->state],
+			 jack_client_state_name (client),
 			 client->error);
 		jack_remove_client(engine, client);
 		jack_sort_graph (engine);
