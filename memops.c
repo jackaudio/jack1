@@ -64,6 +64,109 @@ void sample_move_dS_s32u24 (sample_t *dst, char *src, unsigned long nsamples, un
 	}
 }	
 
+void sample_move_dither_rect_d32u24_sS (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
+
+{
+	/* ALERT: signed sign-extension portability !!! */
+	sample_t  x;
+	long long y;
+
+	while (nsamples--) {
+		x = *src * SAMPLE_MAX_16BIT;
+		x -= (float)rand() / (float)RAND_MAX;
+		y = (long long)f_round(x);
+		y <<= 16;
+		if (y > INT_MAX) {
+			*((int *) dst) = INT_MAX;
+		} else if (y < INT_MIN) {
+			*((int *) dst) = INT_MIN;
+		} else {
+			*((int *) dst) = (int)y;
+		}
+		dst += dst_skip;
+		src++;
+	}
+}	
+
+void sample_move_dither_tri_d32u24_sS (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
+	
+{
+	sample_t  x;
+	float     r;
+	float     rm1 = state->rm1;
+	long long y;
+
+	while (nsamples--) {
+		x = *src * (float)SAMPLE_MAX_16BIT;
+		r = 2.0f * (float)rand() / (float)RAND_MAX - 1.0f;
+		x += r - rm1;
+		rm1 = r;
+		/* swh: This could be some inline asm on x86 */
+		y = (long long)f_round(x);
+		y <<= 16;
+
+		if (y > INT_MAX) {
+			*((int *) dst) = INT_MAX;
+		} else if (y < INT_MIN) {
+			*((int *) dst) = INT_MIN;
+		} else {
+			*((int *) dst) = (int)y;
+		}
+
+		dst += dst_skip;
+		src++;
+	}
+	state->rm1 = rm1;
+}
+
+void sample_move_dither_shaped_d32u24_sS (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
+	
+{
+	sample_t     x;
+	sample_t     xe; /* the innput sample - filtered error */
+	sample_t     xp; /* x' */
+	float        r;
+	float        rm1 = state->rm1;
+	unsigned int idx = state->idx;
+	long long    y;
+
+	while (nsamples--) {
+		x = *src * (float)SAMPLE_MAX_16BIT;
+		r = 2.0f * (float)rand() / (float)RAND_MAX - 1.0f;
+		/* Filter the error with Lipshitz's minimally audible FIR:
+		   [2.033 -2.165 1.959 -1.590 0.6149] */
+		xe = x
+		     - state->e[idx] * 2.033f
+		     + state->e[(idx - 1) & DITHER_BUF_MASK] * 2.165f
+		     - state->e[(idx - 2) & DITHER_BUF_MASK] * 1.959f
+		     + state->e[(idx - 3) & DITHER_BUF_MASK] * 1.590f
+		     - state->e[(idx - 4) & DITHER_BUF_MASK] * 0.6149f;
+		xp = xe + r - rm1;
+		rm1 = r;
+
+		/* This could be some inline asm on x86 */
+		y = (long long)f_round(xp);
+
+		/* Intrinsic z^-1 delay */
+		idx = (idx + 1) & DITHER_BUF_MASK;
+		state->e[idx] = y - xe;
+
+		y <<= 16;
+
+		if (y > INT_MAX) {
+			*((int *) dst) = INT_MAX;
+		} else if (y < INT_MIN) {
+			*((int *) dst) = INT_MIN;
+		} else {
+			*((int *) dst) = (int)y;
+		}
+		dst += dst_skip;
+		src++;
+	}
+	state->rm1 = rm1;
+	state->idx = idx;
+}
+
 void sample_move_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 	
 {
