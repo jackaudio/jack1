@@ -4,33 +4,45 @@
 
 Version: $Id$
 
+Note to developers! You can update this list directly or alternatively
+send a change request to Kai Vehmanen (mailto:k_at_eca.cx).
+
 -----------------------------------------------------------------------
 
 TO BE DECIDED (owner)
 
+- whether to hide the transport.h structs from clients (kaiv)
 - dropping the use of CAP_RESOURCE (nando)
 - whether to default to triangular dithering the at 16bit (swh)
 
 TODO (owner)
 
+- do build static libraries of drivers and ip-clients (kaiv)
+- add explanation of protocol versioning to README.developers (kaiv)
+- add Pauls graph/subgraph explanation to the design doc (kaiv)
+- add support for custom jackd --tmpdir in libjack (pbd)
+- add a sane way handle situations where the unix sockets already 
+  exist when jackd is started (kaiv)
+- add code to enforce the 'bufsize==2^x' rule (kaiv)
 - update at least the user-visible copyrights with year 2003 (kaiv)
 - capture_client has pthread_mutex_lock() in its process() (pbd)
-- server<->libjack interface version handshake (kaiv)
 - figure out how to have pools of buffers for ports by type (pbd)
 - proper handling of client return values in libjack (kaiv)
 - passing args to drivers and clients? (pbd)
-- getting callbacks and args from dynamically loaded clients? (pbd)
-- how do dynamically loaded clients (un)register ports, activate, etc. (pbd)
 - pool based malloc for rt client-local mem allocation (pbd)
 
 TO THINK ABOUT
 
 - multiple port buffer shm segments (i.e. dynamically
-         increase the total number of ports in the system) 
+  increase the total number of ports in the system) 
 
 CLOSED (date,who,comment)
 
-- jack_deactive called unconditionally in jack_client_close (05.02.2003, kaiv, fixed)
-- call time client before all others (28.01.2003, kaiv, another solution)
+- getting callbacks and args from dynamically loaded clients? (2003/02/25, pbd, see jack/jack.h)
+- how do dynamically loaded clients (un)register ports, activate, etc. (2003/02/25, pbd, see example-clients/inprocess.c)
+- server<->libjack interface version handshake (2003/02/11, trutkin, done)
+- alsa-driver parameter parsing patch (2003/02/25, joq, done)
+- jack_deactive called unconditionally in jack_client_close (2003/02/05, kaiv, fixed)
+- call time client before all others (2003/01/28, kaiv, another solution)
 
 -----------------------------------------------------------------------
