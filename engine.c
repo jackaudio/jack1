@@ -1834,14 +1834,14 @@ jack_port_do_connect (jack_engine_t *engine,
 
 	pthread_mutex_lock (&engine->graph_lock);
 
-	if (dstport->shared->type_info.mixdown == NULL && dstport->connections) {
+	if (dstport->connections && dstport->shared->type_info.mixdown == NULL) {
 		jack_error ("cannot make multiple connections to a port of type [%s]", dstport->shared->type_info.type_name);
 		free (connection);
 		return -1;
 	} else {
 		dstport->connections = g_slist_prepend (dstport->connections, connection);
 		srcport->connections = g_slist_prepend (srcport->connections, connection);
-		
+
 		jack_sort_graph (engine, FALSE);
 		
 		jack_send_connection_notification (engine, srcport->shared->client_id, src_id, dst_id, TRUE);
@@ -2305,6 +2305,7 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 
 	node = port->connections;
 	input = (jack_port_shared_t *) node->data;
+
 	memcpy (port->shared->buffer, input->buffer, sizeof (sample_t) * nframes);
 	
 	for (node = g_slist_next (node); node; node = g_slist_next (node)) {

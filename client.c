@@ -183,7 +183,6 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 		shared = jack_port_shared_by_id (client, event->y.other_id);
 		control_port = jack_port_by_id (client, event->x.self_id);
 		control_port->connections = g_slist_prepend (control_port->connections, shared);
-		printf ("%s connected to %s\n", control_port->shared->name, shared->name);
 		break;
 
 	case PortDisconnected:

@@ -27,7 +27,7 @@
 typedef struct _jack_port_type_info {
     const char *type_name;                       /* what do you think ? */
 
-    void (*mixdown)(jack_port_t *, nframes_t);  /* function to mixdown multiple inputs to a buffer. can be
+    void (*mixdown)(jack_port_t *, nframes_t);   /* function to mixdown multiple inputs to a buffer. can be
 						    NULL, indicating that multiple input connections
 						    are not legal for this data type.
 						 */
@@ -55,10 +55,10 @@ typedef struct _jack_port_shared {
     void                      *buffer;      
     unsigned long              flags; 
     unsigned long              buffer_size;
-    jack_port_id_t            id;
+    jack_port_id_t             id;
     char                       name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
-    jack_port_type_info_t     type_info;
-    jack_client_id_t          client_id;
+    jack_port_type_info_t      type_info;
+    jack_client_id_t           client_id;
 
     char                       in_use : 1;
     char                       locked : 1;
@@ -71,9 +71,9 @@ typedef struct _jack_port_shared {
 
 struct _jack_port {
     struct _jack_port_shared *shared;
-    GSList                    *connections;
+    GSList                   *connections;
     struct _jack_port        *tied;
-    void                      *own_buffer;
+    void                     *own_buffer;
 };
 
 /* this is the structure allocated by the engine in local
@@ -82,7 +82,7 @@ struct _jack_port {
 
 typedef struct _jack_port_internal {
     struct _jack_port_shared *shared;
-    GSList                    *connections;
+    GSList                   *connections;
 } jack_port_internal_t;
 
 #endif /* __jack_port_h__ */

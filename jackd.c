@@ -53,6 +53,17 @@ catch_signals (void)
 	sigaddset(&signals, SIGTTIN);
 	sigaddset(&signals, SIGTTOU);
 
+	/* this can make debugging a pain, but it also makes
+	   segv-exits cleanup after themselves rather than
+	   leaving the audio thread active. i still
+	   find it truly wierd that _exit() or whatever is done
+	   by the default SIGSEGV handler does not
+	   cancel all threads in a process, but what
+	   else can we do?
+	*/
+
+	sigaddset(&signals, SIGSEGV);
+
 	/* all child threads will inherit this mask */
 
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
