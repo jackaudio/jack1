@@ -83,13 +83,14 @@ jack_release_shm_info (jack_shm_registry_index_t index)
 }
 
 void
-jack_cleanup_shm (void)
+jack_cleanup_shm (const char *server_name)
 {
+	//JOQ: only clean up shm for this server
 	int i;
 	int destroy;
 	jack_shm_info_t copy;
 
-	jack_initialize_shm ();
+	jack_initialize_shm (server_name);
 	jack_shm_lock_registry ();
 
 	for (i = 0; i < MAX_SHM_ID; i++) {
@@ -133,8 +134,9 @@ jack_cleanup_shm (void)
 #ifdef USE_POSIX_SHM
 
 int
-jack_initialize_shm (void)
+jack_initialize_shm (const char *server_name)
 {
+	//JOQ: specific init for this server
 	int shm_fd;
 	jack_shmsize_t size;
 	int new_registry = FALSE;
@@ -324,8 +326,9 @@ jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 #define JACK_SHM_REGISTRY_KEY 0x282929
 
 int
-jack_initialize_shm (void)
+jack_initialize_shm (const char *server_name)
 {
+	//JOQ: specific init for this server
 	int shmflags;
 	int shmid;
 	key_t key;

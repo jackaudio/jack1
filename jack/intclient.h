@@ -116,7 +116,7 @@ jack_intclient_t jack_internal_client_load (jack_client_t *client,
  * @param client unloading JACK client's handle.
  *
  * @param intclient handle returned from jack_internal_client_load() or
- * jack_internal_client_attach().
+ * jack_internal_client_handle().
  *
  * @return 0 if successful, otherwise @ref JackStatus bits.
  */

@@ -1,6 +1,6 @@
 /* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
- *  Internal client handling interfaces for JACK engine.
+ *  Client creation and destruction interfaces for JACK engine.
  *
  *  Copyright (C) 2001-2003 Paul Davis
  *  Copyright (C) 2004 Jack O'Quin
@@ -39,8 +39,8 @@
 #define JACK_ERROR_WITH_SOCKETS 10000000
 
 static void
-jack_client_disconnect (jack_engine_t *engine, jack_client_internal_t *client)
-
+jack_client_disconnect_ports (jack_engine_t *engine,
+			      jack_client_internal_t *client)
 {
 	JSList *node;
 	jack_port_internal_t *port;
@@ -93,7 +93,7 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	client->control->dead = TRUE;
 	
-	jack_client_disconnect (engine, client);
+	jack_client_disconnect_ports (engine, client);
 	jack_client_do_deactivate (engine, client, FALSE);
 }
 
@@ -598,7 +598,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 }
 
 jack_client_internal_t *
-jack_setup_driver_client (jack_engine_t *engine, char *name)
+jack_create_driver_client (jack_engine_t *engine, char *name)
 {
 	jack_client_connect_request_t req;
 	jack_status_t status;
@@ -636,7 +636,7 @@ handle_unload_client (jack_engine_t *engine, jack_client_id_t id)
 }
 
 int
-jack_new_client_request (jack_engine_t *engine, int client_fd)
+jack_client_create (jack_engine_t *engine, int client_fd)
 {
 	/* called *without* the request_lock */
 	jack_client_internal_t *client;
@@ -689,7 +689,7 @@ jack_new_client_request (jack_engine_t *engine, int client_fd)
 	} else {
 		strcpy (res.fifo_prefix, engine->fifo_prefix);
 	}
-	
+
 	if (write (client->request_fd, &res, sizeof (res)) != sizeof (res)) {
 		jack_error ("cannot write connection response to client");
 		jack_client_delete (engine, client);
@@ -776,7 +776,7 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 }	
 
 int
-jack_client_socket_error (jack_engine_t *engine, int fd)
+jack_client_disconnect (jack_engine_t *engine, int fd)
 {
 	jack_client_internal_t *client = 0;
 	JSList *node;

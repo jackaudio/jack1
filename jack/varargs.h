@@ -36,8 +36,7 @@ static inline void
 jack_varargs_init (jack_varargs_t *va)
 {
 	memset (va, 0, sizeof(jack_varargs_t));
-	if ((va->server_name = getenv("JACK_DEFAULT_SERVER")) == NULL)
-		va->server_name = "default";
+	va->server_name = jack_default_server_name ();
 }
 
 static inline void

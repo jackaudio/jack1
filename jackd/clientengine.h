@@ -1,6 +1,7 @@
 /*
- *  Internal client handling interfaces for JACK engine.
+ *  Client creation and destruction interfaces for JACK engine.
  *
+ *  Copyright (C) 2001-2003 Paul Davis
  *  Copyright (C) 2004 Jack O'Quin
  *  
  *  This program is free software; you can redistribute it and/or
@@ -34,9 +35,12 @@ jack_client_is_internal (jack_client_internal_t *client)
 
 int	jack_client_activate (jack_engine_t *engine, jack_client_id_t id);
 int	jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id);
+int	jack_client_create (jack_engine_t *engine, int client_fd);
 void	jack_client_delete (jack_engine_t *engine,
 			    jack_client_internal_t *client);
-int	jack_client_socket_error (jack_engine_t *engine, int fd);
+int	jack_client_disconnect (jack_engine_t *engine, int fd);
+jack_client_internal_t *
+	jack_create_driver_client (jack_engine_t *engine, char *name);
 void	jack_intclient_handle_request (jack_engine_t *engine,
 				       jack_request_t *req);
 void	jack_intclient_load_request (jack_engine_t *engine,
@@ -45,7 +49,4 @@ void	jack_intclient_name_request (jack_engine_t *engine,
 				     jack_request_t *req);
 void	jack_intclient_unload_request (jack_engine_t *engine,
 				       jack_request_t *req);
-int	jack_new_client_request (jack_engine_t *engine, int client_fd);
 void	jack_remove_clients (jack_engine_t* engine);
-jack_client_internal_t *jack_setup_driver_client (jack_engine_t *engine,
-						  char *name);

@@ -1,6 +1,7 @@
 /* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
+    Copyright (C) 2004 Jack O'Quin
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -156,10 +157,75 @@ jack_port_buffer_list (jack_engine_t *engine, jack_port_internal_t *port)
 }
 
 static int
-make_sockets (int fd[2])
+make_directory (const char *path)
+{
+	struct stat statbuf;
+
+	if (stat (path, &statbuf)) {
+
+		if (errno == ENOENT) {
+			if (mkdir (path, 0700) < 0){
+				jack_error ("cannot create %s directory (%s)\n",
+					    path, strerror (errno));
+				return -1;
+			}
+		} else {
+			jack_error ("cannot stat() %s\n", path);
+			return -1;
+		}
+
+	} else {
+
+		if (!S_ISDIR (statbuf.st_mode)) {
+			jack_error ("%s already exists, but is not"
+				    " a directory!\n", path);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+static int
+make_socket_subdirectories (const char *server_name)
+{
+	struct stat statbuf;
+
+	/* check tmpdir directory */
+	if (stat (jack_tmpdir, &statbuf)) {
+		jack_error ("cannot stat() %s (%s)\n",
+			    jack_tmpdir, strerror (errno));
+		return -1;
+	} else {
+		if (!S_ISDIR(statbuf.st_mode)) {
+			jack_error ("%s exists, but is not a directory!\n",
+				    jack_tmpdir);
+			return -1;
+		}
+	}
+
+	/* create user subdirectory */
+	if (make_directory (jack_user_dir ()) < 0) {
+		return -1;
+	}
+
+	/* create server_name subdirectory */
+	if (make_directory (jack_server_dir (server_name)) < 0) {
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+make_sockets (const char *server_name, int fd[2])
 {
 	struct sockaddr_un addr;
 	int i;
+
+	if (make_socket_subdirectories (server_name) < 0) {
+		return -1;
+	}
 
 	/* First, the master server socket */
 
@@ -172,7 +238,8 @@ make_sockets (int fd[2])
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
 		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1,
-			  "%s/jack_%d_%d", jack_server_dir, getuid (), i);
+			  "%s/jack_%d_%d", jack_server_dir (server_name),
+			  getuid (), i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -210,7 +277,8 @@ make_sockets (int fd[2])
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
 		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1,
-			  "%s/jack_%d_ack_%d", jack_server_dir, getuid (), i);
+			  "%s/jack_%d_ack_%d", jack_server_dir (server_name),
+			  getuid (), i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -243,19 +311,29 @@ make_sockets (int fd[2])
 }
 
 void
-jack_cleanup_files ()
+jack_cleanup_files (const char *server_name)
 {
 	DIR *dir;
 	struct dirent *dirent;
 
-	/* its important that we remove all files that jackd creates
-	   because otherwise subsequent attempts to start jackd will
-	   believe that an instance is already running.
-	*/
+	/* On termination, we remove all files that jackd creates so
+	 * subsequent attempts to start jackd will not believe that an
+	 * instance is already running.  If the server crashes or is
+	 * terminated with SIGKILL, this is not possible.  So, cleanup
+	 * is also attempted when jackd starts.
+	 *
+	 * There are several tricky issues.  First, the previous JACK
+	 * server may have run for a different user ID, so its files
+	 * may be inaccessible.  This is handled by using a separate
+	 * JACK_TMP_DIR subdirectory for each user.  Second, there may
+	 * be other servers running with different names.  So, they
+	 * get separate subdirectories, too.
+	 */
 
-	if ((dir = opendir (jack_server_dir)) == NULL) {
-		fprintf (stderr, "jack(%d): cannot open jack FIFO directory "
-			 "(%s)\n", getpid(), strerror (errno));
+	if ((dir = opendir (jack_server_dir (server_name))) == NULL) {
+		//JOQ: is this really an error?
+		//fprintf (stderr, "jack(%d): cannot open jack FIFO directory "
+		//	 "(%s)\n", getpid(), strerror (errno));
 		return;
 	}
 
@@ -263,13 +341,18 @@ jack_cleanup_files ()
 		/* jack-99999999- is 14 chars long */
 		char name_prefix1[15];
 		char name_prefix2[15];
-		snprintf (name_prefix1, sizeof (name_prefix1), "jack-%d-", getuid ());
-		snprintf (name_prefix2, sizeof (name_prefix2), "jack_%d_", getuid ());
-		if (strncmp (dirent->d_name, name_prefix1, strlen(name_prefix1)) == 0 ||
-		    strncmp (dirent->d_name, name_prefix2, strlen(name_prefix2)) == 0) {
+		snprintf (name_prefix1, sizeof (name_prefix1),
+			  "jack-%d-", getuid ());
+		snprintf (name_prefix2, sizeof (name_prefix2),
+			  "jack_%d_", getuid ());
+		if (strncmp (dirent->d_name, name_prefix1,
+			     strlen(name_prefix1)) == 0
+		    || strncmp (dirent->d_name, name_prefix2,
+				strlen(name_prefix2)) == 0) {
 			char fullpath[PATH_MAX+1];
 			snprintf (fullpath, sizeof (fullpath), "%s/%s",
-				  jack_server_dir, dirent->d_name);
+				  jack_server_dir (server_name),
+				  dirent->d_name);
 			unlink (fullpath);
 		} 
 	}
@@ -926,7 +1009,7 @@ jack_engine_load_driver (jack_engine_t *engine,
 		return -1;
 	}
 
-	if ((client = jack_setup_driver_client (engine, info->client_name)
+	if ((client = jack_create_driver_client (engine, info->client_name)
 		    ) == NULL) {
 		return -1;
 	}
@@ -1357,7 +1440,7 @@ jack_server_thread (void *arg)
 			}
 
 			if (pfd[i].revents & ~POLLIN) {
-				jack_client_socket_error (engine, pfd[i].fd);
+				jack_client_disconnect (engine, pfd[i].fd);
 			} else if (pfd[i].revents & POLLIN) {
 				if (handle_external_client_request
 				    (engine, pfd[i].fd)) {
@@ -1375,8 +1458,7 @@ jack_server_thread (void *arg)
 				       this condition as a socket error
 				       and remove the client.
                                     */
-                                    handle_client_socket_error(engine,
-							       pfd[i].fd);
+                                    jack_client_disconnect(engine, pfd[i].fd);
 #endif /* JACK_USE_MACH_THREADS */
 				}
 			}
@@ -1401,8 +1483,7 @@ jack_server_thread (void *arg)
 				     &client_addrlen)) < 0) {
 				jack_error ("cannot accept new connection (%s)",
 					    strerror (errno));
-			} else if (jack_new_client_request (engine,
-							    client_socket)
+			} else if (jack_client_create (engine, client_socket)
 				   < 0) {
 				jack_error ("cannot complete client "
 					    "connection process");
@@ -1410,7 +1491,7 @@ jack_server_thread (void *arg)
 			}
 		}
 		
-		/* Possibly, jack_new_client_request() may have
+		/* Possibly, jack_client_create() may have
 		 * realloced engine->pfd.  We depend on that being
 		 * done within this thread.  That is currently true,
 		 * since external clients are only created here. */
@@ -1450,8 +1531,9 @@ jack_server_thread (void *arg)
 
 jack_engine_t *
 jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
-		 int temporary, int verbose, int client_timeout,
-		 unsigned int port_max, pid_t wait_pid, JSList *drivers)
+		 const char *server_name, int temporary, int verbose,
+		 int client_timeout, unsigned int port_max, pid_t wait_pid,
+		 JSList *drivers)
 {
 	jack_engine_t *engine;
 	unsigned int i;
@@ -1482,6 +1564,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->rtpriority = rtpriority;
 	engine->silent_buffer = 0;
 	engine->verbose = verbose;
+	engine->server_name = server_name;
 	engine->temporary = temporary;
 	engine->freewheeling = 0;
 	engine->wait_pid = wait_pid;
@@ -1510,7 +1593,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	srandom (time ((time_t *) 0));
 
-	if (jack_initialize_shm ()) {
+	if (jack_initialize_shm (engine->server_name)) {
 		return 0;
 	}
         
@@ -1524,8 +1607,8 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	}
 
 	if (jack_attach_shm (&engine->control_shm)) {
-		jack_error ("cannot attach to engine control shared memory (%s)",
-			    strerror (errno));
+		jack_error ("cannot attach to engine control shared memory"
+			    " (%s)", strerror (errno));
 		jack_destroy_shm (&engine->control_shm);
 		return 0;
 	}
@@ -1579,7 +1662,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 		engine->internal_ports[i].connections = 0;
 	}
 
-	if (make_sockets (engine->fds) < 0) {
+	if (make_sockets (engine->server_name, engine->fds) < 0) {
 		jack_error ("cannot create server sockets");
 		return 0;
 	}
@@ -1647,13 +1730,16 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 #endif /* USE_MLOCK */
 
 	engine->control->engine_ok = 1;
+
 	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix),
-		  "%s/jack-%d-ack-fifo-%d", jack_server_dir, getuid (), getpid());
+		  "%s/jack-%d-ack-fifo-%d",
+		  jack_server_dir (engine->server_name),
+		  getuid (), getpid ());
 
 	(void) jack_get_fifo_fd (engine, 0);
 
-	jack_create_thread (&engine->server_thread, 0, FALSE, &jack_server_thread,
-			    engine);
+	jack_create_thread (&engine->server_thread, 0, FALSE,
+			    &jack_server_thread, engine);
 
 	return engine;
 }

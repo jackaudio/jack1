@@ -51,9 +51,10 @@ static struct stat pipe_stat;
 
 #endif /* USE_CAPABILITIES */
 
-static JSList * drivers = NULL;
+static JSList *drivers = NULL;
 static sigset_t signals;
-static jack_engine_t *engine = 0;
+static jack_engine_t *engine = NULL;
+static char *server_name = NULL;
 static int realtime = 0;
 static int realtime_priority = 10;
 static int do_mlock = 1;
@@ -137,7 +138,7 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	/* get the engine/driver started */
 
 	if ((engine = jack_engine_new (realtime, realtime_priority, 
-				       do_mlock, do_unlock,
+				       do_mlock, do_unlock, server_name,
 				       temporary, verbose, client_timeout,
 				       port_max, getpid(), drivers)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
@@ -352,6 +353,7 @@ static void usage (FILE *file)
 	copyright (file);
 	fprintf (file, "\n"
 "usage: jackd [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
+"             [ --name OR -n server-name ]\n"
 "             [ --no-mlock OR -m ]\n"
 "             [ --unlock OR -u ]\n"
 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
@@ -390,7 +392,7 @@ main (int argc, char *argv[])
 
 {
 	jack_driver_desc_t * desc;
-	const char *options = "-ad:P:uvshVRTFl:t:mp:";
+	const char *options = "-ad:P:uvshVRTFl:t:mn:p:";
 	struct option long_options[] = 
 	{ 
 		{ "driver", 1, 0, 'd' },
@@ -398,6 +400,7 @@ main (int argc, char *argv[])
 		{ "help", 0, 0, 'h' },
 		{ "port-max", 1, 0, 'p' },
 		{ "no-mlock", 0, 0, 'm' },
+		{ "name", 0, 0, 'n' },
 		{ "unlock", 0, 0, 'u' },
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
@@ -410,8 +413,8 @@ main (int argc, char *argv[])
 	int opt = 0;
 	int option_index = 0;
 	int seen_driver = 0;
-	char *driver_name = 0;
-	char **driver_args = 0;
+	char *driver_name = NULL;
+	char **driver_args = NULL;
 	JSList * driver_params;
 	int driver_nargs = 1;
 	int show_version = 0;
@@ -475,6 +478,10 @@ main (int argc, char *argv[])
 			jack_set_error_function (silent_jack_error_callback);
 			break;
 
+		case 'n':
+			server_name = optarg;
+			break;
+
 		case 'm':
 			do_mlock = 0;
 			break;
@@ -508,7 +515,8 @@ main (int argc, char *argv[])
 			break;
 
 		default:
-			fprintf (stderr, "unknown option character %c\n", optopt);
+			fprintf (stderr, "unknown option character %c\n",
+				 optopt);
 			/*fallthru*/
 		case 'h':
 			usage (stdout);
@@ -517,18 +525,10 @@ main (int argc, char *argv[])
 	}
 
 	if (show_version) {
-#ifdef DEFAULT_TMP_DIR
 		printf ( "jackd version " VERSION 
 				" tmpdir " DEFAULT_TMP_DIR 
 				" protocol " PROTOCOL_VERSION
 				"\n");
-#else
-		printf ( "jackd version " VERSION 
-				" tmpdir " "/tmp" 
-				" protocol " PROTOCOL_VERSION
-				"\n");
-#endif
-		return -1;
 	}
 
 	if (!seen_driver) {
@@ -537,15 +537,13 @@ main (int argc, char *argv[])
 	}
 
 	drivers = jack_drivers_load ();
-	if (!drivers)
-	{
+	if (!drivers) {
 		fprintf (stderr, "jackd: no drivers found; exiting\n");
 		exit (1);
 	}
 
 	desc = jack_find_driver_descriptor (driver_name);
-	if (!desc)
-	{
+	if (!desc) {
 		fprintf (stderr, "jackd: unknown driver '%s'\n", driver_name);
 		exit (1);
 	}
@@ -569,20 +567,23 @@ main (int argc, char *argv[])
 		driver_args[i] = argv[optind++];
 	}
 
-	i = jack_parse_driver_params (desc, driver_nargs, driver_args, &driver_params);
-	if (i)
+	if (jack_parse_driver_params (desc, driver_nargs,
+				      driver_args, &driver_params)) {
 		exit (0);
+	}
+
+	if (server_name == NULL)
+		server_name = jack_default_server_name ();
 
 	copyright (stdout);
 
-	jack_cleanup_shm ();
-	jack_cleanup_files ();
+	jack_cleanup_shm (server_name);
+	jack_cleanup_files (server_name);
 
 	jack_main (desc, driver_params);
 
-	jack_cleanup_shm ();
-	jack_cleanup_files ();
+	jack_cleanup_shm (server_name);
+	jack_cleanup_files (server_name);
 
 	exit (0);
 }
-

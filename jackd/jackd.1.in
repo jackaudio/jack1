@@ -47,6 +47,11 @@ show how to list them.
 \fB\-m, \-\-no\-mlock\fR
 Do not attempt to lock memory, even if \fB\-\-realtime\fR.
 .TP
+\fB\-n, \-\-name\fR \fIserver\-name\fR
+Name this \fBjackd\fR instance \fIserver\-name\fR.  If unspecified,
+this name comes from the \fB$JACK_DEFAULT_SERVER\fR environment
+variable.  It will be "default" if that is not defined.
+.TP
 \fB\-p, \-\-port\-max \fI n\fR
 Set the maximum number of ports the JACK server can manage.  
 The default value is 128.
@@ -371,7 +376,15 @@ defined in the environment of the calling process.  In the future this
 will become normal behavior.  In either case, defining
 \fB$JACK_NO_START_SERVER\fR disables this feature.
 
-To change where JACK looks for the backend drivers, set \fB$JACK_DRIVER_DIR\fR.
+To change where JACK looks for the backend drivers, set
+\fB$JACK_DRIVER_DIR\fR.
+
+\fB$JACK_DEFAULT_SERVER\fR specifies the default server name.  If not
+defined, the string "default" is used.  If set in their respective
+environments, this affects \fBjackd\fR unless its \fB\-\-name\fR
+parameter is set, and all JACK clients unless they pass an explicit
+name to \fBjack_client_open()\fR.
+
 .SH "SEE ALSO:"
 .PP
 .I http://jackit.sourceforge.net

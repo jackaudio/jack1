@@ -63,16 +63,6 @@ JACK_TIME_GLOBAL_DECL;			/* One instance per process. */
 #include <jack/timestamps.h>
 #endif /* WITH_TIMESTAMPS */
 
-char *jack_server_dir = DEFAULT_TMP_DIR;
-
-void
-jack_set_server_dir (const char *path)
-{
-	jack_error ("jack_set_server_dir() is deprecated.\n"
-		    "Please contact the program's author");
-	jack_server_dir = strdup (path);
-}
-
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
 void *jack_zero_filled_buffer = NULL;
@@ -302,7 +292,8 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 	sprintf (path, "%s-%" PRIu32, client->fifo_prefix, event->x.n);
 
 	if ((client->graph_wait_fd = open (path, O_RDONLY|O_NONBLOCK)) < 0) {
-		jack_error ("cannot open specified fifo [%s] for reading (%s)", path, strerror (errno));
+		jack_error ("cannot open specified fifo [%s] for reading (%s)",
+			    path, strerror (errno));
 		return -1;
 	}
 
@@ -311,14 +302,16 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 	sprintf (path, "%s-%" PRIu32, client->fifo_prefix, event->x.n+1);
 	
 	if ((client->graph_next_fd = open (path, O_WRONLY|O_NONBLOCK)) < 0) {
-		jack_error ("cannot open specified fifo [%s] for writing (%s)", path, strerror (errno));
+		jack_error ("cannot open specified fifo [%s] for writing (%s)",
+			    path, strerror (errno));
 		return -1;
 	}
 
 	client->upstream_is_jackd = event->y.n;
 	client->pollmax = 2;
 
-	DEBUG ("opened new graph_next_fd %d (%s) (upstream is jackd? %d)", client->graph_next_fd, path, 
+	DEBUG ("opened new graph_next_fd %d (%s) (upstream is jackd? %d)",
+	       client->graph_next_fd, path, 
 	       client->upstream_is_jackd);
 
 	/* If the client registered its own callback for graph order events,
@@ -345,13 +338,12 @@ server_connect (const char *server_name)
 		return -1;
 	}
 
-	//JOQ: temporary debug code
-	//fprintf (stderr, "DEBUG: connecting to `%s' server\n", server_name);
+	//JOQ: temporary debug message
+	fprintf (stderr, "DEBUG: connecting to `%s' server\n", server_name);
 
-	//JOQ: use server_name as part of socket path
 	addr.sun_family = AF_UNIX;
 	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d_%d",
-		  jack_server_dir, getuid (), which);
+		  jack_server_dir (server_name), getuid (), which);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		close (fd);
@@ -362,7 +354,7 @@ server_connect (const char *server_name)
 }
 
 static int
-server_event_connect (jack_client_t *client)
+server_event_connect (jack_client_t *client, const char *server_name)
 {
 	int fd;
 	struct sockaddr_un addr;
@@ -377,7 +369,7 @@ server_event_connect (jack_client_t *client)
 
 	addr.sun_family = AF_UNIX;
 	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d_ack_0",
-		  jack_server_dir, getuid () );
+		  jack_server_dir (server_name), getuid () );
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server for events",
@@ -501,14 +493,14 @@ int
 start_server (jack_options_t options)
 {
 	if ((options & JackNoStartServer)
-	    || (getenv("JACK_NO_START_SERVER") != NULL)) {
+	    || getenv("JACK_NO_START_SERVER")) {
 		return 1;
 	}
 
 	/* The double fork() forces the server to become a child of
 	 * init, which will always clean up zombie process state on
-	 * termination.  This even works in strange corner cases where
-	 * the server terminates but this client does not.
+	 * termination.  This even works in cases where the server
+	 * terminates but this client does not.
 	 *
 	 * Since fork() is usually implemented using copy-on-write
 	 * virtual memory tricks, the overhead of the second fork() is
@@ -768,7 +760,7 @@ jack_client_open (const char *client_name,
 	 */
 	jack_init_time ();
 
-	if (jack_initialize_shm ()) {
+	if (jack_initialize_shm (va.server_name)) {
 		jack_error ("Unable to initialize shared memory.");
 		return NULL;
 	}
@@ -831,7 +823,7 @@ jack_client_open (const char *client_name,
 	client->control->deliver_request = oop_client_deliver_request;
 	client->control->deliver_arg = client;
 
-	if ((ev_fd = server_event_connect (client)) < 0) {
+	if ((ev_fd = server_event_connect (client, va.server_name)) < 0) {
 		goto fail;
 	}
 
@@ -910,15 +902,53 @@ jack_internal_client_new (const char *client_name,
 				    options, &status, &va, &res, &req_fd);
 }
 
+char *
+jack_default_server_name (void)
+{
+	char *server_name;
+	if ((server_name = getenv("JACK_DEFAULT_SERVER")) == NULL)
+		server_name = "default";
+	return server_name;
+}
+
+char *jack_tmpdir = DEFAULT_TMP_DIR;
+
+/* returns the name of the per-user subdirectory of jack_tmpdir */
+char *
+jack_user_dir (void)
+{
+	static char user_dir[PATH_MAX] = "";
+
+	/* format the path name on the first call */
+	if (user_dir[0] == '\0') {
+		snprintf (user_dir, sizeof (user_dir), "%s/jack-%d",
+			  jack_tmpdir, getuid ());
+	}
+
+	return user_dir;
+}
+
+/* returns the name of the per-server subdirectory of jack_user_dir() */
+char *
+jack_server_dir (const char *server_name)
+{
+	static char server_dir[PATH_MAX] = "";
+
+	/* format the path name on the first call */
+	if (server_dir[0] == '\0') {
+		snprintf (server_dir, sizeof (server_dir), "%s/%s",
+			  jack_user_dir (), server_name);
+	}
+
+	return server_dir;
+}
+
 void
 jack_internal_client_close (const char *client_name)
 {
 	jack_client_connect_request_t req;
 	int fd;
-	char *server_name;
-
-	if ((server_name = getenv("JACK_DEFAULT_SERVER")) == NULL)
-		server_name = "default";
+	char *server_name = jack_default_server_name ();
 
 	req.load = FALSE;
 	snprintf (req.name, sizeof (req.name), "%s", client_name);

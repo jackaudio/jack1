@@ -366,7 +366,7 @@ typedef struct _jack_client_internal {
     
 } jack_client_internal_t;
 
-extern void jack_cleanup_files ();
+extern void jack_cleanup_files (const char *server_name);
 
 extern int  jack_client_handle_port_connection (jack_client_t *client,
 						jack_event_t *event);
@@ -378,7 +378,11 @@ extern jack_client_t *jack_client_alloc_internal (jack_client_control_t*,
 /* internal clients call this. it's defined in jack/engine.c */
 void handle_internal_client_request (jack_control_t*, jack_request_t*);
 
-extern char *jack_server_dir;
+extern char *jack_tmpdir;
+
+extern char *jack_user_dir (void);
+
+extern char *jack_server_dir (const char *server_name);
 
 extern void *jack_zero_filled_buffer;
 
@@ -393,6 +397,8 @@ extern void jack_transport_copy_position (jack_position_t *from,
 extern void jack_call_sync_client (jack_client_t *client);
 
 extern void jack_call_timebase_master (jack_client_t *client);
+
+extern char *jack_default_server_name (void);
 
 void silent_jack_error_callback (const char *desc);
 
