@@ -29,8 +29,9 @@
  Feb 04, 2004: Johnny Petrantoni: now the driver supports interfaces with multiple interleaved streams (such as the MOTU 828).
  Nov 05, 2004: S.Letz: correct management of -I option for use with JackPilot.
  Nov 15, 2004: S.Letz: Set a default value for deviceID.
- Nov 30, 2004: S.Letz: In coreaudio_driver_write : clear to avoid playing dirty buffers when the client does not produce output anymore. 
- 
+ Nov 30, 2004: S.Letz: In coreaudio_driver_write : clear to avoid playing dirty buffers when the client does not produce output anymore.
+ Dec 05, 2004: S.Letz: XRun detection 
+ Dec 09, 2004: S.Letz: Dynamic buffer size change
  
  TODO:
 	- fix cpu load behavior.
@@ -83,7 +84,8 @@ int coreaudio_runCycle(void *driver, long bufferSize)
     coreaudio_driver_t *ca_driver = (coreaudio_driver_t *) driver;
 	if (ca_driver->xrun_detected > 0) { /* XRun was detected */
 		jack_time_t current_time = jack_get_microseconds();
-		ca_driver->engine->delay(ca_driver->engine, current_time - (ca_driver->last_wait_ust + ca_driver->period_usecs));
+		ca_driver->engine->delay(ca_driver->engine, current_time - 
+			(ca_driver->last_wait_ust + ca_driver->period_usecs));
 		ca_driver->last_wait_ust = current_time;
 		ca_driver->xrun_detected = 0;
 		return 0;
@@ -113,12 +115,11 @@ coreaudio_driver_attach(coreaudio_driver_t * driver,
     driver->engine->set_buffer_size(engine, driver->frames_per_cycle);
     driver->engine->set_sample_rate(engine, driver->frame_rate);
 
-    port_flags =
-	JackPortIsOutput | JackPortIsPhysical | JackPortIsTerminal;
+    port_flags = JackPortIsOutput | JackPortIsPhysical | JackPortIsTerminal;
 
     /*
        if (driver->has_hw_monitoring) {
-       port_flags |= JackPortCanMonitor;
+			port_flags |= JackPortCanMonitor;
        }
      */
 
@@ -328,36 +329,43 @@ static int coreaudio_driver_audio_stop(coreaudio_driver_t * driver)
     return (!stopPandaAudioProcess(driver->stream)) ? -1 : 0;
 }
 
-#if 0
 static int
 coreaudio_driver_bufsize(coreaudio_driver_t * driver,
 			 jack_nframes_t nframes)
 {
 
     /* This gets called from the engine server thread, so it must
-     * be serialized with the driver thread.  Stopping the audio
+     * be serialized with the driver thread. Stopping the audio
      * also stops that thread. */
 
     closePandaAudioInstance(driver->stream);
-
+	driver->frames_per_cycle = nframes;
+	
     driver->stream =
 		openPandaAudioInstance((float) driver->frame_rate,
 			       driver->frames_per_cycle, driver->capturing,
 			       driver->playing, &driver->driver_name[0]);
+	
+	if (!driver->stream) return -1;
 
-    if (!driver->stream)
-		return FALSE;
-
-    setHostData(driver->stream, driver);
+	setHostData(driver->stream, driver);
     setCycleFun(driver->stream, coreaudio_runCycle);
+	setXRunFun(driver->stream, coreaudio_XRun);
     setParameter(driver->stream, 'inte', &driver->isInterleaved);
+    setParameter(driver->stream, 'nstr', &driver->numberOfInputStreams);
+    setParameter(driver->stream, 'nstO', &driver->numberOfOuputStreams);
+
+	setParameter(driver->stream, 'cstr', driver->channelsPerInputStream);
+    setParameter(driver->stream, 'cstO', driver->channelsPerOuputStream);
 
     driver->incoreaudio = getPandaAudioInputs(driver->stream);
     driver->outcoreaudio = getPandaAudioOutputs(driver->stream);
+	
+	driver->engine->set_buffer_size (driver->engine,
+									driver->frames_per_cycle);
 
-    return startPandaAudioProcess(driver->stream);
+    return startPandaAudioProcess(driver->stream) ? 0 : -1;
 }
-#endif
 
 /** create a new driver instance
 */
@@ -397,7 +405,7 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     driver->write = (JackDriverReadFunction) coreaudio_driver_write;
     driver->null_cycle =
 	(JackDriverNullCycleFunction) coreaudio_driver_null_cycle;
-    //driver->bufsize = (JackDriverBufSizeFunction) coreaudio_driver_bufsize;
+    driver->bufsize = (JackDriverBufSizeFunction) coreaudio_driver_bufsize;
     driver->start = (JackDriverStartFunction) coreaudio_driver_audio_start;
     driver->stop = (JackDriverStopFunction) coreaudio_driver_audio_stop;
     driver->stream = NULL;

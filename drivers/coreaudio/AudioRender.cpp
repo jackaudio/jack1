@@ -326,7 +326,7 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
     vBufferSize = (long) bufFrame;
 
     if ((long) bufFrame != bufferSize) {
-		JCALog("I'm trying to set a new buffer size.\n");
+		JCALog("I'm trying to set a new buffer size %ld \n",bufferSize);
 		UInt32 theSize = sizeof(UInt32);
 		UInt32 newBufferSize = (UInt32) bufferSize;
 		err =
@@ -353,7 +353,7 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
     vSampleRate = (float) SR.mSampleRate;
 
     if ((float) SR.mSampleRate != sampleRate) {
-		JCALog("I'm trying to set a new sample rate.\n");
+		JCALog("I'm trying to set a new sample rate %ld\n",sampleRate);
 		UInt32 theSize = sizeof(AudioStreamBasicDescription);
 		SR.mSampleRate = (Float64) sampleRate;
 		err = AudioDeviceSetProperty(vDevice, NULL, 0, false,

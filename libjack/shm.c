@@ -347,7 +347,10 @@ jack_destroy_shm (jack_shm_info_t* si)
 void
 jack_release_shm (jack_shm_info_t* si)
 {
+	printf("client->jack_release_shm \n");
+	
 	if (si->attached_at != MAP_FAILED) {
+		printf("client->jack_release_shm 1 \n");
 		munmap (si->attached_at, jack_shm_registry[si->index].size);
 	}
 }
@@ -420,7 +423,29 @@ jack_attach_shm (jack_shm_info_t* si)
 int
 jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 {
+	/* There is no way to resize a System V shm segment.  So, we
+	 * delete it and allocate a new one.  This is tricky, because
+	 * the old segment will not disappear until all the clients
+	 * have released it. We can only do what we can from here.
+	 */
+
+	jack_release_shm (si);
+	jack_destroy_shm (si);
+
+	if (jack_shmalloc ("not used", size, si)) {
+		return -1;
+	}
+
+	return jack_attach_shm (si);
+}
+
+/*
+int
+jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
+{
 	int shm_fd;
+	//steph
+	int res;
 	jack_shm_registry_t *registry = &jack_shm_registry[si->index];
 
 	if ((shm_fd = shm_open (registry->id, O_RDWR, 0666)) < 0) {
@@ -429,13 +454,17 @@ jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 		return -1;
 	}
 
-	munmap (si->attached_at, registry->size);
-
-	if (ftruncate (shm_fd, size) < 0) {
+	res = munmap (si->attached_at, registry->size);
+	printf("munmap %ld\n", res);
+	
+		
+	if ((res = ftruncate (shm_fd, size)) < 0) {
 		jack_error ("cannot set size of shm segment %s "
 			    "(%s)", registry->id, strerror (errno));
+		printf("ftruncate %ld\n", res);
 		return -1;
 	}
+	
 		
 	if ((si->attached_at = mmap (0, size, PROT_READ|PROT_WRITE,
 				     MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
@@ -448,6 +477,7 @@ jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 	close (shm_fd);
 	return 0;
 }
+*/
 
 #else /* USE_POSIX_SHM */
 

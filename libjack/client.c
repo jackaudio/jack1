@@ -452,8 +452,8 @@ _start_server (void)
 			good = 1;
 		}
 	}
-
 	if (!good) {
+#define JACK_LOCATION
 #if defined(USE_CAPABILITIES)
 		command = JACK_LOCATION "/jackstart";
 		strncpy(arguments, JACK_LOCATION "/jackstart -T -R -d "
@@ -1187,7 +1187,6 @@ jack_client_thread (void *arg)
 
 			case BufferSizeChange:
 				jack_client_invalidate_port_buffers (client);
-
 				if (control->bufsize) {
 					status = control->bufsize
 						(control->nframes,

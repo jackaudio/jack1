@@ -261,12 +261,6 @@
 			settings = {
 			};
 		};
-		4B117C5C05DD0C4100B5DA5A = {
-			fileRef = 4B117C5A05DD0C4100B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B117C5D05DD0C5B00B5DA5A = {
 			fileEncoding = 30;
 			isa = PBXFileReference;
@@ -277,12 +271,6 @@
 			sourceTree = SOURCE_ROOT;
 		};
 		4B117C5E05DD0C5B00B5DA5A = {
-			fileRef = 4B117C5D05DD0C5B00B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		4B117C5F05DD0C5B00B5DA5A = {
 			fileRef = 4B117C5D05DD0C5B00B5DA5A;
 			isa = PBXBuildFile;
 			settings = {
@@ -1143,8 +1131,6 @@
 		4BA1CADB0470D14500053105 = {
 			buildActionMask = 2147483647;
 			files = (
-				4B117C5C05DD0C4100B5DA5A,
-				4B117C5F05DD0C5B00B5DA5A,
 				4B117C6505DD0C8000B5DA5A,
 				4B117C6805DD0C8700B5DA5A,
 				4B117C6B05DD0C8D00B5DA5A,
@@ -1212,7 +1198,7 @@
 	<key>CFBundleExecutable</key>
 	<string>Jack</string>
 	<key>CFBundleGetInfoString</key>
-	<string>Jack Server 0.99.10, @03-04 Paul Davis, Grame</string>
+	<string>Jack Server 0.99.27, @03-04 Paul Davis, Grame</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -1228,7 +1214,7 @@
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>0.99.10</string>
+	<string>0.99.27</string>
 </dict>
 </plist>
 ";
