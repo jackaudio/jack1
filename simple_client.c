@@ -17,6 +17,7 @@ process (nframes_t nframes, void *arg)
 	sample_t *in = (sample_t *) jack_port_get_buffer (input_port, nframes);
 
 	memcpy (out, in, sizeof (sample_t) * nframes);
+
 	return 0;      
 }
 
@@ -118,9 +119,9 @@ main (int argc, char *argv[])
 		fprintf (stderr, "cannot connect output ports\n");
 	}
 
-	/* Since this is just a toy, run for 5 seconds, then finish */
+	/* Since this is just a toy, run for a few seconds, then finish */
 
-	sleep (2);
+	sleep (10);
 	jack_client_close (client);
 	exit (0);
 }

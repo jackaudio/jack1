@@ -78,9 +78,11 @@ static void jack_remove_client (jack_engine_t *engine, jack_client_internal_t *c
 static jack_client_internal_t *jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_request_t *);
 static jack_client_internal_t *jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
 
-static void jack_sort_graph (jack_engine_t *engine, int take_lock);
+static void jack_sort_graph (jack_engine_t *engine);
 static int  jack_rechain_graph (jack_engine_t *engine, int take_lock);
 static int  jack_get_fifo_fd (jack_engine_t *engine, int which_fifo);
+static void jack_clear_fifos (jack_engine_t *engine);
+
 static int  jack_port_do_connect (jack_engine_t *engine, const char *source_port, const char *destination_port);
 static int  jack_port_do_disconnect (jack_engine_t *engine, const char *source_port, const char *destination_port);
 static int  jack_port_do_disconnect_all (jack_engine_t *engine, jack_port_id_t);
@@ -470,8 +472,6 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 
 			ctl->state = Triggered; // a race exists if we do this after the write(2) 
 
-			printf ("start subgraph\n");
-
 			if (write (client->subgraph_start_fd, &c, sizeof (c)) != sizeof (c)) {
 				jack_error ("cannot initiate graph processing (%s)", strerror (errno));
 				engine->process_errors++;
@@ -484,6 +484,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 
 			pollfd[0].fd = client->subgraph_wait_fd;
 			pollfd[0].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
+			pollfd[0].revents = 0;
 
 			if (poll (pollfd, 1, engine->driver->period_interval) < 0) {
 				if (errno == EINTR) {
@@ -509,8 +510,6 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 					break;
 				}
 			}
-
-			printf ("subgraph done\n");
 
 			/* Move to next in-process client (or end of client list) */
 
@@ -686,8 +685,6 @@ handle_client_ack_connection (jack_engine_t *engine, int client_fd)
 		return -1;
 	}
 
-	printf ("ack message, id = %lu\n", req.client_id);
-	
 	if ((client = jack_client_internal_by_id (engine, req.client_id)) == NULL) {
 		jack_error ("unknown client ID in ACK connection request");
 		return -1;
@@ -722,13 +719,15 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 			client = (jack_client_internal_t *) node->data;
 			client->control->active = TRUE;
 
-			/* we call this to make sure the FIFO is built by the time
-			   the client needs it. we don't care about the return
-			   value at this point.
+			/* we call this to make sure the
+			   FIFO is built+ready by the time
+			   the client needs it. we don't
+			   care about the return value at
+			   this point.  
 			*/
 
 			jack_get_fifo_fd (engine, ++engine->external_client_cnt);
-			jack_rechain_graph (engine, FALSE);
+			jack_sort_graph (engine);
 
 			ret = 0;
 			break;
@@ -753,7 +752,7 @@ jack_client_do_deactivate (jack_engine_t *engine, jack_client_internal_t *client
 		engine->external_client_cnt--;
 	}
 
-	jack_sort_graph (engine, FALSE);
+	jack_sort_graph (engine);
 	return 0;
 }
 
@@ -1034,7 +1033,6 @@ jack_server_thread (void *arg)
 			}
 
 			if (pfd[i].revents & ~POLLIN) {
-				printf ("bad poll status on pfd[%d] (%d) = 0x%x\n", i, pfd[i].fd, pfd[i].revents);
 				handle_client_jack_error (engine, pfd[i].fd);
 			} else if (pfd[i].revents & POLLIN) {
 				if (handle_client_io (engine, pfd[i].fd)) {
@@ -1390,8 +1388,6 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	/* caller must hold the graph_lock */
 
-	printf ("remove client\n");
-
 	/* these stop the process() loop from paying this client any attention,
 	   as well as stopping jack_deliver_event() from bothering to try to 
 	   talk to the client.
@@ -1574,6 +1570,8 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 	if (take_lock) {
 		pthread_mutex_lock (&engine->graph_lock);
 	}
+
+	jack_clear_fifos (engine);
 
 	/* We're going to try to avoid reconnecting clients that 
 	   don't need to be reconnected. This is slightly tricky, 
@@ -1803,15 +1801,11 @@ jack_client_feeds (jack_client_internal_t *might, jack_client_internal_t *target
  */
 
 static void
-jack_sort_graph (jack_engine_t *engine, int take_lock)
+jack_sort_graph (jack_engine_t *engine)
 {
 	GSList *node, *onode;
 	jack_client_internal_t *client;
 	jack_client_internal_t *oclient;
-
-	if (take_lock) {
-		pthread_mutex_lock (&engine->graph_lock);
-	}
 
 	for (node = engine->clients; node; node = g_slist_next (node)) {
 
@@ -1837,10 +1831,6 @@ jack_sort_graph (jack_engine_t *engine, int take_lock)
 
 	engine->clients = g_slist_sort (engine->clients, (GCompareFunc) jack_client_sort);
 	jack_rechain_graph (engine, FALSE);
-
-	if (take_lock) {
-		pthread_mutex_unlock (&engine->graph_lock);
-	}
 }
 
 /**
@@ -1966,7 +1956,7 @@ jack_port_do_connect (jack_engine_t *engine,
 		dstport->connections = g_slist_prepend (dstport->connections, connection);
 		srcport->connections = g_slist_prepend (srcport->connections, connection);
 		
-		jack_sort_graph (engine, FALSE);
+		jack_sort_graph (engine);
 
 		jack_send_connection_notification (engine, srcport->shared->client_id, src_id, dst_id, TRUE);
 		jack_send_connection_notification (engine, dstport->shared->client_id, dst_id, src_id, TRUE);
@@ -2029,7 +2019,7 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 	}
 
 	if (sort_graph) {
-		jack_sort_graph (engine, FALSE);
+		jack_sort_graph (engine);
 	}
 
 	return ret;
@@ -2050,7 +2040,7 @@ jack_port_do_disconnect_all (jack_engine_t *engine,
 
 	pthread_mutex_lock (&engine->graph_lock);
 	jack_port_clear_connections (engine, &engine->internal_ports[port_id]);
-	jack_sort_graph (engine, FALSE);
+	jack_sort_graph (engine);
 	pthread_mutex_unlock (&engine->graph_lock);
 
 	return 0;
@@ -2131,6 +2121,8 @@ static int
 jack_get_fifo_fd (jack_engine_t *engine, int which_fifo)
 
 {
+	/* caller must hold graph_lock */
+
 	char path[PATH_MAX+1];
 	struct stat statbuf;
 
@@ -2164,13 +2156,38 @@ jack_get_fifo_fd (jack_engine_t *engine, int which_fifo)
 	}
 
 	if (engine->fifo[which_fifo] < 0) {
-		if ((engine->fifo[which_fifo] = open (path, O_RDWR|O_CREAT, 0666)) < 0) {
+		if ((engine->fifo[which_fifo] = open (path, O_RDWR|O_CREAT|O_NONBLOCK, 0666)) < 0) {
 			jack_error ("cannot open fifo [%s] (%s)", path, strerror (errno));
 			return -1;
 		}
 	}
 
 	return engine->fifo[which_fifo];
+}
+
+static void
+jack_clear_fifos (jack_engine_t *engine)
+{
+	/* caller must hold graph_lock */
+
+	int i;
+	char buf[16];
+
+	/* this just drains the existing FIFO's of any data left in them
+	   by aborted clients, etc. there is only ever going to be
+	   0, 1 or 2 bytes in them, but we'll allow for up to 16.
+	*/
+
+	for (i = 0; i < engine->fifo_size; i++) {
+		if (engine->fifo[i] >= 0) {
+			int nread = read (engine->fifo[i], buf, sizeof (buf));
+			if (nread < 0 && errno != EAGAIN) {
+				printf ("clear fifo[%d]: %s\n", i, strerror (errno));
+			} else if (nread > 0) {
+				printf ("clear fifo[%d]: %d bytes\n", i, nread);
+			}
+		}
+	}
 }
 
 int

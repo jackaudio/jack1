@@ -35,9 +35,6 @@
 #include <jack/hammerfall.h>
 #include <jack/generic.h>
 
-FILE *alog;
-static sample_t gbuf[4096];
-
 static void
 alsa_driver_release_channel_dependent_memory (alsa_driver_t *driver)
 
@@ -837,48 +834,12 @@ alsa_driver_wait (alsa_driver_t *driver)
 			for (chn = 0, prev = 0, node = driver->playback_ports; node; prev = node, node = g_slist_next (node), chn++) {
 				
 				jack_port_t *port = (jack_port_t *) node->data;
-				sample_t *buf;
 
-				/* optimize needless data copying away */
-				
-				if (chn == 1) {
-					nframes_t nn;
-					sample_t *prevbuf;
-
-					/* 1 read the actual data from channel 0 */
-					
-					alsa_driver_read_from_channel (driver, 0, gbuf, contiguous);
-					buf = gbuf;
-
-					if (jack_port_connected ((jack_port_t *) prev->data)) {
-						prevbuf = jack_port_get_buffer (((jack_port_t *) prev->data), contiguous);
-						printf ("compare with %p\n", prevbuf);
-						
-						for (nn = 0; nn < contiguous; nn++) {
-							if (gbuf[nn] != prevbuf[nn]) {
-								printf ("%d different at %lu (chn=%d, gbuf=%f, prevbuf=%f\n",
-									waitcnt, nn, driver->capture_addr[0][nn],
-									gbuf[nn], prevbuf[nn]);
-								break;
-							}
-						}
-					}
-
-				} else if (chn == 0) {
-
-					if (jack_port_connected (port)) {
-						buf = jack_port_get_buffer (port, contiguous);
-						printf ("%d buffer = %p\n", waitcnt, buf);
-					} else {
-						continue;
-					}
-
-				} else {
+				if (!jack_port_connected (port)) {
 					continue;
 				}
 
-				alsa_driver_write_to_channel (driver, chn, buf, contiguous, 1.0);
-
+				alsa_driver_write_to_channel (driver, 1, jack_port_get_buffer (port, contiguous), contiguous, 1.0);
 			}
 			
 			engine->process_unlock (engine);
@@ -937,20 +898,16 @@ alsa_driver_process (nframes_t nframes, void *arg)
 	channel_t chn;
 	jack_port_t *port;
 	GSList *node;
-	sample_t *buf;
 
 	for (chn = 0, node = driver->capture_ports; node; node = g_slist_next (node), chn++) {
 
 		port = (jack_port_t *) node->data;
-
+		
 		if (!jack_port_connected (port)) {
 			continue;
 		}
 		
-		buf = jack_port_get_buffer (port, nframes);
-		
-		alsa_driver_read_from_channel (driver, chn, buf, nframes);
-		printf ("%d: read into %p with %d => %f\n", waitcnt, buf, driver->capture_addr[0][0], buf[0]);
+		alsa_driver_read_from_channel (driver, chn, jack_port_get_buffer (port, nframes), nframes);
 	}
 
 	return 0;
@@ -1329,8 +1286,6 @@ driver_initialize (va_list ap)
 	unsigned long user_nperiods;
 	char *pcm_name;
 	int hw_monitoring;
-
-	alog = fopen ("/dev/null", "w");
 
 	pcm_name = va_arg (ap, char *);
 	frames_per_interrupt = va_arg (ap, nframes_t);
