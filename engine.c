@@ -586,8 +586,11 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 				engine->spare_usecs = 0;
 			}
 
+			engine->control->cpu_load = (1.0f - (engine->spare_usecs / engine->driver->period_usecs)) * 100.0f;
+
 			if (engine->verbose) {
-				fprintf (stderr, "average usecs: %.3f, spare = %.3f\n", average_usecs, engine->spare_usecs);
+				fprintf (stderr, "load = %.4f average usecs: %.3f, spare = %.3f\n", 
+					 engine->control->cpu_load, average_usecs, engine->spare_usecs);
 			}
 		}
 	} 
@@ -1205,7 +1208,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine->verbose = verbose;
 	engine->asio_mode = FALSE;
 	engine->cpu_mhz = jack_get_mhz();
-	
+
 	jack_engine_reset_rolling_usecs (engine);
 
 	pthread_mutex_init (&engine->client_lock, 0);
@@ -1278,6 +1281,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine->control->port_max = engine->port_max;
 	engine->control->real_time = realtime;
 	engine->control->client_priority = engine->rtpriority - 1;
+	engine->control->cpu_load = 0;
  
 	engine->control->buffer_size = 0;
 	engine->control->time.frame_rate = 0;

@@ -517,6 +517,12 @@ void jack_update_time (jack_client_t *, nframes_t);
 
 nframes_t jack_frames_since_cycle_start (jack_client_t *);
 
+/**
+ * This returns the current CPU load estimated by JACK
+ * as a percentage.
+ */
+float jack_cpu_load (jack_client_t *client);
+
 #ifdef __cplusplus
 }
 #endif

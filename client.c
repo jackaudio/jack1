@@ -1790,3 +1790,9 @@ jack_get_mhz (void)
 		}
 	}
 }
+
+float
+jack_cpu_load (jack_client_t *client)
+{
+	return client->engine->cpu_load;
+}

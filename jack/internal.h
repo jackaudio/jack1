@@ -80,6 +80,7 @@ typedef struct {
     unsigned long       buffer_size;
     char                real_time;
     int                 client_priority;
+    float               cpu_load;
     unsigned long       port_max;
     jack_port_shared_t ports[0];
 
