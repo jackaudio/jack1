@@ -1,6 +1,17 @@
 # $Id$
 # set to 0 to build rpms without capabilities support
 %define enable_capabilities 1
+# set to 1 to enable alternate jack temporary directory
+# mounted as tmpfs
+%define enable_tmpdir 1
+%if %{enable_tmpdir}
+%define jack_tmpdir /var/lib/tmp
+%endif
+# use port audio
+%define port_audio 1
+# strip binaries 
+%define strip_jackd 1
+
 
 Summary:	the Jack Audio Connection Kit
 Name:		jack-audio-connection-kit
@@ -10,7 +21,13 @@ License:	GPL
 Group:		System Environment/Daemons
 Source0:	%{name}-%{version}.tar.gz
 URL:		http://jackit.sourceforge.net
-BuildRoot:	/var/tmp/%{name}-%{version}-root-%(id -u -n)
+BuildRoot:	 %{_tmppath}/%{name}-%{version}-root-%(id -u -n)
+
+BuildRequires: automake >= 1.6 libsndfile-devel >= 1.0.0
+
+%if %{port_audio}
+BuildRequires: portaudio >= 18.1
+%endif
 
 %description
 JACK is a low-latency audio server, written primarily for the Linux
@@ -45,20 +62,100 @@ Small example clients that use the Jack Audio Connection Kit.
 %setup -q
 
 %build
-%if "%{enable_capabilities}" == "1"
-%configure --enable-capabilities --enable-stripped-jackd
-%else
-%configure
+%configure      --enable-optimize \
+%if %{enable_tmpdir}
+                --with-default-tmpdir=%{jack_tmpdir} \
+%endif
+%if %{enable_capabilities}
+                 --enable-capabilities \
+%endif
+%if ! %{port_audio}
+		--disable-portaudio \
+%endif
+%if %{strip_jackd}
+                 --enable-stripped-jackd
 %endif
 make
 
+
 %install
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
-
 make install DESTDIR=$RPM_BUILD_ROOT
 
-%post   -p /sbin/ldconfig
-%postun -p /sbin/ldconfig
+%if %{enable_capabilities}
+# make jackstart suid root
+chmod 04755 $RPM_BUILD_ROOT%{_bindir}/jackstart
+%endif
+
+%if %{enable_tmpdir}
+# create jack temporary directory
+mkdir -p $RPM_BUILD_ROOT%{jack_tmpdir}
+%endif
+
+# remove extra install of the documentation
+rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
+
+%if %{enable_tmpdir}
+%preun
+if [ "$1" = "0" ] ; then
+    # try to unmount the tmpfs filesystem
+    umount %{jack_tmpdir} >/dev/null 2>&1
+    # remove any leftover files after the mount is gone
+    rm -rf %{jack_tmpdir}/* >/dev/null 2>&1
+fi
+%endif
+
+%post
+/sbin/ldconfig
+%if %{enable_tmpdir}
+# add jack temporary directory mount point to fstab
+if [ -f /etc/fstab ] ; then
+    if grep 'jack' /etc/fstab >/dev/null 2>&1 ; then
+        if ! grep '%{jack_tmpdir}' /etc/fstab >/dev/null 2>&1 ; then
+            echo
+            echo "A line containing \"jack\" was found in /etc/fstab. The mount point"
+            echo "does not match the one needed by this package, so the tmpfs mount line"
+            echo "was not automatically added. Edit /etc/fstab (be very careful!) and"
+            echo "add the following line:"
+            echo "    \"none %{jack_tmpdir} tmpfs defaults 0 0\""
+            echo
+        fi
+    else
+        # add the mount point
+        echo "Adding jack tmpfs entry to /etc/fstab..."
+        NEWLINES=$(wc -l /etc/fstab|awk '{print $1}' 2> /dev/null)
+        LINES=$(grep -c '^.*$' /etc/fstab 2> /dev/null)
+        if [ $NEWLINES -lt $LINES ] ; then
+            echo '' >> /etc/fstab || \
+            { echo "failed to add jack tmpfs entry to /etc/fstab" 1>&2 ; exit 0 ; }
+        fi
+        echo 'none                    %{jack_tmpdir}       tmpfs   defaults         0 0' \
+        >> /etc/fstab || \
+        { echo "failed to add jack tmpfs entry to /etc/fstab" 1>&2 ; exit 0 ; }
+        echo "Mounting jack tmpfs temporary directory..."
+        mount %{jack_tmpdir} >/dev/null 2>&1 || \
+        { echo "failed to mount jack tmpfs temporary directory" 1>&2 ; exit 0 ; }
+    fi
+fi
+%endif
+
+%postun
+/sbin/ldconfig
+%if %{enable_tmpdir}
+if [ "$1" = "0" ] ; then
+    if grep "%{jack_tmpdir}" /etc/fstab >/dev/null 2>&1 ; then
+        echo "Deleting jack tmpfs fstab entry..."
+        TMP=$(mktemp /tmp/fstab.XXXXXX)
+        grep -v "%{jack_tmpdir}" /etc/fstab > $TMP
+        if [ "$?" == "0" -a -f $TMP -a -s $TMP ] ; then
+            cat $TMP > /etc/fstab
+        else
+            echo "failed to erase jack tmpfs entry from /etc/fstab"
+        fi
+        rm -f $TMP
+    fi
+fi
+%endif
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
@@ -66,35 +163,66 @@ make install DESTDIR=$RPM_BUILD_ROOT
 %files 
 %defattr(-,root,root)
 %doc AUTHORS TODO COPYING* doc/reference
-%if "%{enable_capabilities}" == "1"
+%if %{enable_capabilities}
 %attr(4755, root, root) %{_bindir}/jackstart
 %endif
 %{_bindir}/jackd
+%{_bindir}/jack_load
+%{_bindir}/jack_unload
+%{_bindir}/jack_bufsize
+%{_bindir}/jack_freewheel
+%{_bindir}/jack_transport
 %{_libdir}/libjack.so
-%{_libdir}/libjack.so.*
+%{_libdir}/libjack.so.0
+%{_libdir}/libjack.so.0.0.*
+%{_libdir}/jack/inprocess.so
+%{_libdir}/jack/intime.so
 %{_libdir}/jack/jack_alsa.so
-%{_libdir}/jack/jack_alsa.so.*
+%{_libdir}/jack/jack_dummy.so
+%if %{port_audio}
+%{_libdir}/jack/jack_portaudio.so
+%endif
+%{_mandir}/man1/*
+%if %{enable_tmpdir}
+%dir %{jack_tmpdir}
+%attr(0777, root, root) %{jack_tmpdir}
+%endif
 
 %files devel
 %defattr(-,root,root)
-%{_includedir}/jack
-%{_libdir}/libjack.a
 %{_libdir}/libjack.la
-%{_libdir}/jack/jack_alsa.a
+%{_libdir}/jack/inprocess.la
+%{_libdir}/jack/intime.la
 %{_libdir}/jack/jack_alsa.la
+%{_libdir}/jack/jack_dummy.la
+%if %{port_audio}
+%{_libdir}/jack/jack_portaudio.la
+%endif
+%{_includedir}/jack/jack.h
+%{_includedir}/jack/ringbuffer.h
+%{_includedir}/jack/timestamps.h
+%{_includedir}/jack/transport.h
+%{_includedir}/jack/types.h
 %{_libdir}/pkgconfig/jack.pc
+
 
 %files example-clients
 %defattr(-,root,root)
 %{_bindir}/jackrec
-%{_bindir}/jack_cache_killer
 %{_bindir}/jack_connect
 %{_bindir}/jack_disconnect
 %{_bindir}/jack_impulse_grabber
+%{_bindir}/jack_lsp
+%{_bindir}/jack_metro
 %{_bindir}/jack_monitor_client
+%{_bindir}/jack_showtime
 %{_bindir}/jack_simple_client
 
+
 %changelog
+
+* Mon Nov 13  2003 Lawrie Abbott <lawrieabbott@iinet.net.au>      
+- update based on Planet CCRMA 0.80.0 release
 
 * Thu May 23 2002 Fernando Lopez-Lezcano <nando@ccrma.stanford.edu>
 - added configuration variable to build with/without capabilities
