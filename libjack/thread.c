@@ -22,6 +22,8 @@
 
 */
 
+#include <config.h>
+
 #include <jack/thread.h>
 #include <jack/internal.h>
 
@@ -30,6 +32,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+
+#ifdef JACK_USE_MACH_THREADS
+#include <sysdeps/pThreadUtilities.h>
+#endif
 
 #define log_internal(msg, res, fatal)	                             \
   if (res) {                                                         \
@@ -65,7 +71,7 @@ jack_create_thread (pthread_t* thread,
 
 #ifdef JACK_USE_MACH_THREADS
 		/* fixed priority thread */
-		setThreadToPriority(thread, 63, TRUE, 10000000);
+		setThreadToPriority(*thread, 63, TRUE, 10000000);
 #endif /* JACK_USE_MACH_THREADS */
 
 		return 0;
@@ -186,7 +192,7 @@ jack_create_thread (pthread_t* thread,
 	result = pthread_create (thread, 0, start_routine, arg);
 	log_result ("creating realtime thread");
 	/* time constraint thread */
-	setThreadToPriority (thread, 96, TRUE, 10000000);
+	setThreadToPriority (*thread, 96, TRUE, 10000000);
 	
 #endif
 
@@ -198,14 +204,14 @@ jack_create_thread (pthread_t* thread,
 int
 jack_drop_real_time_scheduling (pthread_t thread)
 {
-	setThreadToPriority(thread, 31, false, 10000000);
+	setThreadToPriority(thread, 31, FALSE, 10000000);
 	return 0;       
 }
 
 int
 jack_acquire_real_time_scheduling (pthread_t thread, int priority) //priority is unused
 {
-	setThreadToPriority(thread, 96, true, 10000000);
+	setThreadToPriority(thread, 96, TRUE, 10000000);
 	return 0;
 }
 
