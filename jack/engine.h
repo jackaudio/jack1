@@ -134,6 +134,7 @@ struct _jack_engine {
     int		    rolling_client_usecs_cnt;
     int		    rolling_client_usecs_index;
     int		    rolling_interval;
+    float	    max_usecs;
     float	    spare_usecs;
     float	    usecs_per_cycle;
     

@@ -961,6 +961,23 @@ jack_client_thread (void *arg)
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
+        if (client->engine->real_time){
+	    /* exit thread if it was not created SCHED_FIFO */
+	    int policy = SCHED_OTHER;
+	    struct sched_param self_param;
+	    memset (&self_param, 0, sizeof (self_param));
+	    if (pthread_getschedparam(pthread_self(), &policy, &self_param)
+		== 0) {
+		if (policy != SCHED_FIFO) {
+		    /*
+		    jack_error ("Client thread was not created with SCHED_FIFO "
+				"scheduling, exiting thread\n");
+		    */
+		    pthread_exit(1);
+		}
+	    }
+	}
+
 	pthread_mutex_lock (&client_lock);
 	client->thread_ok = TRUE;
 	client->thread_id = pthread_self();
@@ -1342,6 +1359,20 @@ jack_start_thread (jack_client_t *client)
 
 		pthread_attr_init (attributes);
 
+		if (pthread_attr_setdetachstate (attributes,
+						 PTHREAD_CREATE_JOINABLE)) {
+			jack_error ("cannot set JOINABLE scheduling for RT "
+				    "thread");
+			return -1;
+		}
+
+		if (pthread_attr_setinheritsched (attributes,
+						  PTHREAD_EXPLICIT_SCHED)) {
+			jack_error ("cannot set EXPLICIT scheduling for RT "
+				    "thread");
+			return -1;
+		}
+
 		if (pthread_attr_setschedpolicy (attributes, SCHED_FIFO)) {
 			jack_error ("cannot set FIFO scheduling class for RT "
 				    "thread");
@@ -1402,12 +1433,32 @@ jack_start_thread (jack_client_t *client)
 
 	if (pthread_create (&client->thread, attributes,
 			    jack_client_thread, client) == 0) {
-		return 0;
+		if (client->engine->real_time){
+			int status;
+			memset (&client_param, 0, sizeof (client_param));
+			status=pthread_getschedparam(client->thread, &policy,
+						     &client_param);
+			if (status == 0 && policy == SCHED_FIFO) {
+			    return 0;
+			}
+		} else {
+		    return 0;
+		}
 	}
+
+	/* we get here if there was an error creating the thread, or if
+	   there was no error but the resulting thread was not SCHED_FIFO.
+	   The thread itself detects that as well and exits asynchronously.
+	*/
 
 	if (!client->engine->real_time) {
 		return -1;
 	}
+
+	/*
+	jack_error ("Client thread was not created with SCHED_FIFO, "
+		    "recreating with workaround\n");
+	*/
 
 	/* the version of glibc I've played with has a bug that makes
 	   that code fail when running under a non-root user but with the
@@ -1449,6 +1500,11 @@ jack_start_thread (jack_client_t *client)
 	/* prepare the attributes for the realtime thread */
 	attributes = (pthread_attr_t *) malloc (sizeof (pthread_attr_t));
 	pthread_attr_init (attributes);
+	if (pthread_attr_setdetachstate (attributes, PTHREAD_CREATE_JOINABLE)) {
+		jack_error ("cannot set JOINABLE scheduling for RT "
+			    "thread");
+		return -1;
+	}
 	if (pthread_attr_setscope (attributes, PTHREAD_SCOPE_SYSTEM)) {
 		sched_setscheduler (0, policy, &client_param);
 		jack_error ("Cannot set scheduling scope for RT thread");
@@ -1497,6 +1553,7 @@ jack_start_thread (jack_client_t *client)
 			}
 		}
 	}
+
 #endif /* JACK_USE_MACH_THREADS */
 
 	return 0;

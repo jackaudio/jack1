@@ -802,6 +802,10 @@ jack_calc_cpu_load(jack_engine_t *engine)
 			}
 		}
 
+		if (max_usecs > engine->max_usecs) {
+			engine->max_usecs = max_usecs;
+		}
+
 		if (max_usecs < engine->driver->period_usecs) {
 			engine->spare_usecs =
 				engine->driver->period_usecs - max_usecs;
@@ -1971,6 +1975,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
 	engine->wait_pid = wait_pid;
 
 	jack_engine_reset_rolling_usecs (engine);
+	engine->max_usecs = 0.0f;
 
 	pthread_mutex_init (&engine->client_lock, 0);
 	pthread_mutex_init (&engine->port_lock, 0);
@@ -2502,6 +2507,8 @@ jack_engine_delete (jack_engine_t *engine)
 	VERBOSE (engine, "freeing engine shared memory\n");
 	jack_release_shm (&engine->control_shm);
 	jack_destroy_shm (&engine->control_shm);
+
+	VERBOSE (engine, "max usecs: %.3f, ", engine->max_usecs);
 
 	VERBOSE (engine, "engine deleted\n");
 	free (engine);
