@@ -36,7 +36,7 @@ TO THINK ABOUT
 
 CLOSED (date,who,comment)
 
-- capture_client has pthread_mutex_lock() in its process() (2003/05/30,fixed,jack/joq)
+- capture_client has pthread_mutex_lock() in its process() (2003/05/30,fixed,joq)
 - update at least the user-visible copyrights with year 2003 (2003/04/05,done,paul)
 - add a sane way handle situations where the unix sockets already 
     exist when jackd is started (2003/04/05,sockets removed on startup,paul)
