@@ -1627,34 +1627,33 @@ jack_main_thread (void *arg)
 			engine->rolling_client_usecs_index = 0;
 		}
 		
-		/* every so often, recompute the current average use over the
+		/* every so often, recompute the current maximum use over the
 		   last JACK_ENGINE_ROLLING_COUNT client iterations.
 		*/
 
 		if (++engine->rolling_client_usecs_cnt % engine->rolling_interval == 0) {
-			float average_usecs = 0;
+			float max_usecs = 0.0f;
 			int i;
 			
 			for (i = 0; i < JACK_ENGINE_ROLLING_COUNT; i++) {
-				average_usecs += engine->rolling_client_usecs[i];
+				if (engine->rolling_client_usecs[i] > max_usecs) {
+					max_usecs = engine->rolling_client_usecs[i];
+				}
 			}
 			
-			average_usecs /= i;
-			if (average_usecs < engine->driver->period_usecs) {
-				engine->spare_usecs = engine->driver->period_usecs - average_usecs;
+			if (max_usecs < engine->driver->period_usecs) {
+				engine->spare_usecs = engine->driver->period_usecs - max_usecs;
 			} else {
 				engine->spare_usecs = 0;
 			}
 
-			engine->control->cpu_load = (1.0f - (engine->spare_usecs / engine->driver->period_usecs)) * 100.0f;
+			engine->control->cpu_load = (1.0f - (engine->spare_usecs / engine->driver->period_usecs)) * 50.0f + (engine->control->cpu_load * 0.5f);
 
 			if (engine->verbose) {
-				fprintf (stderr, "load = %.4f average usecs: %.3f, spare = %.3f\n", 
-					 engine->control->cpu_load, average_usecs, engine->spare_usecs);
+				fprintf (stderr, "load = %.4f max usecs: %.3f, spare = %.3f\n", 
+					 engine->control->cpu_load, max_usecs, engine->spare_usecs);
 			}
 		}
-
-
 	}
 
 	pthread_exit (0);
