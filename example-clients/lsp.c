@@ -99,7 +99,7 @@ main (int argc, char *argv[])
 			fprintf (stderr, "JACK server not running\n");
 		} else {
 			fprintf (stderr, "jack_client_open() failed, "
-				 "status = 0x%x\n", status);
+				 "status = 0x%2.0x\n", status);
 		}
 		return 1;
 	}

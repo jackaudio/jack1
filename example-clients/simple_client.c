@@ -93,8 +93,8 @@ main (int argc, char *argv[])
 
 	client = jack_client_open (client_name, options, &status, server_name);
 	if (client == NULL) {
-		fprintf (stderr, "jack_client_open() failed, status = 0x%x\n",
-			 status);
+		fprintf (stderr, "jack_client_open() failed, "
+			 "status = 0x%2.0x\n", status);
 		if (status & JackServerFailed) {
 			fprintf (stderr, "Unable to connect to JACK server\n");
 		}

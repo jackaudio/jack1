@@ -41,8 +41,8 @@ main (int argc, char *argv[])
 		if (status & JackServerFailed) {
 			fprintf (stderr, "JACK server not running.\n");
 		} else {
-			fprintf (stderr, "JACK open failed, status = 0x%0x\n",
-				 status);
+			fprintf (stderr, "JACK open failed, "
+				 "status = 0x%2.0x\n", status);
 		}
 		exit (1);
 	}
@@ -62,8 +62,8 @@ main (int argc, char *argv[])
 			fprintf (stderr, "client %s is gone.\n",
 				 client_name);
 		} else {
-			fprintf (stderr, "could not unload %s, returns 0x%0x\n",
-				 client_name, status);
+			fprintf (stderr, "could not unload %s, "
+				 "returns 0x%2.0x\n", client_name, status);
 		}
 		exit (3);
 	} else {

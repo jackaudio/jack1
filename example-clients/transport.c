@@ -434,8 +434,8 @@ int main(int argc, char *argv[])
 	/* open a connection to the JACK server */
 	client = jack_client_open (package, JackNullOption, &status);
 	if (client == NULL) {
-		fprintf (stderr, "jack_client_open() failed, status = %d\n",
-			 status);
+		fprintf (stderr, "jack_client_open() failed, "
+			 "status = 0x%2.0x\n", status);
 		return 1;
 	}
 

@@ -6,7 +6,7 @@ install-exec-hook:
 else
 install-exec-hook:
 	@echo "Removing JACK shared memory registry."
-	ipcrm -M @JACK_SHM_REGISTRY_KEY@
+	-ipcrm -M @JACK_SHM_REGISTRY_KEY@
 endif
 
 SOURCE_FILES = \

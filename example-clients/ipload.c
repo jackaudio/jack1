@@ -24,7 +24,7 @@ signal_handler (int sig)
 	fprintf (stderr, "signal received, unloading...");
 	status = jack_internal_client_unload (client, intclient);
 	if (status & JackFailure)
-		fprintf (stderr, "(failed), status = 0x%x\n", status);
+		fprintf (stderr, "(failed), status = 0x%2.0x\n", status);
 	else
 		fprintf (stderr, "(succeeded)\n");
 	jack_client_close (client);
@@ -118,8 +118,8 @@ main (int argc, char *argv[])
 	client = jack_client_open (client_name, JackServerName,
 				   &status, server_name);
 	if (client == NULL) {
-		fprintf (stderr, "jack_client_open() failed, status = 0x%x\n",
-			 status);
+		fprintf (stderr, "jack_client_open() failed, "
+			 "status = 0x%2.0x\n", status);
 		if (status & JackServerFailed) {
 			fprintf (stderr, "Unable to connect to JACK server\n");
 		}
@@ -138,7 +138,7 @@ main (int argc, char *argv[])
 					       (JackLoadName|JackLoadInit),
 					       &status, load_name, load_init);
 	if (status & JackFailure) {
-		fprintf (stderr, "could not load %s, status = %d\n",
+		fprintf (stderr, "could not load %s, status = 0x%2.0x\n",
 			 load_name, status);
 		return 2;
 	}

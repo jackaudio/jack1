@@ -77,7 +77,9 @@ jack_initialize (jack_client_t *client, const char *load_init)
 	/* join the process() cycle */
 	jack_activate (client);
 
-	/* connect the ports */
+	/* connect the ports.  NOTE: this code only works with the
+	 * ALSA backend.  See simple_client.c for a better method that
+	 * works with any backend. */
 	if (jack_connect (client, "alsa_pcm:capture_1",
 			  jack_port_name (pp->input_port))) {
 		fprintf (stderr, "cannot connect input port\n");

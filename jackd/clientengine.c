@@ -514,6 +514,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 	/* create a client struct for this name */
 	if ((client = jack_setup_client_control (engine, client_fd,
 						 type, name)) == NULL) {
+		*status |= (JackFailure|JackInitFailure);
 		jack_error ("cannot create new client object");
 		return NULL;
 	}
@@ -524,6 +525,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 			jack_error ("cannot dynamically load client from"
 				    " \"%s\"", object_path);
 			jack_client_delete (engine, client);
+			*status |= (JackFailure|JackLoadFailure);
 			return NULL;
 		}
 	}
@@ -575,6 +577,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 				jack_lock_graph (engine);
 				jack_remove_client (engine, client);
 				jack_unlock_graph (engine);
+				*status |= (JackFailure|JackInitFailure);
 				client = NULL;
 				//JOQ: not clear that all allocated
 				//storage has been cleaned up properly.
@@ -674,6 +677,7 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 			       req.object_path, req.object_data);
 	pthread_mutex_unlock (&engine->request_lock);
 	if (client == NULL) {
+		res.status |= JackFailure; /* just making sure */
 		return -1;
 	}
 	res.protocol_v = jack_protocol_version;
@@ -893,12 +897,14 @@ jack_intclient_load_request (jack_engine_t *engine, jack_request_t *req)
 			       req->x.intclient.options, &status, -1,
 			       req->x.intclient.path, req->x.intclient.init);
 
-	if (status & JackFailure) {
+	if (client == NULL) {
+		status |= JackFailure;	/* just making sure */
 		req->x.intclient.id = 0;
 		VERBOSE (engine, "load failed, status = 0x%x\n", status);
 	} else {
 		req->x.intclient.id = client->control->id;
 	}
+
 	req->status = status;
 }
 

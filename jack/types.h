@@ -342,7 +342,17 @@ enum JackStatus {
      /**
       * Requested client does not exist.
       */
-     JackNoSuchClient = 0x40
+     JackNoSuchClient = 0x40,
+
+     /**
+      * Unable to load internal client
+      */
+     JackLoadFailure = 0x80,
+
+     /**
+      * Unable to initialize client
+      */
+     JackInitFailure = 0x100
 };
 
 /**
