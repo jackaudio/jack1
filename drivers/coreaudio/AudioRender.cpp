@@ -56,7 +56,7 @@ static OSStatus GetTotalChannels(AudioDeviceID device, UInt32  *channelCount, Bo
     unsigned short i;
 
     *channelCount = 0;
-    err = AudioDeviceGetPropertyInfo(device, 0, isInput, kAudioDevicePropertyStreamConfiguration,  &outSize, &outWritable);
+    err = AudioDeviceGetPropertyInfo(device, 0, isInput, kAudioDevicePropertyStreamConfiguration, &outSize, &outWritable);
     if (err == noErr)
     {
 		JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamConfiguration: OK\n");
@@ -137,7 +137,7 @@ static void printError(OSStatus err)
 AudioRender::AudioRender(float sampleRate, long bufferSize, int inChannels,
 						int outChannels,
 						char *device):vSampleRate(sampleRate),
-vBufferSize(bufferSize)
+						vBufferSize(bufferSize)
 {
     inBuffers = NULL;
     outBuffers = NULL;

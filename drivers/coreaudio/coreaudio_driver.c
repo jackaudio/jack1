@@ -53,6 +53,7 @@ void JCALog(char *fmt, ...);
 static OSStatus GetDeviceNameFromID(AudioDeviceID id, char name[60])
 {
     UInt32 size = sizeof(char) * 60;
+	JCALog("GetDeviceNameFromID %ld\n",id);
     OSStatus stat = AudioDeviceGetProperty(id, 0, false,
 					   kAudioDevicePropertyDeviceName,
 					   &size,
@@ -65,13 +66,13 @@ static OSStatus get_device_id_from_num(int i, AudioDeviceID * id)
     OSStatus theStatus;
     UInt32 theSize;
     int nDevices;
-    AudioDeviceID *theDeviceList;
+    AudioDeviceID* theDeviceList;
 
     theStatus = AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDevices,
 				     &theSize, NULL);
     nDevices = theSize / sizeof(AudioDeviceID);
     theDeviceList =
-	(AudioDeviceID *) malloc(nDevices * sizeof(AudioDeviceID));
+	(AudioDeviceID*) malloc(nDevices * sizeof(AudioDeviceID));
     theStatus = AudioHardwareGetProperty(kAudioHardwarePropertyDevices, 
 					&theSize, theDeviceList);
 
@@ -412,12 +413,13 @@ static jack_driver_t *coreaudio_driver_new(char *name,
 
     char deviceName[60];
     bzero(&deviceName[0], sizeof(char) * 60);
-	get_device_id_from_num(0,&deviceID);
-
+	
     if (!driver_name) {
+		JCALog("Get driver name from deviceID\n");
 		if (GetDeviceNameFromID(deviceID, deviceName) != noErr)
 			goto error;
     } else {
+		JCALog("Use driver name from command line \n");
 		strcpy(&deviceName[0], driver_name);
     }
 
@@ -458,9 +460,7 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     driver->capture_nchannels = chan_in;
 
     strcpy(&driver->driver_name[0], &deviceName[0]);
-	// steph
-    //jack_init_time();
-    return ((jack_driver_t *) driver);
+	return ((jack_driver_t *) driver);
 
   error:
 
@@ -591,6 +591,8 @@ jack_driver_t *driver_initialize(jack_client_t * client,
     AudioDeviceID deviceID = 0;
     const JSList *node;
     const jack_driver_param_t *param;
+	
+	get_device_id_from_num(0,&deviceID); // takes a default value (first device)
 
     for (node = params; node; node = jack_slist_next(node)) {
 	param = (const jack_driver_param_t *) node->data;
