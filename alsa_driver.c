@@ -341,7 +341,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 	c_period_size = snd_pcm_hw_params_get_period_size (driver->capture_hw_params, &dir);
 	
 	if (c_period_size != driver->frames_per_cycle || p_period_size != driver->frames_per_cycle) {
-		jack_error ("ALSA I/O: requested an interrupt every %u frames but got %uc%up frames",
+		jack_error ("alsa_pcm: requested an interrupt every %u frames but got %uc%up frames",
 			  driver->frames_per_cycle, c_period_size, p_period_size);
 		return -1;
 	}
@@ -350,7 +350,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 	c_nfragments = snd_pcm_hw_params_get_periods (driver->capture_hw_params, &dir);
 
 	if (p_nfragments != c_nfragments) {
-		jack_error ("ALSA I/O: different period counts for playback and capture!");
+		jack_error ("alsa_pcm: different period counts for playback and capture!");
 		return -1;
 	}
 
@@ -620,13 +620,13 @@ alsa_driver_audio_stop (alsa_driver_t *driver)
 	int err;
 
 	if ((err = snd_pcm_drop (driver->playback_handle)) < 0) {
-		jack_error ("ALSA I/O: channel flush for playback failed (%s)", snd_strerror (err));
+		jack_error ("alsa_pcm: channel flush for playback failed (%s)", snd_strerror (err));
 		return -1;
 	}
 
 	if (driver->capture_and_playback_not_synced) {
 		if ((err = snd_pcm_drop (driver->capture_handle)) < 0) {
-			jack_error ("ALSA I/O: channel flush for capture failed (%s)", snd_strerror (err));
+			jack_error ("alsa_pcm: channel flush for capture failed (%s)", snd_strerror (err));
 			return -1;
 		}
 	}
@@ -644,11 +644,11 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver)
 	int err;
 
 	if ((err = snd_pcm_delay (driver->capture_handle, &capture_delay))) {
-		jack_error ("ALSA I/O: cannot determine capture delay (%s)", snd_strerror (err));
+		jack_error ("alsa_pcm: cannot determine capture delay (%s)", snd_strerror (err));
 		exit (1);
 	}
 
-	fprintf (stderr, "ALSA I/O: xrun of %lu frames, (%.3f msecs)\n", capture_delay,
+	fprintf (stderr, "alsa_pcm: xrun of %lu frames, (%.3f msecs)\n", capture_delay,
 		 ((float) capture_delay / (float) driver->frame_rate) * 1000.0);
 	
 #if ENGINE
@@ -882,7 +882,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 		/* XXX race condition on engine ptr */
 
 		if (driver->engine && driver->engine->process (driver->engine, contiguous)) {
-			jack_error ("ALSA I/O: engine processing error - stopping.");
+			jack_error ("alsa_pcm: engine processing error - stopping.");
 			return -1;
 		}
 
