@@ -108,7 +108,9 @@ jack_driver_nt_become_real_time (jack_driver_nt_t* driver)
         if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
 		jack_error ("cannot lock down memory for RT thread (%s)",
 			    strerror (errno));
+#ifdef ENSURE_MLOCK
 		return -1;
+#endif /* ENSURE_MLOCK */
         }
 
         return 0;

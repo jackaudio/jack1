@@ -2125,7 +2125,9 @@ jack_become_real_time (pthread_t thread, int priority)
         if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
 	    jack_error ("cannot lock down memory for RT thread (%s)",
 			strerror (errno));
+#ifdef ENSURE_MLOCK
 	    return -1;
+#endif /* ENSURE_MLOCK */
 	}
 #endif
 	return 0;

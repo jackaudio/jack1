@@ -128,29 +128,29 @@ static int check_binary (const char *binpath)
 	FILE *binstream;
 
 	if (lstat(jackd_bin_path, &status)) {
-		fprintf (stderr, "jackstart: could not stat %s: %s\n", binpath, strerror(errno));
+		fprintf (stderr, "jackstart: could not stat %s: %s\n",
+			 binpath, strerror(errno));
 		return -1;
 	}
 	if (!(S_ISREG(status.st_mode))) {
-		fprintf (stderr, "jackstart: %s is not a regular file\n", binpath);
+		fprintf (stderr, "jackstart: %s is not a regular file\n",
+			 binpath);
 		return -1;
 	}
 	if (status.st_uid != 0) {
-		fprintf (stderr, "jackstart: %s is not owned by root\n", binpath);
-		return -1;
-	}
-	if (status.st_gid != 0) {
-		fprintf (stderr, "jackstart: %s group is not root\n", binpath);
+		fprintf (stderr, "jackstart: %s is not owned by root\n",
+			 binpath);
 		return -1;
 	}
 	if ((status.st_mode & 022) != 0) {
-			fprintf (stderr,
-					"jackstart: %s mode %o writeable by non-root users\n",
-					binpath, status.st_mode & 07777);
+		fprintf (stderr,
+			 "jackstart: %s mode %o writeable by non-root users\n",
+			 binpath, status.st_mode & 07777);
 		return -1;
 	}
 	if ((binstream = fopen (binpath, "r")) == NULL) {
-		fprintf (stderr, "jackstart: can't open %s for reading: %s\n", binpath, strerror(errno));
+		fprintf (stderr, "jackstart: can't open %s for reading: %s\n", 
+			 binpath, strerror(errno));
 		return -1;
 	} else {
 		/* md5sum the executable file, check man evp for more details */

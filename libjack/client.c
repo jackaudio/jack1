@@ -1019,7 +1019,8 @@ jack_client_thread (void *arg)
 
 
 #if defined(__APPLE__) && defined(__POWERPC__) 
-/* real-time thread : separated from the normal client thread, it will communicate with the server using fast mach RPC mechanism */
+/* real-time thread : separated from the normal client thread, it will
+ * communicate with the server using fast mach RPC mechanism */
 
 static void *
 jack_client_process_thread (void *arg)
@@ -1046,7 +1047,8 @@ jack_client_process_thread (void *arg)
                 control->state = Running;
 
                 if (control->process) {
-                        if (control->process (control->nframes, control->process_arg) == 0) {
+                        if (control->process (control->nframes,
+					      control->process_arg) == 0) {
                                 control->state = Finished;
                         }
                 } else {
@@ -1110,17 +1112,20 @@ jack_start_thread (jack_client_t *client)
 
 		struct sched_param rt_param;
 
-		attributes = (pthread_attr_t *) malloc (sizeof (pthread_attr_t));
+		attributes = (pthread_attr_t *)
+			malloc (sizeof (pthread_attr_t));
 
 		pthread_attr_init (attributes);
 
 		if (pthread_attr_setschedpolicy (attributes, SCHED_FIFO)) {
-			jack_error ("cannot set FIFO scheduling class for RT thread");
+			jack_error ("cannot set FIFO scheduling class for RT "
+				    "thread");
 			return -1;
 		}
 
 		if (pthread_attr_setscope (attributes, PTHREAD_SCOPE_SYSTEM)) {
-			jack_error ("Cannot set scheduling scope for RT thread");
+			jack_error ("Cannot set scheduling scope for RT "
+				    "thread");
 			return -1;
 		}
 
@@ -1128,22 +1133,27 @@ jack_start_thread (jack_client_t *client)
 		rt_param.sched_priority = client->engine->client_priority;
 
 		if (pthread_attr_setschedparam (attributes, &rt_param)) {
-			jack_error ("Cannot set scheduling priority for RT thread (%s)", strerror (errno));
+			jack_error ("Cannot set scheduling priority for RT "
+				    "thread (%s)", strerror (errno));
 			return -1;
 		}
                 
-        #if defined(__APPLE__) && defined(__POWERPC__) 
+#if defined(__APPLE__) && defined(__POWERPC__) 
                 // To be implemented
-        #else
+#else
                 if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
-                    jack_error ("cannot lock down memory for RT thread (%s)", strerror (errno));
+                    jack_error ("cannot lock down memory for RT thread (%s)",
+				strerror (errno));
+#ifdef ENSURE_MLOCK
                     return -1;
+#endif /* ENSURE_MLOCK */
                 }
-        #endif
+#endif
         
 	}
 
-	if (pthread_create (&client->thread, attributes, jack_client_thread, client)) {
+	if (pthread_create (&client->thread, attributes,
+			    jack_client_thread, client)) {
 #ifdef USE_CAPABILITIES
 		if (client->engine->real_time) {
 			/* we are probably dealing with a broken glibc so try
@@ -1156,8 +1166,11 @@ jack_start_thread (jack_client_t *client)
 	}
         
 #if defined(__APPLE__) && defined(__POWERPC__) 
-        /* a spcial real-time thread to call the "process" callback. It will communicate with the server using fast mach RPC mechanism */
-        if (pthread_create (&client->process_thread, attributes, jack_client_process_thread, client)) {
+        /* a spcial real-time thread to call the "process"
+	 * callback. It will communicate with the server using fast
+	 * mach RPC mechanism */
+        if (pthread_create (&client->process_thread, attributes,
+			    jack_client_process_thread, client)) {
                 jack_error("pthread_create failed for process_thread \n");
                 return -1;
         }
@@ -1193,12 +1206,14 @@ jack_start_thread (jack_client_t *client)
 
 	/* get current scheduler and parameters of the client process */
 	if ((policy = sched_getscheduler (0)) < 0) {
-		jack_error ("Cannot get current client scheduler: %s", strerror(errno));
+		jack_error ("Cannot get current client scheduler: %s",
+			    strerror(errno));
 		return -1;
 	}
 	memset (&client_param, 0, sizeof (client_param));
 	if (sched_getparam (0, &client_param)) {
-		jack_error ("Cannot get current client scheduler parameters: %s", strerror(errno));
+		jack_error ("Cannot get current client scheduler "
+			    "parameters: %s", strerror(errno));
 		return -1;
 	}
 
@@ -1208,7 +1223,8 @@ jack_start_thread (jack_client_t *client)
 	memset (&temp_param, 0, sizeof (temp_param));
 	temp_param.sched_priority = client->engine->client_priority;
 	if (sched_setscheduler(0, SCHED_FIFO, &temp_param)) {
-		jack_error ("Cannot temporarily set client to RT scheduler: %s", strerror(errno));
+		jack_error ("Cannot temporarily set client to RT scheduler:"
+			    " %s", strerror(errno));
 		return -1;
 	}
 
@@ -1222,36 +1238,43 @@ jack_start_thread (jack_client_t *client)
 	}
 	if (pthread_attr_setinheritsched (attributes, PTHREAD_INHERIT_SCHED)) {
 		sched_setscheduler (0, policy, &client_param);
-		jack_error ("Cannot set scheduler inherit policy for RT thread");
+		jack_error ("Cannot set scheduler inherit policy for RT "
+			    "thread");
 		return -1;
 	}
 
 	/* create the RT thread */
-	if (pthread_create (&client->thread, attributes, jack_client_thread, client)) {
+	if (pthread_create (&client->thread, attributes,
+			    jack_client_thread, client)) {
 		sched_setscheduler (0, policy, &client_param);
 		return -1;
 	}
 
 	/* return the client process to the scheduler it was in before */
 	if (sched_setscheduler (0, policy, &client_param)) {
-		jack_error ("Cannot reset original client scheduler: %s", strerror(errno));
+		jack_error ("Cannot reset original client scheduler: %s",
+			    strerror(errno));
 		return -1;
 	}
 
-	/* check again... inheritance of policy and priority works in jack_simple_client
-	   but not in ardour! So I check again and force the policy if it is not set
-	   correctly. This does not really really work either, the manager thread
-	   of the linuxthreads implementation is left running with SCHED_OTHER,
-	   that is presumably very bad.
+	/* check again... inheritance of policy and priority works in
+	   jack_simple_client but not in ardour! So I check again and
+	   force the policy if it is not set correctly. This does not
+	   really really work either, the manager thread of the
+	   linuxthreads implementation is left running with
+	   SCHED_OTHER, that is presumably very bad.
 	*/
 	memset (&client_param, 0, sizeof (client_param));
-	if (pthread_getschedparam(client->thread, &policy, &client_param) == 0) {
+	if (pthread_getschedparam(client->thread, &policy,
+				  &client_param) == 0) {
 		if (policy != SCHED_FIFO) {
-			/* jack_error ("RT thread did not go SCHED_FIFO, trying again"); */
 			memset (&client_param, 0, sizeof (client_param));
-			client_param.sched_priority = client->engine->client_priority;
-			if (pthread_setschedparam (client->thread, SCHED_FIFO, &client_param)) {
-				jack_error ("Cannot set (again) FIFO scheduling class for RT thread\n");
+			client_param.sched_priority =
+				client->engine->client_priority;
+			if (pthread_setschedparam (client->thread, SCHED_FIFO,
+						   &client_param)) {
+				jack_error ("Cannot set (again) FIFO scheduling"
+					    " class for RT thread\n");
 				return -1;
 			}
 		}
@@ -1265,15 +1288,16 @@ jack_activate (jack_client_t *client)
 {
 	jack_request_t req;
 
-	/* we need to scribble on our stack to ensure that its memory pages are
-	 * actually mapped (more important for mlockall(2) usage in
-	 * jack_start_thread()) 
+	/* we need to scribble on our stack to ensure that its memory
+	 * pages are actually mapped (more important for mlockall(2)
+	 * usage in jack_start_thread())
 	 */
          
-#if defined(__APPLE__) && defined(__POWERPC__) 
-       #define BIG_ENOUGH_STACK 10000 // a bigger stack make the application crash...
+#if defined(__APPLE__) && defined(__POWERPC__)
+/* a bigger stack makes the application crash... */
+#define BIG_ENOUGH_STACK 10000
 #else
-       #define BIG_ENOUGH_STACK 1048576
+#define BIG_ENOUGH_STACK 1048576
 #endif
 
 	char buf[BIG_ENOUGH_STACK];
@@ -1285,7 +1309,8 @@ jack_activate (jack_client_t *client)
 
 #undef BIG_ENOUGH_STACK
 
-	if (client->control->type == ClientInternal || client->control->type == ClientDriver) {
+	if (client->control->type == ClientInternal ||
+	    client->control->type == ClientDriver) {
 		goto startit;
 	}
 
@@ -1309,13 +1334,17 @@ jack_activate (jack_client_t *client)
 
 		if (req.status) {
 
-			/* what to do? engine is running realtime, it is using capabilities and has
-			   them (otherwise we would not get an error return) but for some reason it
-			   could not give the client the required capabilities, so for now downgrade
-			   the client so that it still runs, albeit non-realtime - nando
+			/* what to do? engine is running realtime, it
+			   is using capabilities and has them
+			   (otherwise we would not get an error
+			   return) but for some reason it could not
+			   give the client the required capabilities,
+			   so for now downgrade the client so that it
+			   still runs, albeit non-realtime - nando
 			*/
 
-			jack_error ("could not receive realtime capabilities, client will run non-realtime");
+			jack_error ("could not receive realtime capabilities, "
+				    "client will run non-realtime");
 			/* XXX wrong, this is a property of the engine
 			client->engine->real_time = 0;
 			*/
