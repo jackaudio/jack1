@@ -509,10 +509,9 @@ start_server (void)
 		}
 	case -1:			/* fork() error */
 		return 1;		/* failed to start server */
-
-	default:			/* original parent process */
-		/* fall through and return */
 	}
+
+	/* only the original parent process goes here */
 	return 0;			/* (probably) successful */
 }
 
