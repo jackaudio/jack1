@@ -3196,14 +3196,16 @@ jack_send_connection_notification (jack_engine_t *engine, jack_client_id_t clien
 		return -1;
 	}
 
-	event.type = (connected ? PortConnected : PortDisconnected);
-	event.x.self_id = self_id;
-	event.y.other_id = other_id;
-
-	if (jack_deliver_event (engine, client, &event)) {
-		jack_error ("cannot send port connection notification to client %s (%s)", 
-			     client->control->name, strerror (errno));
-		return -1;
+	if (client->control->active) {
+		event.type = (connected ? PortConnected : PortDisconnected);
+		event.x.self_id = self_id;
+		event.y.other_id = other_id;
+		
+		if (jack_deliver_event (engine, client, &event)) {
+			jack_error ("cannot send port connection notification to client %s (%s)", 
+				    client->control->name, strerror (errno));
+			return -1;
+		}
 	}
 
 	return 0;
