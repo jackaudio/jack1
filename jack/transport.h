@@ -116,10 +116,11 @@ int  jack_release_timebase (jack_client_t *client);
 
 /**
  * Prototype for the @a sync_callback defined by slow-sync clients.
- * Called just before process() in the same thread on the first cycle
- * after being registered, whenever some client requests a new
- * position, or when the transport enters the ::JackTransportStarting
- * state.  This realtime function must not wait.
+ * When the client is active, this callback is invoked just before
+ * process() in the same thread.  This occurs once after registration,
+ * then subsequently whenever some client requests a new position, or
+ * the transport enters the ::JackTransportStarting state.  This
+ * realtime function must not wait.
  *
  * The transport @a state will be:
  *
@@ -142,12 +143,13 @@ typedef int  (*JackSyncCallback)(jack_transport_state_t state,
  * Register (or unregister) as a slow-sync client, one that cannot
  * respond immediately to transport position changes.
  *
- * The @a sync_callback will be invoked in the first process cycle
- * after its registration is complete, or in the first cycle after
- * jack_activate() if the client had been inactive.  After that, it
- * runs according to the ::JackSyncCallback rules.  Clients that don't
- * set a @a sync_callback are assumed to be ready immediately any time
- * the transport wants to start.
+ * The @a sync_callback will be invoked at the first available
+ * opportunity after its registration is complete.  If the client is
+ * currently active this will be the following process cycle,
+ * otherwise it will be the first cycle after calling jack_activate().
+ * After that, it runs according to the ::JackSyncCallback rules.
+ * Clients that don't set a @a sync_callback are assumed to be ready
+ * immediately any time the transport wants to start.
  *
  * @param client the JACK client structure.
  * @param sync_callback is a realtime function that returns TRUE when
