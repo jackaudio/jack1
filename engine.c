@@ -2352,6 +2352,7 @@ jack_port_release (jack_engine_t *engine, jack_port_internal_t *port)
 	if (port->buffer_info) {
 		pthread_mutex_lock (&engine->buffer_lock);
 		engine->port_buffer_freelist = g_slist_prepend (engine->port_buffer_freelist, port->buffer_info);
+		port->buffer_info = NULL;
 		pthread_mutex_unlock (&engine->buffer_lock);
 	}
 	pthread_mutex_unlock (&engine->port_lock);
@@ -2538,14 +2539,16 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 	}
 
 	if (engine->verbose) {
-		fprintf (stderr, "port %s assigned buffer in shm key 0x%x at offset %d\n", 
+		fprintf (stderr, "port %s buf shm key 0x%x at offset %d bi = %p\n", 
 			 port->shared->name,
 			 port->shared->shm_key,
-			 port->shared->offset);
+			 port->shared->offset,
+			 port->buffer_info);
 	}
-	
+
 	if (port->shared->shm_key >= 0) {
 		engine->port_buffer_freelist = g_slist_remove (engine->port_buffer_freelist, bi);
+		
 	} else {
 		jack_error ("port segment info for 0x%x:%d not found!", bi->shm_key, bi->offset);
 	}
