@@ -64,7 +64,7 @@ int            jack_client_close (jack_client_t *client);
 void jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg);
 
 /**
- * Tell the Jack serve to call 'process_callback' whenever there is work
+ * Tell the Jack server to call 'process_callback' whenever there is work
  * be done, passing 'arg' as the second argument.
  */
 int jack_set_process_callback (jack_client_t *, JackProcessCallback process_callback, void *arg);
@@ -95,7 +95,7 @@ int jack_set_port_registration_callback (jack_client_t *, JackPortRegistrationCa
 int jack_set_graph_order_callback (jack_client_t *, JackGraphOrderCallback graph_callback, void *);
 
 /**
- * Tell the Jack serve to call 'xrun_callback' whenever there is a xrun, passing
+ * Tell the Jack server to call 'xrun_callback' whenever there is a xrun, passing
  * 'arg' as an argument.
  */
 int jack_set_xrun_callback (jack_client_t *, JackXRunCallback xrun_callback, void *arg);
@@ -392,8 +392,11 @@ jack_nframes_t jack_get_buffer_size (jack_client_t *);
  * the specified arguments.
  * The caller is responsible for calling free(3) any non-NULL returned value.
  */
-const char ** jack_get_ports (jack_client_t *, const char *port_name_pattern, 
-                              const char *type_name_pattern, unsigned long flags);
+
+const char ** jack_get_ports (jack_client_t *, 
+			      const char *port_name_pattern, 
+			      const char *type_name_pattern, 
+			      unsigned long flags);
 
 /**
  * Searchs for and returns the jack_port_t with the name value
@@ -437,7 +440,10 @@ jack_nframes_t jack_frame_time (const jack_client_t *);
 
 /**
  * This returns the current CPU load estimated by JACK
- * as a percentage.
+ * as a percentage. The load is computed by measuring
+ * the number of cycles it took to execute all clients
+ * as a fraction of the total number of cycles
+ * represented by the data that was processed.
  */
 float jack_cpu_load (jack_client_t *client);
 

@@ -100,7 +100,7 @@ libjack_la_SOURCES = client.c pool.c driver.c
 libjack_la_LDFLAGS = $(GLIB_LIBS) -lm
 
 jack_alsa_la_LDFLAGS = -module
-jack_alsa_la_SOURCES = alsa_driver.c hammerfall.c generic_hw.c memops.c
+jack_alsa_la_SOURCES = alsa_driver.c hammerfall.c generic_hw.c memops.c ice1712.c
 jack_alsa_la_LIBADD = -lasound $(GLIB_LIBS) -lm
 
 pkgconfigdir = $(libdir)/pkgconfig
