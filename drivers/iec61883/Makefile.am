@@ -9,9 +9,13 @@ plugin_LTLIBRARIES = jack_iec61883.la
 
 jack_iec61883_la_SOURCES = \
 	iec61883_common.c \
-        iec61883_driver.c \
-        iec61883_client.c \
-	iec61883_ip_client.c
+	iec61883_common.h \
+    iec61883_driver.c \
+	iec61883_driver.h \
+    iec61883_client.c \
+	iec61883_client.h \
+	iec61883_ip_client.c \
+	iec61883_ip_client.h
 
 jack_iec61883_la_LIBADD = $(RAW1394_LIBS)
 endif

@@ -14,8 +14,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=93
-JACK_MICRO_VERSION=11
+JACK_MINOR_VERSION=94
+JACK_MICRO_VERSION=0
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -117,7 +117,50 @@ fi
 JACK_CORE_CFLAGS="-I\$(top_srcdir) -I\$(top_builddir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
 
 JACK_CFLAGS="$JACK_CORE_CFLAGS -g"
-JACK_OPT_CFLAGS="$JACK_CORE_CFLAGS -O3 -march=$target_cpu -fomit-frame-pointer -ffast-math -fstrength-reduce -funroll-loops -fmove-all-movables"
+dnl
+dnl figure out how best to optimize
+dnl
+                                                                                
+if test "$target_cpu" = "powerpc"; then
+  AC_DEFINE(POWERPC, 1, "Are we running a ppc CPU?")
+  altivecLinux=`cat /proc/cpuinfo | grep -i altivec >/dev/null`
+  if test "$?" = "0"; then
+    AC_DEFINE(HAVE_ALTIVEC_LINUX, 1, "Is there Altivec Support ?")
+    if test "$gcc_major_version" = "3"; then
+dnl -mcpu=7450 does not reliably work with gcc 3.*
+      JACK_OPT_FLAGS="-D_REENTRANT -O2 -mcpu=7400 -maltivec -mabi=altivec"
+    else
+      JACK_OPT_FLAGS="-D_REENTRANT -O3 -mcpu=7400"
+    fi
+  else
+    JACK_OPT_FLAGS="-D_REENTRANT -O3 -mcpu=750 -mmultiple"
+  fi
+  JACK_OPT_FLAGS="$OPTIM_FLAGS -mhard-float -mpowerpc-gfxopt"
+elif echo $target_cpu | grep "i*86" >/dev/null; then
+  cat /proc/cpuinfo | grep mmx >/dev/null
+  if test $? = 0; then
+    mmx="-mmmx"
+  fi
+  cat /proc/cpuinfo | grep sse >/dev/null
+  if test $? = 0; then
+    sse="-msse -mfpmath=sse"
+  fi
+    cat /proc/cpuinfo | grep 3dnow >/dev/null
+  if test $? = 0; then
+    dreidnow="-m3dnow"
+  fi
+  AC_DEFINE(x86, 1, "Nope its intel")
+  if test "$target_cpu" = "i586"; then
+    JACK_OPT_FLAGS="-DREENTRANT -O3 -march=i586 -fomit-frame-pointer -ffast-math -funroll-loops -fmove-all-movables"
+  elif test "$target_cpu" = "i686"; then
+    JACK_OPT_FLAGS="-D_REENTRANT -O3 -march=i686 -fomit-frame-pointer -ffast-math -funroll-loops -fmove-all-movables"
+    if test "$gcc_major_version" = "3"; then
+      JACK_OPT_FLAGS="$OPTIM_FLAGS $mmx $sse $dreidnow"
+    fi
+  else
+    JACK_OPT_FLAGS="-D_REENTRANT -O3 -fomit-frame-pointer -ffast-math -funroll-loops -fmove-all-movables"
+  fi
+fi
 
 AC_ARG_ENABLE(optimize,
               [  --enable-optimize       ask the compiler for its best optimizations],
@@ -303,7 +346,7 @@ AC_ARG_ENABLE(iec61883,
 ])
 
 if test x$jack_enable_iec61883 != xno; then
-  AC_CHECK_LIB(raw1394, raw1394_loop_iterate,
+  AC_CHECK_LIB(raw1394, raw1394_iso_xmit_init,
                [
                  AC_CHECK_HEADER(libraw1394/raw1394.h,
                                  [
