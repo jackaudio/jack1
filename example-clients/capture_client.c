@@ -127,7 +127,7 @@ disk_thread (void *arg)
 	unsigned int chn;
 	jack_nframes_t total_captured = 0;
 	int done = 0;
-	double *fbuf;
+	float *fbuf;
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 	pthread_mutex_lock (&buffer_lock);
@@ -147,11 +147,11 @@ disk_thread (void *arg)
 		while ((buf = get_write_buffer ()) != 0) {
 			pthread_mutex_unlock (&buffer_lock);
 
-			/* grrr ... libsndfile doesn't do float data yet, only double */
+			/* libsndfile requires interleaved data */
 			
 			if (info->can_capture) {
 
-				fbuf = (double *) malloc (sizeof (double) * buf->nframes * info->channels);
+				fbuf = (float *) malloc (sizeof (float) * buf->nframes * info->channels);
 
 				for (chn = 0; chn < info->channels; chn++) {
 					for (i = 0; i < buf->nframes; i++) {
@@ -159,7 +159,7 @@ disk_thread (void *arg)
 					}
 				}
 				
-				if (sf_writef_double (info->sf, fbuf, buf->nframes) != (sf_count_t)buf->nframes) {
+				if (sf_writef_float (info->sf, fbuf, buf->nframes) != (sf_count_t)buf->nframes) {
 					char errstr[256];
 					sf_error_str (0, errstr, sizeof (errstr) - 1);
 					fprintf (stderr, "cannot write data to sndfile (%s)\n", errstr);

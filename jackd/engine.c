@@ -55,7 +55,13 @@
  * Time to wait for clients in msecs. Used when jackd is 
  * run in non-ASIO mode and without realtime priority enabled.
  */
+#define DEBUGGING_SLOW_CLIENTS
+
+#ifdef DEBUGGING_SLOW_CLIENTS
+#define JACKD_SOFT_MODE_TIMEOUT 5000
+#else
 #define JACKD_SOFT_MODE_TIMEOUT 500
+#endif
 
 #define JACK_ERROR_WITH_SOCKETS 10000000
 

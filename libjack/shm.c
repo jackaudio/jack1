@@ -64,6 +64,12 @@ jack_initialize_shm ()
 	void *addr;
 	int id;
 
+#ifdef USE_POSIX_SHM
+	fprintf (stderr, "JACK compiled with POSIX SHM support\n");
+#else
+	fprintf (stderr, "JACK compiled with System V SHM support\n");
+#endif
+
 	if (jack_shm_registry != NULL) {
 		return 0;
 	}
@@ -82,7 +88,7 @@ jack_initialize_shm ()
 	jack_shm_registry = (jack_shm_registry_entry_t *) addr;
 	jack_shm_id_cnt = 0;
 	
-	jack_register_shm("/jack-shm-registry", addr, id);
+	jack_register_shm ("/jack-shm-registry", addr, id);
 
 	return 0;
 }
@@ -264,23 +270,43 @@ jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot, i
 		unlink (path);
 		return MAP_FAILED;
 	}
+	
+	/* XXX need to figure out how to do this without causing the inode reallocation
+	   the next time this function is called resulting in ftok() returning non-unique
+	   keys.
+	*/
 
-	unlink (path);
+	/* unlink (path); */
 
-	fprintf (stderr, "key for %s is 0x%x\n", path, key);
+	shmflags = mode;
 
-	shmflags = 0;
-
-//	if (mode & O_TRUNC) {
-//		shmflags |= IPC_CREAT;
-//	}
-
-	if ((*shmid = shmget (key, size, shmflags)) < 0) {
-		jack_error ("cannot create shm segment %s (%s)", shm_name, strerror (errno));
-		return MAP_FAILED;
+	if (perm & O_CREAT) {
+		shmflags |= IPC_CREAT;
 	}
 
-	if ((addr = shmat (*shmid, 0, 0)) != 0) {
+	if (perm & O_TRUNC) {
+		shmflags |= IPC_EXCL;
+	}
+
+	if ((*shmid = shmget (key, size, shmflags)) < 0) {
+
+		if (errno == EEXIST && (shmflags & IPC_EXCL)) {
+
+			shmflags &= ~IPC_EXCL;
+
+			if ((*shmid = shmget (key, size, shmflags)) < 0) {
+				jack_error ("cannot get existing shm segment for %s (%s)",
+					    shm_name, strerror (errno));
+				return MAP_FAILED;
+			}
+
+		} else {
+			jack_error ("cannot create shm segment %s (%s)", shm_name, strerror (errno));
+			return MAP_FAILED;
+		}
+	}
+
+	if ((addr = shmat (*shmid, 0, 0)) < 0) {
 		jack_error ("cannot attach shm segment %s (%s)", shm_name, strerror (errno));
 		return MAP_FAILED;
 	}

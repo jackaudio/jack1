@@ -13,7 +13,7 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=68
+JACK_MINOR_VERSION=69
 JACK_MICRO_VERSION=0
 
 dnl ---
@@ -41,7 +41,7 @@ dnl slacker than this, and closer to those for the JACK version
 dnl number.
 dnl ---
 JACK_API_CURRENT=0
-JACK_API_REVISION=18
+JACK_API_REVISION=19
 JACK_API_AGE=0
 
 AC_SUBST(JACK_MAJOR_VERSION)
@@ -87,12 +87,19 @@ dnl look for system support for POSIX shm API
 dnl XXX this could probably be improved
 dnl
 
+AC_ARG_ENABLE(sysv-shm, [  --enable-sysv-shm       use System V shm API even if POSIX API is supported ])
+
 AC_MSG_CHECKING([POSIX shm support (compile time)])
 df | grep -s /dev/shm >/dev/null 2>&1
 if test $? = 0 ; then
-   SHM_FLAGS=-DUSE_POSIX_SHM
-   AC_MSG_RESULT([found.
-	JACK will use shm_open() and friends])
+   if test "x$enable-sysv-shm" = "xno" ; then
+        SHM_FLAGS=-DUSE_POSIX_SHM
+        AC_MSG_RESULT([found.
+	     JACK will use shm_open() and friends.])
+   else 
+        AC_MSG_RESULT([found.
+	     But JACK will use shmget() and friends because you asked for it.])
+   fi
 else
    AC_MSG_RESULT([not found. 
 	JACK will use System V shm API (shmget() and friends])
