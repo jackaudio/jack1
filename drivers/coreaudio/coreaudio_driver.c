@@ -46,7 +46,7 @@ const int CAVersion = 2;
 
 void JCALog(char *fmt, ...);
 
-OSStatus GetDeviceNameFromID(AudioDeviceID id, char name[60])
+static OSStatus GetDeviceNameFromID(AudioDeviceID id, char name[60])
 {
     UInt32 size = sizeof(char) * 60;
     OSStatus stat = AudioDeviceGetProperty(id, 0, false,
@@ -563,8 +563,6 @@ jack_driver_t *driver_initialize(jack_client_t * client,
     int chan_out = 2;
     char *name = NULL;
     AudioDeviceID deviceID;
-    get_device_id_from_num(0, &deviceID);
-
     const JSList *node;
     const jack_driver_param_t *param;
 
@@ -575,7 +573,6 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 
 		case 'n':
 			name = (char *) param->value.str;
-			printf("Driver name found %s\n", name);
 			break;
 
 		case 'D':
