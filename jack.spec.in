@@ -1,5 +1,8 @@
 # $Id$
-Summary:	Jack Professional Audio Server
+# set to 0 to build rpms without capabilities support
+%define enable_capabilities 1
+
+Summary:	the Jack Audio Connection Kit
 Name:		jack-audio-connection-kit
 Version:	@JACK_VERSION@
 Release:	1
@@ -7,67 +10,111 @@ License:	GPL
 Group:		System Environment/Daemons
 Source0:	%{name}-%{version}.tar.gz
 URL:		http://jackit.sourceforge.net
-Requires:	%{name}-libs = %{version}
 BuildRoot:	/var/tmp/%{name}-%{version}-root-%(id -u -n)
 
-%description
-Jack is a sound server aimed at satisfying the needs of music profesionals.
+# disable build root strip policy, otherwise rpm strips the executables
+# and the jackd md5 checksum checked by jackstart does not match.
+%define __spec_install_post /usr/lib/rpm/brp-compress || :
 
-%package libs
-Summary:	Jack audio connection kit libraries
-Group:		Development/Libraries
-%description libs
-The %{name}-libs package contains all libraries required for running
-programs using the Jack Audio Server.
+%description
+JACK is a low-latency audio server, written primarily for the Linux
+operating system. It can connect a number of different applications to
+an audio device, as well as allowing them to share audio between
+themselves. Its clients can run in their own processes (ie. as a
+normal application), or can they can run within a JACK server (ie. a
+"plugin").
+
+JACK is different from other audio server efforts in that it has been
+designed from the ground up to be suitable for professional audio
+work. This means that it focuses on two key areas: synchronous
+execution of all clients, and low latency operation.
 
 %package devel
 Summary:	Header files for Jack 
 Group:		Development/Libraries
-Requires:	%{name}-libs = %{version}
+Requires:	%{name} = %{version}
 
 %description devel
-Header files for jack.
+Header files for the Jack Audio Connection Kit.
+
+%package example-clients
+Summary:	Example clients that use Jack 
+Group:		Applications/Multimedia
+Requires:	%{name} = %{version}
+
+%description example-clients
+Small example clients that use the Jack Audio Connection Kit.
 
 %prep
 %setup -q
 
 %build
+%if "%{enable_capabilities}" == "1"
+%configure --enable-capabilities
+%else
 %configure
-
-%{__make}
+%endif
+make
 
 %install
-rm -rf $RPM_BUILD_ROOT
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
 
-%{__make} install \
-	DESTDIR=$RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
 
-gzip -9nf AUTHORS TODO
-
-%find_lang %{name}
-
-%post   libs -p /sbin/ldconfig
-%postun libs -p /sbin/ldconfig
+%post   -p /sbin/ldconfig
+%postun -p /sbin/ldconfig
 
 %clean
-rm -rf $RPM_BUILD_ROOT
+[ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
 
 %files 
-%defattr(644,root,root,755)
-%doc *.gz
-%attr(755,root,root) %{_bindir}/*
-
-%files libs
-%defattr(644,root,root,755) 
-%attr(755,root,root) %{_libdir}/lib*.so.*.*
+%defattr(-,root,root)
+%doc AUTHORS TODO COPYING* doc/reference
+%if "%{enable_capabilities}" == "1"
+%attr(4755, root, root) %{_bindir}/jackstart
+%endif
+%{_bindir}/jackd
+%{_libdir}/libjack.so
+%{_libdir}/libjack.so.*
+%{_libdir}/jack/jack_alsa.so
+%{_libdir}/jack/jack_alsa.so.*
 
 %files devel
-%defattr(644,root,root,755)
-%attr(755,root,root) %{_libdir}/lib*.so
-%attr(755,root,root) %{_libdir}/lib*.la
-%{_includedir}/jack/*.h
-%attr(755,root,root) %{_libdir}/pkgconfig/jack.pc
+%defattr(-,root,root)
+%{_includedir}/jack
+%{_libdir}/libjack.a
+%{_libdir}/libjack.la
+%{_libdir}/jack/jack_alsa.a
+%{_libdir}/jack/jack_alsa.la
+%{_libdir}/pkgconfig/jack.pc
+
+%files example-clients
+%defattr(-,root,root)
+%{_bindir}/jack_fltk_client
+%{_bindir}/jackrec
+%{_bindir}/jack_cache_killer
+%{_bindir}/jack_connect
+%{_bindir}/jack_disconnect
+%{_bindir}/jack_impulse_grabber
+%{_bindir}/jack_monitor_client
+%{_bindir}/jack_simple_client
 
 %changelog
-* Sat May 4 2002 Christian Fredrik Kalager Schaller <uraeus@linuxrising.org> 
+
+* Thu May 23 2002 Fernando Lopez-Lezcano <nando@ccrma.stanford.edu>
+- added configuration variable to build with/without capabilities
+
+* Tue May 21 2002 Fernando Lopez-Lezcano <nando@ccrma.stanford.edu>
+- split the examples into a different package so that the base
+  package does not depend on, for example, fltk. 
+- disable stripping of binaries
+
+* Mon May 13 2002 Fernando Lopez-Lezcano <nando@ccrma.stanford.edu>
+- do not compress documentation, added doxygen docs directory
+- changed defattr directives
+- added libdir/jack*, libdir/*.a and libdir/*.so.* to files
+- moved all so's to libs, jack will not start without jack_alsa.so
+- merged base and libs packages
+
+* Sat May  4 2002 Christian Fredrik Kalager Schaller <uraeus@linuxrising.org> 
 - initial release of jack sound server package for GStreamer
