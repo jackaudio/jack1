@@ -734,8 +734,8 @@ jack_client_do_deactivate (jack_engine_t *engine, jack_client_internal_t *client
 	*/
 	
 	client->control->active = FALSE;
-	
-	if (!jack_client_is_inprocess (client)) {
+
+	if (!jack_client_is_inprocess (client) && engine->external_client_cnt > 0) {	
 		engine->external_client_cnt--;
 	}
 
