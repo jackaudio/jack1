@@ -648,7 +648,7 @@ main (int argc, char *argv[])
 	copyright (stdout);
 
 	if (jack_initialize_shm ()) {
-		fprintf (stderr, "no access to shared memory registry");
+		fprintf (stderr, "no access to shm registry\n");
 		exit (1);
 	}
 	rc = jack_register_server (server_name);
