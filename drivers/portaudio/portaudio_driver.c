@@ -29,7 +29,8 @@
 	12-01-04 : Connect port names (inverse "in" and "out")    	
 	13-01-04 : Correct the length of jack port : use JACK_PORT_NAME_SIZE
 	22-03-04 : Remove jack_init_time, rename input and ouput ports using "capture" and "playback" 
-   
+    10-03-04 : S. Letz: Add management of -I option for use with JackPilot.
+
 */
 
 #include <stdio.h>
@@ -37,9 +38,39 @@
 #include <string.h>
 
 #include <jack/engine.h>
-
+#include <CoreAudio/CoreAudio.h>
 #include "portaudio_driver.h"
 
+static OSStatus GetDeviceNameFromID(AudioDeviceID id, char name[60])
+{
+    UInt32 size = sizeof(char) * 60;
+    OSStatus stat = AudioDeviceGetProperty(id, 0, false,
+					   kAudioDevicePropertyDeviceName,
+					   &size,
+					   &name[0]);
+    return stat;
+}
+
+static OSStatus get_device_id_from_num(int i, AudioDeviceID * id)
+{
+    OSStatus theStatus;
+    UInt32 theSize;
+    int nDevices;
+    AudioDeviceID *theDeviceList;
+
+    theStatus =
+	AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDevices,
+				     &theSize, NULL);
+    nDevices = theSize / sizeof(AudioDeviceID);
+    theDeviceList =
+	(AudioDeviceID *) malloc(nDevices * sizeof(AudioDeviceID));
+    theStatus =
+	AudioHardwareGetProperty(kAudioHardwarePropertyDevices, &theSize,
+				 theDeviceList);
+
+    *id = theDeviceList[i];
+    return theStatus;
+}
 
 static int
 paCallback(void *inputBuffer, void *outputBuffer,
@@ -203,7 +234,6 @@ portaudio_driver_write (portaudio_driver_t *driver, jack_nframes_t nframes)
         
         return 0;
 }
-
 
 static int
 portaudio_driver_audio_start (portaudio_driver_t *driver)
@@ -446,7 +476,6 @@ static int portaudio_load_driver (portaudio_driver_t *driver,
     return found;
 }
 
-
 /** create a new driver instance
  */
 static jack_driver_t *
@@ -459,7 +488,8 @@ portaudio_driver_new (char *name,
 				int chan_in, 
 				int chan_out,
 				DitherAlgorithm dither,
-				char* driver_name)
+				char* driver_name,
+				AudioDeviceID deviceID)
 {
 	portaudio_driver_t *driver;
 	PaError err = paNoError;
@@ -494,6 +524,16 @@ portaudio_driver_new (char *name,
 	driver->start = (JackDriverStartFunction) portaudio_driver_audio_start;
 	driver->stop = (JackDriverStopFunction) portaudio_driver_audio_stop;
 	driver->stream = NULL;
+	
+	char deviceName[60];
+    bzero(&deviceName[0], sizeof(char) * 60);
+
+    if (!driver_name) {
+		if (GetDeviceNameFromID(deviceID, deviceName) != noErr)
+			goto error;
+    } else {
+		strcpy(&deviceName[0], driver_name);
+    }
        
 	err = Pa_Initialize();
 	printf("Pa_Initialize OK \n");
@@ -588,9 +628,9 @@ error:
 static void
 portaudio_driver_delete (portaudio_driver_t *driver)
 {
-        /* Close PortAudio stream and terminate */
-        Pa_CloseStream(driver->stream);
-        Pa_Terminate();
+	/* Close PortAudio stream and terminate */
+	Pa_CloseStream(driver->stream);
+	Pa_Terminate();
 	free(driver);
 }
 
@@ -606,7 +646,7 @@ driver_get_descriptor ()
 	desc = calloc (1, sizeof (jack_driver_desc_t));
 
 	strcpy (desc->name, "portaudio");
-	desc->nparams = 10;
+	desc->nparams = 11;
 	desc->params = calloc (desc->nparams,
 			       sizeof (jack_driver_param_desc_t));
 
@@ -694,6 +734,15 @@ driver_get_descriptor ()
 		"    t : triangular\n"
 		"    s : shaped\n"
 		"    - : no dithering");
+	
+	i++;
+    strcpy(desc->params[i].name, "id");
+    desc->params[i].character = 'I';
+    desc->params[i].type = JackDriverParamInt;
+    desc->params[i].value.i = 0;
+    strcpy(desc->params[i].short_desc, "Audio Device ID");
+    strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
+    return desc;
 	return desc;
 }
 
@@ -704,7 +753,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 {
 	jack_nframes_t srate = 48000;
 	jack_nframes_t frames_per_interrupt = 1024;
-	
+	AudioDeviceID deviceID;
 	int capture = FALSE;
 	int playback = FALSE;
 	int chan_in = -1;
@@ -713,6 +762,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 	const JSList * node;
 	const jack_driver_param_t * param;
 	char *name = "";
+	get_device_id_from_num(0, &deviceID);
 
 	for (node = params; node; node = jack_slist_next (node)) {
 		param = (const jack_driver_param_t *) node->data;
@@ -757,6 +807,10 @@ driver_initialize (jack_client_t *client, const JSList * params)
 		case 'p':
 			frames_per_interrupt = (unsigned int) param->value.ui;
 			break;
+			
+		case 'I':
+			deviceID = (AudioDeviceID) param->value.ui;
+			break;
                                     
 		case 'z':
 			switch ((int) param->value.c) {
@@ -781,7 +835,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 		}
 	}
 
-        /* duplex is the default */
+	/* duplex is the default */
 	if (!capture && !playback) {
 		capture = TRUE;
 		playback = TRUE;
@@ -789,9 +843,8 @@ driver_initialize (jack_client_t *client, const JSList * params)
 
 	return portaudio_driver_new ("portaudio", client, frames_per_interrupt,
 				     srate, capture, playback, chan_in,
-				     chan_out, dither,name);
+				     chan_out, dither, name, deviceID);
 }
-
 
 void
 driver_finish (jack_driver_t *driver)
