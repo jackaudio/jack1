@@ -136,6 +136,11 @@ main (int argc, char *argv[])
 					  JACK_DEFAULT_AUDIO_TYPE,
 					  JackPortIsOutput, 0);
 
+	if ((input_port == NULL) || (output_port == NULL)) {
+		fprintf(stderr, "no more JACK ports available\n");
+		exit (1);
+	}
+
 	/* Tell the JACK server that we are ready to roll.  Our
 	 * process() callback will start running now. */
 

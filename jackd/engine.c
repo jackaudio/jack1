@@ -1895,19 +1895,12 @@ jack_server_thread (void *arg)
 	engine->pfd[1].fd = engine->fds[1];
 	engine->pfd[1].events = POLLIN|POLLERR;
 	engine->pfd_max = 2;
+	pfd = engine->pfd;
+	max = engine->pfd_max;
 
 	while (!done) {
 		DEBUG ("start while");
 		
-		/* XXX race here with new external clients
-		   causing engine->pfd to be reallocated.
-		   I don't know how to solve this
-		   short of copying the entire
-		   contents of the pfd struct. Ick.
-		*/
-	
-		max = engine->pfd_max;
-		pfd = engine->pfd;
 	
 		if (poll (pfd, max, 10000) < 0) {
 			if (errno == EINTR) {
@@ -1979,6 +1972,10 @@ jack_server_thread (void *arg)
 				close (client_socket);
 			}
 		}
+		
+		/* handle_new_client() may have realloced engine->pfd */
+		pfd = engine->pfd;
+		max = engine->pfd_max;
 
 		/* check the ACK server socket */
 
