@@ -10,19 +10,18 @@ libjackinclude_HEADERS = 	\
 	types.h	
 
 noinst_HEADERS =		\
-	cycles.h 		\
+	atomicity.h		\
 	driver.h 		\
+	driver_interface.h	\
+	driver_parse.h		\
 	engine.h		\
 	hardware.h 		\
 	internal.h 		\
 	jslist.h		\
+	memops.h		\
 	pool.h			\
 	port.h			\
 	ringbuffer.h		\
 	shm.h			\
 	start.h			\
-	time.h			\
-	version.h		\
-	driver_interface.h	\
-	driver_parse.h
-
+	version.h

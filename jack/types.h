@@ -41,15 +41,7 @@ typedef uint32_t	     jack_nframes_t;
  * Type used to represent the value of free running
  * monotonic clock with units of microseconds.
  */
-
-/* JOQ: this is trouble.  APPLE POWERPC should use a compatible
- * typedef, explicitly converting from double, if necessary.
- * Otherwise applications cannot safely print a jack_time_t. */
-#if defined(__APPLE__) && defined(__POWERPC__) 
-typedef double jack_time_t;
-#else
 typedef uint64_t jack_time_t;
-#endif
 
 /**
  *  jack_port_t is an opaque type.  You may only access it using the

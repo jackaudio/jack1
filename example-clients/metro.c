@@ -16,15 +16,17 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+#include <sysdeps/os_defines.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
 #include <math.h>
+#include GETOPT_H
+#include <string.h>
+
 #include <jack/jack.h>
 #include <jack/transport.h>
-#include <getopt.h>
-#include <string.h>
 
 typedef jack_default_audio_sample_t sample_t;
 

@@ -6,6 +6,12 @@
 	  int jack_port_name_size(void);
 	  int jack_port_type_size(void);
 
+2004-02-16  Jack O'Quin  <joq@io.com>
+
+	* Changed JACK_PORT_NAME_SIZE from 32 to 256
+
+	This could affect some client that defines its own value.
+
 2003-10-15  Paul Davis <paul@linuxaudiosystems.com>
 
 	* new ring buffer interface: <jack/ringbuffer.h>

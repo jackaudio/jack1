@@ -104,6 +104,14 @@ useful. It includes
   - simple examples of wrapping a GUI around a JACK application.
   - tools for checking the status of a running JACK system.
 
+@section porting Porting
+
+JACK is designed to be portable to any system supporting the relevant
+POSIX and ANSI C standards.  It currently runs under GNU/Linux and Mac
+OS X on several different processor architectures.  If you want to
+port JACK to another platform, please read the @ref porting-guide
+document.
+
 @section license License
 
 Copyright (C) 2001-2003 by Paul Davis and others.

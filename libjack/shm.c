@@ -17,6 +17,7 @@
 
     $Id$
 */
+#include <config.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -25,12 +26,10 @@
 #include <signal.h>
 #include <limits.h>
 #include <errno.h>
+#include <dirent.h>
 #include <sys/mman.h>
 #include <sys/types.h>
-#include <dirent.h>
-#include <sys/ipc.h>
 #include <sys/shm.h>
-#include <config.h>
 
 #include <jack/shm.h>
 #include <jack/internal.h>

@@ -1,6 +1,9 @@
 /*
-    Copyright (C) 2001 Paul Davis
-    
+    Copyright (C) 2004 Jack O'Quin
+
+    Mac OS/X replacement for <sys/poll.h>.  Overrides system version,
+    using <sysdeps/fakepoll.h> to emulate the needed features.
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
     the Free Software Foundation; either version 2.1 of the License, or
@@ -18,12 +21,9 @@
     $Id$
 */
 
-/* Defined "by hand" on Darwin/MacOSX */
+#ifndef __poll_h__
+#define __poll_h__
 
-#define VERSION "0.74.2"
+#include <poll.h>
 
-#define ADDON_DIR "/usr/local/lib"
-
-#define USE_POSIX_SHM  1
-
-#define HAVE_ATEXIT 1
+#endif /* __poll_h__ */

@@ -1,5 +1,7 @@
 /*
-    Copyright (C) 2001-2003 Paul Davis
+    Copyright (C) 2004 Jack O'Quin
+
+    Generic version, overridden by OS-specific defines when needed.
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -18,36 +20,9 @@
     $Id$
 */
 
-#ifndef __jack_time_h__
-#define __jack_time_h__
+#ifndef _jack_sys_poll
+#define _jack_sys_poll 1
 
-#include <jack/types.h>
+#include <sys/poll.h>
 
-extern void jack_init_time ();
-
-#if defined(__APPLE__) && defined(__POWERPC__) 
-
-#include <mach/mach_time.h>
-
-extern double __jack_time_ratio;
-
-static inline jack_time_t jack_get_microseconds(void) 
-{  
-        return  mach_absolute_time () * __jack_time_ratio;
-}
-
-#else
-
-#include <jack/cycles.h>
-
-extern jack_time_t __jack_cpu_mhz;
-extern jack_time_t jack_get_mhz();
-extern void jack_init_time ();
-
-static inline jack_time_t jack_get_microseconds (void) {
-	return get_cycles() / __jack_cpu_mhz;
-}
-
-#endif
-
-#endif /* __jack_time_h__ */
+#endif /* _jack_sys_poll */

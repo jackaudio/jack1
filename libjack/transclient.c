@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <math.h>
 #include <stdio.h>
+#include <jack/atomicity.h>
 #include <jack/internal.h>
 #include "local.h"
 
@@ -34,40 +35,8 @@
 jack_unique_t
 jack_generate_unique_id (jack_control_t *ectl)
 {
-	/* The jack_unique_t is an opaque type.  Its structure is only
-	 * known here.  We use the least significant word of the CPU
-	 * cycle counter.  For SMP, I would like to include the
-	 * current thread ID, since only one thread runs on a CPU at a
-	 * time.
-	 *
-	 * But, pthread_self() is broken on my Debian GNU/Linux
-	 * system, it always seems to return 16384.  That's useless.
-	 * So, I'm using the process ID instead.  With Linux 2.4 and
-	 * Linuxthreads there is an LWP for each thread so this works,
-	 * but is not portable.  :-(
-	 */
-	volatile union {
-		jack_unique_t unique;
-		struct {
-			pid_t pid;
-			unsigned long cycle;
-		} field;
-	} id;
-
-	id.field.cycle = (unsigned long) get_cycles();
-	id.field.pid = getpid();
-
-	// JOQ: Alternatively, we could keep a sequence number in
-	// shared memory, using <asm/atomic.h> to increment it.  I
-	// really like the simplicity of that approach.  But I hate
-	// forcing JACK to either depend on that pesky header file, or
-	// maintain its own like ardour does.
-
-	// fprintf (stderr, "unique ID 0x%" PRIx64
-	//          ", process %d, cycle 0x%" PRIx32 "\n",
-	//	    id.unique, id.field.pid, id.field.cycle);
-
-	return id.unique;
+	/* The jack_unique_t is an opaque type. */
+	return exchange_and_add(&ectl->seq_number, 1);
 }
 
 static inline void
@@ -226,7 +195,8 @@ jack_get_current_transport_frame (const jack_client_t *client)
 	*/
 	
 	usecs = jack_get_microseconds() - position.usecs;
-	elapsed = (jack_nframes_t) floor ((((float) position.frame_rate) / 1000000.0f) * usecs);
+	elapsed = (jack_nframes_t) floor ((((float) position.frame_rate)
+					   / 1000000.0f) * usecs);
 
 	/* return the estimated transport frame position
 	 */

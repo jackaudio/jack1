@@ -19,17 +19,11 @@
     $Id$
 */
 
+#include <config.h>
+
 #include <math.h>
 #include <unistd.h>
 #include <sys/socket.h>
-
-#if defined(__APPLE__) && defined(__POWERPC__) 
-    #include "fakepoll.h"
-    #include "ipc.h"
-#else
-    #include <sys/poll.h>
-#endif
-
 #include <sys/un.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -38,21 +32,22 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <dirent.h>
-#include <sys/ipc.h>
 #include <signal.h>
 #include <sys/types.h>
-#include <sys/mman.h>
 #include <string.h>
 #include <limits.h>
-
-#include <config.h>
 
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <jack/driver.h>
-#include <jack/time.h>
 #include <jack/version.h>
 #include <jack/shm.h>
+#include <sysdeps/poll.h>
+#include <sysdeps/ipc.h>
+
+#ifndef JACK_DO_NOT_MLOCK
+#include <sys/mman.h>
+#endif /* JACK_DO_NOT_MLOCK */
 
 #ifdef USE_CAPABILITIES
 /* capgetp and capsetp are linux only extensions, not posix */
@@ -454,7 +449,8 @@ jack_resize_port_segment (jack_engine_t *engine,
 		memset (jack_zero_filled_buffer, 0, one_buffer);
 	}
 
-	if (engine->control->real_time && engine->control->do_mlock) {
+#ifndef JACK_DO_NOT_MLOCK
+	if (engine->control->real_time) {
 
 		/* Although we've called mlockall(CURRENT|FUTURE), the
 		 * Linux VM manager still allows newly allocated pages
@@ -471,6 +467,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 				   "%s", strerror(errno));
 		}
 	}
+#endif /* JACK_DO_NOT_MLOCK */
 
 	/* Tell everybody about this segment. */
 	event.type = AttachPortSegment;
@@ -577,7 +574,7 @@ jack_process_internal(jack_engine_t *engine, JSList *node,
 		return jack_slist_next (node);
 }
 
-#if defined(__APPLE__) && defined(__POWERPC__) 
+#ifdef JACK_USE_MACH_THREADS
 static JSList * 
 jack_process_external(jack_engine_t *engine, JSList *node)
 {
@@ -595,11 +592,14 @@ jack_process_external(jack_engine_t *engine, JSList *node)
         ctl->awake_at = 0;
         ctl->finished_at = 0;
         
-        jack_client_resume(client);
+        if (jack_client_resume(client) < 0) {
+            jack_error("Client will be removed\n");
+            ctl->state = Finished;
+        }
         
         return jack_slist_next (node);
 }
-#else
+#else /* !JACK_USE_MACH_THREADS */
 static JSList * 
 jack_process_external(jack_engine_t *engine, JSList *node)
 {
@@ -610,7 +610,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
 	jack_time_t now, then;
-	
+
 	client = (jack_client_internal_t *) node->data;
 	
 	ctl = client->control;
@@ -731,7 +731,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	return node;
 }
 
-#endif
+#endif /* JACK_USE_MACH_THREADS */
 
 
 static int
@@ -1022,8 +1022,8 @@ setup_client (jack_engine_t *engine, int client_fd,
 	res->engine_shm = engine->control_shm;
 	res->realtime = engine->control->real_time;
 	res->realtime_priority = engine->rtpriority - 1;
-        
-#if defined(__APPLE__) && defined(__POWERPC__) 	
+
+#ifdef JACK_USE_MACH_THREADS
 	/* specific resources for server/client real-time thread
 	 * communication */
 	res->portnum = client->portnum;
@@ -1840,9 +1840,9 @@ jack_server_thread (void *arg)
 				    (engine, pfd[i].fd)) {
 					jack_error ("could not handle external"
 						    " client request");
-#if defined(__APPLE__) && defined(__POWERPC__) 
+#ifdef JACK_USE_MACH_THREADS
                                     /* poll is implemented using
-                                    select (see the fakepool
+                                    select (see the macosx/fakepoll
                                     code). When the socket is closed
                                     select does not return any error,
                                     POLLIN is true and the next read
@@ -1854,7 +1854,7 @@ jack_server_thread (void *arg)
                                     */
                                     handle_client_socket_error(engine,
 							       pfd[i].fd);
-#endif
+#endif /* JACK_USE_MACH_THREADS */
                                                 }
 			}
 		}
@@ -2068,8 +2068,8 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
 
 	engine->control->has_capabilities = 0;
         
-#if defined(__APPLE__) && defined(__POWERPC__) 
-        /* specific ressources for server/client real-time thread
+#ifdef JACK_USE_MACH_THREADS
+        /* specific resources for server/client real-time thread
 	 * communication */
 	engine->servertask = mach_task_self();
 	if (task_get_bootstrap_port(engine->servertask, &engine->bp)){
@@ -2077,7 +2077,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
 		return 0;
         }
         engine->portnum = 0;
-#endif
+#endif /* JACK_USE_MACH_THREADS */
         
         
 #ifdef USE_CAPABILITIES
@@ -2131,18 +2131,16 @@ jack_become_real_time (jack_engine_t *engine, pthread_t thread, int priority)
 		return -1;
 	}
         
-#if defined(__APPLE__) && defined(__POWERPC__) 
-        // To be implemented
-#else
+#ifndef JACK_DO_NOT_MLOCK
         if (engine->control->do_mlock
 	    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
 		jack_error ("cannot lock down memory for RT thread (%s)",
 			    strerror (errno));
 #ifdef ENSURE_MLOCK
-		return -1;
+	    return -1;
 #endif /* ENSURE_MLOCK */
 	}
-#endif
+#endif /* JACK_DO_NOT_MLOCK */
 	return 0;
 }
 
@@ -2168,7 +2166,6 @@ jack_watchdog_thread (void *arg)
 
 	while (1) {
 		usleep (5000000);
-		pthread_testcancel();
 		if ( engine->watchdog_check == 0) {
 
 			jack_error ("jackd watchdog: timeout - killing jackd");
@@ -2183,6 +2180,11 @@ jack_watchdog_thread (void *arg)
 			kill (-getpgrp(), SIGABRT);
 			/*NOTREACHED*/
 			exit (1);
+
+#if 0  /* suppress watchdog message */
+		} else {
+			VERBOSE(engine, "jackd watchdog: all is well.\n");
+#endif
 		}
 		engine->watchdog_check = 0;
 	}
@@ -2564,7 +2566,7 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 
 	jack_transport_client_new (client);
         
-#if defined(__APPLE__) && defined(__POWERPC__) 
+#ifdef JACK_USE_MACH_THREADS
         /* specific resources for server/client real-time thread
 	 * communication */
         allocate_mach_serverport(engine, client);

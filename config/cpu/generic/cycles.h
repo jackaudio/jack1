@@ -1,6 +1,7 @@
 /*
-    Copyright © Grame 2003
-
+    Copyright (C) 2001 Paul Davis
+    Code derived from various headers from the Linux kernel
+    
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -14,24 +15,27 @@
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-    
-    Grame Research Laboratory, 9, rue du Garet 69001 Lyon - France
-    grame@rd.grame.fr
+
+    $Id$
 */
 
-#ifndef __ipc__
-#define __ipc__
+#ifndef __jack_cycles_h__
+#define __jack_cycles_h__
 
-#include <jack/internal.h>
-#include <jack/engine.h>
-#include <local.h>
+/* generic solution */
 
-int jack_client_resume(jack_client_internal_t *client);
-int jack_client_suspend(jack_client_t * client);
+#warning You are compiling JACK on a platform for which jack/cycles.h needs work
+#include <sys/time.h>
 
-void allocate_mach_serverport(jack_engine_t * engine, jack_client_internal_t *client);
-int allocate_mach_clientport(jack_client_t * client, int portnum);
+typedef long cycles_t;
+extern cycles_t cacheflush_time;
 
-typedef int socklen_t;
+static inline cycles_t get_cycles(void)
+{
+       struct timeval tv;
+       gettimeofday (&tv, NULL);
 
-#endif
+       return tv.tv_usec;
+}
+
+#endif /* __jack_cycles_h__ */

@@ -20,6 +20,8 @@
     $Id$
 */
 
+#include <sysdeps/os_defines.h>
+#include GETOPT_H
 #include <math.h>
 #include <stdio.h>
 #include <memory.h>
@@ -27,13 +29,12 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdarg.h>
-#include <getopt.h>
 #include <sys/mman.h>
 
 #include <jack/types.h>
 #include <jack/internal.h>
 #include <jack/engine.h>
-#include <jack/time.h>
+#include <sysdeps/time.h>
 
 #include "dummy_driver.h"
 

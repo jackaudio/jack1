@@ -22,7 +22,7 @@
 #include <string.h>
 #include <jack/timestamps.h>
 #include <jack/internal.h>
-#include <jack/time.h>
+#include <sysdeps/time.h>
 
 typedef struct {
     jack_time_t when;

@@ -19,9 +19,12 @@
     $Id$
 */
 
+#include <config.h>
+#include <sysdeps/os_defines.h>
+
 #include <stdio.h>
 #include <signal.h>
-#include <getopt.h>
+#include GETOPT_H
 #include <sys/types.h>
 #include <sys/shm.h>
 #include <sys/wait.h>
@@ -30,8 +33,6 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <dlfcn.h>
-
-#include <config.h>
 
 #include <jack/engine.h>
 #include <jack/internal.h>
@@ -144,7 +145,8 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	fprintf (stderr, "loading driver ..\n");
 	
 	if (jack_engine_load_driver (engine, driver_desc, driver_params)) {
-		fprintf (stderr, "cannot load driver module %s\n", driver_desc->name);
+		fprintf (stderr, "cannot load driver module %s\n",
+			 driver_desc->name);
 		return -1;
 	}
 
@@ -254,7 +256,6 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 	if (err) {
 		jack_error ("error closing driver .so '%s': %s\n", filename, dlerror ());
 	}
-
 
 	/* check it doesn't exist already */
 	for (node = drivers; node; node = jack_slist_next (node)) {
@@ -377,7 +378,7 @@ int
 main (int argc, char *argv[])
 
 {
-    jack_driver_desc_t * desc;
+	jack_driver_desc_t * desc;
 	const char *options = "-ad:P:vshVRTFl:t:m";
 	struct option long_options[] = 
 	{ 

@@ -1,0 +1,119 @@
+/*
+ * This file documents the process of porting JACK to new platforms.
+ * It is part of the JACK reference manual, built using doxygen.
+ */
+
+/**
+
+@page porting-guide Porting JACK
+
+The @ref index is designed to be portable to any system supporting the
+relevant POSIX and C language standards.  It currently works with
+GNU/Linux and Mac OS X on several different processor architectures.
+This document describes the steps needed to port JACK to another
+platform, and the methods used to provide portability.
+
+  - @ref portrequirements
+  - @ref portoverview
+  - @ref portopsys
+  - @ref portcpu
+  - @ref portissues
+
+@section portrequirements Requirements
+
+  - Each platform should build directly from CVS or from a tarball
+  using the GNU @c ./configure tools.  Platform-specific toolsets can
+  by used for development, but the GNU tools should at least work for
+  basic distribution and configuration.
+
+  - For long-term maintainability we want to minimize the use of
+  conditional compilation in source files.
+
+  - We should provide generic versions of all system-dependent
+  headers, so platforms need only provide those they modify.
+
+  - In some cases, operating system-specific information must be able
+  to override processor-specific data.
+
+@section portoverview Overview
+
+JACK relies on two types of platform-specific headers:
+
+  - @ref portopsys
+  - @ref portcpu
+
+OS-specific headers take precedence over CPU-specific headers.
+
+The JACK @c configure.host script and its system-dependent header
+directories were adapted from the @c libstdc++-v3 component of the GNU
+Compiler Collective, <http://gcc.gnu.org>.
+
+
+@section portopsys Operating System Dependencies
+
+JACK is intended to conform with C99, as defined in International
+Standard ISO/IEC 9899.  Because many existing C compilers do not fully
+support this standard, some new features should be avoided for better
+portablility.  For example, variables should not be declared in the
+middle of a compound statement, because many compilers still cannot
+handle that extension to the language.
+
+Whenever possible, OS dependencies should be isolated in OS-specific
+header files.  Each target OS may optionally provide a @c
+<sysdeps/os_defines.h> header, otherwise @c
+conf/os/generic/os_defines.h will be used.  The @c configure.host
+script distinguishes OS variations using a case statement based on the
+host system's type and version.
+
+Some needed POSIX features may be missing on certain platforms.  If
+so, the preferred solution is to provide a substitute, like the @c
+fakepoll.c implementation for Mac OS X.
+
+If conditional compilation is required in mainline
+platform-independent code, avoid using the system name.  Instead, @c
+#define a descriptive name in your @c <sysdeps/os_defines.h>, and test
+it like this:
+
+@code
+  #ifdef JACK_USE_MACH_THREADS
+          allocate_mach_serverport(engine, client);
+          client->running = FALSE;
+  #endif
+@endcode
+
+Be sure to place any generic implementation alternative in the @c
+#else or use an @c #ifndef, so other OS ports are not required to know
+your platform's conditional labels.
+
+@section portcpu Processor Dependencies
+
+JACK uses some low-level machine operations for thread-safe updates to
+shared memory.  A low-level implementation of @c <sysdeps/atomicity.h>
+is provided for every target processor architecture.  There is also a
+generic implementation using POSIX spin locks, but that is not a good
+enough solution for serious use.
+
+The GCC package provides versions that work on most modern hardware.
+We've tried to keep things as close to the original as possible, while
+removing a bunch of os-specific files that didn't seem relevant.  A
+primary goal has been to avoid changing the CPU-dependent @c
+<sysdeps/atomicity.h> headers.
+
+The relevant GCC documentation provides some helpful background,
+especially the @c atomicity.h discussion at
+<http://gcc.gnu.org/onlinedocs/porting/Thread-safety.html>.
+
+
+@section portissues Issues Not Addressed
+
+  - Cross-compilation has not been tested, or even thought through in
+  much detail.  The @a host is the system on which JACK will run.
+  This may differ from the @a build system doing the compilation.
+  These are selected using the standard @c ./configure options @c
+  --host and @c --build.  Usually, @c ./config.guess can print the
+  appropriate canonical name for any system on which it runs.
+
+  - Platform-specific build tools like Apple's Project Builder are not
+  well-supported.
+
+*/

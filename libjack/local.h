@@ -31,11 +31,12 @@ struct _jack_client {
     char first_active : 1;
     pthread_t thread_id;
     
-#if defined(__APPLE__) && defined(__POWERPC__)
+#ifdef JACK_USE_MACH_THREADS
     /* specific ressources for server/client real-time thread communication */
     mach_port_t clienttask, bp, serverport, replyport;
     trivial_message  message;
     pthread_t process_thread;
+	char rt_thread_ok : 1;
 #endif
 
 };

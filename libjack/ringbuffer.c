@@ -20,9 +20,12 @@
   This is safe for the case of one read thread and one write thread.
 */
 
+#include <sysdeps/os_defines.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef JACK_DO_NOT_MLOCK
 #include <sys/mman.h>
+#endif /* JACK_DO_NOT_MLOCK */
 #include <jack/ringbuffer.h>
 
 /* Create a new ringbuffer to hold at least `sz' bytes of data. The
@@ -54,9 +57,11 @@ jack_ringbuffer_create (size_t sz)
 void
 jack_ringbuffer_free (jack_ringbuffer_t * rb)
 {
+#ifndef JACK_DO_NOT_MLOCK
   if (rb->mlocked) {
     munlock (rb->buf, rb->size);
   }
+#endif /* JACK_DO_NOT_MLOCK */
   free (rb->buf);
 }
 
@@ -65,9 +70,11 @@ jack_ringbuffer_free (jack_ringbuffer_t * rb)
 int
 jack_ringbuffer_mlock (jack_ringbuffer_t * rb)
 {
+#ifndef JACK_DO_NOT_MLOCK
   if (mlock (rb->buf, rb->size)) {
     return -1;
   }
+#endif /* JACK_DO_NOT_MLOCK */
   rb->mlocked = 1;
   return 0;
 }

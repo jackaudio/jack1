@@ -22,6 +22,7 @@
     $Id$
 */
 
+#include <sysdeps/os_defines.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +30,7 @@
 #include <unistd.h>
 #include <sndfile.h>
 #include <pthread.h>
-#include <getopt.h>
+#include GETOPT_H
 #include <jack/jack.h>
 #include <jack/ringbuffer.h>
 
@@ -45,7 +46,7 @@ typedef struct _thread_info {
     volatile int can_capture;
     volatile int can_process;
     volatile int status;
-} thread_info_t;
+} jack_thread_info_t;
 
 /* JACK data */
 unsigned int nports;
@@ -65,7 +66,7 @@ long overruns = 0;
 void *
 disk_thread (void *arg)
 {
-	thread_info_t *info = (thread_info_t *) arg;
+	jack_thread_info_t *info = (jack_thread_info_t *) arg;
 	static jack_nframes_t total_captured = 0;
 	jack_nframes_t samples_per_frame = info->channels;
 	size_t bytes_per_frame = samples_per_frame * sample_size;
@@ -116,7 +117,7 @@ process (jack_nframes_t nframes, void *arg)
 {
 	int chn;
 	size_t i;
-	thread_info_t *info = (thread_info_t *) arg;
+	jack_thread_info_t *info = (jack_thread_info_t *) arg;
 
 	/* Do nothing until we're ready to begin. */
 	if ((!info->can_process) || (!info->can_capture))
@@ -158,7 +159,7 @@ jack_shutdown (void *arg)
 }
 
 void
-setup_disk_thread (thread_info_t *info)
+setup_disk_thread (jack_thread_info_t *info)
 {
 	SF_INFO sf_info;
 	int short_mask;
@@ -195,7 +196,7 @@ setup_disk_thread (thread_info_t *info)
 }
 
 void
-run_disk_thread (thread_info_t *info)
+run_disk_thread (jack_thread_info_t *info)
 {
 	info->can_capture = 1;
 	pthread_join (info->thread_id, NULL);
@@ -213,7 +214,7 @@ run_disk_thread (thread_info_t *info)
 }
 
 void
-setup_ports (int sources, char *source_names[], thread_info_t *info)
+setup_ports (int sources, char *source_names[], jack_thread_info_t *info)
 {
 	unsigned int i;
 	size_t in_size;
@@ -261,7 +262,7 @@ main (int argc, char *argv[])
 
 {
 	jack_client_t *client;
-	thread_info_t thread_info;
+	jack_thread_info_t thread_info;
 	int c;
 	int longopt_index = 0;
 	extern int optind, opterr;

@@ -4,7 +4,7 @@
  * that runs within the JACK server process.
  *
  * For the sake of example, a port_pair_t is allocated in
- * jack_initialize(), passed to process() as an argument, then freed
+ * jack_initialize(), passed to inprocess() as an argument, then freed
  * in jack_finish().
  */
 
@@ -15,7 +15,7 @@
 
 /**
  * For the sake of example, an instance of this struct is allocated in
- * jack_initialize(), passed to process() as an argument, then freed
+ * jack_initialize(), passed to inprocess() as an argument, then freed
  * in jack_finish().
  */
 typedef struct {
@@ -25,14 +25,15 @@ typedef struct {
 
 /**
  * Called in the realtime thread on every process cycle.  The entry
- * point name was passed to jack_set_process_callback() by
- * jack_initialize().
+ * point name was passed to jack_set_process_callback() from
+ * jack_initialize().  Although this is an internal client, its
+ * process() interface is identical to @ref simple_client.c.
  *
  * @return 0 if successful; otherwise jack_finish() will be called and
  * the client terminated immediately.
  */
 int
-process (jack_nframes_t nframes, void *arg)
+inprocess (jack_nframes_t nframes, void *arg)
 {
 	port_pair_t *pp = arg;
 	jack_default_audio_sample_t *out =
@@ -63,7 +64,7 @@ jack_initialize (jack_client_t *client, const char *so_data)
 	if (pp == NULL)
 		return 1;		/* heap exhausted */
 
-	jack_set_process_callback (client, process, pp);
+	jack_set_process_callback (client, inprocess, pp);
 
 	/* create a pair of ports */
 	pp->input_port = jack_port_register (client, "input",
@@ -96,9 +97,9 @@ jack_initialize (jack_client_t *client, const char *so_data)
  * This required entry point is called immediately before the client
  * is unloaded, which could happen due to a call to
  * jack_internal_client_close(), or a nonzero return from either
- * jack_initialize() or process().
+ * jack_initialize() or inprocess().
  *
- * @param arg the same parameter provided to process().
+ * @param arg the same parameter provided to inprocess().
  */
 void
 jack_finish (void *arg)

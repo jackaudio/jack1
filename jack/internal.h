@@ -27,29 +27,35 @@
 #ifndef __jack_internal_h__
 #define __jack_internal_h__
 
+#include <sysdeps/os_defines.h>
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
 #include <dlfcn.h>
+#include <pthread.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#include <pthread.h>
 
-#if defined(__APPLE__) && defined(__POWERPC__) 
-    #include "mach_port.h"
-#endif
+/* Needed by <sysdeps/time.h> */
+extern void jack_error (const char *fmt, ...);
 
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/port.h>
 #include <jack/transport.h>
-#include <jack/time.h>
+#include <sysdeps/time.h>
+#include <sysdeps/atomicity.h>
+
+#ifdef JACK_USE_MACH_THREADS
+#include <sysdeps/mach_port.h>
+#endif
 
 #ifdef DEBUG_ENABLED
 #define DEBUG(format,args...) \
 	fprintf (stderr, "jack:%5d:%" PRIu64 " %s:%s:%d: " format "\n", getpid(), jack_get_microseconds(), __FILE__, __FUNCTION__, __LINE__ , ## args)
 #else
-#if defined(__APPLE__) && defined(__POWERPC__) 
+#if JACK_CPP_VARARGS_BROKEN
     #define DEBUG(format...)
 #else
     #define DEBUG(format,args...)
@@ -92,7 +98,7 @@ typedef struct {
     jack_position_t	  pending_time;	/* position for next cycle */
     jack_position_t	  request_time;	/* latest requested position */
     jack_unique_t	  prev_request; /* previous request unique ID */
-    volatile uint32_t	  seq_number;	/* unique ID sequence number */
+    volatile _Atomic_word seq_number;	/* unique ID sequence number */
     int8_t		  new_pos;	/* new position this cycle */
     int8_t		  pending_pos;	/* new position request pending */
     jack_nframes_t	  pending_frame; /* pending frame number */
@@ -112,7 +118,7 @@ typedef struct {
     float                 cpu_load;
     uint32_t		  port_max;
     int32_t		  engine_ok;
-    uint32_t		  n_port_types;
+    jack_port_type_id_t	  n_port_types;
     jack_port_type_info_t port_types[JACK_MAX_PORT_TYPES];
     jack_port_shared_t    ports[0];
 
@@ -249,7 +255,7 @@ typedef struct {
     jack_client_control_t *client_control; /* JOQ: 64/32 problem */
     jack_control_t        *engine_control; /* JOQ: 64/32 problem */
 
-#if defined(__APPLE__) && defined(__POWERPC__) 
+#ifdef JACK_USE_MACH_THREADS
     /* specific resources for server/client real-time thread communication */
     int32_t	portnum;
 #endif
@@ -338,13 +344,13 @@ typedef struct _jack_client_internal {
     void    (*finish)(void *);		/* internal clients only */
     int      error;
     
-#if defined(__APPLE__) && defined(__POWERPC__) 
+#ifdef JACK_USE_MACH_THREADS
     /* specific resources for server/client real-time thread communication */
     mach_port_t serverport;
     trivial_message message;
     int running;
     int portnum;
-#endif
+#endif /* JACK_USE_MACH_THREADS */
     
 } jack_client_internal_t;
 
@@ -363,8 +369,6 @@ void handle_internal_client_request (jack_control_t*, jack_request_t*);
 extern char *jack_server_dir;
 
 extern void *jack_zero_filled_buffer;
-
-extern void jack_error (const char *fmt, ...);
 
 extern jack_port_functions_t jack_builtin_audio_functions;
 

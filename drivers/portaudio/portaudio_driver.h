@@ -23,19 +23,14 @@
 #define __jack_portaudio_driver_h__
 
 
-#if defined(__APPLE__) && defined(__POWERPC__) 
-#include <jack/memops.h>
-#include <PortAudio.h>
-#else
-#include "../alsa/memops.h"
-#include <portaudio.h>
-#endif
+#include PORTAUDIO_H
 
 #include <jack/types.h>
 #include <jack/hardware.h>
 #include <jack/driver.h>
 #include <jack/jack.h>
 #include <jack/internal.h>
+#include <jack/memops.h>
 
 typedef struct {
 
@@ -57,10 +52,12 @@ typedef struct {
         JSList   *playback_ports;
 
         float *inPortAudio;
-	float *outPortAudio;
-
+		float *outPortAudio;
+        char driver_name[256];
         PortAudioStream*   stream;
 
 } portaudio_driver_t;
+
+#define kVersion 101
 
 #endif /* __jack_portaudio_driver_h__ */

@@ -137,7 +137,7 @@ struct _jack_engine {
     float	    spare_usecs;
     float	    usecs_per_cycle;
     
-#if defined(__APPLE__) && defined(__POWERPC__) 
+#ifdef JACK_USE_MACH_THREADS
     /* specific resources for server/client real-time thread communication */
     mach_port_t servertask, bp;
     int portnum;

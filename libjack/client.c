@@ -19,41 +19,39 @@
     $Id$
 */
 
-#if defined(__APPLE__) && defined(__POWERPC__) 
-    #include "pThreadUtilities.h"
-    #include "ipc.h"
-    #include "fakepoll.h"
-#else
-    #include <sys/poll.h>
-#endif
+#include <config.h>
 
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <pthread.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/mman.h>
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <regex.h>
-#include <signal.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
-#include <config.h>
-
-#include <jack/jack.h>
 #include <jack/internal.h>
+#include <jack/jack.h>
 #include <jack/engine.h>
 #include <jack/pool.h>
-#include <jack/time.h>
 #include <jack/jslist.h>
 #include <jack/version.h>
 #include <jack/shm.h>
 
+#include <sysdeps/time.h>
+JACK_TIME_GLOBAL_DECL;			/* One instance per process. */
+
 #include "local.h"
+
+#include <sysdeps/poll.h>
+#include <sysdeps/ipc.h>
+
+#ifdef JACK_USE_MACH_THREADS
+#include <sysdeps/pThreadUtilities.h>
+#endif
 
 #ifdef WITH_TIMESTAMPS
 #include <jack/timestamps.h>
@@ -168,6 +166,9 @@ jack_client_alloc ()
 	client->engine = NULL;
 	client->control = NULL;
 	client->thread_ok = FALSE;
+#if JACK_USE_MACH_THREADS 
+	client->rt_thread_ok = FALSE;
+#endif
 	client->first_active = TRUE;
 	client->on_shutdown = NULL;
 	client->n_port_types = 0;
@@ -433,7 +434,7 @@ _start_server (void)
 	}
 
 	if (!good) {
-#if defined(__APPLE__) && defined(__POWERPC__) 
+#if 0 /* JOQ: need a good way to select the right default MACOSX driver */
 		command = JACK_LOCATION "/jackd";
 		strncpy(arguments, JACK_LOCATION "/jackd -T -d portaudio -p 512", 255);
 #elif defined(USE_CAPABILITIES)
@@ -624,7 +625,7 @@ jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 		client->port_segment = (jack_shm_info_t*)
 			realloc (client->port_segment,
 				 sizeof (jack_shm_info_t) * (ptid+1));
-		
+
 		memset (&client->port_segment[client->n_port_types],
 			0,
 			sizeof (jack_shm_info_t) * 
@@ -636,7 +637,14 @@ jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 
 		/* release any previous segment */
 		
+#if JACK_USE_MACH_THREADS 
+		/* Stephane Letz : letz@grame.fr
+		Need a fix : this crash on MacOSX : temporary removed 
 		jack_release_shm (&client->port_segment[ptid]);
+		*/
+#else
+		jack_release_shm (&client->port_segment[ptid]);
+#endif
 	}
 
 	/* get the index into the shm registry */
@@ -747,7 +755,7 @@ jack_client_new (const char *client_name)
 
 	client->event_fd = ev_fd;
         
-#if defined(__APPLE__) && defined(__POWERPC__) 
+#ifdef JACK_USE_MACH_THREADS
         /* specific resources for server/client real-time thread
 	 * communication */
 	client->clienttask = mach_task_self();
@@ -761,7 +769,7 @@ jack_client_new (const char *client_name)
             jack_error("Can't allocate mach port");
             goto fail; 
         }; 
-#endif
+#endif /* JACK_USE_MACH_THREADS */
  	return client;
 	
   fail:
@@ -815,6 +823,24 @@ jack_internal_client_close (const char *client_name)
 	return;
 }
 
+#if JACK_USE_MACH_THREADS 
+
+int
+jack_drop_real_time_scheduling (pthread_t thread)
+{
+	setThreadToPriority(thread, 31, false, 10000000);
+	return 0;       
+}
+
+int
+jack_acquire_real_time_scheduling (pthread_t thread, int priority) //priority is unused
+{
+	setThreadToPriority(thread, 96, true, 10000000);
+	return 0;
+}
+
+#else
+
 int
 jack_drop_real_time_scheduling (pthread_t thread)
 {
@@ -849,6 +875,8 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
         return 0;
 }
 
+#endif
+
 int
 jack_set_freewheel (jack_client_t* client, int onoff)
 {
@@ -863,7 +891,11 @@ jack_start_freewheel (jack_client_t* client)
 	jack_client_control_t *control = client->control;
 
 	if (client->engine->real_time) {
+#if JACK_USE_MACH_THREADS 
+		jack_drop_real_time_scheduling (client->process_thread);
+#else
 		jack_drop_real_time_scheduling (client->thread);
+#endif
 	}
 
 	if (control->freewheel_cb) {
@@ -881,8 +913,13 @@ jack_stop_freewheel (jack_client_t* client)
 	}
 
 	if (client->engine->real_time) {
+#if JACK_USE_MACH_THREADS 
+		jack_acquire_real_time_scheduling (client->process_thread,
+						   client->engine->client_priority);
+#else
 		jack_acquire_real_time_scheduling (client->thread,
 						   client->engine->client_priority);
+#endif
 	}
 }
 
@@ -1164,7 +1201,7 @@ jack_client_thread (void *arg)
 }
 
 
-#if defined(__APPLE__) && defined(__POWERPC__) 
+#ifdef JACK_USE_MACH_THREADS
 /* real-time thread : separated from the normal client thread, it will
  * communicate with the server using fast mach RPC mechanism */
 
@@ -1176,14 +1213,17 @@ jack_client_process_thread (void *arg)
 	int err = 0;
       
 	client->control->pid = getpid();
-        DEBUG ("client process thread is now running");
+	DEBUG ("client process thread is now running");
         
-        pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+        
+	client->rt_thread_ok = TRUE;
             
    	while (err == 0) {
         
                 if (jack_client_suspend(client) < 0) {
-                        pthread_exit (0);
+                        jack_error ("jack_client_process_thread : resume error");
+                        goto zombie;
                 }
                 
                 control->awake_at = jack_get_microseconds();
@@ -1191,6 +1231,9 @@ jack_client_process_thread (void *arg)
                 DEBUG ("client resumed");
                  
                 control->state = Running;
+
+		if (control->sync_cb)
+			jack_call_sync_client (client);
 
                 if (control->process) {
                         if (control->process (control->nframes,
@@ -1200,6 +1243,9 @@ jack_client_process_thread (void *arg)
                 } else {
                         control->state = Finished;
                 }
+
+		if (control->timebase_cb)
+			jack_call_timebase_master (client);
                 
                 control->finished_at = jack_get_microseconds();
                 
@@ -1226,27 +1272,31 @@ jack_client_process_thread (void *arg)
         
         jack_error ("jack_client_process_thread : zombified");
         
+        client->rt_thread_ok = FALSE;
+
 	if (client->on_shutdown) {
 		jack_error ("zombified - calling shutdown handler");
 		client->on_shutdown (client->on_shutdown_arg);
 	} else {
 		jack_error ("zombified - exiting from JACK");
-                jack_client_close (client); /* Need a fix : possibly make client crash if zombified without shutdown handler */
+		jack_client_close (client); /* Need a fix : possibly make client crash if zombified without shutdown handler */
 	}
 
 	pthread_exit (0);
 	/*NOTREACHED*/
 	return 0;
 }
-#endif
+#endif /* JACK_USE_MACH_THREADS */
 
 static int
 jack_start_thread (jack_client_t *client)
 
 {
-	pthread_attr_t *attributes = 0;
+#ifndef JACK_USE_MACH_THREADS
 	int policy = SCHED_OTHER;
 	struct sched_param client_param, temp_param;
+#endif
+	pthread_attr_t *attributes = 0;
 
 	if (client->engine->real_time) {
 		
@@ -1282,9 +1332,7 @@ jack_start_thread (jack_client_t *client)
 			return -1;
 		}
                 
-#if defined(__APPLE__) && defined(__POWERPC__) 
-                // To be implemented
-#else
+#ifndef JACK_DO_NOT_MLOCK
                 if (client->engine->do_mlock
 		    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
                     jack_error ("cannot lock down memory for RT thread (%s)",
@@ -1293,23 +1341,17 @@ jack_start_thread (jack_client_t *client)
                     return -1;
 #endif /* ENSURE_MLOCK */
                 }
-#endif
-        
+#endif /* JACK_DO_NOT_MLOCK */
 	}
+        
+#ifdef JACK_USE_MACH_THREADS
 
 	if (pthread_create (&client->thread, attributes,
 			    jack_client_thread, client)) {
-		if (client->engine->real_time) {
-			/* we are probably dealing with a broken glibc so try
-			   to work around the bug, see below for more details
-			*/
-			goto realtime_workaround;
-		}
 		return -1;
 	}
-        
-#if defined(__APPLE__) && defined(__POWERPC__) 
-        /* a spcial real-time thread to call the "process"
+
+        /* a special real-time thread to call the "process"
 	 * callback. It will communicate with the server using fast
 	 * mach RPC mechanism */
         if (pthread_create (&client->process_thread, attributes,
@@ -1319,18 +1361,22 @@ jack_start_thread (jack_client_t *client)
         }
         if (client->engine->real_time){
             /* time constraint thread */
-            setThreadToPriority(client->process_thread, 96, true, 10000000);
+            setThreadToPriority(client->process_thread, 96, TRUE, 10000000);
         }else{
             /* fixed priority thread */
-            setThreadToPriority(client->process_thread, 63, true, 10000000);
+            setThreadToPriority(client->process_thread, 63, TRUE, 10000000);
         }
-#endif
-            
-	return 0;
 
-	/* we get here only with engine running realtime */
+#else /* !JACK_USE_MACH_THREADS */
 
- realtime_workaround:
+	if (pthread_create (&client->thread, attributes,
+			    jack_client_thread, client) == 0) {
+		return 0;
+	}
+
+	if (!client->engine->real_time) {
+		return -1;
+	}
 
 	/* the version of glibc I've played with has a bug that makes
 	   that code fail when running under a non-root user but with the
@@ -1420,6 +1466,8 @@ jack_start_thread (jack_client_t *client)
 			}
 		}
 	}
+#endif /* JACK_USE_MACH_THREADS */
+
 	return 0;
 }
 
@@ -1433,21 +1481,12 @@ jack_activate (jack_client_t *client)
 	 * usage in jack_start_thread())
 	 */
          
-#if defined(__APPLE__) && defined(__POWERPC__)
-/* a bigger stack makes the application crash... */
-#define BIG_ENOUGH_STACK 10000
-#else
-#define BIG_ENOUGH_STACK 1048576
-#endif
-
-	char buf[BIG_ENOUGH_STACK];
+	char buf[JACK_THREAD_STACK_TOUCH];
 	int i;
 
-	for (i = 0; i < BIG_ENOUGH_STACK; i++) {
+	for (i = 0; i < JACK_THREAD_STACK_TOUCH; i++) {
 		buf[i] = (char) (i & 0xff);
 	}
-
-#undef BIG_ENOUGH_STACK
 
 	if (client->control->type == ClientInternal ||
 	    client->control->type == ClientDriver) {
@@ -1546,6 +1585,16 @@ jack_client_close (jack_client_t *client)
 	}
 
 	if (client->control->type == ClientExternal) {
+
+#if JACK_USE_MACH_THREADS 
+		if (client->rt_thread_ok) {
+			// MacOSX pthread_cancel not implemented in
+			// Darwin 5.5, 6.4
+			mach_port_t machThread =
+				pthread_mach_thread_np (client->process_thread);
+			thread_terminate (machThread);
+		}
+#endif
 	
 		/* stop the thread that communicates with the jack
 		 * server, only if it was actually running 
@@ -1889,69 +1938,3 @@ jack_port_type_size(void)
 {
 	return JACK_PORT_TYPE_SIZE;
 }
-
-#if defined(__APPLE__) && defined(__POWERPC__) 
-
-double __jack_time_ratio;
-
-void jack_init_time ()
-{
-        mach_timebase_info_data_t info; 
-        mach_timebase_info(&info);
-        __jack_time_ratio = ((float)info.numer/info.denom) / 1000;
-}
-#else
-
-jack_time_t
-jack_get_mhz (void)
-{
-	FILE *f = fopen("/proc/cpuinfo", "r");
-	if (f == 0)
-	{
-		perror("can't open /proc/cpuinfo\n");
-		exit(1);
-	}
-
-	for ( ; ; )
-	{
-		jack_time_t mhz;
-		int ret;
-		char buf[1000];
-
-		if (fgets(buf, sizeof(buf), f) == NULL) {
-			jack_error ("FATAL: cannot locate cpu MHz in "
-				    "/proc/cpuinfo\n");
-			exit(1);
-		}
-
-#if defined(__powerpc__)
-		ret = sscanf(buf, "clock\t: %" SCNu64 "MHz", &mhz);
-#elif defined( __i386__ ) || defined (__hppa__)  || defined (__ia64__) || \
-      defined(__x86_64__)
-		ret = sscanf(buf, "cpu MHz         : %" SCNu64, &mhz);
-#elif defined( __sparc__ )
-		ret = sscanf(buf, "Cpu0Bogo        : %" SCNu64, &mhz);
-#elif defined( __mc68000__ )
-		ret = sscanf(buf, "Clocking:       %" SCNu64, &mhz);
-#elif defined( __s390__  )
-		ret = sscanf(buf, "bogomips per cpu: %" SCNu64, &mhz);
-#else /* MIPS, ARM, alpha */
-		ret = sscanf(buf, "BogoMIPS        : %" SCNu64, &mhz);
-#endif 
-
-		if (ret == 1)
-		{
-			fclose(f);
-			return (jack_time_t)mhz;
-		}
-	}
-}
-
-jack_time_t __jack_cpu_mhz;
-
-void jack_init_time ()
-{
-	__jack_cpu_mhz = jack_get_mhz ();
-}
-
-#endif

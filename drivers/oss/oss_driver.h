@@ -30,7 +30,6 @@
 #include <jack/types.h>
 #include <jack/jslist.h>
 #include <jack/driver.h>
-#include <jack/time.h>
 #include <jack/jack.h>
 
 

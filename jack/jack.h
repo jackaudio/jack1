@@ -148,15 +148,16 @@ int jack_set_freewheel_callback (jack_client_t *client,
 				 void *arg);
 
 /**
- * Start or stop JACK's "freewheel" mode.
+ * Start/Stop JACK's "freewheel" mode.
  *
- * When in "freewheel" mode, JACK no longer waits for any external
- * event to begin the start of the next process cycle.  External
- * hardware I/O is muted.
+ * When in "freewheel" mode, JACK no longer waits for
+ * any external event to begin the start of the next process
+ * cycle. 
  *
- * As a result, freewheel mode causes "faster than realtime" execution
- * of a JACK graph. If possessed, real-time scheduling is dropped when
- * entering freewheel mode, and reacquired when stopping.
+ * As a result, freewheel mode causes "faster than realtime"
+ * execution of a JACK graph. If possessed, real-time
+ * scheduling is dropped when entering freewheel mode, and
+ * if appropriate it is reacquired when stopping.
  * 
  * @param client pointer to JACK client structure
  * @param onoff  if non-zero, freewheel mode starts. Otherwise

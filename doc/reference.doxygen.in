@@ -363,7 +363,8 @@ WARN_LOGFILE           =
 # with spaces.
 
 INPUT                  = @top_srcdir@/doc/mainpage.dox \
-			 @top_srcdir@/doc/transport.dox \
+                         @top_srcdir@/doc/transport.dox \
+                         @top_srcdir@/doc/porting.dox \
                          @top_srcdir@/jack/jack.h \
                          @top_srcdir@/jack/types.h \
                          @top_srcdir@/jack/transport.h \

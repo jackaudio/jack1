@@ -1,11 +1,25 @@
 #!/bin/sh
 
-libtoolize --force 2>&1 | sed '/^You should/d' || {
+if which libtoolize >/dev/null
+then
+    LIBTOOLIZE=libtoolize
+else
+    if which glibtoolize >/dev/null
+    then
+	# on the Mac it's called glibtoolize for some reason
+	LIBTOOLIZE=glibtoolize
+    else
+	echo "libtoolize not found"
+	exit 1
+    fi
+fi
+
+$LIBTOOLIZE --force 2>&1 | sed '/^You should/d' || {
     echo "libtool failed, exiting..."
     exit 1
 }
 
-aclocal $ACLOCAL_FLAGS || {
+aclocal $ACLOCAL_FLAGS -I config || {
     echo "aclocal \$ACLOCAL_FLAGS where \$ACLOCAL_FLAGS= failed, exiting..."
     exit 1
 }

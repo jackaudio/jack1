@@ -43,7 +43,7 @@
 #include <jack/types.h>
 #include <jack/internal.h>
 #include <jack/engine.h>
-#include <jack/time.h>
+#include <sysdeps/time.h>
 
 #include "oss_driver.h"
 

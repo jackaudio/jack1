@@ -26,20 +26,22 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdarg.h>
-#include <getopt.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <regex.h>
 #include <string.h>
-#include "alsa_driver.h"
-#include <jack/types.h>
+
 #include <jack/internal.h>
 #include <jack/engine.h>
+
+#include GETOPT_H
+#include <sysdeps/time.h>
+
+#include "alsa_driver.h"
 #include "hammerfall.h"
 #include "hdsp.h"
 #include "ice1712.h"
 #include "generic.h"
-#include <jack/time.h>
 
 extern void store_work_time (int);
 extern void store_wait_time (int);

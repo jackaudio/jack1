@@ -18,18 +18,26 @@
     $Id$
 */
 
+#include <config.h>
+
+#ifdef HAVE_POSIX_MEMALIGN
 #define _XOPEN_SOURCE 600
+#endif
 #include <stdlib.h>
 #include <config.h>
 #include <jack/pool.h>
 
+/* XXX need RT-pool based allocator here */
 void *
 jack_pool_alloc (size_t bytes)
 {
-	/* XXX need RT-pool based allocator here */
+#ifdef HAVE_POSIX_MEMALIGN
 	void* m;
 	int	err = posix_memalign (&m, 16, bytes);
 	return (!err) ? m : 0;
+#else
+	return malloc (bytes);
+#endif /* HAVE_POSIX_MEMALIGN */
 }
 
 void

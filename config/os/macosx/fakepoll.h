@@ -17,7 +17,6 @@
 #define _FAKE_POLL_H
 
 #include <limits.h>
-#define FD_SETSIZE OPEN_MAX
 #include <sys/types.h>
 #include <sys/time.h>
 #include <unistd.h>
