@@ -1145,7 +1145,7 @@ jack_start_thread (jack_client_t *client)
 
 	if (pthread_create (&client->thread, attributes, jack_client_thread, client)) {
 #ifdef USE_CAPABILITIES
-		if (client->engine->real_time && client->engine->has_capabilities) {
+		if (client->engine->real_time) {
 			/* we are probably dealing with a broken glibc so try
 			   to work around the bug, see below for more details
 			*/
