@@ -407,8 +407,10 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 }
 
 static int 
-alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cycle, jack_nframes_t user_nperiods, jack_nframes_t rate)
-
+alsa_driver_set_parameters (alsa_driver_t *driver,
+			    jack_nframes_t frames_per_cycle,
+			    jack_nframes_t user_nperiods,
+			    jack_nframes_t rate)
 {
 	int dir;
 	unsigned int p_period_size = 0;
@@ -422,7 +424,9 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	driver->user_nperiods = user_nperiods;
 	
 	if (driver->capture_handle) {
-		if (alsa_driver_configure_stream (driver, driver->alsa_name_capture, "capture", 
+		if (alsa_driver_configure_stream (driver,
+						  driver->alsa_name_capture,
+						  "capture", 
 						  driver->capture_handle,
 						  driver->capture_hw_params,
 						  driver->capture_sw_params,
@@ -433,7 +437,9 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	}
 
 	if (driver->playback_handle) {
-		if (alsa_driver_configure_stream (driver, driver->alsa_name_playback, "playback",
+		if (alsa_driver_configure_stream (driver,
+						  driver->alsa_name_playback,
+						  "playback",
 						  driver->playback_handle,
 						  driver->playback_hw_params,
 						  driver->playback_sw_params,
@@ -446,10 +452,19 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	/* check the fragment size, since thats non-negotiable */
 	
 	if (driver->playback_handle) {
-		p_period_size = snd_pcm_hw_params_get_period_size (driver->playback_hw_params, &dir);
-		p_nfragments = snd_pcm_hw_params_get_periods (driver->playback_hw_params, &dir);
-		driver->playback_sample_format = (snd_pcm_format_t) snd_pcm_hw_params_get_format (driver->playback_hw_params);
-		driver->playback_interleaved = (snd_pcm_hw_params_get_access (driver->playback_hw_params) == SND_PCM_ACCESS_MMAP_INTERLEAVED);
+		p_period_size =
+			snd_pcm_hw_params_get_period_size (
+				driver->playback_hw_params, &dir);
+		p_nfragments =
+			snd_pcm_hw_params_get_periods (
+				driver->playback_hw_params, &dir);
+		driver->playback_sample_format = (snd_pcm_format_t)
+			snd_pcm_hw_params_get_format (
+				driver->playback_hw_params);
+		driver->playback_interleaved =
+			(snd_pcm_hw_params_get_access (
+				driver->playback_hw_params)
+			 == SND_PCM_ACCESS_MMAP_INTERLEAVED);
 
 		if (p_period_size != driver->frames_per_cycle) {
 			jack_error ("alsa_pcm: requested an interrupt every %"
@@ -461,10 +476,19 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	}
 
 	if (driver->capture_handle) {
-		c_period_size = snd_pcm_hw_params_get_period_size (driver->capture_hw_params, &dir);
-		c_nfragments = snd_pcm_hw_params_get_periods (driver->capture_hw_params, &dir);
-		driver->capture_sample_format = (snd_pcm_format_t) snd_pcm_hw_params_get_format (driver->capture_hw_params);
-		driver->capture_interleaved = (snd_pcm_hw_params_get_access (driver->capture_hw_params) == SND_PCM_ACCESS_MMAP_INTERLEAVED);
+		c_period_size =
+			snd_pcm_hw_params_get_period_size (
+				driver->capture_hw_params, &dir);
+		c_nfragments =
+			snd_pcm_hw_params_get_periods (
+				driver->capture_hw_params, &dir);
+		driver->capture_sample_format = (snd_pcm_format_t)
+			snd_pcm_hw_params_get_format (
+				driver->capture_hw_params);
+		driver->capture_interleaved =
+			(snd_pcm_hw_params_get_access (
+				driver->capture_hw_params)
+			 == SND_PCM_ACCESS_MMAP_INTERLEAVED);
 	
 		if (c_period_size != driver->frames_per_cycle) {
 			jack_error ("alsa_pcm: requested an interrupt every %"
@@ -477,7 +501,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 
 	if (driver->capture_handle && driver->playback_handle) {
 		if (p_nfragments != c_nfragments) {
-			jack_error ("alsa_pcm: different period counts for playback and capture!");
+			jack_error ("alsa_pcm: different period counts for "
+				    "playback and capture!");
 			return -1;
 		}
 
@@ -494,8 +519,12 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	}
 
 	driver->buffer_frames = driver->frames_per_cycle * driver->nfragments;
-	driver->playback_sample_bytes = snd_pcm_format_physical_width (driver->playback_sample_format) / 8;
-	driver->capture_sample_bytes = snd_pcm_format_physical_width (driver->capture_sample_format) / 8;
+	driver->playback_sample_bytes =
+		snd_pcm_format_physical_width (driver->playback_sample_format)
+		/ 8;
+	driver->capture_sample_bytes =
+		snd_pcm_format_physical_width (driver->capture_sample_format)
+		/ 8;
 
 	if (driver->playback_handle) {
 		switch (driver->playback_sample_format) {
@@ -506,7 +535,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 			break;
 
 		default:
-			jack_error ("programming error: unhandled format type for playback");
+			jack_error ("programming error: unhandled format "
+				    "type for playback");
 			exit (1);
 		}
 	}
@@ -520,7 +550,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 			break;
 
 		default:
-			jack_error ("programming error: unhandled format type for capture");
+			jack_error ("programming error: unhandled format "
+				    "type for capture");
 			exit (1);
 		}
 	}
@@ -528,27 +559,37 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	if (driver->playback_interleaved) {
 		const snd_pcm_channel_area_t *my_areas;
 		snd_pcm_uframes_t offset, frames;
-		if (snd_pcm_mmap_begin(driver->playback_handle, &my_areas, &offset, &frames) < 0) {
-			jack_error ("ALSA: %s: mmap areas info error", driver->alsa_name_playback);
+		if (snd_pcm_mmap_begin(driver->playback_handle,
+				       &my_areas, &offset, &frames) < 0) {
+			jack_error ("ALSA: %s: mmap areas info error",
+				    driver->alsa_name_playback);
 			return -1;
 		}
 		driver->playback_interleave_skip = my_areas[0].step / 8;
-		driver->interleave_unit = snd_pcm_format_physical_width (driver->playback_sample_format) / 8;
+		driver->interleave_unit =
+			snd_pcm_format_physical_width (
+				driver->playback_sample_format) / 8;
 	} else {
 		driver->interleave_unit = 0;  /* NOT USED */
-		driver->playback_interleave_skip = snd_pcm_format_physical_width (driver->playback_sample_format) / 8;
+		driver->playback_interleave_skip =
+			snd_pcm_format_physical_width (
+				driver->playback_sample_format) / 8;
 	}
 
 	if (driver->capture_interleaved) {
 		const snd_pcm_channel_area_t *my_areas;
 		snd_pcm_uframes_t offset, frames;
-		if (snd_pcm_mmap_begin(driver->capture_handle, &my_areas, &offset, &frames) < 0) {
-			jack_error ("ALSA: %s: mmap areas info error", driver->alsa_name_capture);
+		if (snd_pcm_mmap_begin(driver->capture_handle,
+				       &my_areas, &offset, &frames) < 0) {
+			jack_error ("ALSA: %s: mmap areas info error",
+				    driver->alsa_name_capture);
 			return -1;
 		}
 		driver->capture_interleave_skip = my_areas[0].step / 8;
 	} else {
-		driver->capture_interleave_skip = snd_pcm_format_physical_width (driver->capture_sample_format) / 8;
+		driver->capture_interleave_skip =
+			snd_pcm_format_physical_width (
+			driver->capture_sample_format) / 8;
 	}
 
 	if (driver->playback_nchannels > driver->capture_nchannels) {
@@ -561,14 +602,13 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 
 	alsa_driver_setup_io_function_pointers (driver);
 
-	/* Allocate and initialize structures that rely on
-	   the channels counts.
-	*/
+	/* Allocate and initialize structures that rely on the
+	   channels counts.
 
-	/* set up the bit pattern that is used to record which
+	   Set up the bit pattern that is used to record which
 	   channels require action on every cycle. any bits that are
 	   not set after the engine's process() call indicate channels
-	   that potentially need to be silenced.  
+	   that potentially need to be silenced.
 
 	   XXX this is limited to <wordsize> channels. Use a bitset
 	   type instead.
@@ -577,9 +617,13 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	driver->channel_done_bits = 0;
 
 	if (driver->playback_handle) {
-		driver->playback_addr = (char **) malloc (sizeof (char *) * driver->playback_nchannels);
-		memset (driver->playback_addr, 0, sizeof (char *) * driver->playback_nchannels);
-		driver->silent = (unsigned long *) malloc (sizeof (unsigned long) * driver->playback_nchannels);
+		driver->playback_addr = (char **)
+			malloc (sizeof (char *) * driver->playback_nchannels);
+		memset (driver->playback_addr, 0,
+			sizeof (char *) * driver->playback_nchannels);
+		driver->silent = (unsigned long *)
+			malloc (sizeof (unsigned long)
+				* driver->playback_nchannels);
 		
 		for (chn = 0; chn < driver->playback_nchannels; chn++) {
 			driver->silent[chn] = 0;
@@ -589,22 +633,29 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 			driver->channel_done_bits |= (1<<chn);
 		}
 
-		driver->dither_state = (dither_state_t *) calloc ( driver->playback_nchannels, sizeof (dither_state_t));
+		driver->dither_state = (dither_state_t *)
+			calloc ( driver->playback_nchannels,
+				 sizeof (dither_state_t));
 	}
 
 	if (driver->capture_handle) {
-		driver->capture_addr = (char **) malloc (sizeof (char *)  * driver->capture_nchannels);
-		memset (driver->capture_addr, 0, sizeof (char *) * driver->capture_nchannels);
+		driver->capture_addr = (char **)
+			malloc (sizeof (char *) * driver->capture_nchannels);
+		memset (driver->capture_addr, 0,
+			sizeof (char *) * driver->capture_nchannels);
 	}
 
-	driver->clock_sync_data = (ClockSyncStatus *) malloc (sizeof (ClockSyncStatus) * 
-							      driver->max_nchannels);
+	driver->clock_sync_data = (ClockSyncStatus *)
+		malloc (sizeof (ClockSyncStatus) * driver->max_nchannels);
 
-	driver->period_usecs = (jack_time_t) floor ((((float) driver->frames_per_cycle) / driver->frame_rate) * 1000000.0f);
+	driver->period_usecs =
+		(jack_time_t) floor ((((float) driver->frames_per_cycle) /
+				      driver->frame_rate) * 1000000.0f);
 	driver->poll_timeout = (int) floor (1.5f * driver->period_usecs);
 
 	if (driver->engine) {
-		driver->engine->set_buffer_size (driver->engine, driver->frames_per_cycle);
+		driver->engine->set_buffer_size (driver->engine,
+						 driver->frames_per_cycle);
 	}
 
 	return 0;
@@ -616,7 +667,9 @@ alsa_driver_reset_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_c
 {
 	/* XXX unregister old ports ? */
 	alsa_driver_release_channel_dependent_memory (driver);
-	return alsa_driver_set_parameters (driver, frames_per_cycle, user_nperiods, rate);
+	return alsa_driver_set_parameters (driver,
+					   frames_per_cycle,
+					   user_nperiods, rate);
 }
 #endif
 
@@ -943,7 +996,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 		}
 
 #ifdef DEBUG_WAKEUP
-		fprintf (stderr, "%Lu: checked %d fds, %Lu usecs since poll entered\n", 
+		fprintf (stderr, "%Lu: checked %d fds, %Lu usecs since poll"" entered\n", 
 			 poll_ret, 
 			 nfds,
 			 poll_ret - poll_enter);
@@ -1480,7 +1533,8 @@ alsa_driver_delete (alsa_driver_t *driver)
 }
 
 static jack_driver_t *
-alsa_driver_new (char *name, char *playback_alsa_device, char *capture_alsa_device,
+alsa_driver_new (char *name, char *playback_alsa_device,
+		 char *capture_alsa_device,
 		 jack_client_t *client, 
 		 jack_nframes_t frames_per_cycle,
 		 jack_nframes_t user_nperiods,
@@ -1513,7 +1567,8 @@ alsa_driver_new (char *name, char *playback_alsa_device, char *capture_alsa_devi
 	driver->wait = (JackDriverWaitFunction) alsa_driver_wait;
 	driver->read = (JackDriverReadFunction) alsa_driver_read;
 	driver->write = (JackDriverReadFunction) alsa_driver_write;
-	driver->null_cycle = (JackDriverNullCycleFunction) alsa_driver_null_cycle;
+	driver->null_cycle =
+		(JackDriverNullCycleFunction) alsa_driver_null_cycle;
 	driver->start = (JackDriverStartFunction) alsa_driver_audio_start;
 	driver->stop = (JackDriverStopFunction) alsa_driver_audio_stop;
 
@@ -1661,7 +1716,8 @@ alsa_driver_new (char *name, char *playback_alsa_device, char *capture_alsa_devi
 		}
 	}
 
-	if (alsa_driver_set_parameters (driver, frames_per_cycle, user_nperiods, rate)) {
+	if (alsa_driver_set_parameters (driver, frames_per_cycle,
+					user_nperiods, rate)) {
 		alsa_driver_delete (driver);
 		return 0;
 	}
@@ -1669,7 +1725,8 @@ alsa_driver_new (char *name, char *playback_alsa_device, char *capture_alsa_devi
 	driver->capture_and_playback_not_synced = FALSE;
 
 	if (driver->capture_handle && driver->playback_handle) {
-		if (snd_pcm_link (driver->capture_handle, driver->playback_handle) != 0) {
+		if (snd_pcm_link (driver->capture_handle,
+				  driver->playback_handle) != 0) {
 			driver->capture_and_playback_not_synced = TRUE;
 		} 
 	}

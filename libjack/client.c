@@ -197,7 +197,8 @@ jack_client_invalidate_port_buffers (jack_client_t *client)
 
 		if (port->shared->flags & JackPortIsInput) {
 			if (port->client_segment_base == 0) {
-				jack_pool_release ((void *) port->shared->offset);
+				jack_pool_release (
+					(void *) port->shared->offset);
 				port->client_segment_base = 0;
 				port->shared->offset = 0;
 			}
@@ -469,10 +470,10 @@ jack_client_new (const char *client_name)
 	/* external clients need this initialized; internal clients
 	   will use the setup in the server's address space.
 	*/
-
 	jack_init_time ();
 
-	if (jack_request_client (ClientExternal, client_name, "", "", &res, &req_fd)) {
+	if (jack_request_client (ClientExternal, client_name, "", "",
+				 &res, &req_fd)) {
 		return NULL;
 	}
 
@@ -485,10 +486,11 @@ jack_client_new (const char *client_name)
 	client->pollfd[1].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
 
 	/* attach the engine control/info block */
-
-	if ((addr = jack_get_shm (res.control_shm_name, res.control_size, O_RDWR, 
-				  0, (PROT_READ|PROT_WRITE), &shmid)) == MAP_FAILED) {
-		jack_error ("cannot attached engine control shared memory segment");
+	if ((addr = jack_get_shm (res.control_shm_name, res.control_size,
+				  O_RDWR, 0, (PROT_READ|PROT_WRITE),
+				  &shmid)) == MAP_FAILED) {
+		jack_error ("cannot attached engine control shared memory"
+			    " segment");
 		goto fail;
 	}
 	
@@ -496,55 +498,62 @@ jack_client_new (const char *client_name)
 	client->engine = (jack_control_t *) addr;
 
 	/* now attach the client control block */
-
-	if ((addr = jack_get_shm (res.client_shm_name, sizeof (jack_client_control_t), O_RDWR, 
-				  0, (PROT_READ|PROT_WRITE), &shmid)) == MAP_FAILED) {
-		jack_error ("cannot attached client control shared memory segment");
+	if ((addr = jack_get_shm (res.client_shm_name,
+				  sizeof (jack_client_control_t), O_RDWR,
+				  0, (PROT_READ|PROT_WRITE),
+				  &shmid)) == MAP_FAILED) {
+		jack_error ("cannot attached client control shared memory"
+			    " segment");
 		goto fail;
 	}
 
 	client->control = (jack_client_control_t *) addr;
 
-	/* nobody else needs to access this shared memory any more, so 
-	   destroy it. because we have our own link to it, it won't vanish
-	   till we exit.
+	/* nobody else needs to access this shared memory any more, so
+	   destroy it. because we have our own link to it, it won't
+	   vanish till we exit.
 	*/
-
 	jack_destroy_shm (res.client_shm_name);
 
-	/* read incoming port type information so that we can get shared memory
-	   information for each one.
+	/* read incoming port type information so that we can get
+	   shared memory information for each one.
 	*/
+	type_info = (jack_port_type_info_t *)
+		malloc (sizeof (jack_port_type_info_t) * res.n_port_types);
 
-	type_info = (jack_port_type_info_t *) malloc (sizeof (jack_port_type_info_t) * res.n_port_types);
-
-	if (read (req_fd, type_info, sizeof (jack_port_type_info_t) * res.n_port_types) != 
+	if (read (req_fd, type_info,
+		  sizeof (jack_port_type_info_t) * res.n_port_types) != 
 	    sizeof (jack_port_type_info_t) * res.n_port_types) {
-		jack_error ("cannot read port type information during client connection");
+		jack_error ("cannot read port type information during client"
+			    " connection");
 		free (type_info);
 		goto fail;
 	}
 
 	for (i = 0; i < res.n_port_types; ++i) {
-		jack_client_handle_new_port_type (client, type_info[i].shm_info.shm_name, type_info[i].shm_info.size, 0);
+		jack_client_handle_new_port_type (
+			client, type_info[i].shm_info.shm_name,
+			type_info[i].shm_info.size, 0);
 	}
 
 	free (type_info);
 
-	/* set up the client so that it does the right thing for an external client */
-
+	/* set up the client so that it does the right thing for an
+	 * external client */
 	client->control->deliver_request = oop_client_deliver_request;
 	client->control->deliver_arg = client;
 
 	if ((ev_fd = server_event_connect (client)) < 0) {
-		jack_error ("cannot connect to server for event stream (%s)", strerror (errno));
+		jack_error ("cannot connect to server for event stream (%s)",
+			    strerror (errno));
 		goto fail;
 	}
 
 	client->event_fd = ev_fd;
         
 #if defined(__APPLE__) && defined(__POWERPC__) 
-        /* specific ressources for server/client real-time thread communication */
+        /* specific resources for server/client real-time thread
+	 * communication */
 	client->clienttask = mach_task_self();
         
 	if (task_get_bootstrap_port(client->clienttask, &client->bp)){
@@ -564,7 +573,8 @@ jack_client_new (const char *client_name)
 		munmap ((char *) client->engine, res.control_size);
 	}
 	if (client->control) {
-		munmap ((char *) client->control, sizeof (jack_client_control_t));
+		munmap ((char *) client->control,
+			sizeof (jack_client_control_t));
 	}
 	if (req_fd >= 0) {
 		close (req_fd);
@@ -610,36 +620,39 @@ jack_internal_client_close (const char *client_name)
 }
 
 void
-jack_client_handle_new_port_type (jack_client_t *client, shm_name_t shm_name, size_t size, void* addr)
+jack_client_handle_new_port_type (jack_client_t *client, shm_name_t shm_name,
+				  size_t size, void* addr)
 {
 	jack_port_segment_info_t *si;
 	int shmid;
 
 	/* Lookup, attach and register the port/buffer segments in use
-	   right now.
-	*/
-
+	 * right now. */
 	if (client->control->type == ClientExternal) {
 		
-		if ((addr = jack_get_shm(shm_name, size, O_RDWR, 0, (PROT_READ|PROT_WRITE), &shmid)) == MAP_FAILED) {
-			jack_error ("cannot attached port segment shared memory (%s)", strerror (errno));
+		if ((addr = jack_get_shm(shm_name, size, O_RDWR, 0,
+					 (PROT_READ|PROT_WRITE),
+					 &shmid)) == MAP_FAILED) {
+			jack_error ("cannot attached port segment shared memory"
+				    " (%s)", strerror (errno));
 			return;
 		}
 
 	} else {
 
-		/* client is in same address space as server, so just use `addr' directly */
+		/* client is in same address space as server, so just
+		 * use `addr' directly */
 	}
 
-	si = (jack_port_segment_info_t *) malloc (sizeof (jack_port_segment_info_t));
+	si = (jack_port_segment_info_t *)
+		malloc (sizeof (jack_port_segment_info_t));
 	strcpy (si->shm_name, shm_name);
 	si->address = addr;
 	si->size = size;
 
-	/* the first chunk of the first port segment is always set by the engine
-	   to be a conveniently-sized, zero-filled lump of memory.
-	*/
-
+	/* the first chunk of the first port segment is always set by
+	 * the engine to be a conveniently-sized, zero-filled lump of
+	 * memory. */
 	if (client->port_segments == NULL) {
 		jack_zero_filled_buffer = si->address;
 	}
@@ -672,7 +685,8 @@ jack_client_thread (void *arg)
 
 	while (err == 0) {
 	        if (client->engine->engine_ok == 0) {
-		     jack_error ("engine unexpectedly shutdown; thread exiting\n");
+		     jack_error ("engine unexpectedly shutdown; "
+				 "thread exiting\n");
 		     if (client->on_shutdown) {
 			     client->on_shutdown (client->on_shutdown_arg);
 		     }
@@ -687,49 +701,57 @@ jack_client_thread (void *arg)
 				printf ("poll interrupted\n");
 				continue;
 			}
-			jack_error ("poll failed in client (%s)", strerror (errno));
+			jack_error ("poll failed in client (%s)",
+				    strerror (errno));
 			status = -1;
 			break;
 		}
                 
-        pthread_testcancel();
+		pthread_testcancel();
 
-		/* get an accurate timestamp on waking from poll for a process()
-		   cycle.
-		*/
-
+		/* get an accurate timestamp on waking from poll for a
+		 * process() cycle. */
 		if (client->pollfd[1].revents & POLLIN) {
 			control->awake_at = jack_get_microseconds();
 		}
 
-		if (client->pollfd[0].revents & ~POLLIN || client->control->dead) {
+		if (client->pollfd[0].revents & ~POLLIN ||
+		    client->control->dead) {
 			goto zombie;
 		}
 
 		if (client->pollfd[0].revents & POLLIN) {
 
-			DEBUG ("client receives an event, now reading on event fd");
+			DEBUG ("client receives an event, "
+			       "now reading on event fd");
                 
-			/* server has sent us an event. process the event and reply */
+			/* server has sent us an event. process the
+			 * event and reply */
 
-			if (read (client->event_fd, &event, sizeof (event)) != sizeof (event)) {
-				jack_error ("cannot read server event (%s)", strerror (errno));
+			if (read (client->event_fd, &event, sizeof (event))
+			    != sizeof (event)) {
+				jack_error ("cannot read server event (%s)",
+					    strerror (errno));
 				err++;
 				break;
 			}
-			
+
 			status = 0;
 
 			switch (event.type) {
 			case PortRegistered:
 				if (control->port_register) {
-					control->port_register (event.x.port_id, TRUE, control->port_register_arg);
+					control->port_register
+						(event.x.port_id, TRUE,
+						 control->port_register_arg);
 				} 
 				break;
 
 			case PortUnregistered:
 				if (control->port_register) {
-					control->port_register (event.x.port_id, FALSE, control->port_register_arg);
+					control->port_register
+						(event.x.port_id, FALSE,
+						 control->port_register_arg);
 				}
 				break;
 
@@ -739,38 +761,49 @@ jack_client_thread (void *arg)
 
 			case PortConnected:
 			case PortDisconnected:
-				status = jack_client_handle_port_connection (client, &event);
+				status = jack_client_handle_port_connection
+					(client, &event);
 				break;
 
 			case BufferSizeChange:
 				jack_client_invalidate_port_buffers (client);
 
 				if (control->bufsize) {
-					status = control->bufsize (control->nframes, control->bufsize_arg);
+					status = control->bufsize
+						(control->nframes,
+						 control->bufsize_arg);
 				} 
 				break;
 
 			case SampleRateChange:
 				if (control->srate) {
-					status = control->srate (control->nframes, control->srate_arg);
+					status = control->srate
+						(control->nframes,
+						 control->srate_arg);
 				}
 				break;
 
 			case XRun:
 				if (control->xrun) {
-					status = control->xrun (control->xrun_arg);
+					status = control->xrun
+						(control->xrun_arg);
 				}
 				break;
 
 			case NewPortType:
-				jack_client_handle_new_port_type (client, event.x.shm_name, event.z.size, event.y.addr);
+				jack_client_handle_new_port_type (
+					client, event.x.shm_name,
+					event.z.size, event.y.addr);
 				break;
 			}
 
-			DEBUG ("client has dealt with the event, writing response on event fd");
+			DEBUG ("client has dealt with the event, writing "
+			       "response on event fd");
 
-			if (write (client->event_fd, &status, sizeof (status)) != sizeof (status)) {
-				jack_error ("cannot send event response to engine (%s)", strerror (errno));
+			if (write (client->event_fd, &status, sizeof (status))
+			    != sizeof (status)) {
+				jack_error ("cannot send event response to "
+					    "engine (%s)", strerror (errno));
 				err++;
 				break;
 			}
@@ -798,7 +831,9 @@ jack_client_thread (void *arg)
 				jack_call_sync_client (client);
 
 			if (control->process) {
-				if (control->process (control->nframes, control->process_arg) == 0) {
+				if (control->process (control->nframes,
+						      control->process_arg)
+				    == 0) {
 					control->state = Finished;
 				}
 			} else {
@@ -815,18 +850,24 @@ jack_client_thread (void *arg)
 #endif
 			/* pass the execution token along */
 
-			DEBUG ("client finished processing at %Lu (elapsed = %Lu usecs), writing on graph_next_fd==%d", 
+			DEBUG ("client finished processing at %" PRIu64
+			       " (elapsed = %" PRIu64
+			       " usecs), writing on graph_next_fd==%d", 
 			       control->finished_at, 
 			       control->finished_at - control->awake_at,
 			       client->graph_next_fd);
 
-			if (write (client->graph_next_fd, &c, sizeof (c)) != sizeof (c)) {
-				jack_error ("cannot continue execution of the processing graph (%s)", strerror(errno));
+			if (write (client->graph_next_fd, &c, sizeof (c))
+			    != sizeof (c)) {
+				jack_error ("cannot continue execution of the "
+					    "processing graph (%s)",
+					    strerror(errno));
 				err++;
 				break;
 			}
 
-			DEBUG ("client sent message to next stage by %Lu, client reading on graph_wait_fd==%d", 
+			DEBUG ("client sent message to next stage by %" PRIu64
+			       ", client reading on graph_wait_fd==%d", 
 			       jack_get_microseconds(), client->graph_wait_fd);
 
 #ifdef WITH_TIMESTAMPS
@@ -834,17 +875,20 @@ jack_client_thread (void *arg)
 #endif
 			DEBUG("reading cleanup byte from pipe\n");
 
-			if ((read (client->graph_wait_fd, &c, sizeof (c)) != sizeof (c))) {
+			if ((read (client->graph_wait_fd, &c, sizeof (c))
+			     != sizeof (c))) {
 				DEBUG ("WARNING: READ FAILED!");
-/*
-				jack_error ("cannot complete execution of the processing graph (%s)", strerror(errno));
+#if 0
+				jack_error ("cannot complete execution of the "
+				            "processing graph (%s)",
+					    strerror(errno));
 				err++;
 				break;
-*/
+#endif
 			}
 
-			/* check if we were killed during the process cycle (or whatever) */
-
+			/* check if we were killed during the process
+			 * cycle (or whatever) */
 			if (client->control->dead) {
 				goto zombie;
 			}
@@ -856,8 +900,6 @@ jack_client_thread (void *arg)
 			jack_dump_timestamps (stdout);
 #endif			
 
-
-			
 		}
 	}
 	
@@ -869,7 +911,9 @@ jack_client_thread (void *arg)
 		client->on_shutdown (client->on_shutdown_arg);
 	} else {
 		jack_error ("zombified - exiting from JACK");
-		jack_client_close (client); /* Need a fix : possibly make client crash if zombified without shutdown handler */
+		jack_client_close (client);
+		/* Need a fix : possibly make client crash if
+		 * zombified without shutdown handler */
 	}
 
 	pthread_exit (0);
@@ -951,6 +995,7 @@ jack_client_process_thread (void *arg)
 	return 0;
 }
 #endif
+
 static int
 jack_start_thread (jack_client_t *client)
 
@@ -1237,18 +1282,23 @@ jack_client_close (jack_client_t *client)
 
 	if (client->control->type == ClientExternal) {
 	
-		/* stop the thread that communicates with the jack server, only if it was actually running */
+		/* stop the thread that communicates with the jack
+		 * server, only if it was actually running */
 		
 		if (client->thread_ok){
 			pthread_cancel (client->thread);
 			pthread_join (client->thread, &status);
 		}
 
-		munmap ((char *) client->control, sizeof (jack_client_control_t));
-		munmap ((char *) client->engine, sizeof (jack_control_t));
+		munmap ((char *) client->control,
+			sizeof (jack_client_control_t));
+		munmap ((char *) client->engine,
+			sizeof (jack_control_t));
 
-		for (node = client->port_segments; node; node = jack_slist_next (node)) {
-			jack_port_segment_info_t *si = (jack_port_segment_info_t *) node->data;
+		for (node = client->port_segments; node;
+		     node = jack_slist_next (node)) {
+			jack_port_segment_info_t *si =
+				(jack_port_segment_info_t *) node->data;
 			munmap ((char *) si->address, si->size);
 			free (node->data);
 		}
@@ -1271,32 +1321,35 @@ jack_client_close (jack_client_t *client)
 	}
 	jack_slist_free (client->ports);
 	jack_client_free (client);
-	
+
 	return 0;
 }	
 
-int jack_is_realtime (jack_client_t *client)
-
+int 
+jack_is_realtime (jack_client_t *client)
 {
 	return client->engine->real_time;
 }
 
-jack_nframes_t jack_get_buffer_size (jack_client_t *client)
-
+jack_nframes_t 
+jack_get_buffer_size (jack_client_t *client)
 {
 	return client->engine->buffer_size;
 }
 
 int 
-jack_connect (jack_client_t *client, const char *source_port, const char *destination_port)
-
+jack_connect (jack_client_t *client, const char *source_port,
+	      const char *destination_port)
 {
 	jack_request_t req;
 
 	req.type = ConnectPorts;
 
-	snprintf (req.x.connect.source_port, sizeof (req.x.connect.source_port), "%s", source_port);
-	snprintf (req.x.connect.destination_port, sizeof (req.x.connect.destination_port), "%s", destination_port);
+	snprintf (req.x.connect.source_port,
+		  sizeof (req.x.connect.source_port), "%s", source_port);
+	snprintf (req.x.connect.destination_port,
+		  sizeof (req.x.connect.destination_port),
+		  "%s", destination_port);
 
 	return jack_client_deliver_request (client, &req);
 }
@@ -1322,14 +1375,18 @@ jack_port_disconnect (jack_client_t *client, jack_port_t *port)
 }
 
 int 
-jack_disconnect (jack_client_t *client, const char *source_port, const char *destination_port)
+jack_disconnect (jack_client_t *client, const char *source_port,
+		 const char *destination_port)
 {
 	jack_request_t req;
 
 	req.type = DisconnectPorts;
 
-	snprintf (req.x.connect.source_port, sizeof (req.x.connect.source_port), "%s", source_port);
-	snprintf (req.x.connect.destination_port, sizeof (req.x.connect.destination_port), "%s", destination_port);
+	snprintf (req.x.connect.source_port,
+		  sizeof (req.x.connect.source_port), "%s", source_port);
+	snprintf (req.x.connect.destination_port,
+		  sizeof (req.x.connect.destination_port),
+		  "%s", destination_port);
 	
 	return jack_client_deliver_request (client, &req);
 }
@@ -1342,7 +1399,8 @@ jack_set_error_function (void (*func) (const char *))
 
 
 int 
-jack_set_graph_order_callback (jack_client_t *client, JackGraphOrderCallback callback, void *arg)
+jack_set_graph_order_callback (jack_client_t *client,
+			       JackGraphOrderCallback callback, void *arg)
 {
 	if (client->control->active) {
 		jack_error ("You cannot set callbacks on an active client.");
@@ -1353,7 +1411,8 @@ jack_set_graph_order_callback (jack_client_t *client, JackGraphOrderCallback cal
 	return 0;
 }
 
-int jack_set_xrun_callback (jack_client_t *client, JackXRunCallback callback, void *arg)
+int jack_set_xrun_callback (jack_client_t *client,
+			    JackXRunCallback callback, void *arg)
 {
 	if (client->control->active) {
 		jack_error ("You cannot set callbacks on an active client.");
@@ -1366,7 +1425,8 @@ int jack_set_xrun_callback (jack_client_t *client, JackXRunCallback callback, vo
 }
 
 int
-jack_set_process_callback (jack_client_t *client, JackProcessCallback callback, void *arg)
+jack_set_process_callback (jack_client_t *client,
+			   JackProcessCallback callback, void *arg)
 
 {
 	if (client->control->active) {
@@ -1379,7 +1439,8 @@ jack_set_process_callback (jack_client_t *client, JackProcessCallback callback, 
 }
 
 int
-jack_set_buffer_size_callback (jack_client_t *client, JackBufferSizeCallback callback, void *arg)
+jack_set_buffer_size_callback (jack_client_t *client,
+			       JackBufferSizeCallback callback, void *arg)
 {
 	client->control->bufsize_arg = arg;
 	client->control->bufsize = callback;
@@ -1387,7 +1448,9 @@ jack_set_buffer_size_callback (jack_client_t *client, JackBufferSizeCallback cal
 }
 
 int
-jack_set_port_registration_callback(jack_client_t *client, JackPortRegistrationCallback callback, void *arg)
+jack_set_port_registration_callback(jack_client_t *client,
+				    JackPortRegistrationCallback callback,
+				    void *arg)
 
 {
 	if (client->control->active) {
