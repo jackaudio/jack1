@@ -69,13 +69,7 @@ jack_create_thread (pthread_t* thread,
 		result = pthread_create (thread, 0, start_routine, arg);
 		log_result("creating thread with default parameters");
 
-#ifdef JACK_USE_MACH_THREADS
-		/* fixed priority thread */
-		setThreadToPriority(*thread, 63, TRUE, 10000000);
-#endif /* JACK_USE_MACH_THREADS */
-
 		return 0;
-
 	}
 
 	/* realtime thread. this disgusting mess is a

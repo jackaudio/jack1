@@ -1237,7 +1237,7 @@ jack_client_process_thread (void *arg)
 	client->rt_thread_ok = TRUE;
             
    	while (err == 0) {
-        
+	
                 if (jack_client_suspend(client) < 0) {
                         jack_error ("jack_client_process_thread : resume error");
                         goto zombie;
@@ -1328,12 +1328,25 @@ jack_start_thread (jack_client_t *client)
 #endif /* USE_MLOCK */
 	}
 
+#ifdef JACK_USE_MACH_THREADS
+/* Stephane Letz : letz@grame.fr
+On MacOSX, the normal thread does not need to be real-time.
+*/
+	if (jack_create_thread (&client->thread,
+				client->engine->client_priority,
+				0,
+				jack_client_thread, client)) {
+		return -1;
+	}
+#else
 	if (jack_create_thread (&client->thread,
 				client->engine->client_priority,
 				client->engine->real_time,
 				jack_client_thread, client)) {
 		return -1;
 	}
+
+#endif
 	
 #ifdef JACK_USE_MACH_THREADS
 
@@ -1347,10 +1360,10 @@ jack_start_thread (jack_client_t *client)
 
 	*/
 
-	if (jack_create_thread (&client->process_thread,
+	if (jack_create_thread(&client->process_thread,
 				client->engine->client_priority,
 				client->engine->real_time,
-				jack_client_thread, client)) {
+				jack_client_process_thread, client)) {
 		return -1;
 	}
 #endif /* JACK_USE_MACH_THREADS */
