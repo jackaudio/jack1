@@ -656,8 +656,16 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 
 	nbytes = read (client_fd, &req, sizeof (req));
 
+	if (nbytes == 0) {		/* EOF? */
+		jack_error ("cannot read connection request from client");
+		return -1;
+	}
+
+	/* First verify protocol version (first field of request), if
+	 * present, then make sure request has the expected length. */
 	if ((nbytes < sizeof (req.protocol_v))
-	    || (req.protocol_v != jack_protocol_version)) {
+	    || (req.protocol_v != jack_protocol_version)
+	    || (nbytes != sizeof (req))) {
 
 		/* JACK protocol incompatibility */
 		res.status |= (JackFailure|JackVersionError);
@@ -665,11 +673,6 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 		if (write (client_fd, &res, sizeof (res)) != sizeof (res)) {
 			jack_error ("cannot write client connection response");
 		}
-		return -1;
-	}
-
-	if (nbytes != sizeof (req)) {
-		jack_error ("cannot read connection request from client");
 		return -1;
 	}
 
