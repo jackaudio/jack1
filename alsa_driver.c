@@ -706,8 +706,6 @@ alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 			nfds++;
 		}
 
-		/* fprintf(stderr, "before poll\n"); */
-
 		if (poll (driver->pfd, nfds, 1000) < 0) {
 			if (errno == EINTR) {
 				printf ("poll interrupt\n");
