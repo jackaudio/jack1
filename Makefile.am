@@ -6,12 +6,11 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure config.h.in \
 
 if HAVE_DOXYGEN
 SUBDIRS = . jack doc
-DIST_SUBDIRS = jack
 else
 SUBDIRS = . jack
-DIST_SUBDIRS = jack
 endif
 
+DIST_SUBDIRS = jack doc
 
 if HAVE_FLTK
 FLTK_CLIENT = jack_fltk_client

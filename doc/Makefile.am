@@ -6,7 +6,7 @@ EXTRA_DIST=
 
 DOC_STAMPS=html-build.stamp
 
-DOC_DIR=$(datadir)/doc/jack
+DOC_DIR=$(HTML_DIR)
 
 all-local: doxygen-build.stamp
 
