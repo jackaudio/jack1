@@ -266,7 +266,6 @@ enum JackOptions {
 
      /**
       * Open with optional <em>(char *) server_name</em> parameter.
-      * <b>Warning: this option is not yet implemented.</b>
       */
      JackServerName = 0x04,
 
