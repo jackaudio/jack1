@@ -1677,7 +1677,7 @@ jack_main_thread (void *arg)
 
 #define WORK_SCALE 1.0f
 
-		if (engine->spare_usecs && ((WORK_SCALE * engine->spare_usecs) <= delayed_usecs)) {
+		if (engine->control->real_time != 0 && engine->spare_usecs && ((WORK_SCALE * engine->spare_usecs) <= delayed_usecs)) {
 			
 			printf ("delay of %.3f usecs exceeds estimated spare time of %.3f; restart ...\n",
 				delayed_usecs, WORK_SCALE * engine->spare_usecs);

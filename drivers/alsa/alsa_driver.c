@@ -337,12 +337,19 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 		jack_error ("ALSA: cannot set start mode for %s", stream_name);
 		return -1;
 	}
-	
-	if ((err = snd_pcm_sw_params_set_stop_threshold (handle, sw_params, driver->user_nperiods * driver->frames_per_cycle)) < 0) {
-		jack_error ("ALSA: cannot set stop mode for %s", stream_name);
-		return -1;
-	}
 
+	{
+		snd_pcm_uframes_t stop_th = driver->user_nperiods * driver->frames_per_cycle;
+		if (driver->soft_mode) {
+			stop_th = (snd_pcm_uframes_t)-1;
+		}
+
+		if ((err = snd_pcm_sw_params_set_stop_threshold (handle, sw_params, stop_th)) < 0) {
+			jack_error ("ALSA: cannot set stop mode for %s", stream_name);
+			return -1;
+		}
+	}
+	
 	if ((err = snd_pcm_sw_params_set_silence_threshold (handle, sw_params, 0)) < 0) {
 		jack_error ("ALSA: cannot set silence threshold for %s", stream_name);
 		return -1;
@@ -1393,15 +1400,16 @@ alsa_driver_new (char *name, char *alsa_device,
 		 int hw_monitoring,
 		 int capturing,
 		 int playing,
-		 DitherAlgorithm dither)
+		 DitherAlgorithm dither,
+		 int soft_mode)
 {
 	int err;
 
 	alsa_driver_t *driver;
 
-	printf ("creating alsa driver ... %s|%lu|%lu|%lu|%s\n", 
+	printf ("creating alsa driver ... %s|%lu|%lu|%lu|%s|%s\n", 
 		alsa_device, frames_per_cycle, user_nperiods, rate,
-		hw_monitoring ? "hwmon":"swmon");
+		hw_monitoring ? "hwmon":"swmon", soft_mode ? "soft-mode":"rt");
 
 	driver = (alsa_driver_t *) calloc (1, sizeof (alsa_driver_t));
 
@@ -1441,6 +1449,7 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->capture_nfds = 0;
 
 	driver->dither = dither;
+	driver->soft_mode = soft_mode;
 
 	pthread_mutex_init (&driver->clock_sync_lock, 0);
 	driver->clock_sync_listeners = 0;
@@ -1595,6 +1604,7 @@ alsa PCM driver args:
     -C (capture, default: duplex)
     -P (playback, default: duplex)
     -z[r|t|s|-] (dither, rect|tri|shaped|off, default: off)
+    -s soft-mode, no xrun handling (default: off)
 ");
 }
 
@@ -1608,6 +1618,7 @@ driver_initialize (int argc, char **argv)
 	int hw_monitoring = FALSE;
 	int capture = FALSE;
 	int playback = FALSE;
+	int soft_mode = FALSE;
 	DitherAlgorithm dither = None;
 	int i;
 
@@ -1653,7 +1664,7 @@ driver_initialize (int argc, char **argv)
 				break;
 				
 			case 'H':
-				hw_monitoring = 1;
+				hw_monitoring = TRUE;
 				break;
 
 			case 'z':
@@ -1676,6 +1687,11 @@ driver_initialize (int argc, char **argv)
 					break;
 				}
 				break;
+
+			case 's':
+				soft_mode = TRUE;
+				break;
+
 				
 			default:
 				alsa_usage ();
@@ -1696,7 +1712,7 @@ driver_initialize (int argc, char **argv)
 
 	return alsa_driver_new ("alsa_pcm", pcm_name, frames_per_interrupt, 
 				user_nperiods, srate, hw_monitoring, capture,
-			        playback, dither);
+			        playback, dither, soft_mode);
 }
 
 void
