@@ -35,25 +35,3 @@
 6) as root, do 
 
        make install
-
-7) create a .asoundrc file in your home directory like this:
-
------- 8< ----------- 8< ------
-
-pcm.SOMENAME {
-    type hw
-    card 0
-}
-
-ctl.SOMENAME {
-    type hw
-    card 0
-}
-
------- 8< ----------- 8< ------
-
-8) run the jack server with:
-
-      jackstart -R -d alsa -d SOMENAME
-
-
