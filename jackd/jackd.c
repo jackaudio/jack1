@@ -31,6 +31,18 @@
 #include <jack/internal.h>
 #include <jack/driver.h>
 
+#ifdef USE_CAPABILITIES
+
+#include <sys/stat.h>
+/* capgetp and capsetp are linux only extensions, not posix */
+#undef _POSIX_SOURCE
+#include <sys/capability.h>
+#include <jack/start.h>
+
+static struct stat pipe_stat;
+
+#endif
+
 static sigset_t signals;
 static jack_engine_t *engine = 0;
 static int jackd_pid;
@@ -302,7 +314,6 @@ static void usage ()
 usage: jackd [ --asio OR -a ]
 	     [ --realtime OR -R [ --realtime-priority OR -P priority ] ]
              [ --verbose OR -v ]
-             [ --getcap OR -g capability-program-name ]
              [ --tmpdir OR -D directory-for-temporary-files ]
          -d driver [ ... driver args ... ]
 ");
@@ -318,7 +329,6 @@ main (int argc, char *argv[])
 		{ "asio", 0, 0, 'a' },
 		{ "driver", 1, 0, 'd' },
 		{ "tmpdir", 1, 0, 'D' },
-		{ "getcap", 1, 0, 'g' },
 		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
 		{ "realtime", 0, 0, 'R' },
@@ -330,10 +340,32 @@ main (int argc, char *argv[])
 	int opt;
 	int seen_driver = 0;
 	char *driver_name = 0;
-	char *getcap_name = 0;
 	char **driver_args = 0;
 	int driver_nargs = 1;
 	int i;
+#ifdef USE_CAPABILITIES
+	int status;
+#endif
+
+#ifdef USE_CAPABILITIES
+
+	/* check to see if there is a pipe in the right descriptor */
+	if ((status = fstat (PIPE_WRITE_FD, &pipe_stat)) == 0 && S_ISFIFO(pipe_stat.st_mode)) {
+		/* tell jackstart we are up and running */
+		if (close(PIPE_WRITE_FD) != 0) {
+			fprintf(stderr, "jackd: error on startup pipe close: %s\n", strerror (errno));
+		} else {
+			/* wait for jackstart process to set our capabilities */
+			if (wait (&status) == -1) {
+				fprintf (stderr, "jackd: wait for startup process exit failed\n");
+			}
+			if (!WIFEXITED (status) || WEXITSTATUS (status)) {
+				fprintf(stderr, "jackd: jackstart did not exit cleanly\n");
+				exit (1);
+			}
+		}
+	}
+#endif
 
 	opterr = 0;
 	while (!seen_driver && (opt = getopt_long (argc, argv, options, long_options, &option_index)) != EOF) {
@@ -349,10 +381,6 @@ main (int argc, char *argv[])
 		case 'd':
 			seen_driver = 1;
 			driver_name = optarg;
-			break;
-
-		case 'g':
-			getcap_name = optarg;
 			break;
 
 		case 'v':
@@ -403,9 +431,6 @@ main (int argc, char *argv[])
 		 "jackd comes with ABSOLUTELY NO WARRANTY\n"
 		 "This is free software, and you are welcome to redistribute it\n"
 		 "under certain conditions; see the file COPYING for details\n\n");
-
-	/* get real-time capabilities for this process, we should check for errors */
-	if (getcap_name) system (getcap_name);
 
 	if (!with_fork) {
 

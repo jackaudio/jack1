@@ -93,6 +93,7 @@ typedef struct {
     unsigned long       buffer_size;
     char                real_time;
     int                 client_priority;
+    int                 has_capabilities;
     float               cpu_load;
     unsigned long       port_max;
     jack_port_shared_t ports[0];
@@ -148,6 +149,7 @@ typedef volatile struct {
     volatile char       active : 1;       /* w: engine r: engine and client */
     volatile char       dead : 1;         /* r/w: engine */
     volatile char       timed_out : 1;    /* r/w: engine */
+    volatile pid_t      pid;              /* w: client r: engine; pid of client */
     volatile unsigned long long signalled_at;
     volatile unsigned long long finished_at;
 
@@ -222,7 +224,8 @@ typedef enum {
 	SetTimeBaseClient = 5,
 	ActivateClient = 6,
 	DeactivateClient = 7,
-	DisconnectPort = 8
+	DisconnectPort = 8,
+	SetClientCapabilities = 9
 } AudioEngineRequestType;
 
 typedef struct {

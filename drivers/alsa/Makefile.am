@@ -1,4 +1,4 @@
-AM_CFLAGS = -I$(top_srcdir) $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" $(GLIB_CFLAGS)
+AM_CFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" $(GLIB_CFLAGS)
 
 plugindir = $(ADDON_DIR)
 

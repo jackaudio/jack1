@@ -19,4 +19,5 @@ noinst_HEADERS = 		\
 	internal.h 		\
 	memops.h 		\
 	pool.h			\
-	port.h
+	port.h			\
+	start.h

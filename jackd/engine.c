@@ -42,6 +42,12 @@
 #include <jack/driver.h>
 #include <jack/cycles.h>
 
+#ifdef USE_CAPABILITIES
+/* capgetp and capsetp are linux only extensions, not posix */
+#undef _POSIX_SOURCE
+#include <sys/capability.h>
+#endif
+
 #define MAX_SHM_ID 256 /* likely use is more like 16 */
 
 #define NoPort    -1
@@ -793,6 +799,130 @@ handle_client_ack_connection (jack_engine_t *engine, int client_fd)
 	return 0;
 }
 
+#ifdef USE_CAPABILITIES
+
+static int check_capabilities (jack_engine_t *engine)
+
+{
+	cap_t caps = cap_init();
+	cap_flag_value_t cap;
+	pid_t pid;
+	int have_all_caps = 1;
+
+	if (caps == NULL) {
+		if (engine->verbose) {
+			fprintf (stderr, "check: could not allocate capability working storage\n");
+		}
+		return 0;
+	}
+	pid = getpid ();
+	cap_clear (caps);
+	if (capgetp (pid, caps)) {
+		if (engine->verbose) {
+			fprintf (stderr, "check: could not get capabilities for process %d\n", pid);
+		}
+		return 0;
+	}
+	/* check that we are able to give capabilites to other processes */
+	cap_get_flag(caps, CAP_SETPCAP, CAP_EFFECTIVE, &cap);
+	if (cap == CAP_CLEAR) {
+		have_all_caps = 0;
+		goto done;
+	}
+	/* check that we have the capabilities we want to transfer */
+	cap_get_flag(caps, CAP_SYS_NICE, CAP_EFFECTIVE, &cap);
+	if (cap == CAP_CLEAR) {
+		have_all_caps = 0;
+		goto done;
+	}
+	cap_get_flag(caps, CAP_SYS_RESOURCE, CAP_EFFECTIVE, &cap);
+	if (cap == CAP_CLEAR) {
+		have_all_caps = 0;
+		goto done;
+	}
+	cap_get_flag(caps, CAP_IPC_LOCK, CAP_EFFECTIVE, &cap);
+	if (cap == CAP_CLEAR) {
+		have_all_caps = 0;
+		goto done;
+	}
+  done:
+	cap_free (caps);
+	return have_all_caps;
+}
+
+
+static int give_capabilities (jack_engine_t *engine, pid_t pid)
+
+{
+	cap_t caps = cap_init();
+	const unsigned caps_size = 3;
+	cap_value_t cap_list[] = { CAP_SYS_NICE, CAP_SYS_RESOURCE, CAP_IPC_LOCK};
+
+	if (caps == NULL) {
+		if (engine->verbose) {
+			fprintf (stderr, "give: could not allocate capability working storage\n");
+		}
+		return -1;
+	}
+	cap_clear(caps);
+	if (capgetp (pid, caps)) {
+		if (engine->verbose) {
+			fprintf (stderr, "give: could not get current capabilities for process %d\n", pid);
+		}
+		cap_clear(caps);
+	}
+	cap_set_flag(caps, CAP_EFFECTIVE, caps_size, cap_list , CAP_SET);
+	cap_set_flag(caps, CAP_INHERITABLE, caps_size, cap_list , CAP_SET);
+	cap_set_flag(caps, CAP_PERMITTED, caps_size, cap_list , CAP_SET);
+	if (capsetp (pid, caps)) {
+		cap_free (caps);
+		return -1;
+	}
+	cap_free (caps);
+	return 0;
+}
+
+
+static int
+jack_set_client_capabilities (jack_engine_t *engine, jack_client_id_t id)
+
+{
+	GSList *node;
+	int ret = -1;
+
+	jack_lock_graph (engine);
+
+	for (node = engine->clients; node; node = g_slist_next (node)) {
+
+		jack_client_internal_t *client = (jack_client_internal_t *) node->data;
+
+		if (client->control->id == id) {
+
+			/* before sending this request the client has already checked
+			   that the engine has realtime capabilities, that it is running
+			   realtime and that the pid is defined
+			*/
+			ret = give_capabilities (engine, client->control->pid);
+			if (ret) {
+				jack_error ("could not give capabilities to process %d\n",
+					    client->control->pid);
+			} else {
+				if (engine->verbose) {
+					fprintf (stderr, "gave capabilities to process %d\n",
+						 client->control->pid);
+				}
+			}
+		}
+	}
+
+	jack_unlock_graph (engine);
+
+	return ret;
+}	
+
+#endif
+
+
 static int
 jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 
@@ -1016,6 +1146,11 @@ handle_client_request (jack_engine_t *engine, int fd)
 		req.status = jack_set_timebase (engine, req.x.client_id);
 		break;
 
+#ifdef USE_CAPABILITIES
+	case SetClientCapabilities:
+		req.status = jack_set_client_capabilities (engine, req.x.client_id);
+		break;
+#endif
 	default:
 		/* some requests are handled entirely on the client side,
 		   by adjusting the shared memory area(s)
@@ -1149,6 +1284,10 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	size_t control_size;
 	void *addr;
 	int i;
+#ifdef USE_CAPABILITIES
+	uid_t uid = getuid ();
+	uid_t euid = geteuid ();
+#endif
 
 	engine = (jack_engine_t *) malloc (sizeof (jack_engine_t));
 
@@ -1247,6 +1386,30 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine->control->time.frame_rate = 0;
 	engine->control->time.frame = 0;
 	engine->control->in_process = 0;
+
+	engine->control->has_capabilities = 0;
+#ifdef USE_CAPABILITIES
+	if (uid == 0 || euid == 0) {
+		if (engine->verbose) {
+			fprintf (stderr, "running with uid=%d and euid=%d, will not try to use capabilites\n",
+				 uid, euid);
+		}
+	} else {
+		/* only try to use capabilities if we are not running as root */
+		engine->control->has_capabilities = check_capabilities (engine);
+		if (engine->control->has_capabilities == 0) {
+			if (engine->verbose) {
+				fprintf (stderr, "required capabilities not available\n");
+			}
+		}
+		if (engine->verbose) {
+			size_t size;
+			cap_t cap = cap_init();
+			capgetp(0, cap);
+			fprintf (stderr, "capabilities: %s\n", cap_to_text(cap, &size));
+		}
+	}
+#endif
 
 	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix), "%s/jack-ack-fifo-%d", jack_temp_dir, getpid());
 

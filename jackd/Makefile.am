@@ -1,15 +1,37 @@
-MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure config.h.in \
-                          stamp-h.in \
-			  config.guess mkinstalldirs \
-                          missing install-sh config.sub ltconfig \
-                          ltmain.sh acinclude.m4 libjack.la
+MAINTAINERCLEANFILES = Makefile.in
 
-bin_PROGRAMS = jackd 
+if USE_CAPABILITIES
+bin_PROGRAMS = jackd jackstart
+else
+bin_PROGRAMS = jackd
+endif
 
 AM_CFLAGS = -I.. $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" $(GLIB_CFLAGS)
-AM_CXXFLAGS = -I.. $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\"
 
 jackd_SOURCES = jackd.c engine.c
-jackd_LDFLAGS = -lm -ldl -lpthread -Xlinker -export-dynamic $(GLIB_LIBS)
 jackd_LDADD = ../libjack/libjack.la
+
+if USE_CAPABILITIES
+jackd_LDFLAGS = -lm -ldl -lpthread $(GLIB_LIBS) -lcap
+else
+jackd_LDFLAGS = -lm -ldl -lpthread $(GLIB_LIBS)
+endif
+
+jackdincludedir = $(includedir)/jack
+
+jackdinclude_HEADERS = md5.h
+
+BUILT_SOURCES = md5.h
+
+md5.h: jackd
+	echo "#define JACKD_MD5_SUM \"`md5sum jackd | awk '{print $1}'`\"" > md5.h
+
+dist-hook:
+	rm -f $(distdir)/md5.h
+distclean-local:
+	rm -f $(top_builddir)/jackd/md5.h
+
+jackstart_SOURCES = jackstart.c
+jackstart_LDFLAGS = -lcap -lssl
+
 

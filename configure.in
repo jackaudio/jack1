@@ -1,11 +1,11 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT(client.c)
+AC_INIT(jackd/jackd.c)
 
 AC_CONFIG_AUX_DIR(.)
 
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=29
-JACK_MICRO_VERSION=2
+JACK_MINOR_VERSION=30
+JACK_MICRO_VERSION=0
 
 BETA=
 
@@ -28,12 +28,51 @@ AC_PROG_CXX
 AC_PROG_LD
 AM_PROG_LIBTOOL
 
-JACK_CFLAGS="-g -Wall -D_REENTRANT"
-JACK_OPT_CFLAGS="-D_REENTRANT -O6 -Wall -fomit-frame-pointer -ffast-math -fstrength-reduce -funroll-loops -fmove-all-movables"
+JACK_CFLAGS='-I$(top_srcdir) -DADDON_DIR=\"$(ADDON_DIR)\" -g -Wall -D_REENTRANT'
+JACK_OPT_CFLAGS='-I$(top_srcdir) -DADDON_DIR=\"$(ADDON_DIR)\" -D_REENTRANT -O6 -Wall -fomit-frame-pointer -ffast-math -fstrength-reduce -funroll-loops -fmove-all-movables'
 
 AC_ARG_ENABLE(optimize,
-     [  --enable-optimize       ask the compiler for its best optimizations],
-     [ if test "x$enable_optimize" != "xno" ; then JACK_CFLAGS="$JACK_OPT_CFLAGS" ; fi ])
+              [  --enable-optimize       ask the compiler for its best optimizations],
+              [ if test "x$enable_optimize" != "xno" ; then JACK_CFLAGS="$JACK_OPT_CFLAGS" ; fi ])
+
+USE_CAPABILITIES=false
+
+AC_ARG_ENABLE(capabilities,
+              [  --enable-capabilities   use libcap to gain realtime scheduling priviledges],
+              [ if test "x$enable_capabilities" != "xno" ; then
+                    AC_CHECK_LIB(cap, capgetp,
+                                 [AC_CHECK_HEADER(sys/capability.h,
+                                                  [HAVE_CAPABILITIES=true],
+                                                  [AC_MSG_WARN([*** no kernel support for capabilities])
+                                                   HAVE_CAPABILITIES=false]
+                                  )],
+                                 [AC_MSG_WARN([*** no libcap present])
+                                  HAVE_CAPABILITIES=false]
+                    )
+                    if test "x$HAVE_CAPABILITIES" = "xtrue"; then
+                        AC_CHECK_PROG(HAVE_CAPABILITIES, md5sum, true, false)
+                    fi
+                    if test "x$HAVE_CAPABILITIES" = "xfalse"; then
+                        AC_MSG_WARN([*** required program md5sum not found])
+                    else
+                        AC_CHECK_LIB(ssl, EVP_DigestInit,
+                                     [AC_CHECK_HEADER(openssl/evp.h,
+                                                      [HAVE_CAPABILITIES=true],
+                                                      [AC_MSG_WARN([*** openssl headers not found])
+                                                       HAVE_CAPABILITIES=false]
+                                      )],
+                                     [AC_MSG_WARN([*** openssl library not found])
+                                      HAVE_CAPABILITIES=false]
+                        )
+                    fi
+                    if test "x$HAVE_CAPABILITIES" = "xfalse"; then
+                        AC_MSG_ERROR([*** Capabilities support not present. Run configure again without --enable-capabilities.])
+                    fi
+                    USE_CAPABILITIES=true
+                    JACK_CFLAGS="$JACK_CFLAGS -DUSE_CAPABILITIES"
+                fi
+              ]
+)
 
 AC_SUBST(JACK_CFLAGS)
 
@@ -43,12 +82,12 @@ ADDON_DIR=${libdir}/jack
 AC_SUBST(ADDON_DIR)
 
 AC_ARG_WITH(html-dir,
-     [  --with-html-dir=PATH    where to install the html documentation])
+            [  --with-html-dir=PATH    where to install the html documentation])
 
 if test "x$with_html_dir" = "x" ; then
-  HTML_DIR='${datadir}/gtk-doc/html'
+    HTML_DIR='${datadir}/gtk-doc/html'
 else
-  HTML_DIR=$with_html_dir
+    HTML_DIR=$with_html_dir
 fi
 
 AC_SUBST(HTML_DIR)
@@ -57,7 +96,7 @@ AC_SUBST(HTML_DIR)
 
 AM_PATH_GLIB(1.0.0,
              [:],
-             [AC_MSG_ERROR([*** JACK requires glib, but it does not appear to be installed])]
+             [AC_MSG_ERROR([*** JACK requires GLib, but it does not appear to be installed])]
 )
 
 AC_CHECK_LIB(asound,snd_pcm_drop,
@@ -101,4 +140,17 @@ fi
 AM_CONDITIONAL(HAVE_FLTK, $HAVE_FLTK)
 AM_CONDITIONAL(HAVE_SNDFILE, $HAVE_SNDFILE)
 AM_CONDITIONAL(HAVE_DOXYGEN, $HAVE_DOXYGEN)
-AC_OUTPUT(Makefile jack.pc jack.spec jack/Makefile doc/Makefile doc/reference.doxygen)
+AM_CONDITIONAL(USE_CAPABILITIES, $USE_CAPABILITIES)
+AC_OUTPUT(
+Makefile
+jack.pc
+jack.spec
+jack/Makefile
+jackd/Makefile
+libjack/Makefile
+drivers/Makefile
+drivers/alsa/Makefile
+example-clients/Makefile
+doc/Makefile
+doc/reference.doxygen
+)

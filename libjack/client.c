@@ -475,6 +475,11 @@ jack_client_new (const char *client_name)
 
 	client->event_fd = ev_fd;
 
+#ifdef USE_CAPABILITIES
+	/* get the pid of the client process to pass it to engine */
+	client->control->pid = getpid ();
+#endif
+
 	return client;
 	
   fail:
@@ -638,6 +643,10 @@ jack_start_thread (jack_client_t *client)
 
 {
 	pthread_attr_t *attributes = 0;
+#ifdef USE_CAPABILITIES
+	int policy = SCHED_OTHER;
+	struct sched_param client_param, temp_param;
+#endif
 
 	if (client->engine->real_time) {
 
@@ -676,9 +685,104 @@ jack_start_thread (jack_client_t *client)
 	}
 
 	if (pthread_create (&client->thread, attributes, jack_client_thread, client)) {
+#ifdef USE_CAPABILITIES
+		if (client->engine->real_time && client->engine->has_capabilities) {
+			/* we are probably dealing with a broken glibc so try
+			   to work around the bug, see below for more details
+			*/
+			goto capabilities_workaround;
+		}
+#endif
 		return -1;
 	}
 	return 0;
+
+#ifdef USE_CAPABILITIES
+
+	/* we get here only with engine running realtime and capabilities */
+
+ capabilities_workaround:
+
+	/* the version of glibc I've played with has a bug that makes
+	   that code fail when running under a non-root user but with the
+	   proper realtime capabilities (in short,  pthread_attr_setschedpolicy 
+	   does not check for capabilities, only for the uid being
+	   zero). Newer versions apparently have this fixed. Thus
+	   workaround temporarily switches the client thread to the
+	   proper scheduler and priority, then starts the realtime
+	   thread so that it can inherit them and finally switches the
+	   client thread back to what it was before. Sigh. For ardour
+	   I have to check again and switch the thread explicitly to
+	   realtime, don't know why or how to debug - nando
+	*/
+
+	/* get current scheduler and parameters of the client process */
+	if ((policy = sched_getscheduler (0)) < 0) {
+		jack_error ("Cannot get current client scheduler: %s", strerror(errno));
+		return -1;
+	}
+	memset (&client_param, 0, sizeof (client_param));
+	if (sched_getparam (0, &client_param)) {
+		jack_error ("Cannot get current client scheduler parameters: %s", strerror(errno));
+		return -1;
+	}
+
+	/* temporarily change the client process to SCHED_FIFO so that
+	   the realtime thread can inherit the scheduler and priority
+	*/
+	memset (&temp_param, 0, sizeof (temp_param));
+	temp_param.sched_priority = client->engine->client_priority;
+	if (sched_setscheduler(0, SCHED_FIFO, &temp_param)) {
+		jack_error ("Cannot temporarily set client to RT scheduler: %s", strerror(errno));
+		return -1;
+	}
+
+	/* prepare the attributes for the realtime thread */
+	attributes = (pthread_attr_t *) malloc (sizeof (pthread_attr_t));
+	pthread_attr_init (attributes);
+	if (pthread_attr_setscope (attributes, PTHREAD_SCOPE_SYSTEM)) {
+		sched_setscheduler (0, policy, &client_param);
+		jack_error ("Cannot set scheduling scope for RT thread");
+		return -1;
+	}
+	if (pthread_attr_setinheritsched (attributes, PTHREAD_INHERIT_SCHED)) {
+		sched_setscheduler (0, policy, &client_param);
+		jack_error ("Cannot set scheduler inherit policy for RT thread");
+		return -1;
+	}
+
+	/* create the RT thread */
+	if (pthread_create (&client->thread, attributes, jack_client_thread, client)) {
+		sched_setscheduler (0, policy, &client_param);
+		return -1;
+	}
+
+	/* return the client process to the scheduler it was in before */
+	if (sched_setscheduler (0, policy, &client_param)) {
+		jack_error ("Cannot reset original client scheduler: %s", strerror(errno));
+		return -1;
+	}
+
+	/* check again... inheritance of policy and priority works in jack_simple_client
+	   but not in ardour! So I check again and force the policy if it is not set
+	   correctly. This does not really really work either, the manager thread
+	   of the linuxthreads implementation is left running with SCHED_OTHER,
+	   that is presumably very bad.
+	*/
+	memset (&client_param, 0, sizeof (client_param));
+	if (pthread_getschedparam(client->thread, &policy, &client_param) == 0) {
+		if (policy != SCHED_FIFO) {
+			/* jack_error ("RT thread did not go SCHED_FIFO, trying again"); */
+			memset (&client_param, 0, sizeof (client_param));
+			client_param.sched_priority = client->engine->client_priority;
+			if (pthread_setschedparam (client->thread, SCHED_FIFO, &client_param)) {
+				jack_error ("Cannot set (again) FIFO scheduling class for RT thread\n");
+				return -1;
+			}
+		}
+	}
+	return 0;
+#endif
 }
 
 int 
@@ -697,6 +801,41 @@ jack_activate (jack_client_t *client)
 	}
 
 #undef BIG_ENOUGH_STACK
+
+#ifdef USE_CAPABILITIES
+	if (client->engine->has_capabilities != 0 &&
+	    client->control->pid != 0 && client->engine->real_time != 0) {
+
+		/* we need to ask the engine for realtime capabilities
+		   before trying to start the realtime thread
+		*/
+
+		req.type = SetClientCapabilities;
+		req.x.client_id = client->control->id;
+
+		if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+			jack_error ("cannot send set client capabilities request to server");
+			return -1;
+		}
+		if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+			jack_error ("cannot read set client capabilities result from server (%s)", strerror (errno));
+			return -1;
+		}
+		if (req.status) {
+
+			/* what to do? engine is running realtime, it is using capabilities and has
+			   them (otherwise we would not get an error return) but for some reason it
+			   could not give the client the required capabilities, so for now downgrade
+			   the client so that it still runs, albeit non-realtime - nando
+			*/
+
+			jack_error ("could not receive realtime capabilities, client will run non-realtime");
+			/* XXX wrong, this is a property of the engine
+			client->engine->real_time = 0;
+			*/
+		}
+	}
+#endif
 
 	if (client->control->type == ClientOutOfProcess && client->first_active) {
 
