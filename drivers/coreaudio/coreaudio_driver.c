@@ -32,6 +32,8 @@
  Nov 30, 2004: S.Letz: In coreaudio_driver_write : clear to avoid playing dirty buffers when the client does not produce output anymore.
  Dec 05, 2004: S.Letz: XRun detection 
  Dec 09, 2004: S.Letz: Dynamic buffer size change
+ Dec 23, 2004: S.Letz: Correct bug in dynamic buffer size change : update period_usecs
+
  
  TODO:
 	- fix cpu load behavior.
@@ -341,6 +343,10 @@ coreaudio_driver_bufsize(coreaudio_driver_t * driver,
 
     closePandaAudioInstance(driver->stream);
 	driver->frames_per_cycle = nframes;
+	
+	driver->period_usecs =
+		(((float) driver->frames_per_cycle) / driver->frame_rate) *
+		1000000.0f;
 	
     driver->stream =
 		openPandaAudioInstance((float) driver->frame_rate,
