@@ -645,10 +645,11 @@ static int oss_driver_start (oss_driver_t *driver)
 	if (infd >= 0)
 	{
 		if (jack_create_thread(&driver->thread_in, 
-				       driver->engine->rtpriority, driver->engine->control->real_time, 
-				       io_thread, driver) < 0)
+			driver->engine->rtpriority, 
+			driver->engine->control->real_time, 
+			io_thread, driver) < 0)
 		{
-			jack_error("OSS: pthread_create() failed: %s@%i",
+			jack_error("OSS: jack_create_thread() failed: %s@%i",
 				__FILE__, __LINE__);
 			return -1;
 		}
@@ -658,10 +659,11 @@ static int oss_driver_start (oss_driver_t *driver)
 	if (outfd >= 0)
 	{
 		if (jack_create_thread(&driver->thread_out, 
-				       driver->engine->rtpriority, driver->engine->control->real_time, 
-				       io_thread, driver) < 0)
+			driver->engine->rtpriority, 
+			driver->engine->control->real_time, 
+			io_thread, driver) < 0)
 		{
-			jack_error("OSS: pthread_create() failed: %s@%i",
+			jack_error("OSS: jack_create_thread() failed: %s@%i",
 				__FILE__, __LINE__);
 			return -1;
 		}
@@ -874,7 +876,6 @@ static inline void synchronize (oss_driver_t *driver)
 
 static void *io_thread (void *param)
 {
-	int schedpol;
 	size_t localsize;
 	void *localbuf;
 	oss_driver_t *driver = (oss_driver_t *) param;
