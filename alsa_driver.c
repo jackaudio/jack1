@@ -258,8 +258,8 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 		jack_error ("ALSA: cannot set start mode for %s", stream_name);
 		return -1;
 	}
-
-	if ((err = snd_pcm_sw_params_set_stop_threshold (handle, sw_params, ~0U)) < 0) {
+	
+	if ((err = snd_pcm_sw_params_set_stop_threshold (handle, sw_params, driver->user_nperiods * driver->frames_per_cycle)) < 0) {
 		jack_error ("ALSA: cannot set stop mode for %s", stream_name);
 		return -1;
 	}
@@ -597,17 +597,22 @@ static int
 alsa_driver_xrun_recovery (alsa_driver_t *driver)
 
 {
-	snd_pcm_sframes_t capture_delay;
-	int err;
+	snd_pcm_status_t *status;
+	int res;
 
-	if ((err = snd_pcm_delay (driver->capture_handle, &capture_delay))) {
-		jack_error ("alsa_pcm: cannot determine capture delay (%s)", snd_strerror (err));
-		exit (1);
+	snd_pcm_status_alloca(&status);
+	if ((res = snd_pcm_status(driver->capture_handle, status)) < 0) {
+	        jack_error("status error: %s", snd_strerror(res));
 	}
 
-	fprintf (stderr, "alsa_pcm: xrun of %lu frames, (%.3f msecs)\n", capture_delay,
-		 ((float) capture_delay / (float) driver->frame_rate) * 1000.0);
-	
+	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_XRUN) {
+		struct timeval now, diff, tstamp;
+		gettimeofday(&now, 0);
+		snd_pcm_status_get_trigger_tstamp(status, &tstamp);
+		timersub(&now, &tstamp, &diff);
+		fprintf(stderr, "alsa_pcm: xrun of at least %.3f msecs\n", diff.tv_sec * 1000 + diff.tv_usec / 1000.0);
+	}
+
 #if ENGINE
 	if (!engine->xrun_recoverable ()) {
 		/* don't report an error here, its distracting */
@@ -655,7 +660,7 @@ alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 	snd_pcm_sframes_t avail = 0;
 	snd_pcm_sframes_t capture_avail = 0;
 	snd_pcm_sframes_t playback_avail = 0;
-	int xrun_detected;
+	int xrun_detected = FALSE;
 	int need_capture;
 	int need_playback;
 	int i;
@@ -701,6 +706,8 @@ alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 			nfds++;
 		}
 
+		/* fprintf(stderr, "before poll\n"); */
+
 		if (poll (driver->pfd, nfds, 1000) < 0) {
 			if (errno == EINTR) {
 				printf ("poll interrupt\n");
@@ -742,8 +749,7 @@ alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 		if (need_playback) {
 			for (i = 0; i < driver->playback_nfds; i++) {
 				if (driver->pfd[i].revents & POLLERR) {
-					jack_error ("ALSA: poll reports error on playback stream.");
-					return 0;
+					xrun_detected = TRUE;
 				}
 				
 				if (driver->pfd[i].revents == 0) {
@@ -761,8 +767,7 @@ alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 		if (need_capture) {
 			for (i = ci; i < nfds; i++) {
 				if (driver->pfd[i].revents & POLLERR) {
-					jack_error ("ALSA: poll reports error on capture stream.");
-					return 0;
+					xrun_detected = TRUE;
 				}
 				
 				if (driver->pfd[i].revents == 0) {
@@ -782,8 +787,6 @@ alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 
 	}
 
-	xrun_detected = FALSE;
-	
 	if ((capture_avail = snd_pcm_avail_update (driver->capture_handle)) < 0) {
 		if (capture_avail == -EPIPE) {
 			xrun_detected = TRUE;
