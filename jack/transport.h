@@ -41,6 +41,8 @@ typedef enum {
 
 } jack_transport_state_t;
 
+typedef unsigned long long jack_unique_t; /**< Unique ID (opaque) */
+
 /**
  * Optional struct jack_position_t fields.
  */
@@ -58,7 +60,8 @@ typedef enum {
  */
 typedef struct {
     
-    /* these two cannot be set from clients: the server sets them */
+    /* these three cannot be set from clients: the server sets them */
+    jack_unique_t	unique_1;	/**< unique ID */
     jack_time_t		usecs;		/**< monotonic, free-rolling */
     jack_nframes_t	frame_rate;	/**< current frame rate (per second) */
 
@@ -81,9 +84,8 @@ typedef struct {
      * the existing structure size and offsets are preserved. */
     int		padding[14];
 
-    /* When (guard_usecs == usecs) the entire structure is consistent.
-     * This is set by server. */
-    jack_time_t    guard_usecs;		/**< guard copy of usecs */
+    /* When (unique_1 == unique_2) the contents are consistent. */
+    jack_unique_t	unique_2;	/**< unique ID */
 
 } jack_position_t;
 

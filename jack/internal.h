@@ -98,9 +98,11 @@ typedef struct {
 
     jack_transport_state_t transport_state;
     volatile transport_command_t transport_cmd;
+    transport_command_t	  previous_cmd;	/* previous transport_cmd */
     jack_position_t	  current_time;	/* position for current cycle */
     jack_position_t	  pending_time;	/* position for next cycle */
     jack_position_t	  request_time;	/* latest requested position */
+    jack_unique_t	  prev_request; /* previous request unique ID */
     int			  new_pos;	/* new position this cycle */
     unsigned long	  sync_clients;	/* number of is_slowsync clients */
     unsigned long	  sync_remain;	/* number of them with sync_poll */

@@ -34,7 +34,7 @@ bin_PROGRAMS = jack_load \
 	       jack_metro \
 	       jack_showtime \
 	       jack_lsp \
-	       jackrec \
+	       $(JACKREC) \
 	       $(JACK_TRANSPORT)
 
 if HAVE_SNDFILE

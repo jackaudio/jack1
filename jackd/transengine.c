@@ -22,6 +22,7 @@
 #include <config.h>
 #include <errno.h>
 #include <assert.h>
+#include <stdio.h>
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include "transengine.h"
@@ -44,8 +45,11 @@ jack_sync_poll_new (jack_engine_t *engine, jack_client_internal_t *client)
 	}
 
 	// JOQ: I don't like doing this here...
-	if (engine->control->transport_state == JackTransportRolling)
+	if (engine->control->transport_state == JackTransportRolling) {
 		engine->control->transport_state = JackTransportStarting;
+		VERBOSE (engine, "force transport state to Starting\n");
+	}
+	VERBOSE (engine, "polling sync client %lu\n", client->control->id);
 }
 
 /* stop polling a specific slow-sync client
@@ -58,6 +62,8 @@ jack_sync_poll_exit (jack_engine_t *engine, jack_client_internal_t *client)
 		client->control->sync_poll = 0;
 		client->control->sync_new = 0;
 		engine->control->sync_remain--;
+		VERBOSE (engine, "sync poll interrupted for client %lu\n",
+			 client->control->id);
 	}
 	client->control->is_slowsync = 0;
 	engine->control->sync_clients--;
@@ -84,6 +90,9 @@ jack_sync_poll_stop (jack_engine_t *engine)
 
 	//JOQ: check invariant for debugging...
 	assert (poll_count == engine->control->sync_remain);
+	VERBOSE (engine,
+		 "sync poll halted with %ld clients and %llu usecs remaining\n",
+		 engine->control->sync_remain, engine->control->sync_time_left);
 	engine->control->sync_remain = 0;
 	engine->control->sync_time_left = 0;
 }
@@ -110,6 +119,9 @@ jack_sync_poll_start (jack_engine_t *engine)
 	assert (sync_count == engine->control->sync_clients);
 	engine->control->sync_remain = engine->control->sync_clients;
 	engine->control->sync_time_left = engine->control->sync_timeout;
+	VERBOSE (engine, "transport Starting, sync poll of %ld clients "
+		 "for %llu usecs\n", engine->control->sync_remain,
+		 engine->control->sync_time_left);
 }
 
 /* check for sync timeout */
@@ -124,12 +136,13 @@ jack_sync_timeout (jack_engine_t *engine)
 	/* compare carefully, jack_time_t is unsigned */
 	if (ectl->sync_time_left > buf_usecs) {
 		ectl->sync_time_left -= buf_usecs;
-		return 0;		/* continue */
+		return FALSE;
 	}
 
 	/* timed out */
+	VERBOSE (engine, "transport sync timeout\n");
 	ectl->sync_time_left = 0;
-	return 1;
+	return TRUE;
 }
 
 /**************** subroutines used by engine.c ****************/
@@ -212,10 +225,12 @@ jack_transport_init (jack_engine_t *engine)
 
 	engine->timebase_client = NULL;
 	ectl->transport_state = JackTransportStopped;
-	ectl->transport_cmd = TransportCommandNone;
+	ectl->transport_cmd = TransportCommandStop;
+	ectl->previous_cmd = TransportCommandStop;
 	memset (&ectl->current_time, 0, sizeof(ectl->current_time));
 	memset (&ectl->pending_time, 0, sizeof(ectl->pending_time));
 	memset (&ectl->request_time, 0, sizeof(ectl->request_time));
+	ectl->prev_request = 0;
 	ectl->new_pos = 0;
 	ectl->sync_remain = 0;
 	ectl->sync_clients = 0;
@@ -235,6 +250,7 @@ jack_transport_client_exit (jack_engine_t *engine,
 		engine->timebase_client = NULL;
 		engine->control->current_time.valid = 0;
 		engine->control->pending_time.valid = 0;
+		VERBOSE (engine, "timebase master exit\n");
 	}
 
 	if (client->control->is_slowsync)
@@ -327,43 +343,44 @@ jack_transport_cycle_end (jack_engine_t *engine)
 			ectl->current_time.frame + ectl->buffer_size;
 	} 
 
-	/* Handle latest asynchronous requests from the last cycle.
-	 *
-	 * This should ideally use an atomic swap, since commands can
-	 * arrive at any time.  There is a small timing window during
-	 * which a request could be ignored inadvertently.  Since
-	 * another could have arrived in the previous moment and
-	 * replaced it anyway, we won't bother with <asm/atomic.h>.
-	 */
+	/* Handle any new transport command from the last cycle. */
 	cmd = ectl->transport_cmd;
-	// JOQ: may be able to close the window by eliminating this
-	// store, but watch out below...
-	ectl->transport_cmd = TransportCommandNone;
+	if (cmd != ectl->previous_cmd) {
+		ectl->previous_cmd = cmd;
+		VERBOSE (engine, "transport command: %s\n",
+		       (cmd == TransportCommandStart? "START": "STOP"));
+	} else
+		cmd = TransportCommandNone;
 
-	if (ectl->request_time.usecs) {
-		/* request_time could change during this copy */
+	/* See if a position request arrived during the last cycle.
+	 * The request_time could change during the guarded copy.  If
+	 * so, we'll handle it now, but mistake it for a new request
+	 * in the following cycle.  That may cause an extra sync poll
+	 * cycle, but should work. */
+	if (ectl->request_time.unique_1 != ectl->prev_request) {
+		ectl->prev_request = ectl->request_time.unique_1;
 		jack_transport_copy_position(&ectl->request_time,
 					     &ectl->pending_time);
-		ectl->request_time.usecs = 0; /* empty request buffer */
 		ectl->new_pos = 1;
+		VERBOSE (engine, "new transport postition: %lu, id=0x%llx\n",
+		       ectl->pending_time.frame, ectl->pending_time.unique_1);
 	} else
 		ectl->new_pos = 0;
 
 	/* Promote pending_time to current_time.  Maintain the usecs
 	 * and frame_rate values, clients may not set them. */
-	ectl->pending_time.guard_usecs = 
-		ectl->pending_time.usecs = ectl->current_time.usecs;
+	ectl->pending_time.usecs = ectl->current_time.usecs;
 	ectl->pending_time.frame_rate = ectl->current_time.frame_rate;
 	ectl->current_time = ectl->pending_time;
 
 	/* check sync results from previous cycle */
 	if (ectl->transport_state == JackTransportStarting) {
 		if ((ectl->sync_remain == 0) ||
-		    (jack_sync_timeout(engine)))
+		    (jack_sync_timeout(engine))) {
 			ectl->transport_state = JackTransportRolling;
-
-
-
+			VERBOSE (engine, "transport Rolling, %lld usec"
+				 " left for poll\n", ectl->sync_time_left);
+		}
 	}
 
 	/* state transition switch */
@@ -376,21 +393,38 @@ jack_transport_cycle_end (jack_engine_t *engine)
 				jack_sync_poll_start(engine);
 			} else {
 				ectl->transport_state = JackTransportRolling;
+				VERBOSE (engine, "transport Rolling\n");
 			}
 		}
 		break;
 
 	case JackTransportStarting:
-	case JackTransportRolling:
 		if (cmd == TransportCommandStop) {
 			ectl->transport_state = JackTransportStopped;
-			jack_sync_poll_stop(engine);
+			VERBOSE (engine, "transport Stopped\n");
+			if (ectl->sync_remain)
+				jack_sync_poll_stop(engine);
 		} else if (ectl->new_pos) {
 			if (ectl->sync_clients) {
 				ectl->transport_state = JackTransportStarting;
 				jack_sync_poll_start(engine);
 			} else {
 				ectl->transport_state = JackTransportRolling;
+				VERBOSE (engine, "transport Rolling\n");
+			}
+		}
+		break;
+
+	case JackTransportRolling:
+		if (cmd == TransportCommandStop) {
+			ectl->transport_state = JackTransportStopped;
+			VERBOSE (engine, "transport Stopped\n");
+			if (ectl->sync_remain)
+				jack_sync_poll_stop(engine);
+		} else if (ectl->new_pos) {
+			if (ectl->sync_clients) {
+				ectl->transport_state = JackTransportStarting;
+				jack_sync_poll_start(engine);
 			}
 		}
 		break;
@@ -406,8 +440,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 void 
 jack_transport_cycle_start (jack_engine_t *engine, jack_time_t time)
 {
-	engine->control->current_time.guard_usecs =
-		engine->control->current_time.usecs = time;
+	engine->control->current_time.usecs = time;
 }
 
 /* on SetSyncTimeout request */
@@ -416,5 +449,6 @@ jack_transport_set_sync_timeout (jack_engine_t *engine,
 				 jack_time_t usecs)
 {
 	engine->control->sync_timeout = usecs;
+	VERBOSE (engine, "new sync timeout: %llu usecs\n", usecs);
 	return 0;
 }
