@@ -42,16 +42,21 @@ typedef struct {
 
 
 void sample_move_d32u24_sS           (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_d24u24_sS           (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_d16_sS              (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 
 void sample_move_dither_rect_d32u24_sS   (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_dither_tri_d32u24_sS    (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_dither_shaped_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_dither_rect_d24u24_sS   (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_dither_tri_d24u24_sS    (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_dither_shaped_d24u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_dither_rect_d16_sS      (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_dither_tri_d16_sS       (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_dither_shaped_d16_sS    (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 
 void sample_move_dS_s32u24           (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
+void sample_move_dS_s24u24           (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
 void sample_move_dS_s16              (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
 
 void sample_merge_d16_sS             (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
@@ -79,9 +84,11 @@ void memset_interleave               (char *dst, char val, unsigned long bytes, 
 void memcpy_fake                     (char *dst, char *src, unsigned long src_bytes, unsigned long foo, unsigned long bar);
 
 void memcpy_interleave_d16_s16       (char *dst, char *src, unsigned long src_bytes, unsigned long dst_skip_bytes, unsigned long src_skip_bytes);
+void memcpy_interleave_d24_s24       (char *dst, char *src, unsigned long src_bytes, unsigned long dst_skip_bytes, unsigned long src_skip_bytes);
 void memcpy_interleave_d32_s32       (char *dst, char *src, unsigned long src_bytes, unsigned long dst_skip_bytes, unsigned long src_skip_bytes);
 
 void merge_memcpy_interleave_d16_s16 (char *dst, char *src, unsigned long src_bytes, unsigned long dst_skip_bytes, unsigned long src_skip_bytes);
+void merge_memcpy_interleave_d24_s24 (char *dst, char *src, unsigned long src_bytes, unsigned long dst_skip_bytes, unsigned long src_skip_bytes);
 void merge_memcpy_interleave_d32_s32 (char *dst, char *src, unsigned long src_bytes, unsigned long dst_skip_bytes, unsigned long src_skip_bytes);
 
 void merge_memcpy_d16_s16            (char *dst, char *src, unsigned long src_bytes, unsigned long foo, unsigned long bar);

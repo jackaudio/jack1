@@ -243,6 +243,35 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 		}
 		break;
 
+	case 3:
+		if (driver->playback_interleaved) {
+			driver->channel_copy = memcpy_interleave_d24_s24;
+		} else {
+			driver->channel_copy = memcpy_fake;
+		}
+
+		switch (driver->dither) {
+			case Rectangular:
+			printf("Rectangular dithering at 16 bits\n");
+			driver->write_via_copy = sample_move_dither_rect_d24u24_sS;
+			break;
+
+			case Triangular:
+			printf("Triangular dithering at 16 bits\n");
+			driver->write_via_copy = sample_move_dither_tri_d24u24_sS;
+			break;
+
+			case Shaped:
+			printf("Noise-shaped dithering at 16 bits\n");
+			driver->write_via_copy = sample_move_dither_shaped_d24u24_sS;
+			break;
+
+			default:
+			driver->write_via_copy = sample_move_d24u24_sS;
+			break;
+		}
+		break;
+
 	case 4:
 		if (driver->playback_interleaved) {
 			driver->channel_copy = memcpy_interleave_d32_s32;
@@ -280,6 +309,9 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 	case 2:
 		driver->read_via_copy = sample_move_dS_s16;
 		break;
+	case 3:
+		driver->read_via_copy = sample_move_dS_s24u24;
+		break;
 	case 4:
 		driver->read_via_copy = sample_move_dS_s32u24;
 		break;
@@ -294,8 +326,17 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			      snd_pcm_sw_params_t *sw_params, 
 			      unsigned long *nchns,unsigned long sample_width)
 {
-	int err;
+	int err, format;
 	snd_pcm_uframes_t stop_th;
+	static struct {
+		char Name[16];
+		snd_pcm_format_t format;
+	} formats[] = {
+		{"32bit", SND_PCM_FORMAT_S32},
+		{"24bit", SND_PCM_FORMAT_S24_3},
+		{"16bit", SND_PCM_FORMAT_S16},
+	};
+#define NOFORMATS (sizeof(formats)/sizeof(formats[0]))
 	
 	if ((err = snd_pcm_hw_params_any (handle, hw_params)) < 0)  {
 		jack_error ("ALSA: no playback configurations available (%s)",
@@ -323,44 +364,25 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			return -1;
 		}
 	}
-	
 
-	if (sample_width == 4) {
-
-		if ((err = snd_pcm_hw_params_set_format (
-			     handle, hw_params, SND_PCM_FORMAT_S32)) < 0) {
-			jack_error("Couldn't open %s for 32bit samples "
-				   "trying 16bit instead", device_name);
-			if ((err = snd_pcm_hw_params_set_format (
-				     handle, hw_params, SND_PCM_FORMAT_S16))
-			    < 0) {
+	format = sample_width == 4 ? 0 : NOFORMATS - 1;
+	while (1) {
+		if ((err = snd_pcm_hw_params_set_format (handle, hw_params, formats[format].format)) < 0) {
+			int failed_format = format; 
+			if (sample_width == 4 ? format++ < NOFORMATS - 1 : format-- > 0) {
+				jack_error ("Couldn't open %s for %s samples"
+					    " trying %s instead", device_name, formats[failed_format].Name, formats[format].Name);
+			} else {
 				jack_error ("Sorry. The audio interface \"%s\""
-					    "doesn't support either of the two"
-					    " hardware sample formats that "
-					    "JACK can use.",
+					    " doesn't support any of the"
+					    " hardware sample formats that"
+					    " JACK's alsa-driver can use.",
 					    device_name);
 				return -1;
 			}
-		}
-
-	} else {
-
-		if ((err = snd_pcm_hw_params_set_format (
-			     handle, hw_params, SND_PCM_FORMAT_S16)) < 0) {
-			jack_error("Couldn't open %s for 16bit samples trying"
-				   " 32bit instead",device_name);
-			if ((err = snd_pcm_hw_params_set_format (
-				     handle, hw_params, SND_PCM_FORMAT_S32))
-			    < 0) {
-				jack_error ("Sorry. The audio interface \"%s\""
-					    "doesn't support either of the two"
-					    " hardware sample formats that "
-					    "JACK can use.",
-					    device_name);
-				return -1;
-			}
-		}
-	}
+		} else
+			break;
+	} 
 
 	if ((err = snd_pcm_hw_params_set_rate_near (handle, hw_params,
 						    driver->frame_rate, 0))
@@ -674,6 +696,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	if (driver->playback_handle) {
 		switch (driver->playback_sample_format) {
 		case SND_PCM_FORMAT_S32_LE:
+		case SND_PCM_FORMAT_S24_3:
 		case SND_PCM_FORMAT_S16_LE:
 		case SND_PCM_FORMAT_S32_BE:
 		case SND_PCM_FORMAT_S16_BE:
@@ -689,6 +712,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	if (driver->capture_handle) {
 		switch (driver->capture_sample_format) {
 		case SND_PCM_FORMAT_S32_LE:
+		case SND_PCM_FORMAT_S24_3:
 		case SND_PCM_FORMAT_S16_LE:
 		case SND_PCM_FORMAT_S32_BE:
 		case SND_PCM_FORMAT_S16_BE:

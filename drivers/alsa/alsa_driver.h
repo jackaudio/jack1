@@ -25,6 +25,14 @@
 #define ALSA_PCM_OLD_SW_PARAMS_API
 #include <alsa/asoundlib.h>
 
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	#define	SND_PCM_FORMAT_S24_3 SND_PCM_FORMAT_S24_3LE
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	#define	SND_PCM_FORMAT_S24_3 SND_PCM_FORMAT_S24_3BE
+#endif
+
+
+
 #include <jack/types.h>
 #include <jack/hardware.h>
 #include <jack/driver.h>

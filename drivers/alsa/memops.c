@@ -181,6 +181,163 @@ void sample_move_dither_shaped_d32u24_sS (char *dst,  jack_default_audio_sample_
 	state->idx = idx;
 }
 
+void sample_move_d24u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
+
+{
+        long long y;
+
+	while (nsamples--) {
+		y = (long long)(*src * SAMPLE_MAX_24BIT);
+
+		if (y > (INT_MAX >> 8 )) {
+			y = (INT_MAX >> 8);
+		} else if (y < (INT_MIN >> 8 )) {
+			y = (INT_MIN >> 8 );
+		}
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+		memcpy (dst, &y, 3);
+#elif __BYTE_ORDER == __BIG_ENDIAN
+		memcpy (dst, (char *)&y + 5, 3);
+#endif
+		dst += dst_skip;
+		src++;
+	}
+}	
+
+void sample_move_dS_s24u24 (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip)
+{
+	/* ALERT: signed sign-extension portability !!! */
+
+	while (nsamples--) {
+		int x;
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+		memcpy((char*)&x + 1, src, 3);
+#elif __BYTE_ORDER == __BIG_ENDIAN
+		memcpy(&x, src, 3);
+#endif
+		x >>= 8;
+		*dst = x / SAMPLE_MAX_24BIT;
+		dst++;
+		src += src_skip;
+	}
+}	
+
+void sample_move_dither_rect_d24u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
+
+{
+	/* ALERT: signed sign-extension portability !!! */
+	jack_default_audio_sample_t  x;
+	long long y;
+
+	while (nsamples--) {
+		x = *src * SAMPLE_MAX_16BIT;
+		x -= (float)fast_rand() / (float)INT_MAX;
+		y = (long long)f_round(x);
+
+		y <<= 8;
+
+		if (y > (INT_MAX >> 8)) {
+			y = (INT_MAX >> 8);
+		} else if (y < (INT_MIN >> 8)) {
+			y = (INT_MIN >> 8);
+		}
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+		memcpy (dst, &y, 3);
+#elif __BYTE_ORDER == __BIG_ENDIAN
+		memcpy (dst, (char *)&y + 5, 3);
+#endif
+
+		dst += dst_skip;
+		src++;
+	}
+}	
+
+void sample_move_dither_tri_d24u24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
+	
+{
+	jack_default_audio_sample_t  x;
+	float     r;
+	float     rm1 = state->rm1;
+	long long y;
+
+	while (nsamples--) {
+		x = *src * (float)SAMPLE_MAX_16BIT;
+		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
+		x += r - rm1;
+		rm1 = r;
+		y = (long long)f_round(x);
+
+		y <<= 8;
+
+		if (y > (INT_MAX >> 8)) {
+			y = (INT_MAX >> 8);
+		} else if (y < (INT_MIN >> 8)) {
+			y = (INT_MIN >> 8);
+		}
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+		memcpy (dst, &y, 3);
+#elif __BYTE_ORDER == __BIG_ENDIAN
+		memcpy (dst, (char *)&y + 5, 3);
+#endif
+
+		dst += dst_skip;
+		src++;
+	}
+	state->rm1 = rm1;
+}
+
+void sample_move_dither_shaped_d24u24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
+	
+{
+	jack_default_audio_sample_t     x;
+	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
+	jack_default_audio_sample_t     xp; /* x' */
+	float        r;
+	float        rm1 = state->rm1;
+	unsigned int idx = state->idx;
+	long long    y;
+
+	while (nsamples--) {
+		x = *src * (float)SAMPLE_MAX_16BIT;
+		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
+		/* Filter the error with Lipshitz's minimally audible FIR:
+		   [2.033 -2.165 1.959 -1.590 0.6149] */
+		xe = x
+		     - state->e[idx] * 2.033f
+		     + state->e[(idx - 1) & DITHER_BUF_MASK] * 2.165f
+		     - state->e[(idx - 2) & DITHER_BUF_MASK] * 1.959f
+		     + state->e[(idx - 3) & DITHER_BUF_MASK] * 1.590f
+		     - state->e[(idx - 4) & DITHER_BUF_MASK] * 0.6149f;
+		xp = xe + r - rm1;
+		rm1 = r;
+
+		/* This could be some inline asm on x86 */
+		y = (long long)f_round(xp);
+
+		/* Intrinsic z^-1 delay */
+		idx = (idx + 1) & DITHER_BUF_MASK;
+		state->e[idx] = y - xe;
+
+		y <<= 8;
+
+		if (y > (INT_MAX >> 8)) {
+			y = (INT_MAX >> 8);
+		} else if (y < (INT_MIN >> 8)) {
+			y = (INT_MIN >> 8);
+		}
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+		memcpy (dst, &y, 3);
+#elif __BYTE_ORDER == __BIG_ENDIAN
+		memcpy (dst, (char *)&y + 5, 3);
+#endif
+
+		dst += dst_skip;
+		src++;
+	}
+	state->rm1 = rm1;
+	state->idx = idx;
+}
+
 void sample_move_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 	
 {
@@ -368,6 +525,13 @@ void memset_interleave (char *dst, char val, unsigned long bytes,
 			bytes -= 4;
 		}
 		break;
+	default:
+		while (bytes) {
+			memset(dst, val, unit_bytes);
+			dst += skip_bytes;
+			bytes -= unit_bytes;
+		}
+		break;
 	}
 }
 
@@ -435,6 +599,19 @@ merge_memcpy_interleave_d32_s32 (char *dst, char *src, unsigned long src_bytes,
 }
 
 void 
+merge_memcpy_interleave_d24_s24 (char *dst, char *src, unsigned long src_bytes,
+				 unsigned long dst_skip_bytes, unsigned long src_skip_bytes)
+{
+	while (src_bytes) {
+		int acc = (*(int *)dst & 0xFFFFFF) + (*(int *)src & 0xFFFFFF);
+		memcpy(dst, &acc, 3);
+		dst += dst_skip_bytes;
+		src += src_skip_bytes;
+		src_bytes -= 3;
+	}
+}
+
+void 
 memcpy_interleave_d16_s16 (char *dst, char *src, unsigned long src_bytes,
 			   unsigned long dst_skip_bytes, unsigned long src_skip_bytes)
 {
@@ -443,6 +620,19 @@ memcpy_interleave_d16_s16 (char *dst, char *src, unsigned long src_bytes,
 		dst += dst_skip_bytes;
 		src += src_skip_bytes;
 		src_bytes -= 2;
+	}
+}
+
+void 
+memcpy_interleave_d24_s24 (char *dst, char *src, unsigned long src_bytes,
+			   unsigned long dst_skip_bytes, unsigned long src_skip_bytes)
+
+{
+	while (src_bytes) {
+		memcpy(dst, src, 3);
+		dst += dst_skip_bytes;
+		src += src_skip_bytes;
+		src_bytes -= 3;
 	}
 }
 
