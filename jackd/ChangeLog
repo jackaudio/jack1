@@ -1,3 +1,7 @@
+2003-03-05  Taybin Rutkin  <taybin>
+
+	* jackd.c: added version flag.  -V and --version are accepted.
+
 2003-02-21  Paul Davis  <paul>
 
 	* jackd.c: modified signal catching design to actually follow

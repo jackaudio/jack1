@@ -1,4 +1,4 @@
-MAINTAINERCLEANFILES = Makefile.in jack_md5.h
+MAINTAINERCLEANFILES = Makefile.in jackd.1 jack_md5.h 
 
 if USE_CAPABILITIES
 CAP_PROGS = jackstart
@@ -38,6 +38,9 @@ endif
 
 jackstart_SOURCES = jackstart.c md5.c
 jackstart_LDFLAGS = -lcap
+
+man_MANS = jackd.1 jackstart.1
+EXTRA_DIST = $(man_MANS)
 
 dist-hook:
 	rm -f $(distdir)/jack_md5.h

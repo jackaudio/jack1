@@ -273,6 +273,7 @@ static void usage (FILE *file)
 		 "             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
 		 "             [ --verbose OR -v ]\n"
 		 "             [ --tmpdir OR -D directory-for-temporary-files ]\n"
+		 "             [ --version OR -V ]\n"
 		 "         -d driver [ ... driver args ... ]\n");
 }	
 
@@ -280,7 +281,7 @@ int
 main (int argc, char *argv[])
 
 {
-	const char *options = "-ad:D:P:vhRFl:";
+	const char *options = "-ad:D:P:vhVRFl:";
 	struct option long_options[] = 
 	{ 
 		{ "asio", 0, 0, 'a' },
@@ -291,6 +292,7 @@ main (int argc, char *argv[])
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
 		{ "spoon", 0, 0, 'F' },
+		{ "version", 0, 0, 'V' },
 		{ 0, 0, 0, 0 }
 	};
 	int option_index;
@@ -299,6 +301,7 @@ main (int argc, char *argv[])
 	char *driver_name = 0;
 	char **driver_args = 0;
 	int driver_nargs = 1;
+	int show_version = 0;
 	int i;
 #ifdef USE_CAPABILITIES
 	int status;
@@ -356,6 +359,10 @@ main (int argc, char *argv[])
 			realtime = 1;
 			break;
 
+		case 'V':
+			show_version = 1;
+			break;
+
 		default:
 			fprintf (stderr, "unknown option character %c\n", optopt);
 			/*fallthru*/
@@ -363,6 +370,11 @@ main (int argc, char *argv[])
 			usage (stdout);
 			return -1;
 		}
+	}
+
+	if (show_version) {
+		printf ( "jackd version " VERSION "\n");
+		return -1;
 	}
 
 	if (!seen_driver) {
