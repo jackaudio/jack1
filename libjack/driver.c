@@ -31,10 +31,18 @@
 
 static int dummy_attach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
 static int dummy_detach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
-static jack_nframes_t dummy_wait (jack_driver_t *drv, int fd, int *status, float *delayed_usecs) { *status = 0; *delayed_usecs = 0; return 0; }
-static int dummy_write (jack_driver_t *drv, jack_nframes_t nframes) { return 0; }
+static jack_nframes_t dummy_wait (jack_driver_t *drv, int fd,
+				  int *status, float *delayed_usecs)
+{
+	*status = 0;
+	*delayed_usecs = 0;
+	return 0;
+}
+static int dummy_write (jack_driver_t *drv,
+			jack_nframes_t nframes) { return 0; }
 static int dummy_read (jack_driver_t *drv, jack_nframes_t nframes) { return 0; }
-static int dummy_null_cycle (jack_driver_t *drv, jack_nframes_t nframes) { return 0; }
+static int dummy_null_cycle (jack_driver_t *drv,
+			     jack_nframes_t nframes) { return 0; }
 static int dummy_stop (jack_driver_t *drv) { return 0; }
 static int dummy_start (jack_driver_t *drv) { return 0; }
 
@@ -52,4 +60,3 @@ jack_driver_init (jack_driver_t *driver)
 	driver->start = dummy_start;
 	driver->stop = dummy_stop;
 }
-
