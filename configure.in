@@ -5,7 +5,7 @@ AC_CONFIG_AUX_DIR(.)
 
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=24
-JACK_MICRO_VERSION=1
+JACK_MICRO_VERSION=2
 
 BETA=
 
@@ -81,10 +81,10 @@ if test $HAVE_SNDFILE = "false"; then
 fi
 
 # you need doxygen to make dist.
-AC_CHECK_PROG(DOXYGEN, doxygen,
-              [HAVE_DOXYGEN=true],
-              [HAVE_DOXYGEN=false; AC_MSG_WARN([*** doxygen not found, docs will not be built])]
-)
+AC_CHECK_PROG(HAVE_DOXYGEN, doxygen, true, false)
+if test $HAVE_SNDFILE = "false"; then
+             AC_MSG_WARN([*** doxygen not found, docs will not be built])
+fi
 
 AM_CONDITIONAL(HAVE_FLTK, $HAVE_FLTK)
 AM_CONDITIONAL(HAVE_SNDFILE, $HAVE_SNDFILE)

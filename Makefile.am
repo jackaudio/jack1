@@ -7,7 +7,7 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure config.h.in \
 if HAVE_DOXYGEN
 SUBDIRS = . jack doc
 else
-SUBDIRS = . jack doc
+SUBDIRS = . jack
 endif
 
 DIST_SUBDIRS = jack doc
