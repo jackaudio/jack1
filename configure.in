@@ -14,7 +14,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=70
-JACK_MICRO_VERSION=1
+JACK_MICRO_VERSION=2
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -87,22 +87,27 @@ dnl look for system support for POSIX shm API
 dnl XXX this could probably be improved
 dnl
 
-AC_ARG_ENABLE(sysv-shm, [  --enable-sysv-shm       use System V shm API even if POSIX API is supported ])
+AC_ARG_ENABLE(sysv-shm, [  --enable-sysv-shm       use System V shm API even if POSIX API is supported ],
+			TRY_POSIX_SHM=no , TRY_POSIX_SHM=yes ) 
 
-AC_MSG_CHECKING([POSIX shm support (compile time)])
-df | grep -s /dev/shm >/dev/null 2>&1
-if test $? = 0 ; then
-   if test "x$enable-sysv-shm" = "xno" ; then
-        SHM_FLAGS=-DUSE_POSIX_SHM
-        AC_MSG_RESULT([found.
-	     JACK will use shm_open() and friends.])
-   else 
-        AC_MSG_RESULT([found.
-	     But JACK will use shmget() and friends because you asked for it.])
-   fi
+
+if test "x$TRY_POSIX_SHM" = "xyes"
+then
+
+	AC_MSG_CHECKING([POSIX shm support (compile time) ])
+	df | grep -s /dev/shm >/dev/null 2>&1
+	if test $? = 0 ; then
+        	SHM_FLAGS=-DUSE_POSIX_SHM
+        	AC_MSG_RESULT([found.
+	   			JACK will use shm_open() and friends.])
+
+	else
+   		AC_MSG_RESULT([not found. 
+			JACK will use System V shm API (shmget() and friends])
+	fi
 else
-   AC_MSG_RESULT([not found. 
-	JACK will use System V shm API (shmget() and friends])
+	echo  '   JACK will use System V shm API (shmget() and friends)'
+
 fi
 
 JACK_CORE_CFLAGS="-I\$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall $SHM_FLAGS"

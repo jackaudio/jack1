@@ -79,7 +79,7 @@ do_nothing_handler (int sig)
 	   after another signal.
 	*/
 
-	char buf[32];
+	char buf[64];
 	snprintf (buf, sizeof(buf), "received signal %d during shutdown (ignored)\n", sig);
 	write (1, buf, strlen (buf));
 }
