@@ -1,13 +1,10 @@
 /*
  *  intime.c -- JACK internal timebase master example client.
  *
- *  This demonstrates how to write an internal timebase master client.
- *  It fills in extended timecode fields using the trivial assumption
- *  that we are running at nominal speed, hence there is no drift.
- *
- *  To run, first start `jackd', then `jack_load intime intime'.
- *
- *  Copyright (C) 2003 Jack O'Quin.
+ *  To run: first start `jackd', then `jack_load intime intime 6/8,180bpm'.
+ */
+
+/*  Copyright (C) 2003 Jack O'Quin.
  *  
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,19 +22,93 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <jack/jack.h>
 
+/* Time and tempo variables, global to the entire transport timeline.
+ * There is no attempt to keep a true tempo map.  The default time
+ * signature is "march time": 4/4, 120bpm
+ */
+float time_beats_per_bar = 4.0;
+float time_beat_type = 1.0 / 4.0;
+double time_ticks_per_beat = 1920.0;
+double time_beats_per_minute = 120.0;
 
-/* timebase callback
+/* BBT timebase callback.
+ *
+ * Runs in the process thread.  Realtime, must not wait.
+ */
+void 
+timebbt (jack_transport_state_t state, jack_nframes_t nframes, 
+	 jack_position_t *pos, int new_pos, void *arg)
+{
+	double min;			/* minutes since frame 0 */
+	long abs_tick;			/* ticks since frame 0 */
+	long abs_beat;			/* beats since frame 0 */
+
+	if (new_pos) {
+
+		pos->valid = JackPositionBBT;
+		pos->beats_per_bar = time_beats_per_bar;
+		pos->beat_type = time_beat_type;
+		pos->ticks_per_beat = time_ticks_per_beat;
+		pos->beats_per_minute = time_beats_per_minute;
+
+		/* Compute BBT info from frame number.  This is
+		 * relatively simple here, but would become complex if
+		 * we supported tempo or time signature changes at
+		 * specific locations in the transport timeline.  I
+		 * make no claims for the numerical accuracy or
+		 * efficiency of these calculations. */
+
+		min = pos->frame / ((double) pos->frame_rate * 60.0);
+		abs_tick = min * pos->beats_per_minute * pos->ticks_per_beat;
+		abs_beat = abs_tick / pos->ticks_per_beat;
+
+		pos->bar = abs_beat / pos->beats_per_bar;
+		pos->beat = abs_beat - (pos->bar * pos->beats_per_bar) + 1;
+		pos->tick = abs_tick - (abs_beat * pos->ticks_per_beat);
+		pos->bar_start_tick = pos->bar * pos->beats_per_bar *
+			pos->ticks_per_beat;
+		pos->bar++;		/* adjust start to bar 1 */
+
+		/* some debug code... */
+		fprintf(stderr, "\nnew position: %" PRIu32 "\tBBT: %3"
+			PRIi32 "|%" PRIi32 "|%04" PRIi32 "\n",
+			pos->frame, pos->bar, pos->beat, pos->tick);
+
+	} else {
+
+		/* Compute BBT info based on previous period. */
+		pos->tick += (nframes * pos->ticks_per_beat *
+			      pos->beats_per_minute / (pos->frame_rate * 60));
+
+		while (pos->tick >= pos->ticks_per_beat) {
+			pos->tick -= pos->ticks_per_beat;
+			if (++pos->beat > pos->beats_per_bar) {
+				pos->beat = 1;
+				++pos->bar;
+				pos->bar_start_tick += (pos->beats_per_bar *
+							pos->ticks_per_beat);
+			}
+		}
+	}
+}
+
+/* experimental timecode callback
+ *
+ * Fill in extended timecode fields using the trivial assumption that
+ * we are running at nominal speed, hence with no drift.
  *
  * It would probably be faster to compute frame_time without the
- * conditional expression.  But, it demonstrates the invariant:
+ * conditional expression.  But, this demonstrates the invariant:
  * next_time[i] == frame_time[i+1], unless a reposition occurs.
  *
  * Runs in the process thread.  Realtime, must not wait.
  */
-void timebase(jack_transport_state_t state, jack_nframes_t nframes, 
-	      jack_position_t *pos, int new_pos, void *arg)
+void 
+timecode (jack_transport_state_t state, jack_nframes_t nframes, 
+	  jack_position_t *pos, int new_pos, void *arg)
 {
 	/* nominal transport speed */
 	double seconds_per_frame = 1.0 / (double) pos->frame_rate;
@@ -51,9 +122,25 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
 
 /* after internal client loaded */
 int
-jack_initialize (jack_client_t *client, const char *data)
+jack_initialize (jack_client_t *client, const char *arg)
 {
-	if (jack_set_timebase_callback(client, 0, timebase, NULL) != 0) {
+	JackTimebaseCallback callback = timebbt;
+
+	int rc = sscanf(arg, " %f/%f, %lf bpm ", &time_beats_per_bar,
+			&time_beat_type, &time_beats_per_minute);
+
+	if (rc > 0) {
+		fprintf (stderr, "counting %.1f/%.1f at %.2f bpm\n",
+			 time_beats_per_bar, time_beat_type,
+			 time_beats_per_minute);
+		time_beat_type = 1.0 / time_beat_type;
+	} else {
+		int len = strlen(arg);
+		if ((len > 0) && (strncmp(arg, "timecode", len) == 0))
+			callback = timecode;
+	}
+
+	if (jack_set_timebase_callback(client, 0, callback, NULL) != 0) {
 		fprintf (stderr, "Unable to take over timebase.\n");
 		return 1;
 	}

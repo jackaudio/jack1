@@ -17,15 +17,16 @@ TO BE DECIDED (owner)
 
 TODO for 1.0 (owner)
 
-- resolve helper thread design question?
 - API to change buffer size (joq)
 
 TODO post-1.0
+
 - jack session handling (taybin)
 - TBD
 
 TODO general (owner)
 
+- better scheme for handling machine and system dependencies (joq)
 - don't build static libraries of drivers and ip-clients (kaiv)
 - add explanation of protocol versioning to README.developers (kaiv)
 - proper handling of client return values in libjack (kaiv)
@@ -62,5 +63,6 @@ CLOSED (date,who,comment)
 - finalize discussion on transport API, and implement (2003/08/04, joq)
 - whether to hide the transport.h structs from clients (2003/08/04, joq)
 - define transport info struct contents (2003/08/13, joq)
+- resolve helper thread design question? (2003/08/31, joq)
 
 -----------------------------------------------------------------------
