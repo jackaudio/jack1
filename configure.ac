@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=99
-JACK_MICRO_VERSION=49
+JACK_MICRO_VERSION=50
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -485,8 +485,8 @@ AC_ARG_ENABLE(alsa, [  --disable-alsa          ignore ALSA driver ],
 HAVE_ALSA="false"
 if test "x$TRY_ALSA" = "xyes"
 then
-	# check for ALSA >= 0.9
-	AC_CHECK_LIB(asound,snd_pcm_drop,
+	# check for ALSA >= 1.0.0
+	PKG_CHECK_MODULES(alsa, alsa >= 1.0.0,
 	     [HAVE_ALSA="true"
               ALSA_LIBS=-lasound
               JACK_DEFAULT_DRIVER=\"alsa\"
