@@ -221,10 +221,10 @@ nframes_t jack_get_buffer_size (jack_client_t *);
                       zero, no selection based on flags will be carried out.
 */
 
-jack_port_t **jack_get_ports (jack_client_t *,
-                              const char *port_name_pattern,
-                              const char *type_name_pattern,
-                              unsigned long flags);
+char * const * jack_get_ports (jack_client_t *,
+			       const char *port_name_pattern,
+			       const char *type_name_pattern,
+			       unsigned long flags);
 
 /* If a client is told to become the timebase for the entire system,
    it calls this function. If it returns zero, then the client has

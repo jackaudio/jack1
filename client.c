@@ -29,7 +29,7 @@
 #include <sys/poll.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <asm/msr.h>
+#include <regex.h>
 
 #include <jack/jack.h>
 #include <jack/internal.h>
@@ -1290,4 +1290,68 @@ jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg)
 {
 	client->on_shutdown = function;
 	client->on_shutdown_arg = arg;
+}
+
+char * const *
+jack_get_ports (jack_client_t *client,
+		const char *port_name_pattern,
+		const char *type_name_pattern,
+		unsigned long flags)
+{
+	jack_control_t *engine;
+	char **matching_ports;
+	unsigned long match_cnt;
+	jack_port_shared_t *psp;
+	unsigned long i;
+	regex_t port_regex;
+	regex_t type_regex;
+	int matching;
+
+	engine = client->engine;
+
+	if (port_name_pattern) {
+		regcomp (&port_regex, port_name_pattern, REG_EXTENDED|REG_NOSUB);
+	}
+	if (type_name_pattern) {
+		regcomp (&type_regex, type_name_pattern, REG_EXTENDED|REG_NOSUB);
+	}
+
+	psp = engine->ports;
+	match_cnt = 0;
+
+	matching_ports = (char **) malloc (sizeof (char *) * engine->port_max);
+
+	for (i = 0; i < engine->port_max; i++) {
+		matching = 1;
+
+		if (!psp[i].in_use) {
+			continue;
+		}
+
+		if (flags) {
+			if ((psp[i].flags & flags) != flags) {
+				matching = 0;
+			}
+		}
+
+		if (matching && port_name_pattern) {
+			if (regexec (&port_regex, psp[i].name, 0, NULL, 0)) {
+				matching = 0;
+			}
+		} 
+
+		if (matching && type_name_pattern) {
+			if (regexec (&type_regex, psp[i].type_info.type_name, 0, NULL, 0)) {
+				matching = 0;
+			}
+		} 
+		
+		if (matching) {
+			matching_ports[match_cnt++] = psp[i].name;
+		}
+	}
+
+	matching_ports[match_cnt] = 0;
+
+	return matching_ports;
 }
