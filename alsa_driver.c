@@ -691,7 +691,6 @@ alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn, ClockSy
 }
 
 static int under_gdb = FALSE;
-static unsigned long long last_time;
 
 static int
 alsa_driver_wait (alsa_driver_t *driver)
@@ -1029,6 +1028,10 @@ alsa_driver_detach (alsa_driver_t *driver, jack_engine_t *engine)
 
 {
 	GSList *node;
+
+	if (driver->engine == 0) {
+		return;
+	}
 
 	for (node = driver->capture_ports; node; node = g_slist_next (node)) {
 		jack_port_unregister (driver->client, ((jack_port_t *) node->data));

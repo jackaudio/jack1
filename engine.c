@@ -1982,13 +1982,15 @@ int
 jack_use_driver (jack_engine_t *engine, jack_driver_t *driver)
 
 {
-	if (driver) {
-		driver->detach (driver, engine);
+	if (engine->driver) {
+		engine->driver->detach (engine->driver, engine);
 		engine->driver = 0;
 	}
 
-	if (driver->attach (driver, engine)) {
-		return -1;
+	if (driver) {
+		if (driver->attach (driver, engine)) {
+			return -1;
+		}
 	}
 
 	engine->driver = driver;
