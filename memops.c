@@ -27,7 +27,7 @@
 
 #include <jack/memops.h>
 
-#define SAMPLE_MAX_24BIT  8388608.0f
+#define SAMPLE_MAX_24BIT  8388607.0f
 #define SAMPLE_MAX_16BIT  32767.0f
 
 /* Round float to int (can't go in memops.h otherwise it gets multiply
