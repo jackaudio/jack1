@@ -23,11 +23,17 @@
 
 #include <config.h>
 
-/* I don't know why this is needed, and I wish it were not.  Without
- * it, we get compile errors for things like pthread_barrier_t. */
-#define _XOPEN_SOURCE 600
+#ifdef USE_BARRIER
+/*
+ * POSIX conformance level should be globally defined somewhere, possibly
+ * in config.h? Otherwise it's pre 1993/09 level, which leaves out significant
+ * parts of threading and realtime stuff. Note: most of the parts are still
+ * defined as optional by the standard, so OS conformance to this level
+ * doesn't necessarily mean everything exists.
+ */
+#define _POSIX_C_SOURCE 200112L
+#endif
 #include <unistd.h>
-#undef  _XOPEN_SOURCE
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
