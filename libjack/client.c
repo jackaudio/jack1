@@ -90,7 +90,7 @@ jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot)
 		return MAP_FAILED;
 	}
 
-	if (perm & O_TRUNC) {
+	if (perm & O_CREAT) {
 		if (ftruncate (shm_fd, size) < 0) {
 			jack_error ("cannot set size of engine shm registry (%s)", strerror (errno));
 			return MAP_FAILED;

@@ -330,15 +330,16 @@ int jack_port_lock (jack_client_t *, jack_port_t *);
  */
 int jack_port_unlock (jack_client_t *, jack_port_t *);
 
-/**
- * Returns the time (in frames) between data being available
- * or delivered at/to a port, and the time at which it
- * arrived at or is delivered to the "other side" of the port.
- * E.g. for a physical audio output port, this is the time between
- * writing to the port and when the audio will be audible.
- * For a physical audio input port, this is the time between the sound
- * being audible and the corresponding frames being readable from the
- * port.  
+/** 
+ * Returns the time (in frames) between data being
+ * available or delivered at/to a port, and the time at
+ * which it arrived at or is delivered to the "other side"
+ * of the port.  E.g. for a physical audio output port, this
+ * is the time between writing to the port and when the
+ * signal will leave the connector.  For a physical audio
+ * input port, this is the time between the sound arriving
+ * at the connector and the corresponding frames being
+ * readable from the port.  
  */
 jack_nframes_t jack_port_get_latency (jack_port_t *port);
 

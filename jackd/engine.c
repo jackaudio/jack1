@@ -348,7 +348,7 @@ jack_resize_shm (const char *shm_name, size_t size, int perm, int mode, int prot
 	
 	munmap (jack_shm_registry[i].address, statbuf.st_size);
 
-	if (perm & O_TRUNC) {
+	if (perm & O_CREAT) {
 		if (ftruncate (shm_fd, size) < 0) {
 			jack_error ("cannot set size of engine shm registry (%s)", strerror (errno));
 			return MAP_FAILED;
@@ -413,7 +413,7 @@ jack_resize_port_segment (jack_engine_t *engine, jack_port_type_info_t *port_typ
 
 	if (port_type->shm_info.size == 0) {
 
-		snprintf (port_type->shm_info.shm_name, sizeof(port_type->shm_info.shm_name), "/jack-ports-[%s]", port_type->type_name);
+		snprintf (port_type->shm_info.shm_name, sizeof(port_type->shm_info.shm_name), "/jack-[%s]", port_type->type_name);
 
 		if ((addr = jack_get_shm (port_type->shm_info.shm_name, size, 
 					  (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
@@ -520,16 +520,162 @@ jack_engine_process_unlock (jack_engine_t *engine)
 	pthread_mutex_unlock (&engine->client_lock);
 }
 
+static JSList * 
+jack_process_internal(jack_engine_t *engine, JSList *node, jack_nframes_t nframes)
+{
+	jack_client_internal_t *client;
+	jack_client_control_t *ctl;
+	
+	client = (jack_client_internal_t *) node->data;
+	ctl = client->control;
+	
+	/* internal client ("plugin") */
+
+       if (ctl->process) {
+
+	       DEBUG ("calling process() on an internal client");
+
+	       ctl->state = Running;
+
+	       /* XXX how to time out an internal client? */
+
+	       engine->current_client = client;
+
+	       if (ctl->process (nframes, ctl->process_arg) == 0) {
+		       ctl->state = Finished;
+	       } else {
+		       jack_error ("internal client %s failed", client->control->name);
+		       engine->process_errors++;
+		       return NULL; /* will stop the loop */
+	       }
+
+       } else {
+	       DEBUG ("internal client has no process() function");
+
+	       ctl->state = Finished;
+       }
+
+       return jack_slist_next (node);
+}
+
+static JSList * 
+jack_process_external(jack_engine_t *engine, JSList *node)
+{
+	int status;
+	char c;
+	float delayed_usecs;
+	jack_client_internal_t *client;
+	jack_client_control_t *ctl;
+	jack_time_t now, then;
+	
+	client = (jack_client_internal_t *) node->data;
+	
+	ctl = client->control;
+
+	/* external subgraph */
+
+	ctl->state = Triggered; // a race exists if we do this after the write(2) 
+	ctl->signalled_at = jack_get_microseconds();
+	ctl->awake_at = 0;
+	ctl->finished_at = 0;
+
+	engine->current_client = client;
+
+	DEBUG ("calling process() on an external subgraph, fd==%d", client->subgraph_start_fd);
+
+	if (write (client->subgraph_start_fd, &c, sizeof (c)) != sizeof (c)) {
+		jack_error ("cannot initiate graph processing (%s)", strerror (errno));
+		engine->process_errors++;
+		return NULL; /* will stop the loop */
+	} 
+
+	then = jack_get_microseconds ();
+
+	if (engine->asio_mode) {
+		engine->driver->wait (engine->driver, client->subgraph_wait_fd, &status, &delayed_usecs);
+	} else {
+		struct pollfd pfd[1];
+		int poll_timeout = (engine->control->real_time == 0 ? JACKD_SOFT_MODE_TIMEOUT : engine->driver->period_usecs/1000);
+
+		pfd[0].fd = client->subgraph_wait_fd;
+		pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
+
+		DEBUG ("waiting on fd==%d for process() subgraph to finish", client->subgraph_wait_fd);
+
+		if (poll (pfd, 1, poll_timeout) < 0) {
+			jack_error ("poll on subgraph processing failed (%s)", strerror (errno));
+			status = -1; 
+		}
+
+		if (pfd[0].revents & ~POLLIN) {
+			jack_error ("subgraph starting at %s lost client", client->control->name);
+			status = -2; 
+		}
+
+		if (pfd[0].revents & POLLIN) {
+			status = 0;
+		} else {
+			jack_error ("subgraph starting at %s timed out (subgraph_wait_fd=%d, status = %d, state = %s)", 
+				    client->control->name, client->subgraph_wait_fd, status, 
+				    client_state_names[client->control->state]);
+			status = 1;
+		}
+	}
+
+	now = jack_get_microseconds ();
+
+	if (status != 0) {
+		if (engine->verbose) {
+			fprintf (stderr, "at %Lu client waiting on %d took %Lu usecs, status = %d sig = %Lu awa = %Lu fin = %Lu dur=%Lu\n",
+				now,
+				client->subgraph_wait_fd,
+				now - then,
+				status,
+				ctl->signalled_at,
+				ctl->awake_at,
+				ctl->finished_at,
+				ctl->finished_at - ctl->signalled_at);
+		}
+
+		/* we can only consider the timeout a client error if it actually woke up.
+		   its possible that the kernel scheduler screwed us up and 
+		   never woke up the client in time. sigh.
+		*/
+
+		if (ctl->awake_at > 0) {
+			ctl->timed_out++;
+		}
+
+		engine->process_errors++;
+		return NULL; /* will stop the loop */
+	} else {
+		DEBUG ("reading byte from subgraph_wait_fd==%d", client->subgraph_wait_fd);
+
+		if (read (client->subgraph_wait_fd, &c, sizeof(c)) != sizeof (c)) {
+			jack_error ("pp: cannot clean up byte from graph wait fd (%s)", strerror (errno));
+			client->error++;
+			return NULL; /* will stop the loop */
+		}
+	}
+
+	/* Move to next internal client (or end of client list) */
+
+	while (node) {
+		if (jack_client_is_internal (((jack_client_internal_t *) node->data))) {
+			break;
+		}
+		node = jack_slist_next (node);
+	}
+	
+	return node;
+}
+
 static int
 jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 {
 	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
 	JSList *node;
-	int status;
-	char c;
-	float delayed_usecs;
-	unsigned long long now, then;
 
 	engine->process_errors = 0;
 
@@ -537,6 +683,7 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 		ctl = ((jack_client_internal_t *) node->data)->control;
 		ctl->state = NotTriggered;
 		ctl->nframes = nframes;
+		ctl->timed_out = 0;
 	}
 
 	for (node = engine->clients; engine->process_errors == 0 && node; ) {
@@ -547,139 +694,10 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 
 		if (!client->control->active || client->control->dead) {
 			node = jack_slist_next (node);
-			continue;
-		}
-
-		ctl = client->control;
-		ctl->timed_out = 0;
-
-		if (jack_client_is_internal (client)) {
-
-			/* internal client ("plugin") */
-
-			if (ctl->process) {
-
-				DEBUG ("calling process() on an internal client");
-
-				ctl->state = Running;
-
-				/* XXX how to time out an internal client? */
-
-				engine->current_client = client;
-
-				if (ctl->process (nframes, ctl->process_arg) == 0) {
-					ctl->state = Finished;
-				} else {
-					jack_error ("internal client %s failed", client->control->name);
-					engine->process_errors++;
-					break;
-				}
-
-			} else {
-				DEBUG ("internal client has no process() function");
-
-				ctl->state = Finished;
-			}
-
-			node = jack_slist_next (node);
-
+		} else if (jack_client_is_internal (client)) {
+			node = jack_process_internal (engine, node, nframes);
 		} else {
-
-			/* external subgraph */
-
-			ctl->state = Triggered; // a race exists if we do this after the write(2) 
-			ctl->signalled_at = jack_get_microseconds();
-			ctl->awake_at = 0;
-			ctl->finished_at = 0;
-
-			engine->current_client = client;
-
-			DEBUG ("calling process() on an external subgraph, fd==%d", client->subgraph_start_fd);
-
-			if (write (client->subgraph_start_fd, &c, sizeof (c)) != sizeof (c)) {
-				jack_error ("cannot initiate graph processing (%s)", strerror (errno));
-				engine->process_errors++;
-				break;
-			} 
-
-			then = jack_get_microseconds ();
-
-			if (engine->asio_mode) {
-				engine->driver->wait (engine->driver, client->subgraph_wait_fd, &status, &delayed_usecs);
-			} else {
-				struct pollfd pfd[1];
-				int poll_timeout = (engine->control->real_time == 0 ? JACKD_SOFT_MODE_TIMEOUT : engine->driver->period_usecs/1000);
-
-				pfd[0].fd = client->subgraph_wait_fd;
-				pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
-
-				DEBUG ("waiting on fd==%d for process() subgraph to finish", client->subgraph_wait_fd);
-
-				if (poll (pfd, 1, poll_timeout) < 0) {
-					jack_error ("poll on subgraph processing failed (%s)", strerror (errno));
-					status = -1; 
-				}
-
-				if (pfd[0].revents & ~POLLIN) {
-					jack_error ("subgraph starting at %s lost client", client->control->name);
-					status = -2; 
-				}
-
-				if (pfd[0].revents & POLLIN) {
-					status = 0;
-				} else {
-					jack_error ("subgraph starting at %s timed out (subgraph_wait_fd=%d, status = %d, state = %s)", 
-						    client->control->name, client->subgraph_wait_fd, status, 
-						    client_state_names[client->control->state]);
-					status = 1;
-				}
-			}
-
-			now = jack_get_microseconds ();
-
-			if (status != 0) {
-				if (engine->verbose) {
-					fprintf (stderr, "at %Lu client waiting on %d took %Lu usecs, status = %d sig = %Lu awa = %Lu fin = %Lu dur=%Lu\n",
-						now,
-						client->subgraph_wait_fd,
-						now - then,
-						status,
-						ctl->signalled_at,
-						ctl->awake_at,
-						ctl->finished_at,
-						ctl->finished_at - ctl->signalled_at);
-				}
-
-				/* we can only consider the timeout a client error if it actually woke up.
-				   its possible that the kernel scheduler screwed us up and 
-				   never woke up the client in time. sigh.
-				*/
-
-				if (ctl->awake_at > 0) {
-					ctl->timed_out++;
-				}
-
-				engine->process_errors++;
-				break;
-			} else {
-				DEBUG ("reading byte from subgraph_wait_fd==%d", client->subgraph_wait_fd);
-
-				if (read (client->subgraph_wait_fd, &c, sizeof(c)) != sizeof (c)) {
-					jack_error ("pp: cannot clean up byte from graph wait fd (%s)", strerror (errno));
-					client->error++;
-					break;
-				}
-			}
-			
-			/* Move to next internal client (or end of client list) */
-
-			while (node) {
-				if (jack_client_is_internal (((jack_client_internal_t *) node->data))) {
-					break;
-				}
-				node = jack_slist_next (node);
-			}
-
+			node = jack_process_external (engine, node);
 		}
 	}
 
@@ -1952,20 +1970,166 @@ jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
 	time->guard2++;
 }
 
+static void 
+jack_calc_cpu_load(jack_engine_t *engine)
+{
+	jack_time_t cycle_end = jack_get_microseconds ();
+	
+	/* store the execution time for later averaging */
+
+	engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = 
+		cycle_end - engine->control->current_time.usecs;
+
+	if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
+		engine->rolling_client_usecs_index = 0;
+	}
+
+	/* every so often, recompute the current maximum use over the
+	   last JACK_ENGINE_ROLLING_COUNT client iterations.
+	*/
+
+	if (++engine->rolling_client_usecs_cnt % engine->rolling_interval == 0) {
+		float max_usecs = 0.0f;
+		int i;
+
+		for (i = 0; i < JACK_ENGINE_ROLLING_COUNT; i++) {
+			if (engine->rolling_client_usecs[i] > max_usecs) {
+				max_usecs = engine->rolling_client_usecs[i];
+			}
+		}
+
+		if (max_usecs < engine->driver->period_usecs) {
+			engine->spare_usecs = engine->driver->period_usecs - max_usecs;
+		} else {
+			engine->spare_usecs = 0;
+		}
+
+		engine->control->cpu_load = (1.0f - (engine->spare_usecs / engine->driver->period_usecs)) * 50.0f + (engine->control->cpu_load * 0.5f);
+
+		if (engine->verbose) {
+			fprintf (stderr, "load = %.4f max usecs: %.3f, spare = %.3f\n", 
+				 engine->control->cpu_load, max_usecs, engine->spare_usecs);
+		}
+	}
+
+}
+
+static int
+jack_pre_process(jack_engine_t *engine, int* consecutive_excessive_delays, jack_nframes_t* nframes)
+{
+	jack_driver_t *driver = engine->driver;
+	float delayed_usecs;
+	int status;
+
+	if ((*nframes = driver->wait (driver, -1, &status, &delayed_usecs)) == 0) {
+		/* the driver detected an xrun, and restarted */
+		return 1; /* will continue */
+	}
+
+	jack_inc_frame_time (engine, *nframes);
+
+	engine->watchdog_check = 1;
+
+#define WORK_SCALE 1.0f
+
+	if (engine->control->real_time != 0 && engine->spare_usecs && ((WORK_SCALE * engine->spare_usecs) <= delayed_usecs)) {
+
+		fprintf (stderr, "delay of %.3f usecs exceeds estimated spare time of %.3f; restart ...\n",
+			delayed_usecs, WORK_SCALE * engine->spare_usecs);
+
+		if (++(*consecutive_excessive_delays) > 10) {
+			jack_error ("too many consecutive interrupt delays ... engine stopping");
+			return -1; /* will exit the thread loop */
+		}
+
+		if (driver->stop (driver)) {
+			jack_error ("cannot stop current driver");
+			return -1; /* will exit the thread loop */
+		}
+
+		jack_engine_notify_clients_about_delay (engine);
+
+		if (driver->start (driver)) {
+			jack_error ("cannot restart current driver after delay");
+			return -1; /* will exit the thread loop */
+		}
+
+		return 1; /* will continue */
+
+	} else {
+		*consecutive_excessive_delays = 0;
+	}
+
+	if (status != 0) {
+		jack_error ("driver wait function failed, exiting");
+		return -1; /* will exit the thread loop */
+	}
+	
+	return 0;
+}
+
+
 static void *
 jack_main_thread (void *arg)
-
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
 	jack_driver_t *driver = engine->driver;
-	int consecutive_excessive_delays;
-	unsigned long long cycle_end;
 	jack_nframes_t nframes;
+	int consecutive_excessive_delays;
 
+	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+	
+	consecutive_excessive_delays = 0;
+	engine->watchdog_check = 1; /* really needed here ? */
+	nframes = 0; /* really needed here ? */
+
+	while (1) {
+	
+		int res = jack_pre_process(engine, &consecutive_excessive_delays, &nframes);
+		
+		if (res == 1)
+			continue;
+		else if (res == -1)
+			break;
+		
+		/* this will execute the entire jack graph */
+
+		switch (driver->process (driver, nframes)) {
+		
+			case -1:
+				jack_error ("driver process function failed, exiting");
+				pthread_exit (0);
+				break;
+
+			case  1:
+				if (driver->start (driver)) {
+					jack_error ("cannot restart driver");
+					pthread_exit (0);
+				}
+				break;
+
+			default:
+				break;
+		}
+
+		jack_calc_cpu_load(engine);
+	}
+
+	pthread_exit (0);
+}
+
+int
+jack_run (jack_engine_t *engine)
+{
+	if (engine->driver == NULL) {
+		jack_error ("engine driver not set; cannot start");
+		return -1;
+	}
+	
 	if (engine->control->real_time) {
 
 		if (jack_start_watchdog (engine)) {
-			pthread_exit (0);
+			return -1;
 		}
 
 		if (jack_become_real_time (pthread_self(), engine->rtpriority)) {
@@ -1973,7 +2137,6 @@ jack_main_thread (void *arg)
 		}
 	}
 
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 #ifdef HAVE_ON_EXIT
 	on_exit (cancel_cleanup, engine);
 #else
@@ -1985,139 +2148,17 @@ jack_main_thread (void *arg)
 #endif /* HAVE_ATEXIT */
 #endif /* HAVE_ON_EXIT */
 
-	if (driver->start (driver)) {
+	
+	if (engine->driver->start (engine->driver)) {
 		jack_error ("cannot start driver");
-		pthread_exit (0);
-	}
-
-	consecutive_excessive_delays = 0;
-
-	engine->watchdog_check = 1;
-	nframes = 0;
-
-	while (1) {
-		int status;
-		float delayed_usecs;
-
-		if ((nframes = driver->wait (driver, -1, &status, &delayed_usecs)) == 0) {
-			/* the driver detected an xrun, and restarted */
-			continue;
-		}
-
-		jack_inc_frame_time (engine, nframes);
-
-		engine->watchdog_check = 1;
-
-#define WORK_SCALE 1.0f
-
-		if (engine->control->real_time != 0 && engine->spare_usecs && ((WORK_SCALE * engine->spare_usecs) <= delayed_usecs)) {
-			
-			fprintf (stderr, "delay of %.3f usecs exceeds estimated spare time of %.3f; restart ...\n",
-				delayed_usecs, WORK_SCALE * engine->spare_usecs);
-
-			if (++consecutive_excessive_delays > 10) {
-				jack_error ("too many consecutive interrupt delays ... engine stopping");
-				break;
-			}
-
-			if (driver->stop (driver)) {
-				jack_error ("cannot stop current driver");
-				break;
-			}
-			
-			jack_engine_notify_clients_about_delay (engine);
-
-			if (driver->start (driver)) {
-				jack_error ("cannot restart current driver after delay");
-				break;
-			}
-
-			continue;
-
-		} else {
-			consecutive_excessive_delays = 0;
-		}
-
-		if (status != 0) {
-			jack_error ("driver wait function failed, exiting");
-			pthread_exit (0);
-		}
-
-		/* this will execute the entire jack graph */
-
-		switch (driver->process (driver, nframes)) {
-		case -1:
-			jack_error ("driver process function failed, exiting");
-			pthread_exit (0);
-			break;
-
-		case  1:
-			if (driver->start (driver)) {
-				jack_error ("cannot restart driver");
-				pthread_exit (0);
-			}
-			break;
-
-		default:
-			break;
-		}
-
-		cycle_end = jack_get_microseconds ();
-		
-		/* store the execution time for later averaging */
-		
-		engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = 
-			cycle_end - engine->control->current_time.usecs;
-		
-		if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
-			engine->rolling_client_usecs_index = 0;
-		}
-		
-		/* every so often, recompute the current maximum use over the
-		   last JACK_ENGINE_ROLLING_COUNT client iterations.
-		*/
-
-		if (++engine->rolling_client_usecs_cnt % engine->rolling_interval == 0) {
-			float max_usecs = 0.0f;
-			int i;
-			
-			for (i = 0; i < JACK_ENGINE_ROLLING_COUNT; i++) {
-				if (engine->rolling_client_usecs[i] > max_usecs) {
-					max_usecs = engine->rolling_client_usecs[i];
-				}
-			}
-			
-			if (max_usecs < engine->driver->period_usecs) {
-				engine->spare_usecs = engine->driver->period_usecs - max_usecs;
-			} else {
-				engine->spare_usecs = 0;
-			}
-
-			engine->control->cpu_load = (1.0f - (engine->spare_usecs / engine->driver->period_usecs)) * 50.0f + (engine->control->cpu_load * 0.5f);
-
-			if (engine->verbose) {
-				fprintf (stderr, "load = %.4f max usecs: %.3f, spare = %.3f\n", 
-					 engine->control->cpu_load, max_usecs, engine->spare_usecs);
-			}
-		}
-	}
-
-	pthread_exit (0);
-}
-
-int
-jack_run (jack_engine_t *engine)
-
-{
-	if (engine->driver == NULL) {
-		jack_error ("engine driver not set; cannot start");
 		return -1;
 	}
+
 	return pthread_create (&engine->main_thread, 0, jack_main_thread, engine);
 }
+
 int
 jack_wait (jack_engine_t *engine)
-
 {
 	void *ret = 0;
 	int err;
@@ -2142,7 +2183,6 @@ jack_wait (jack_engine_t *engine)
 
 int 
 jack_engine_delete (jack_engine_t *engine)
-
 {
 	if (engine) {
 		close (engine->control_shm_fd);
@@ -2154,7 +2194,6 @@ jack_engine_delete (jack_engine_t *engine)
 
 static jack_client_internal_t *
 jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_request_t *req)
-
 {
 	jack_client_internal_t *client;
 	shm_name_t shm_name;
