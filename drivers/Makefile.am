@@ -12,6 +12,6 @@ else
 PA_DIR =
 endif
 
-SUBDIRS = dummy $(ALSA_DIR) $(PA_DIR)
+SUBDIRS = dummy iec61883 $(ALSA_DIR) $(PA_DIR)
 
 DIST_SUBDIRS = dummy alsa portaudio

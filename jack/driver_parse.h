@@ -55,7 +55,8 @@ jack_print_driver_options (jack_driver_desc_t * desc, FILE *file)
 			sprintf (arg_default, "%c", desc->params[i].value.c);
 			break;
 		case JackDriverParamString:
-			if (strcmp (desc->params[i].value.str, "") != 0)
+			if (desc->params[i].value.str &&
+			    strcmp (desc->params[i].value.str, "") != 0)
 				sprintf (arg_default, "%s", desc->params[i].value.str);
 			else
 				sprintf (arg_default, "none");

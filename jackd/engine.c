@@ -1188,6 +1188,7 @@ jack_engine_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc
 
 	driver->handle = info->handle;
 	driver->finish = info->finish;
+	driver->internal_client = client;
 	free (info);
 
 	if (jack_use_driver (engine, driver)) {
@@ -2351,7 +2352,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		driver->null_cycle (driver, nframes);
 		return 0;
 	}
-	
+
 	if (!engine->freewheeling) {
 		if (driver->read (driver, nframes)) {
 			goto unlock;

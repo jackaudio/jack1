@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=90
-JACK_MICRO_VERSION=1
+JACK_MICRO_VERSION=2
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -114,7 +114,7 @@ else
 
 fi
 
-JACK_CORE_CFLAGS="-I\$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
+JACK_CORE_CFLAGS="-I\$(top_srcdir) -I\$(top_builddir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
 
 JACK_CFLAGS="$JACK_CORE_CFLAGS -g"
 JACK_OPT_CFLAGS="$JACK_CORE_CFLAGS -O3 -march=$target_cpu -fomit-frame-pointer -ffast-math -fstrength-reduce -funroll-loops -fmove-all-movables"
@@ -237,13 +237,14 @@ AC_SUBST(DEFAULT_TMP_DIR)
 AC_DEFINE_UNQUOTED(DEFAULT_TMP_DIR,"$DEFAULT_TMP_DIR",[Default tmp directory])
 
 
-
+jack_have_driver="no"
 
 # jack depends on alsa 0.9. some example apps depend on libsndfile.
 AC_CHECK_LIB(asound,snd_pcm_drop,
 	     [
                HAVE_ALSA="true"
                ALSA_LIBS=-lasound
+               jack_have_driver="yes"
              ],
              [ 
                HAVE_ALSA="false"
@@ -252,6 +253,8 @@ AC_CHECK_LIB(asound,snd_pcm_drop,
 	     [-lm]
 )
 AC_SUBST(ALSA_LIBS)
+AM_CONDITIONAL(ALSA, test x$HAVE_ALSA = xtrue)
+
 
 AC_ARG_ENABLE(portaudio, [  --disable-portaudio      Ignore PortAudio driver ],
 			TRY_PORTAUDIO=$enableval , TRY_PORTAUDIO=yes ) 
@@ -262,15 +265,54 @@ if test "x$TRY_PORTAUDIO" = "xyes"
 then
 	# check for portaudio V18
 	AC_CHECK_LIB(portaudio, Pa_Initialize,
-	     [HAVE_PA="true" PA_LIBS=-lportaudio], [], [-lm -lpthread]
+	     [HAVE_PA="true"
+              PA_LIBS=-lportaudio
+              jack_have_driver="yes"
+             ], [], [-lm -lpthread]
 	)
 	AC_SUBST(PA_LIBS)
 fi
+AM_CONDITIONAL(PORTAUDIO, test x$HAVE_PA = xtrue)
 
-if test "x$HAVE_ALSA" != "xtrue" && test "x$HAVE_PA" != "xtrue"; then
-	AC_MSG_ERROR(
-	     [*** Neither PortAudio nor ALSA audio available, aborting...])
+jack_enable_iec61883="no"
+AC_ARG_ENABLE(iec61883,
+[  --enable-iec61883       enable the iec61883 driver],[
+  case "$enableval" in
+    "yes")
+      jack_enable_iec61883="yes"
+      ;;
+    "no")
+      ;;
+    *)
+      AC_MSG_ERROR([must use --enable-iec61883(=yes/no) or --disable-iec61883])
+      ;;
+  esac
+])
+
+if test x$jack_enable_iec61883 != xno; then
+  AC_CHECK_LIB(raw1394, raw1394_loop_iterate,
+               [
+                 AC_CHECK_HEADER(libraw1394/raw1394.h,
+                                 [
+                                   HAVE_RAW1394="true"
+                                   RAW1394_LIBS=-lraw1394
+                                   jack_have_driver="yes";
+                                 ],
+                                 HAVE_RAW1394="false"
+                 )
+               ],
+  )
+else
+  HAVE_RAW1394="false"
 fi
+
+AC_SUBST(RAW1394_LIBS)
+AM_CONDITIONAL(IEC61883, test x$HAVE_RAW1394 = xtrue)
+
+if test x$jack_have_driver = xno; then
+  AC_ERROR([No drivers can be built])
+fi
+
 
 HAVE_SNDFILE=false
 PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
@@ -317,6 +359,7 @@ drivers/Makefile
 drivers/alsa/Makefile
 drivers/dummy/Makefile
 drivers/portaudio/Makefile
+drivers/iec61883/Makefile
 example-clients/Makefile
 doc/Makefile
 doc/reference.doxygen

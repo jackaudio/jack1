@@ -104,11 +104,11 @@ typedef struct _jack_driver {
     jack_time_t last_wait_ust;
 
 
-   This is not used by the driver. it should not be written to or
+   These are not used by the driver.  They should not be written to or
    modified in any way
  
     void *handle;
-
+    struct _jack_internal_client *internal_client;
 
    This should perform any cleanup associated with the driver. it will
    be called when jack server process decides to get rid of the
@@ -213,6 +213,7 @@ typedef struct _jack_driver {
     jack_time_t period_usecs; \
     jack_time_t last_wait_ust; \
     void *handle; \
+    struct _jack_client_internal * internal_client; \
     void (*finish)(struct _jack_driver *);\
     JackDriverAttachFunction attach; \
     JackDriverDetachFunction detach; \

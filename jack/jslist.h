@@ -26,6 +26,8 @@
 #ifndef __jack_jslist_h__
 #define __jack_jslist_h__
 
+#include <stdlib.h>
+
 typedef struct _JSList JSList;
 
 typedef int		(*JCompareFunc)		(void*	a,
