@@ -1187,6 +1187,16 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 
 		poll_enter = jack_get_microseconds ();
 
+		if (poll_enter > driver->poll_next) {
+			/*
+			 * This processing cycle was delayed past the
+			 * next due interrupt!  Do not account this as
+			 * a wakeup delay:
+			 */
+			driver->poll_next = 0;
+			driver->poll_late++;
+		}
+
 		if (poll (driver->pfd, nfds, driver->poll_timeout) < 0) {
 
 			if (errno == EINTR) {
@@ -1924,6 +1934,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 	pthread_mutex_init (&driver->clock_sync_lock, 0);
 	driver->clock_sync_listeners = 0;
 
+	driver->poll_late = 0;
 	driver->xrun_count = 0;
 	driver->process_count = 0;
 

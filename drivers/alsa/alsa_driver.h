@@ -135,6 +135,7 @@ typedef struct {
     int running;
     int run;
 
+    int poll_late;
     int xrun_count;
     int process_count;
 
