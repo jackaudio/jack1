@@ -33,8 +33,8 @@
 
 #include "memops.h"
 
-#define SAMPLE_MAX_24BIT  8388607.0f
-#define SAMPLE_MAX_16BIT  32767.0f
+#define SAMPLE_MAX_24BIT  8388608.0f
+#define SAMPLE_MAX_16BIT  32768.0f
 
 #define f_round(f) lrintf(f)
 
@@ -48,10 +48,6 @@ inline unsigned int fast_rand() {
 
 	return seed;
 }
-
-/* XXX we could use rint(), but for now we'll accept whatever default
-   floating-point => int conversion the compiler provides.  
-*/
 
 void sample_move_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 
@@ -120,7 +116,6 @@ void sample_move_dither_tri_d32u24_sS (char *dst,  jack_default_audio_sample_t *
 		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		x += r - rm1;
 		rm1 = r;
-		/* swh: This could be some inline asm on x86 */
 		y = (long long)f_round(x);
 		y <<= 16;
 
@@ -177,7 +172,7 @@ void sample_move_dither_shaped_d32u24_sS (char *dst,  jack_default_audio_sample_
 		} else if (y < INT_MIN) {
 			*((int *) dst) = INT_MIN;
 		} else {
-			*((int *) dst) = (int)y;
+			*((int *) dst) = y;
 		}
 		dst += dst_skip;
 		src++;
@@ -193,10 +188,6 @@ void sample_move_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned 
 
 	/* ALERT: signed sign-extension portability !!! */
 
-	/* XXX good to use x86 assembler here, since float->short
-	   sucks that h/w.
-	*/
-	
 	while (nsamples--) {
 		val = *src;
 		if (val > 1.0f) {
@@ -204,7 +195,7 @@ void sample_move_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned 
 		} else if (val < -1.0f) {
 			*((short *)dst) = SHRT_MIN;
 		} else {
-			*((short *) dst) = (short) (val * SAMPLE_MAX_16BIT);
+			*((short *) dst) = (short) f_round(val * SAMPLE_MAX_16BIT);
 		}
 		dst += dst_skip;
 		src++;
@@ -220,7 +211,6 @@ void sample_move_dither_rect_d16_sS (char *dst,  jack_default_audio_sample_t *sr
 	while (nsamples--) {
 		val = *src * (float)SAMPLE_MAX_16BIT;
 		val -= (float)fast_rand() / (float)INT_MAX;
-		/* swh: This could be some inline asm on x86 */
 		tmp = f_round(val);
 		if (tmp > SHRT_MAX) {
 			*((short *)dst) = SHRT_MAX;
@@ -247,7 +237,6 @@ void sample_move_dither_tri_d16_sS (char *dst,  jack_default_audio_sample_t *src
 		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		x += r - rm1;
 		rm1 = r;
-		/* swh: This could be some inline asm on x86 */
 		y = f_round(x);
 
 		if (y > SHRT_MAX) {
