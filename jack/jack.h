@@ -52,6 +52,8 @@ jack_client_t *jack_client_new_inprocess (const char *client_name, const char *s
 
 /**
  * Disconnects from Jack server.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_client_close (jack_client_t *client);
 
@@ -78,43 +80,53 @@ void jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void 
 /**
  * Tell the Jack server to call 'process_callback' whenever there is work
  * be done, passing 'arg' as the second argument.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_set_process_callback (jack_client_t *, JackProcessCallback process_callback, void *arg);
 
 /**
- * Tell the Jack server to call 'bufsize_callback' whenever the
- * maximum number of frames that could be passed to 'process()'
- * changes. 'arg' will be supplied as a second argument.
+ * <b>Note!</b> This function is deprecated.
  */
 int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback bufsize_callback, void *arg);
 
 /**
  * Tell the Jack server to call 'srate_callback' whenever the sample rate of
  * the system changes.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_set_sample_rate_callback (jack_client_t *, JackSampleRateCallback srate_callback, void *arg);
 
 /**
  * Tell the Jack server to call 'registration_callback' whenever a port is registered
  * or unregistered, passing 'arg' as a second argument.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_set_port_registration_callback (jack_client_t *, JackPortRegistrationCallback registration_callback, void *arg);
 
 /**
  * Tell the Jack server to call 'registration_callback' whenever the processing
  * graph is reordered, passing 'arg' as an argument.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_set_graph_order_callback (jack_client_t *, JackGraphOrderCallback graph_callback, void *);
 
 /**
  * Tell the Jack server to call 'xrun_callback' whenever there is a xrun, passing
  * 'arg' as an argument.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_set_xrun_callback (jack_client_t *, JackXRunCallback xrun_callback, void *arg);
 
 /**
  * Tell the Jack server that the program is ready to start processing
  * audio.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_activate (jack_client_t *client);
 
@@ -123,6 +135,8 @@ int jack_activate (jack_client_t *client);
  * processing graph. As a side effect, this will disconnect any
  * and all ports belonging to the client, since inactive clients
  * are not allowed to be connected to any other ports.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_deactivate (jack_client_t *client);
 
@@ -142,10 +156,10 @@ int jack_deactivate (jack_client_t *client);
  * string, and is passed as the second argument. For types that are
  * not built into the jack API (currently just
  * JACK_DEFAULT_AUDIO_TYPE) the client MUST supply a non-zero size
- * for the buffer as for @buffer_size. For builtin types, 
- * @buffer_size is ignored.
+ * for the buffer as for 'buffer_size' . For builtin types, 
+ * 'buffer_size' is ignored.
  *
- * The @flags argument is formed from a bitmask of JackPortFlags values.
+ * The 'flags' argument is formed from a bitmask of JackPortFlags values.
  */
 jack_port_t *jack_port_register (jack_client_t *,
                                  const char *port_name,
@@ -156,6 +170,8 @@ jack_port_t *jack_port_register (jack_client_t *,
 /** 
  * This removes the port from the client, disconnecting
  * any existing connections at the same time.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_port_unregister (jack_client_t *, jack_port_t *);
 
@@ -186,9 +202,9 @@ int jack_port_is_mine (const jack_client_t *, const jack_port_t *port);
 
 /** 
  * This returns a positive integer indicating the number
- * of connections to or from @port. 
+ * of connections to or from 'port'. 
  *
- * The calling client must own @port.
+ * ®pre The calling client must own 'port'.
  */
 int jack_port_connected (const jack_port_t *port);
 
@@ -196,7 +212,7 @@ int jack_port_connected (const jack_port_t *port);
  * This returns TRUE or FALSE if the port argument is
  * DIRECTLY connected to the port with the name given in 'portname' 
  *
- * The calling client must own @port.
+ * @pre The calling client must own 'port'.
  */
 int jack_port_connected_to (const jack_port_t *port, const char *portname);
 
@@ -208,7 +224,7 @@ int jack_port_connected_to (const jack_port_t *port, const char *portname);
  * The caller is responsible for calling free(3) on any
  * non-NULL returned value.
  *
- * The calling client must own @port.
+ * @pre The calling client must own 'port'.
  *
  * See jack_port_get_all_connections() for an alternative.
  */   
@@ -236,6 +252,8 @@ const char ** jack_port_get_all_connections (const jack_client_t *client, const 
 
 /**
  * This modifies a port's name, and may be called at any time.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_port_set_name (jack_port_t *port, const char *name);
 
@@ -261,9 +279,11 @@ void *jack_port_get_buffer (jack_port_t *, jack_nframes_t);
  * When a connection exists, data written to the source port will
  * be available to be read at the destination port.
  *
- * The types of both ports must be identical to establish a connection.
- * The flags of the source port must include PortIsOutput.
- * The flags of the destination port must include PortIsInput.
+ * @pre The types of both ports must be identical to establish a connection.
+ * @pre The flags of the source port must include PortIsOutput.
+ * @pre The flags of the destination port must include PortIsInput.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_connect (jack_client_t *,
 		  const char *source_port,
@@ -272,9 +292,11 @@ int jack_connect (jack_client_t *,
 /**
  * Removes a connection between two ports.
  *
- * The types of both ports must be identical to establish a connection.
- * The flags of the source port must include PortIsOutput.
- * The flags of the destination port must include PortIsInput.
+ * @pre The types of both ports must be identical to establish a connection.
+ * @pre The flags of the source port must include PortIsOutput.
+ * @pre The flags of the destination port must include PortIsInput.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_disconnect (jack_client_t *,
 		     const char *source_port,
@@ -288,6 +310,8 @@ int jack_disconnect (jack_client_t *,
  * It is envisaged that clients connecting their own ports will use these
  * two, whereas generic connection clients (e.g. patchbays) will use the
  * name-based versions.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_port_connect (jack_client_t *, jack_port_t *src, jack_port_t *dst);
 
@@ -315,6 +339,8 @@ int jack_port_disconnect (jack_client_t *, jack_port_t *);
  * port must be an input port. Both ports must belong to
  * the same client. You cannot use this to tie ports between
  * clients. That is what a connection is for.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int  jack_port_tie (jack_port_t *src, jack_port_t *dst);
 
@@ -322,18 +348,24 @@ int  jack_port_tie (jack_port_t *src, jack_port_t *dst);
  * This undoes the effect of jack_port_tie(). The port
  * should be same as the 'destination' port passed to
  * jack_port_tie().
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int  jack_port_untie (jack_port_t *port);
 
 /**
  * A client may call this function to prevent other objects
- *   from changing the connection status of a port. The port
+ * from changing the connection status of a port. The port
  * must be owned by the calling client.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_port_lock (jack_client_t *, jack_port_t *);
 
 /**
  * This allows other objects to change the connection status of a port.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_port_unlock (jack_client_t *, jack_port_t *);
 
@@ -366,7 +398,6 @@ jack_nframes_t jack_port_get_total_latency (jack_client_t *, jack_port_t *port);
  * to an external digital converter, the latency setting should
  * include both buffering by the audio interface *and* the converter. 
  */
-
 void jack_port_set_latency (jack_port_t *, jack_nframes_t);
 
 /**
@@ -380,6 +411,8 @@ int jack_port_request_monitor (jack_port_t *port, int onoff);
  * If JackPortCanMonitor is set for a port, then these 2 functions will
  * turn on/off input monitoring for the port. If JackPortCanMonitor
  * is not set, then these functions will have no effect.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_port_request_monitor_by_name (jack_client_t *client, const char *port_name, int onoff);
 
@@ -388,6 +421,8 @@ int jack_port_request_monitor_by_name (jack_client_t *client, const char *port_n
  * turn on input monitoring if it was off, and will turn it off it
  * only one request has been made to turn it on.  If JackPortCanMonitor
  * is not set, then this function will do nothing.
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int jack_port_ensure_monitor (jack_port_t *port, int onoff);
 
@@ -426,7 +461,6 @@ jack_nframes_t jack_get_buffer_size (jack_client_t *);
  * the specified arguments.
  * The caller is responsible for calling free(3) any non-NULL returned value.
  */
-
 const char ** jack_get_ports (jack_client_t *, 
 			      const char *port_name_pattern, 
 			      const char *type_name_pattern, 
@@ -439,16 +473,18 @@ const char ** jack_get_ports (jack_client_t *,
 jack_port_t *jack_port_by_name (jack_client_t *, const char *portname);
 
 /**
- * Searchs for and returns the jack_port_t of id @id.
+ * Searchs for and returns the jack_port_t of id 'id'.
  */
 jack_port_t *jack_port_by_id (const jack_client_t *client, jack_port_id_t id);
 
 /**
  * If a client is told (by the user) to become the timebase
- *   for the entire system, it calls this function. If it
+ * for the entire system, it calls this function. If it
  * returns zero, then the client has the responsibility to
  * call jack_set_transport_info()) at the end of its process()
  * callback. 
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
 int  jack_engine_takeover_timebase (jack_client_t *);
 
@@ -499,24 +535,24 @@ void jack_set_server_dir (const char *path);
  * scheme is "alias:<alias>", so if the port alias
  * was "left", and the port name was "foo:out1",
  * then "alias:left" will refer to "foo:out1".
+ *
+ * @return 0 on success, otherwise a non-zero error code
  */
-
 int jack_add_alias    (jack_client_t *, const char *portname, const char *alias);
 
 /**
  * Remove `alias' from a JACK system.
- * Returns zero if successful, less than zero if the alias
+ *
+ * @return zero if successful, less than zero if the alias
  * did not exist, greater than zero if the alias could not
  * be removed.
  */
-
 int jack_remove_alias (jack_client_t *, const char *alias);
 
 /**
  * Return the pthread ID of the thread running the JACK client
  * side code.
  */
-
 pthread_t jack_client_thread_id (jack_client_t *);
 
 #ifdef __cplusplus
@@ -524,4 +560,3 @@ pthread_t jack_client_thread_id (jack_client_t *);
 #endif
 
 #endif /* __jack_h__ */
-

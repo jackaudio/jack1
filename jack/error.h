@@ -22,6 +22,10 @@
 #define __jack_error_h__
 
 extern void (*jack_error_callback)(const char *desc);
+
+/**
+ * Sets callback to be called to print error messages.
+ */
 void jack_set_error_function (void (*func)(const char *));
 
 

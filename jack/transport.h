@@ -27,6 +27,9 @@ extern "C" {
 
 #include <jack/types.h>
 
+/**
+ * Possible transport states.
+ */
 typedef enum {
 
 	JackTransportStopped,
@@ -35,6 +38,12 @@ typedef enum {
 
 } jack_transport_state_t;
 
+/**
+ * Bitfield of all possible transport info struct
+ * fields.
+ *
+ * @see jack_transport_info_t
+ */
 typedef enum {
 
         JackTransportState =    0x1,
@@ -43,20 +52,45 @@ typedef enum {
 
 } jack_transport_bits_t;
 
+/**
+ * Struct for transport status information.
+ */
 typedef struct {
 
     jack_transport_bits_t  valid;
     jack_transport_state_t state;
-    jack_nframes_t              position;
-    jack_nframes_t              loop_start;
-    jack_nframes_t              loop_end;
+    jack_nframes_t         position;
+    jack_nframes_t         loop_start;
+    jack_nframes_t         loop_end;
 
 } jack_transport_info_t;
 
+/**
+ * Sets the transport state for the next engine 
+ * cycle.
+ *
+ * The 'valid' field of the tinfo struct should contain 
+ * a bitmask of all transport info fields that should 
+ * be set with this call.
+ *
+ * @pre Caller must be the current timebase master.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
 int jack_set_transport_info (jack_client_t *client,
-			     jack_transport_info_t *);
+			     jack_transport_info_t *tinfo);
+
+/**
+ * Gets the current transport state. 
+ *
+ * The 'valid' field of the tinfo struct should contain 
+ * a bitmask of all transport info fields that the 
+ * client is interested in.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
 int jack_get_transport_info (jack_client_t *client,
-			     jack_transport_info_t *);
+			     jack_transport_info_t *tinfo);
 
 #ifdef __cplusplus
 }
