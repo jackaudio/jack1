@@ -130,14 +130,6 @@ portaudio_driver_detach (portaudio_driver_t *driver, jack_engine_t *engine)
         return 0; 
 }
 
-static jack_nframes_t 
-portaudio_driver_wait (portaudio_driver_t *driver, int extra_fd, int *status, float *delayed_usecs)
-{
-        *status = 0; 
-        *delayed_usecs = 0;
-        return driver->frames_per_cycle;
-}
-
 static int
 portaudio_driver_null_cycle (portaudio_driver_t* driver, jack_nframes_t nframes)
 {
@@ -273,8 +265,8 @@ portaudio_driver_reset_parameters (portaudio_driver_t* driver,
 				   jack_nframes_t rate)
 {
 	if (!jack_power_of_two(nframes)) {
-		printf("PA: frames must be a power of two "
-		       "(64, 512, 1024, ...)\n");
+		fprintf (stderr, "PA: frames must be a power of two "
+			 "(64, 512, 1024, ...)\n");
 		return EINVAL;
 	}
 
@@ -336,7 +328,7 @@ portaudio_driver_new (char *name,
 	jack_driver_init ((jack_driver_t *) driver);
 
 	if (!jack_power_of_two(frames_per_cycle)) {
-		printf("PA: -p must be a power of two.\n");
+		fprintf (stderr, "PA: -p must be a power of two.\n");
 		goto error;
 	}
 

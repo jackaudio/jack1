@@ -766,7 +766,7 @@ jack_client_thread (void *arg)
                 
 		if (poll (client->pollfd, client->pollmax, 1000) < 0) {
 			if (errno == EINTR) {
-				printf ("poll interrupted\n");
+				fprintf (stderr, "poll interrupted\n");
 				continue;
 			}
 			jack_error ("poll failed in client (%s)",

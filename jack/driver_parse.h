@@ -105,8 +105,9 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 					}
 				}
 
-				fprintf (stderr, "jackd: unknown option '%s' for driver '%s'\n",
-					 argv[2], desc->name);
+				fprintf (stderr, "jackd: unknown option '%s' "
+					 "for driver '%s'\n", argv[2],
+					 desc->name);
 			}
 
 			printf ("Options for driver '%s':\n", desc->name);
