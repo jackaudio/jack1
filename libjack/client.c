@@ -488,11 +488,6 @@ jack_client_new (const char *client_name)
 
 	client->event_fd = ev_fd;
 
-#ifdef USE_CAPABILITIES
-	/* get the pid of the client process to pass it to engine */
-	client->control->pid = getpid ();
-#endif
-
 	return client;
 	
   fail:
@@ -877,6 +872,9 @@ jack_activate (jack_client_t *client)
 #undef BIG_ENOUGH_STACK
 
 #ifdef USE_CAPABILITIES
+	/* get the pid of the client process to pass it to engine */
+	client->control->pid = getpid ();
+
 	if (client->engine->has_capabilities != 0 &&
 	    client->control->pid != 0 && client->engine->real_time != 0) {
 
