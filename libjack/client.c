@@ -435,8 +435,6 @@ _start_server (void)
 		}
 	}
 
-// steph 
-#define JACK_LOCATION
 	if (!good) {
 #if defined(USE_CAPABILITIES)
 		command = JACK_LOCATION "/jackstart";
