@@ -303,7 +303,6 @@ WARN_LOGFILE           =
 
 INPUT                  = @top_srcdir@/jack/jack.h \
                          @top_srcdir@/jack/types.h \
-                         @top_srcdir@/jack/error.h \
                          @top_srcdir@/jack/transport.h
 
 # If the value of the INPUT tag contains directories, you can use the 
