@@ -365,7 +365,7 @@ static int portaudio_load_default (portaudio_driver_t *driver,
     
     *inputDeviceID = Pa_GetDefaultInputDeviceID();
     *outputDeviceID = Pa_GetDefaultOutputDeviceID();
-    
+
     for(i=0; i<numDevices; i++)
     {
         pdi = Pa_GetDeviceInfo(i);
@@ -760,7 +760,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 {
 	jack_nframes_t srate = 48000;
 	jack_nframes_t frames_per_interrupt = 1024;
-	AudioDeviceID deviceID;
+	AudioDeviceID deviceID = 0;
 	int capture = FALSE;
 	int playback = FALSE;
 	int chan_in = -1;
