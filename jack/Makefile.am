@@ -24,6 +24,7 @@ noinst_HEADERS = 	\
 	memops.h 		\
 	pool.h			\
 	port.h			\
+	shm.h			\
 	start.h			\
 	time.h			\
 	version.h
