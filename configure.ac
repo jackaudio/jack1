@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=99
-JACK_MICRO_VERSION=50
+JACK_MICRO_VERSION=51
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -206,7 +206,7 @@ if test "$target_cpu" = "powerpc"; then
     
     JACK_OPT_CFLAGS="-D_REENTRANT -O2 -mcpu=7400 $ALTIVEC_OPT_FLAGS_FLAGS -mhard-float -mpowerpc-gfxopt"
 
-elif echo $target_cpu | grep "i*86" >/dev/null; then
+elif echo $target_cpu | grep "i.86" >/dev/null; then
 
 dnl Check for MMX assembly
 
@@ -266,6 +266,8 @@ if test "x$enable_mmx" = xyes; then
 
   JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS $JACK_OPT_CFLAGS $MMX_FLAGS $SSE_FLAGS"
 
+elif test "$target_cpu" = "x86_64"; then
+      JACK_OPT_CFLAGS="-DREENTRANT -O3 -march=k8 -fomit-frame-pointer -ffast-math -funroll-loops -fmove-all-movables"
 fi
 
 AC_ARG_ENABLE(optimize,
