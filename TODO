@@ -43,7 +43,7 @@ TO THINK ABOUT
 
 CLOSED (date,who,comment)
 
-- alsa_pcm: make sure that returned nframes is less than buffersize (2003/08/27,fixed,kaiv)
+- make sure that process callbacks always have nframes equal to buffersize (2003/08/27,done,kaiv)
 - add Paul's graph/subgraph explanation to the design doc (2003/08/27,done,kaiv)
 - add support for custom jackd --tmpdir in libjack (2003/05/06,done,jesse)
 - capture_client has pthread_mutex_lock() in its process() (2003/05/30,fixed,joq)
