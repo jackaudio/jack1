@@ -962,7 +962,7 @@ alsa_driver_process (alsa_driver_t *driver, nframes_t nframes)
 					if (!jack_port_connected (port)) {
 						continue;
 					}
-					
+
 					alsa_driver_read_from_channel (driver, chn, jack_port_get_buffer (port, nframes), nframes);
 				}
 				
@@ -1434,7 +1434,7 @@ alsa_usage ()
 
 alsa PCM driver args: 
     -d alsa-pcm-name (default: default)
-    -s sample-rate (default: 48kHz)
+    -r sample-rate (default: 48kHz)
     -p frames-per-period (default: 1024)
     -n periods-per-hardware-buffer (default: 2)
     -H (use hardware monitoring if available, default: no)
