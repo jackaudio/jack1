@@ -608,12 +608,6 @@
 			settings = {
 			};
 		};
-		4B4DCB9705DD22BB00DC3452 = {
-			fileRef = 4B117C7505DD0CA000B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B4DCB9805DD22C300DC3452 = {
 			fileRef = 4B117C7205DD0C9D00B5DA5A;
 			isa = PBXBuildFile;
@@ -1013,7 +1007,6 @@
 				4B81402E07240F680025D71C,
 				4B81402F07240F690025D71C,
 				4B81403007240F6A0025D71C,
-				4B81408D07241DF20025D71C,
 				4B81409407241E580025D71C,
 				4B1A735F07252DA3007105CE,
 				4B1A736507252DBE007105CE,
@@ -1049,7 +1042,7 @@
 				HEADER_SEARCH_PATHS = "../../../ ../../";
 				LIBRARY_STYLE = BUNDLE;
 				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = "-framework CoreAudio -framework AudioToolbox";
+				OTHER_LDFLAGS = "-ljack -framework CoreAudio -framework AudioToolbox";
 				OTHER_LIBTOOL_FLAGS = "";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = jack_coreaudio.so;
@@ -1099,12 +1092,6 @@
 		};
 		4B81403007240F6A0025D71C = {
 			fileRef = 4B117C6F05DD0C9900B5DA5A;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		4B81408D07241DF20025D71C = {
-			fileRef = 4B117C7505DD0CA000B5DA5A;
 			isa = PBXBuildFile;
 			settings = {
 			};
@@ -1542,7 +1529,6 @@
 				4B117C8305DD0DA700B5DA5A,
 				4B4DCB9405DD229F00DC3452,
 				4B4DCB9505DD22AF00DC3452,
-				4B4DCB9705DD22BB00DC3452,
 				4B4DCB9805DD22C300DC3452,
 				4B813FF007240D000025D71C,
 				4B81400707240DA30025D71C,
@@ -1578,7 +1564,7 @@
 				LIBRARY_SEARCH_PATHS = "";
 				LIBRARY_STYLE = BUNDLE;
 				OPTIMIZATION_CFLAGS = "-O3";
-				OTHER_LDFLAGS = "-framework CoreAudio -framework AudioToolbox PortAudioLib ";
+				OTHER_LDFLAGS = "-ljack -framework CoreAudio -framework AudioToolbox PortAudioLib ";
 				OTHER_LIBTOOL_FLAGS = "";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = jack_portaudio.so;
