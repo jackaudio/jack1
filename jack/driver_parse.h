@@ -190,6 +190,8 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 				driver_param->value.i = 1;
 				break;
 			}
+                } else {
+			driver_param->value = desc->params[param_index].value;
 		}
 
 		params = jack_slist_append (params, driver_param);
