@@ -59,22 +59,23 @@ typedef struct _jack_port_type_info {
 */
 
 typedef struct _jack_port_shared {
-    int                    shm_key;
-    size_t                 offset;
+    int                      shm_key;
+    size_t                   offset;
     
-    unsigned long          flags; 
-    unsigned long          buffer_size;
-    jack_port_id_t         id;
-    char                   name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
-    jack_port_type_info_t  type_info;
-    jack_client_id_t       client_id;
+    unsigned long            flags; 
+    unsigned long            buffer_size;
+    jack_port_id_t           id;
+    char                     name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
+    jack_port_type_info_t    type_info;
+    jack_client_id_t         client_id;
 
-    volatile jack_nframes_t     latency;
-    volatile jack_nframes_t     total_latency;
-    volatile unsigned char monitor_requests;
+    volatile jack_nframes_t  latency;
+    volatile jack_nframes_t  total_latency;
+    volatile unsigned char   monitor_requests;
 
-    char                  in_use     : 1;
-    char                  locked     : 1;
+    char                     in_use     : 1;
+    char                     locked     : 1;
+    struct _jack_port       *tied;
 
 } jack_port_shared_t;
 
@@ -88,7 +89,6 @@ struct _jack_port {
     struct _jack_port_shared *shared;
     pthread_mutex_t           connection_lock;
     GSList                   *connections;
-    struct _jack_port        *tied;
 };
 
 /* inline would be cleaner, but it needs to be fast even in non-optimized 

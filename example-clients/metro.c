@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <math.h>
 #include <jack/jack.h>
+#include <jack/transport.h>
 #include <glib.h>
 #include <getopt.h>
 #include <string.h>
@@ -37,7 +38,9 @@ int freq = 880;
 int bpm;
 jack_nframes_t tone_length, wave_length;
 sample_t *wave;
-long pos = 0;
+long offset = 0;
+int transport_aware = 0;
+jack_transport_state_t transport_state;
 
 void
 usage ()
@@ -51,25 +54,55 @@ usage: jack_metro
               [ --attack OR -a attack (in percent of duration) ]
               [ --decay OR -d decay (in percent of duration) ]
               [ --name OR -n jack name for metronome client ]
+              [ --transport OR -t transport aware ]
               --bpm OR -b beats per minute
 ");
+}
+
+void
+process_silence (jack_nframes_t nframes) 
+{
+	sample_t *buffer = (sample_t *) jack_port_get_buffer (output_port, nframes);
+	memset (buffer, 0, sizeof (jack_default_audio_sample_t) * nframes);
+}
+
+void
+process_audio (jack_nframes_t nframes) 
+{
+
+	sample_t *buffer = (sample_t *) jack_port_get_buffer (output_port, nframes);
+	jack_nframes_t frames_left = nframes;
+		
+	while (wave_length - offset < frames_left) {
+		memcpy (buffer + (nframes - frames_left), wave + offset, sizeof (sample_t) * (wave_length - offset));
+		frames_left -= wave_length - offset;
+		offset = 0;
+	}
+	if (frames_left > 0) {
+		memcpy (buffer + (nframes - frames_left), wave + offset, sizeof (sample_t) * frames_left);
+		offset += frames_left;
+	}
 }
 
 int
 process (jack_nframes_t nframes, void *arg)
 {
-	sample_t *buffer = (sample_t *) jack_port_get_buffer(output_port, nframes);
-	jack_nframes_t frames_left = nframes;
+	jack_transport_info_t ti;
 	
-	while (wave_length - pos < frames_left) {
-		memcpy (buffer + (nframes - frames_left), wave + pos, sizeof (sample_t) * (wave_length - pos));
-		frames_left -= wave_length - pos;
-		pos = 0;
+	if (transport_aware) {
+		ti.valid = JackTransportPosition | JackTransportState;
+		jack_get_transport_info (client, &ti);
+
+		// not rolling, bail out
+		if (ti.state == JackTransportStopped) {
+			process_silence (nframes);
+			return 0;
+		}
+		offset = ti.position % wave_length;
 	}
-	if (frames_left > 0) {
-		memcpy (buffer + (nframes - frames_left), wave + pos, sizeof (sample_t) * frames_left);
-		pos += frames_left;
-	}
+
+	process_audio (nframes);
+
 	return 0;
 }
 
@@ -101,7 +134,7 @@ main (int argc, char *argv[])
 	char *bpm_string = "bpm";
 	int verbose = 0;
 
-	const char *options = "f:A:D:a:d:b:n:hv";
+	const char *options = "f:A:D:a:d:b:n:thv";
 	struct option long_options[] =
 	{
 		{"frequency", 1, 0, 'f'},
@@ -111,6 +144,7 @@ main (int argc, char *argv[])
 		{"decay", 1, 0, 'd'},
 		{"bpm", 1, 0, 'b'},
 		{"name", 1, 0, 'n'},
+		{"transport", 0, 0, 't'},
 		{"help", 0, 0, 'h'},
 		{"verbose", 0, 0, 'v'},
 		{0, 0, 0, 0}
@@ -132,7 +166,7 @@ main (int argc, char *argv[])
 			break;
 		case 'D':
 			dur_arg = atoi (optarg);
-			fprintf (stderr, "durarg = %lu\n", dur_arg);
+			fprintf (stderr, "durarg = %u\n", dur_arg);
 			break;
 		case 'a':
 			if (((attack_percent = atoi (optarg)) < 0) || (attack_percent > 100)) {
@@ -155,7 +189,6 @@ main (int argc, char *argv[])
 			bpm_string = (char *) malloc ((strlen (optarg) + 4) * sizeof (char));
 			strcpy (bpm_string, optarg);
 			strcat (bpm_string, "_bpm");
-			fprintf (stderr, "bpm = %lu\n", bpm);
 			break;
 		case 'n':
 			client_name = (char *) malloc (strlen (optarg) * sizeof (char));
@@ -163,6 +196,9 @@ main (int argc, char *argv[])
 			break;
 		case 'v':
 			verbose = 1;
+			break;
+		case 't':
+			transport_aware = 1;
 			break;
 		default:
 			fprintf (stderr, "unknown option %c\n", opt); 
@@ -230,9 +266,6 @@ main (int argc, char *argv[])
 	if (jack_activate (client)) {
 		fprintf (stderr, "cannot activate client");
 		return 1;
-	}
-
-	if (verbose) {
 	}
 
 	while (1) {

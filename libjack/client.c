@@ -1120,7 +1120,7 @@ jack_port_new (jack_client_t *client, jack_port_id_t port_id, jack_control_t *co
 	port->shared = shared;
 	pthread_mutex_init (&port->connection_lock, NULL);
 	port->connections = 0;
-	port->tied = NULL;
+	port->shared->tied = NULL;
 
 	si = NULL;
 
@@ -1374,8 +1374,8 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 	*/
 
 	if (port->shared->flags & JackPortIsOutput) {
-		if (port->tied) {
-			return jack_port_get_buffer (port->tied, nframes);
+		if (port->shared->tied) {
+			return jack_port_get_buffer (port->shared->tied, nframes);
 		}
 		return jack_port_buffer (port);
 	}
@@ -1402,7 +1402,7 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 		   the buffer of the connected (output) port.
 		*/
 
-		return jack_port_buffer (((jack_port_t *) node->data));
+		return jack_port_get_buffer (((jack_port_t *) node->data), nframes);
 	}
 
 	/* multiple connections. use a local buffer and mixdown
@@ -1441,7 +1441,7 @@ jack_port_tie (jack_port_t *src, jack_port_t *dst)
 		return -1;
 	}
 
-	dst->tied = src;
+	dst->shared->tied = src;
 	return 0;
 }
 
@@ -1449,11 +1449,11 @@ int
 jack_port_untie (jack_port_t *port)
 
 {
-	if (port->tied == NULL) {
+	if (port->shared->tied == NULL) {
 		jack_error ("port \"%s\" is not tied", port->shared->name);
 		return -1;
 	}
-	port->tied = NULL;
+	port->shared->tied = NULL;
 	return 0;
 }
 
