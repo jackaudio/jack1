@@ -1203,9 +1203,6 @@ jack_port_get_buffer (jack_port_t *port, nframes_t nframes)
 		   the buffer of the connected (output) port.
 		*/
 
-		printf ("get buffer for port %s is at offset %d\n", port->shared->name,  
-			((jack_port_t *) node->data)->shared->offset);
-
 		return jack_port_buffer (((jack_port_t *) node->data));
 	}
 
