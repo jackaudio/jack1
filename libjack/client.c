@@ -1135,6 +1135,12 @@ jack_client_close (jack_client_t *client)
 	return 0;
 }	
 
+int jack_is_realtime (jack_client_t *client)
+
+{
+	return client->engine->real_time;
+}
+
 unsigned long jack_get_buffer_size (jack_client_t *client)
 
 {

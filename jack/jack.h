@@ -63,6 +63,15 @@ int jack_internal_client_new (const char *client_name, const char *so_name, cons
  */
 void jack_internal_client_close (const char *client_name);
 
+/**
+ * @param client The Jack client structure.
+ *
+ * Check if the JACK subsystem is running with -R (--realtime).
+ *
+ * @return 1 if JACK is running realtime, 0 otherwise
+ */
+int jack_is_realtime (jack_client_t *client);
+
 /** 
  * @param client The Jack client structure.
  * @param function The jack_shutdown function pointer.
