@@ -170,6 +170,51 @@ jack_ringbuffer_read (jack_ringbuffer_t * rb, char *dest, size_t cnt)
   return to_read;
 }
 
+/* The copying data reader w/o read pointer advance.  Copy at most 
+   `cnt' bytes from `rb' to `dest'.  Returns the actual number of bytes 
+copied. */
+
+size_t
+jack_ringbuffer_peek (jack_ringbuffer_t * rb, char *dest, size_t cnt)
+{
+  size_t free_cnt;
+  size_t cnt2;
+  size_t to_read;
+  size_t n1, n2;
+  size_t tmp_read_ptr;
+
+  tmp_read_ptr = rb->read_ptr;
+
+  if ((free_cnt = jack_ringbuffer_read_space (rb)) == 0) {
+    return 0;
+  }
+
+  to_read = cnt > free_cnt ? free_cnt : cnt;
+
+  cnt2 = tmp_read_ptr + to_read;
+
+  if (cnt2 > rb->size) {
+    n1 = rb->size - tmp_read_ptr;
+    n2 = cnt2 & rb->size_mask;
+  } else {
+    n1 = to_read;
+    n2 = 0;
+  }
+
+  memcpy (dest, &(rb->buf[tmp_read_ptr]), n1);
+  tmp_read_ptr += n1;
+  tmp_read_ptr &= rb->size_mask;
+
+  if (n2) {
+    memcpy (dest + n1, &(rb->buf[tmp_read_ptr]), n2);
+    tmp_read_ptr += n2;
+    tmp_read_ptr &= rb->size_mask;
+  }
+
+  return to_read;
+}
+
+
 /* The copying data writer.  Copy at most `cnt' bytes to `rb' from
    `src'.  Returns the actual number of bytes copied. */
 

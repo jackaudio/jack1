@@ -138,6 +138,23 @@ void jack_ringbuffer_get_write_vector(const jack_ringbuffer_t *rb,
 size_t jack_ringbuffer_read(jack_ringbuffer_t *rb, char *dest, size_t cnt);
 
 /**
+ * Read data from the ringbuffer. Opposed to jack_ringbuffer_read()
+ * this function does not move the read pointer. Thus it's
+ * a convenient way to inspect data in the ringbuffer in a
+ * continous fashion. The price is that the data is copied
+ * into a user provided buffer. For "raw" non-copy inspection
+ * of the data in the ringbuffer use jack_ringbuffer_get_read_vector().
+ *
+ * @param rb a pointer to the ringbuffer structure.
+ * @param dest a pointer to a buffer where data read from the
+ * ringbuffer will go.
+ * @param cnt the number of bytes to read.
+ *
+ * @return the number of bytes read, which may range from 0 to cnt.
+ */
+size_t jack_ringbuffer_peek(jack_ringbuffer_t *rb, char *dest, size_t cnt);
+
+/**
  * Advance the read pointer.
  *
  * After data have been read from the ringbuffer using the pointers
