@@ -9,14 +9,16 @@ jackd
 jack_impulse_grabber
 jack_simple_client
 jack_monitor_client
+jack_fltk_client
 jackrec
+jack_connect
+jack_disconnect
 *.la
 *.pc
 .libs
 .deps
 Makefile
 Makefile.in
-jack_fltk_client
 configure
 *.tar.gz
 typescript

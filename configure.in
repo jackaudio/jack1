@@ -70,9 +70,5 @@ AC_SUBST(ADDON_DIR)
 
 dnl check for the libraries we need
 
-AC_OUTPUT(Makefile
-          jack.pc
-	  jack/Makefile)
-
-
+AC_OUTPUT(Makefile jack.pc jack/Makefile)
 
