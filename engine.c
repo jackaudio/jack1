@@ -424,7 +424,6 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 	int status;
 	float delayed_usecs;
 	unsigned long long now, then;
-	unsigned long long clients_start, clients_end;
 
 	engine->process_errors = 0;
 
@@ -437,8 +436,6 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 	if (engine->timebase_client) {
 		engine->control->time.frame = engine->timebase_client->control->frame_time;
 	} 
-
-	clients_start = get_cycles();
 
 	for (node = engine->clients; engine->process_errors == 0 && node; ) {
 
@@ -555,45 +552,6 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 
 		}
 	}
-
-	if (!engine->process_errors) {
-		clients_end = get_cycles();
-		
-		/* store the execution time for this this part of the graph */
-		
-		engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = (float) (clients_end - clients_start) / engine->cpu_mhz;
-		
-		if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
-			engine->rolling_client_usecs_index = 0;
-		}
-		
-		/* every so often, recompute the current average use over the
-		   last JACK_ENGINE_ROLLING_COUNT client iterations.
-		*/
-
-		if (++engine->rolling_client_usecs_cnt % engine->rolling_interval == 0) {
-			float average_usecs = 0;
-			int i;
-			
-			for (i = 0; i < JACK_ENGINE_ROLLING_COUNT; i++) {
-				average_usecs += engine->rolling_client_usecs[i];
-			}
-			
-			average_usecs /= i;
-			if (average_usecs < engine->driver->period_usecs) {
-				engine->spare_usecs = engine->driver->period_usecs - average_usecs;
-			} else {
-				engine->spare_usecs = 0;
-			}
-
-			engine->control->cpu_load = (1.0f - (engine->spare_usecs / engine->driver->period_usecs)) * 100.0f;
-
-			if (engine->verbose) {
-				fprintf (stderr, "load = %.4f average usecs: %.3f, spare = %.3f\n", 
-					 engine->control->cpu_load, average_usecs, engine->spare_usecs);
-			}
-		}
-	} 
 
 	return engine->process_errors > 0;
 }
@@ -1386,6 +1344,7 @@ jack_main_thread (void *arg)
 	jack_engine_t *engine = (jack_engine_t *) arg;
 	jack_driver_t *driver = engine->driver;
 	int consecutive_excessive_delays;
+	unsigned long long cycle_start, cycle_end;
 
 	if (engine->control->real_time) {
 
@@ -1408,14 +1367,18 @@ jack_main_thread (void *arg)
 
 	consecutive_excessive_delays = 0;
 
+	engine->watchdog_check = 1;
+
 	while (1) {
 		int status;
 		nframes_t nframes;
 		float delayed_usecs;
 
-		engine->watchdog_check = 1;
-
 		nframes = driver->wait (driver, -1, &status, &delayed_usecs);
+		
+		cycle_start = get_cycles();
+
+		engine->watchdog_check = 1;
 
 #define WORK_SCALE 1.0f
 
@@ -1468,6 +1431,45 @@ jack_main_thread (void *arg)
 		default:
 			break;
 		}
+
+		cycle_end = get_cycles ();
+		
+		/* store the execution time for this this part of the graph */
+		
+		engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = (float) (cycle_end - cycle_start) / engine->cpu_mhz;
+		
+		if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
+			engine->rolling_client_usecs_index = 0;
+		}
+		
+		/* every so often, recompute the current average use over the
+		   last JACK_ENGINE_ROLLING_COUNT client iterations.
+		*/
+
+		if (++engine->rolling_client_usecs_cnt % engine->rolling_interval == 0) {
+			float average_usecs = 0;
+			int i;
+			
+			for (i = 0; i < JACK_ENGINE_ROLLING_COUNT; i++) {
+				average_usecs += engine->rolling_client_usecs[i];
+			}
+			
+			average_usecs /= i;
+			if (average_usecs < engine->driver->period_usecs) {
+				engine->spare_usecs = engine->driver->period_usecs - average_usecs;
+			} else {
+				engine->spare_usecs = 0;
+			}
+
+			engine->control->cpu_load = (1.0f - (engine->spare_usecs / engine->driver->period_usecs)) * 100.0f;
+
+			if (engine->verbose) {
+				fprintf (stderr, "load = %.4f average usecs: %.3f, spare = %.3f\n", 
+					 engine->control->cpu_load, average_usecs, engine->spare_usecs);
+			}
+		}
+
+
 	}
 
 	pthread_exit (0);
