@@ -29,27 +29,6 @@
 #include <libjack/local.h>		/* JOQ: fix me */
 
 /*
-    Copyright © Grame 2003
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-    
-    Grame Research Laboratory, 9, rue du Garet 69001 Lyon - France
-    grame@rd.grame.fr
-*/
-
-/*
     RPC without time out can put the jack server in a blocked state
     (waiting for the client answer) when a client is killed.  The
     mach_msg function does not return any error in this case. Using

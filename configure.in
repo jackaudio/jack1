@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=98
-JACK_MICRO_VERSION=13
+JACK_MICRO_VERSION=14
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -411,7 +411,7 @@ fi
 
 # Check which drivers can be built.  The last one successfully
 # configured becomes the default JACK driver; so the order of
-# precedence is: alsa, oss, portaudio, iec61883, dummy.
+# precedence is: alsa, oss, coreaudio, portaudio, iec61883, dummy.
 
 JACK_DEFAULT_DRIVER=\"dummy\"
 
@@ -462,6 +462,21 @@ then
 	AC_SUBST(PA_LIBS)
 fi
 AM_CONDITIONAL(HAVE_PA, $HAVE_PA)
+
+AC_ARG_ENABLE(coreaudio, [  --disable-coreaudio     ignore CoreAudio driver ],
+			TRY_COREAUDIO=$enableval , TRY_COREAUDIO=yes ) 
+HAVE_COREAUDIO="false"
+if test "x$TRY_COREAUDIO" = "xyes"
+then
+	# check for coreaudio
+	AC_CHECK_HEADERS(CoreAudio/CoreAudio.h,
+		[ HAVE_COREAUDIO="true"
+		  CA_LIBS="-framework CoreAudio"
+		  JACK_DEFAULT_DRIVER=\"coreaudio\"
+		])
+	AC_SUBST(CA_LIBS)
+fi
+AM_CONDITIONAL(HAVE_COREAUDIO, $HAVE_COREAUDIO)
 
 AC_ARG_ENABLE(oss, [  --disable-oss           ignore OSS driver ],
 			TRY_OSS=$enableval , TRY_OSS=yes ) 
@@ -551,6 +566,7 @@ drivers/dummy/Makefile
 drivers/iec61883/Makefile
 drivers/oss/Makefile
 drivers/portaudio/Makefile
+drivers/coreaudio/Makefile
 example-clients/Makefile
 jack.pc
 jack.spec
@@ -571,5 +587,8 @@ echo
 echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with ALSA support............................... : $HAVE_ALSA
 echo \| Build with PortAudio support.......................... : $HAVE_PA
+echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
+echo \|
+echo \| Default driver is..................................... : $JACK_DEFAULT_DRIVER
 echo
 

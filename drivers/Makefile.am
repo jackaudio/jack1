@@ -24,5 +24,11 @@ else
 PA_DIR =
 endif
 
-SUBDIRS = $(ALSA_DIR) dummy $(IEC61883_DIR) $(OSS_DIR) $(PA_DIR)
-DIST_SUBDIRS = alsa dummy iec61883 oss portaudio
+if HAVE_COREAUDIO
+CA_DIR = coreaudio
+else
+CA_DIR =
+endif
+
+SUBDIRS = $(ALSA_DIR) dummy $(IEC61883_DIR) $(OSS_DIR) $(PA_DIR) $(CA_DIR)
+DIST_SUBDIRS = alsa dummy iec61883 oss portaudio coreaudio
