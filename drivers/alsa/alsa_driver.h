@@ -43,7 +43,7 @@ typedef void (*CopyCopyFunction)  (char *dst, char *src,
 
 typedef struct {
 
-    JACK_DRIVER_DECL
+    JACK_DRIVER_NT_DECL
 
     int                           poll_timeout;
     jack_time_t                   poll_last;
@@ -92,7 +92,6 @@ typedef struct {
     snd_pcm_sw_params_t          *capture_sw_params;
     jack_hardware_t              *hw;  
     ClockSyncStatus              *clock_sync_data;
-    struct _jack_engine          *engine;
     jack_client_t                *client;
     JSList                       *capture_ports;
     JSList                       *playback_ports;
@@ -123,8 +122,12 @@ typedef struct {
     char has_hw_monitoring : 1;
     char has_hw_metering : 1;
 
+    int running;
+    int run;
+
     int xrun_count;
     int process_count;
+
 } alsa_driver_t;
 
 static __inline__ void alsa_driver_mark_channel_done (alsa_driver_t *driver, channel_t chn) {

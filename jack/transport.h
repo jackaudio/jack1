@@ -278,9 +278,18 @@ int  jack_transport_locate (jack_client_t *client,
  *
  * @return Current transport state.
  */
-jack_transport_state_t jack_transport_query (jack_client_t *client,
+jack_transport_state_t jack_transport_query (const jack_client_t *client,
 					     jack_position_t *pos);
 
+/**
+ * Return an estimate of the current transport frame,
+ * including any time elapsed since the last transport
+ * positional update.
+ *
+ * @param client the JACK client structure
+ */
+jack_nframes_t jack_get_current_transport_frame (const jack_client_t *client);
+						 
 /**
  * Request a new transport position.
  *

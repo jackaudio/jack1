@@ -1,4 +1,4 @@
-.TH JACKD "1" @VERSION@ "Sept. 2003"
+.TH JACKD "1" @VERSION@ "October 2003"
 .SH NAME
 jackd, jackstart \- JACK Audio Connection Kit sound server
 .SH SYNOPSYS
@@ -87,7 +87,7 @@ is \fBalsa\fR (see below).
 .TP
 \fB\-d, \-\-device \fIname\fR
 .br
-The ALSA pcm device \fIname\fR to use ("default" if none specified).
+The ALSA pcm device \fIname\fR to use ("hw:0" if none specified).
 .TP
 \fB\-r, \-\-rate \fIint\fR
 Specify the sample rate.  The default is 48000.
@@ -110,11 +110,11 @@ the JACK buffer size in bytes.  The JACK output latency in seconds is
 \fB\-D, \-\-duplex\fR
 Provide both capture and playback ports (the default).
 .TP
-\fB\-C, \-\-capture\fR
-Provide only capture ports.
+\fB\-C, \-\-capture\fR [ \fIname\fR ]
+Provide only capture ports.  Optionally set device name.
 .TP
-\fB\-P, \-\-playback\fR
-Provide only playback ports.
+\fB\-P, \-\-playback\fR [ \fIname\fR ]
+Provide only playback ports.  Optionally set device name.
 .TP
 \fB\-H, \-\-hwmon\fR
 .br
@@ -151,6 +151,19 @@ to disconnect unresponsive ports when running without
 \fB\-z, --dither [rectangular,triangular,shaped,none]
 Set dithering mode.  If \fBnone\fR or unspecified, dithering is off.
 Only the first letter of the mode name is required.
+.TP
+\fB\-i, \-\-inchannels \fIint\fR
+.br
+Number of capture channels.  Default is maximum supported by hardware.
+.TP
+\fB\-o, \-\-outchannels \fIint\fR
+.br
+Number of playback channels.  Default is maximum supported by hardware.
+.TP
+\fB\-S, \-\-shorts
+.br
+Try to configure card for 16-bit samples first, only trying 32-bits if
+unsuccessful.  Default is to prefer 32-bit samples.
 .SH EXAMPLES
 .PP
 Print usage message for options specific to the \fBalsa\fR driver.
@@ -193,5 +206,5 @@ Please send bug reports to <\fBjackit-devel@lists.sourceforge.net\fR>.
 Paul Davis and others.
 .PP
 Manpage originally written by Stefan Schwandter
-<e9925373@student.tuwien.ac.at> and later adapted by Jack O'Quin
+<e9925373@student.tuwien.ac.at>, later adapted by Jack O'Quin
 <joq@joq.us>.

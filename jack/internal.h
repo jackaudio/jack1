@@ -1,3 +1,4 @@
+/* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
     Internal shared data and functions.
 
@@ -126,6 +127,8 @@ typedef enum  {
   PortRegistered,
   PortUnregistered,
   XRun,
+  StartFreewheel,
+  StopFreewheel
 } EventType;
 
 typedef struct {
@@ -134,16 +137,12 @@ typedef struct {
 	uint32_t n;
 	jack_port_id_t port_id;
 	jack_port_id_t self_id;
-	shm_name_t shm_name;
     } x;
     union {
 	uint32_t n;
 	jack_port_type_id_t ptid;
 	jack_port_id_t other_id;
     } y;
-    union { 
-	jack_shmsize_t size;
-    } z;
 } jack_event_t;
 
 typedef enum {
@@ -228,8 +227,8 @@ typedef struct {
 
     uint32_t	protocol_v;
 
-    shm_name_t	client_shm_name;
-    shm_name_t	control_shm_name;
+    jack_shm_info_t client_shm;
+    jack_shm_info_t engine_shm;
 
     char	fifo_prefix[PATH_MAX+1];
 
@@ -237,16 +236,12 @@ typedef struct {
     int32_t	realtime_priority;
 
     /* these two are valid only if the connect request
-       was for type == ClientDriver. */
+       was for type == ClientDriver. 
+    */
+
     jack_client_control_t *client_control; /* JOQ: 64/32 problem */
     jack_control_t        *engine_control; /* JOQ: 64/32 problem */
 
-    jack_shmsize_t         control_size;
-
-    /* when we write this response, we deliver n_port_types
-       of jack_port_type_info_t after it. */
-    uint32_t	n_port_types;
-    
 #if defined(__APPLE__) && defined(__POWERPC__) 
     /* specific resources for server/client real-time thread communication */
     int32_t	portnum;
@@ -279,6 +274,8 @@ typedef enum {
 	ResetSyncClient = 14,
 	SetSyncTimeout = 15,
 	SetBufferSize = 16,
+	FreeWheel = 17,
+	StopFreeWheel = 18,
 } RequestType;
 
 struct _jack_request {
@@ -313,7 +310,9 @@ struct _jack_request {
 };
 
 /* per-client structure allocated in the server's address space
- * JOQ: then why isn't this in engine.h? */
+ * its here because its not part of the engine structure.
+ */
+
 typedef struct _jack_client_internal {
 
     jack_client_control_t *control;
@@ -324,7 +323,7 @@ typedef struct _jack_client_internal {
     int        subgraph_wait_fd;
     JSList    *ports;    /* protected by engine->client_lock */
     JSList    *fed_by;   /* protected by engine->client_lock */
-    shm_name_t shm_name;
+    jack_shm_info_t control_shm;
     unsigned long execution_order;
     struct  _jack_client_internal *next_client; /* not a linked list! */
     dlhandle handle;
@@ -346,18 +345,17 @@ extern void jack_cleanup_files ();
 
 extern int  jack_client_handle_port_connection (jack_client_t *client,
 						jack_event_t *event);
-extern void jack_client_set_port_segment (jack_client_t *client, shm_name_t,
-					  jack_port_type_id_t ptid,
-					  jack_shmsize_t, void *addr);
 extern jack_client_t *jack_driver_client_new (jack_engine_t *,
 					      const char *client_name);
-jack_client_t *jack_client_alloc_internal (jack_client_control_t*,
-					   jack_control_t*);
+extern jack_client_t *jack_client_alloc_internal (jack_client_control_t*,
+						  jack_engine_t*);
 
 /* internal clients call this. it's defined in jack/engine.c */
 void handle_internal_client_request (jack_control_t*, jack_request_t*);
 
 extern char *jack_server_dir;
+
+extern void *jack_zero_filled_buffer;
 
 extern void jack_error (const char *fmt, ...);
 
@@ -372,6 +370,9 @@ extern void jack_transport_copy_position (jack_position_t *from,
 extern void jack_call_sync_client (jack_client_t *client);
 
 extern void jack_call_timebase_master (jack_client_t *client);
+
+extern int jack_acquire_real_time_scheduling (pthread_t, int priority);
+extern int jack_drop_real_time_scheduling (pthread_t);
 
 #endif /* __jack_internal_h__ */
 

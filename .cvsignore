@@ -17,3 +17,8 @@ configure
 *.desc
 *diff
 *diffs
+compile
+depcomp
+install-sh
+missing
+mkinstalldirs

@@ -15,21 +15,15 @@ TO BE DECIDED (owner)
 - support for on-the-fly sampling rate change
 - whether to default to triangular dithering for 16bit output. (swh)
 
-TODO for 1.0 (owner)
-
-- API to change buffer size (joq)
-
 TODO post-1.0
 
 - jack session handling (taybin)
-- get portaudio driver working under Linux (joq)
 - handle mixed-mode 64bit and 32bit clients (joq)
 - TBD
 
 TODO general (owner)
 
 - better scheme for handling machine and system dependencies (joq)
-- don't build static libraries of drivers and ip-clients (kaiv)
 - add explanation of protocol versioning to README.developers (kaiv)
 - proper handling of client return values in libjack (kaiv)
 - pool based malloc for rt client-local mem allocation (paul, moved back here)
@@ -40,11 +34,12 @@ TO THINK ABOUT
 - whether we want to support varispeed (resampling and/or changing
   the actual rate)
 - per-block timestamping against system clock (UST stamps at driver level)
-- multiple port buffer shm segments (i.e. dynamically
-  increase the total number of ports in the system) 
+- dynamically increase the total number of ports in the system
 
 CLOSED (date,who,comment)
 
+- don't build static libraries of drivers and ip-clients (2003/10/07,paul)
+- API to change buffer size (joq) (2003/10/07)
 - added code to enforce the 'bufsize==2^x' rule (taybin) (2003/8/28)
 - make sure that process callbacks always have nframes equal to buffersize (2003/08/27,done,kaiv)
 - add Paul's graph/subgraph explanation to the design doc (2003/08/27,done,kaiv)
@@ -66,5 +61,6 @@ CLOSED (date,who,comment)
 - whether to hide the transport.h structs from clients (2003/08/04, joq)
 - define transport info struct contents (2003/08/13, joq)
 - resolve helper thread design question? (2003/08/31, joq)
+- get portaudio driver working under Linux (2003/10/29, joq)
 
 -----------------------------------------------------------------------

@@ -6,17 +6,21 @@ struct _jack_client {
 
     jack_control_t        *engine;
     jack_client_control_t *control;
-    struct pollfd *pollfd;
-    int pollmax;
-    int graph_next_fd;
-    int request_fd;
+    jack_shm_info_t        engine_shm;
+    jack_shm_info_t        control_shm;
+
+    struct pollfd* pollfd;
+    int            pollmax;
+    int            graph_next_fd;
+    int            request_fd;
+
+    /* these two are copied from the engine when the 
+     * client is created.
+    */
 
     jack_port_type_id_t n_port_types;
-    struct {
-	shm_name_t     shm_name;
-	void	       *address;
-	jack_shmsize_t	size;
-    } port_segment[JACK_MAX_PORT_TYPES];
+    jack_shm_info_t*    port_segment;
+
     JSList *ports;
 
     pthread_t thread;

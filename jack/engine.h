@@ -1,3 +1,4 @@
+/* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
     
@@ -23,6 +24,7 @@
 
 #include <jack/jack.h>
 #include <jack/internal.h>
+#include <jack/driver_interface.h>
 
 #define VERBOSE(engine,format,args...) \
 	if ((engine)->verbose) fprintf (stderr, format, ## args)
@@ -32,10 +34,11 @@ struct _jack_client_internal;
 struct _jack_port_internal;
 
 /* Structures is allocated by the engine in local memory to keep track
- * of port buffers and connections. */
+ * of port buffers and connections. 
+ */
 typedef struct {
-    const char *shm_name;
-    jack_shmsize_t offset;
+    jack_shm_info_t* shm_info;
+    jack_shmsize_t   offset;
 } jack_port_buffer_info_t;
 
 /* The engine keeps an array of these in its local memory. */
@@ -46,91 +49,96 @@ typedef struct _jack_port_internal {
 } jack_port_internal_t;
 
 /* The engine's internal port type structure. */
-typedef struct _jack_port_type_internal {
-    pthread_mutex_t  buffer_lock;	/* only lock within server */
-    JSList	     *buffer_freelist;	/* list of free buffers */
-    void	     *buffer_info;	/* jack_buffer_info_t array */
-    void	     *seg_addr;		/* buffer segment address */
-} jack_port_type_internal_t;
-
+typedef struct _jack_port_buffer_list {
+    pthread_mutex_t          lock;	/* only lock within server */
+    JSList	            *freelist;	/* list of free buffers */
+    jack_port_buffer_info_t *info;	/* jack_buffer_info_t array */
+} jack_port_buffer_list_t;
 
 /* The main engine structure in local memory. */
 struct _jack_engine {
     jack_control_t        *control;
+
+    JSList                *drivers;
     struct _jack_driver   *driver;
+    jack_driver_desc_t    *driver_desc;
+    JSList                *driver_params;
 
     /* these are "callbacks" made by the driver */
-
-    int  (*set_buffer_size)(struct _jack_engine *, jack_nframes_t frames);
-    int  (*set_sample_rate)(struct _jack_engine *, jack_nframes_t frames);
-    int  (*run_cycle)(struct _jack_engine *, jack_nframes_t nframes,
-		      float delayed_usecs);
-    void (*transport_cycle_start)(struct _jack_engine *, jack_time_t time);
+    int  (*set_buffer_size) (struct _jack_engine *, jack_nframes_t frames);
+    int  (*set_sample_rate) (struct _jack_engine *, jack_nframes_t frames);
+    int  (*run_cycle)	    (struct _jack_engine *, jack_nframes_t nframes,
+			     float delayed_usecs);
+    void (*delay)	    (struct _jack_engine *);
+    void (*transport_cycle_start) (struct _jack_engine *, jack_time_t time);
+    void (*driver_exit)     (struct _jack_engine *);
 
     /* "private" sections starts here */
 
     /* engine serialization -- use precedence for deadlock avoidance */
-    pthread_mutex_t port_lock;
-    pthread_mutex_t request_lock;	/* precedes driver_lock */
-    pthread_mutex_t driver_lock;	/* precedes client_lock */
+    pthread_mutex_t request_lock;	/* precedes client_lock */
     pthread_mutex_t client_lock;
-    int process_errors;
-    int period_msecs;
-    int client_timeout_msecs;  /* Time to wait for clients in
-				* msecs. Used when jackd is run in
-				* non-ASIO mode and without realtime
-				* priority enabled. */
+    pthread_mutex_t port_lock;
+    int		    process_errors;
+    int		    period_msecs;
 
-    /* internal port type info, indexed by the port type_id */
-    jack_port_type_internal_t port_type[JACK_MAX_PORT_TYPES];
+    /* Time to wait for clients in msecs. Used when jackd is run in
+     * non-ASIO mode and without realtime priority enabled. */
+    int		    client_timeout_msecs;
 
-    unsigned int port_max;
-    shm_name_t control_shm_name;
-    size_t     control_size;
-    shm_name_t port_segment_name;	/* XXX fix me */
-    size_t port_segment_size;		/* XXX fix me */
-    void *port_segment_address;		/* XXX fix me */
-    pthread_t main_thread;
-    pthread_t server_thread;
-    
-    /* these lists are all protected by `client_lock' */
+    /* info on the shm segment containing this->control */
 
-    JSList *clients;
-    JSList *clients_waiting;
+    jack_shm_info_t control_shm;
 
-    struct _jack_port_internal *internal_ports;
+    /* address-space local port buffer and segment info, 
+       indexed by the port type_id 
+    */
+    jack_port_buffer_list_t port_buffers[JACK_MAX_PORT_TYPES];
+    jack_shm_info_t         port_segment[JACK_MAX_PORT_TYPES];
 
-    int fds[2];
+    unsigned int    port_max;
+    pthread_t	    server_thread;
+    pthread_t	    watchdog_thread;
+
+    int		    fds[2];
     jack_client_id_t next_client_id;
-    size_t pfd_size;
-    size_t pfd_max;
-    struct pollfd *pfd;
-    struct _jack_client_internal *timebase_client;
-    jack_port_buffer_info_t *silent_buffer;
-    char fifo_prefix[PATH_MAX+1];
-    int *fifo;
-    unsigned long fifo_size;
-    unsigned long external_client_cnt;
-    int rtpriority;
-    char verbose;
-    char asio_mode;
-    int reordered;
-    int watchdog_check;
+    size_t	    pfd_size;
+    size_t	    pfd_max;
+    struct pollfd  *pfd;
+    char	    fifo_prefix[PATH_MAX+1];
+    int		   *fifo;
+    unsigned long   fifo_size;
+    unsigned long   external_client_cnt;
+    int		    rtpriority;
+    char	    asio_mode;
+    char	    freewheeling;
+    char	    verbose;
+    int		    reordered;
+    int		    watchdog_check;
+    pid_t           wait_pid;
+    pthread_t       freewheel_thread;
 
-    struct _jack_client_internal *current_client;
+    /* these lists are protected by `client_lock' */
+    JSList	   *clients;
+    JSList	   *clients_waiting;
+
+    jack_port_internal_t    *internal_ports;
+    jack_client_internal_t  *timebase_client;
+    jack_port_buffer_info_t *silent_buffer;
+    jack_client_internal_t  *current_client;
 
 #define JACK_ENGINE_ROLLING_COUNT 32
 #define JACK_ENGINE_ROLLING_INTERVAL 1024
 
     jack_time_t rolling_client_usecs[JACK_ENGINE_ROLLING_COUNT];
-    int   rolling_client_usecs_cnt;
-    int   rolling_client_usecs_index;
-    int   rolling_interval;
-    float spare_usecs;
-    float usecs_per_cycle;
+    int		    rolling_client_usecs_cnt;
+    int		    rolling_client_usecs_index;
+    int		    rolling_interval;
+    float	    spare_usecs;
+    float	    usecs_per_cycle;
     
 #if defined(__APPLE__) && defined(__POWERPC__) 
-    /* specific ressources for server/client real-time thread communication */
+    /* specific resources for server/client real-time thread communication */
     mach_port_t servertask, bp;
     int portnum;
 #endif
@@ -139,11 +147,13 @@ struct _jack_engine {
 
 /* public functions */
 
-jack_engine_t  *jack_engine_new (int real_time, int real_time_priority, int verbose, int client_timeout);
+jack_engine_t  *jack_engine_new (int real_time, int real_time_priority,
+                                 int verbose, int client_timeout,
+                                 pid_t waitpid, JSList * drivers);
 int             jack_engine_delete (jack_engine_t *);
 int             jack_run (jack_engine_t *engine);
 int             jack_wait (jack_engine_t *engine);
-int             jack_engine_load_driver (jack_engine_t *, int, char **);
+int             jack_engine_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc, JSList * driver_params);
 void            jack_set_asio_mode (jack_engine_t *, int yn);
 void            jack_dump_configuration(jack_engine_t *engine, int take_lock);
 

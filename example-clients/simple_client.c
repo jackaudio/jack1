@@ -1,3 +1,9 @@
+/** @file simple_client.c
+ *
+ * @brief This is very simple client that demonstrates the basic
+ * features of JACK as they would be used by many applications.
+ */
+
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -9,9 +15,12 @@
 jack_port_t *input_port;
 jack_port_t *output_port;
 
+/**
+ * The process callback for this JACK application.
+ * It is called by JACK at the appropriate times.
+ */
 int
 process (jack_nframes_t nframes, void *arg)
-
 {
 	jack_default_audio_sample_t *out = (jack_default_audio_sample_t *) jack_port_get_buffer (output_port, nframes);
 	jack_default_audio_sample_t *in = (jack_default_audio_sample_t *) jack_port_get_buffer (input_port, nframes);
@@ -21,23 +30,15 @@ process (jack_nframes_t nframes, void *arg)
 	return 0;      
 }
 
-int
-srate (jack_nframes_t nframes, void *arg)
-
-{
-	printf ("the sample rate is now %" PRIu32 "/sec\n", nframes);
-	return 0;
-}
-
-void
-error (const char *desc)
-{
-	fprintf (stderr, "JACK error: %s\n", desc);
-}
-
+/**
+ * This is the shutdown callback for this JACK application.
+ * It is called by JACK if the server ever shuts down or
+ * decides to disconnect the client.
+ */
 void
 jack_shutdown (void *arg)
 {
+
 	exit (1);
 }
 
@@ -52,15 +53,6 @@ main (int argc, char *argv[])
 		return 1;
 	}
 
-	/* tell the JACK server to call error() whenever it
-	   experiences an error.  Notice that this callback is
-	   global to this process, not specific to each client.
-	
-	   This is set here so that it can catch errors in the
-	   connection process
-	*/
-	jack_set_error_function (error);
-
 	/* try to become a client of the JACK server */
 
 	if ((client = jack_client_new (argv[1])) == 0) {
@@ -74,13 +66,6 @@ main (int argc, char *argv[])
 
 	jack_set_process_callback (client, process, 0);
 
-	/* tell the JACK server to call `srate()' whenever
-	   the sample rate of the system changes.
-	*/
-
-
-	jack_set_sample_rate_callback (client, srate, 0);
-
 	/* tell the JACK server to call `jack_shutdown()' if
 	   it ever shuts down, either entirely, or if it
 	   just decides to stop calling us.
@@ -88,10 +73,8 @@ main (int argc, char *argv[])
 
 	jack_on_shutdown (client, jack_shutdown, 0);
 
-	/* display the current sample rate. once the client is activated 
-	   (see below), you should rely on your own sample rate
-	   callback (see above) for this value.
-	*/
+	/* display the current sample rate. 
+	 */
 
 	printf ("engine sample rate: %" PRIu32 "\n",
 		jack_get_sample_rate (client));
@@ -113,7 +96,6 @@ main (int argc, char *argv[])
 	   connections to be made to clients that aren't
 	   running.
 	*/
-
 
 	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsOutput)) == NULL) {
 		fprintf(stderr, "Cannot find any physical capture ports\n");

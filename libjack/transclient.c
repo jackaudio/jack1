@@ -170,6 +170,7 @@ jack_call_timebase_master (jack_client_t *client)
 	jack_control_t *ectl = client->engine;
 	int new_pos = (int) ectl->pending_pos;
 
+	
 	/* Make sure this is still the master; is_timebase is set in a
 	 * critical section; timebase_cb is not. */
 	if (control->is_timebase) { 
@@ -178,6 +179,7 @@ jack_call_timebase_master (jack_client_t *client)
 			client->new_timebase = 0;
 			new_pos = 1;
 		}
+
 
 		if ((ectl->transport_state == JackTransportRolling) ||
 		    new_pos) {
@@ -200,6 +202,38 @@ jack_call_timebase_master (jack_client_t *client)
 
 
 /************************* API functions *************************/
+
+jack_nframes_t
+jack_get_current_transport_frame (const jack_client_t *client)
+{
+ 	jack_position_t position;
+	float usecs;
+	jack_nframes_t elapsed;
+	jack_transport_state_t tstate;
+
+	/* get the current transport position information. 
+	   this is thread-safe and atomic with respect
+	   to the structure contents.
+	*/
+
+	tstate = jack_transport_query (client, &position);
+	
+	if (tstate != JackTransportRolling) {
+		return position.frame;
+	}
+	
+	/* compute the elapsed usecs then audio frames since
+	   the transport info was last updated
+	*/
+	
+	usecs = jack_get_microseconds() - position.usecs;
+	elapsed = (jack_nframes_t) floor ((((float) position.frame_rate) / 1000000.0f) * usecs);
+	
+	/* return the estimated transport frame position
+	 */
+	
+	return position.frame + elapsed;
+}	
 
 jack_nframes_t
 jack_frames_since_cycle_start (const jack_client_t *client)
@@ -338,14 +372,16 @@ jack_transport_locate (jack_client_t *client, jack_nframes_t frame)
 }
 
 jack_transport_state_t 
-jack_transport_query (jack_client_t *client, jack_position_t *pos)
+jack_transport_query (const jack_client_t *client, jack_position_t *pos)
 {
 	jack_control_t *ectl = client->engine;
 
-	if (pos)
+	if (pos) {
 		/* the guarded copy makes this function work in any
-		 * thread */
+		 * thread 
+		 */
 		jack_transport_copy_position (&ectl->current_time, pos);
+	}
 
 	return ectl->transport_state;
 }

@@ -1,3 +1,4 @@
+/* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
     
@@ -71,7 +72,7 @@ typedef struct {
 } jack_connection_internal_t;
 
 typedef struct _jack_driver_info {
-    jack_driver_t *(*initialize)(jack_client_t*, int, char**);
+    jack_driver_t *(*initialize)(jack_client_t*, const JSList *);
     void           (*finish);
     char           (*client_name);
     dlhandle       handle;
@@ -127,6 +128,11 @@ static int  internal_client_request (void*, jack_request_t *);
 static int  jack_use_driver (jack_engine_t *engine, jack_driver_t *driver);
 static int  jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 			    float delayed_usecs);
+static void jack_engine_notify_clients_about_delay (jack_engine_t *engine);
+static void jack_engine_driver_exit (jack_engine_t* engine);
+static int  jack_start_freewheeling (jack_engine_t* engine);
+static int  jack_stop_freewheeling (jack_engine_t* engine);
+static int  jack_start_watchdog (jack_engine_t *engine);
 
 static char *client_state_names[] = {
 	"Not triggered",
@@ -167,18 +173,19 @@ jack_engine_reset_rolling_usecs (jack_engine_t *engine)
 }
 
 static inline jack_port_type_info_t *
-jack_global_port_type_info (jack_engine_t *engine, jack_port_internal_t *port)
+jack_port_type_info (jack_engine_t *engine, jack_port_internal_t *port)
 {
 	/* Returns a pointer to the port type information in the
-	   engine's shared control structure. */
+	   engine's shared control structure. 
+	*/
 	return &engine->control->port_types[port->shared->ptype_id];
 }
 
-static inline jack_port_type_internal_t *
-jack_local_port_type_info (jack_engine_t *engine, jack_port_internal_t *port)
+static inline jack_port_buffer_list_t *
+jack_port_buffer_list (jack_engine_t *engine, jack_port_internal_t *port)
 {
-	/* Points to the engine's private port type struct. */
-	return &engine->port_type[port->shared->ptype_id];
+	/* Points to the engine's private port buffer list struct. */
+	return &engine->port_buffers[port->shared->ptype_id];
 }
 
 static int
@@ -298,23 +305,92 @@ jack_cleanup_files ()
 	closedir (dir);
 }
 
+void
+jack_engine_place_port_buffers (jack_engine_t* engine, 
+				jack_port_type_id_t ptid,
+				jack_shmsize_t one_buffer,
+				jack_shmsize_t size,
+				unsigned long nports)
+{
+	jack_shmsize_t offset;		/* shared memory offset */
+	jack_port_buffer_info_t *bi;
+	jack_port_buffer_list_t* pti = &engine->port_buffers[ptid];
+	
+	pthread_mutex_lock (&pti->lock);
+	offset = 0;
+	
+	if (pti->info) {
+
+		/* Buffer info array already allocated for this port
+		 * type.  This must be a resize operation, so
+		 * recompute the buffer offsets, but leave the free
+		 * list alone.
+		 */
+		int i;
+
+		bi = pti->info;
+		while (offset < size) {
+			bi->offset = offset;
+			offset += one_buffer;
+			++bi;
+		}
+
+		/* update any existing output port offsets */
+		for (i = 0; i < engine->port_max; i++) {
+			jack_port_shared_t *port = &engine->control->ports[i];
+			if (port->in_use &&
+			    (port->flags & JackPortIsOutput) &&
+			    port->ptype_id == ptid) {
+				bi = engine->internal_ports[i].buffer_info;
+				if (bi) {
+					port->offset = bi->offset;
+				}
+			}
+		}
+
+	} else {
+
+		/* Allocate an array of buffer info structures for all
+		 * the buffers in the segment.  Chain them to the free
+		 * list in memory address order, offset zero must come
+		 * first.
+		 */
+		bi = pti->info = (jack_port_buffer_info_t *)
+			malloc (nports * sizeof (jack_port_buffer_info_t));
+
+		while (offset < size) {
+			bi->offset = offset;
+			pti->freelist = jack_slist_append (pti->freelist, bi);
+			offset += one_buffer;
+			++bi;
+		}
+
+		/* allocate the first buffer of the audio port segment
+		 * for a zero-filled area
+		 */
+		if (ptid == JACK_AUDIO_PORT_TYPE) {
+			engine->silent_buffer = (jack_port_buffer_info_t *)
+				pti->freelist->data;
+			pti->freelist =
+				jack_slist_remove_link (pti->freelist,
+							pti->freelist);
+		}
+	}
+
+	pthread_mutex_unlock (&pti->lock);
+}
+
 // JOQ: this should have a return code...
 static void
 jack_resize_port_segment (jack_engine_t *engine,
-			  jack_port_type_info_t *port_type,
+			  jack_port_type_id_t ptid,
 			  unsigned long nports)
 {
 	jack_event_t event;
-	void *addr;
-	jack_shmsize_t offset;		/* shared memory offset */
-	size_t one_buffer;		/* size of one buffer */
-	size_t size;			/* segment size */
-	int shmid;
-	int perm;
-	jack_port_buffer_info_t *bi;
-	jack_port_type_id_t ptid = port_type->ptype_id;
-	jack_port_type_internal_t *pti = &engine->port_type[ptid];
-	jack_port_id_t i;
+	jack_shmsize_t one_buffer;	/* size of one buffer */
+	jack_shmsize_t size;		/* segment size */
+	jack_port_type_info_t* port_type = &engine->control->port_types[ptid];
+	jack_shm_info_t* shm_info = &engine->port_segment[ptid];
 
 	if (port_type->buffer_scale_factor < 0) {
 		one_buffer = port_type->buffer_size;
@@ -325,88 +401,71 @@ jack_resize_port_segment (jack_engine_t *engine,
 	}
 
 	size = nports * one_buffer;
-        perm = O_RDWR|O_CREAT;
 
-	if (port_type->shm_info.size == 0) {
-        
+	if (shm_info->attached_at == 0) {
+
+		char name[64];
+
 		/* no segment allocated, yet */
-                 snprintf (port_type->shm_info.shm_name,
-			   sizeof(port_type->shm_info.shm_name),
-			   "/jck-[%s]", port_type->type_name);
+		snprintf (name, sizeof(name), "/jck-[%s]", port_type->type_name);
 
-		if ((addr = jack_get_shm (port_type->shm_info.shm_name, size, 
-					  perm, 0666, PROT_READ|PROT_WRITE,
-					  &shmid)) == MAP_FAILED) {
+		if (jack_shmalloc (name, size, shm_info)) {
 			jack_error ("cannot create new port segment of %d"
-				    " bytes, shm_name = %s (%s)", 
-				    size, port_type->shm_info.shm_name,
+				    " bytes, name = %s (%s)", 
+				    size, name,
 				    strerror (errno));
 			return;
 		}
-
-		jack_register_shm (port_type->shm_info.shm_name, addr, shmid);
-
-		/* Allocate an array of buffer info structures for all
-		 * the buffers in the segment.  Chain them to the free
-		 * list in memory address order, offset zero must come
-		 * first. */
-		pthread_mutex_lock (&pti->buffer_lock);
-		offset = 0;
-		bi = pti->buffer_info = (jack_port_buffer_info_t *)
-			malloc (nports * sizeof (jack_port_buffer_info_t));
-		while (offset < size) {
-			bi->shm_name = port_type->shm_info.shm_name;
-			bi->offset = offset;
-			pti->buffer_freelist =
-				jack_slist_append (pti->buffer_freelist, bi);
-			offset += one_buffer;
-			++bi;
+		
+		if (jack_attach_shm (shm_info)) {
+			jack_error ("cannot attach to new port segment (name=%s) (%s)",
+				    name, strerror (errno));
+			return;
 		}
-		pthread_mutex_unlock (&pti->buffer_lock);
+
+		engine->control->port_types[ptid].shm_registry_index =
+			shm_info->index;
 
 	} else {
 
 		/* resize existing buffer segment */
-		if ((addr = jack_resize_shm (port_type->shm_info.shm_name,
-					     size, perm, 0666,
-					     PROT_READ|PROT_WRITE))
-		    == MAP_FAILED) {
+		if (jack_resize_shm (shm_info, size)) {
 			jack_error ("cannot resize port segment to %d bytes,"
-				    " shm_name = %s (%s)", size,
-				    port_type->shm_info.shm_name,
+				    " (%s)", size,
 				    strerror (errno));
 			return;
 		}
-
-		/* recompute the buffer offsets */
-		pthread_mutex_lock (&pti->buffer_lock);
-		offset = 0;
-		bi = pti->buffer_info;
-		while (offset < size) {
-			bi->offset = offset;
-			offset += one_buffer;
-			++bi;
-		}
-
-		/* update any existing output port offsets */
-		for (i = 0; i < engine->port_max; i++) {
-			if (engine->control->ports[i].flags & JackPortIsOutput
-			    && engine->control->ports[i].ptype_id == ptid) {
-				bi = engine->internal_ports[i].buffer_info;
-				if (bi) {
-					engine->control->ports[i].offset =
-						bi->offset;
-				}
-			}
-		}
-		pthread_mutex_unlock (&pti->buffer_lock);
 	}
 
-	port_type->shm_info.size = size;
-	engine->port_type[ptid].seg_addr = addr;
+	jack_engine_place_port_buffers (engine, ptid, one_buffer, size, nports);
+
+	if (ptid == JACK_AUDIO_PORT_TYPE) {
+
+		/* Always zero `nframes' samples, it could have
+		 * changed.  The server's global variable
+		 * jack_zero_filled_buffer is for internal clients.
+		 * External clients will set their copies during the
+		 * AttachPortSegment event. */
+
+		jack_zero_filled_buffer =
+			jack_shm_addr (shm_info)
+			+ engine->silent_buffer->offset;
+		memset (jack_zero_filled_buffer, 0,
+			sizeof (jack_default_audio_sample_t) * one_buffer);
+	}
 
 	if (engine->control->real_time) {
-		int rc = mlock (addr, size);
+
+		/* Although we've called mlockall(CURRENT|FUTURE), the
+		 * Linux VM manager still allows newly allocated pages
+		 * to fault on first reference.  This mlock() ensures
+		 * that any new pages are present before restarting
+		 * the process cycle.  Since memory locks do not
+		 * stack, they can still be unlocked with a single
+		 * munlockall().
+		 */
+
+		int rc = mlock (jack_shm_addr (shm_info), size);
 		if (rc < 0) {
 			jack_error("JACK: unable to mlock() port buffers: "
 				   "%s", strerror(errno));
@@ -415,50 +474,30 @@ jack_resize_port_segment (jack_engine_t *engine,
 
 	/* Tell everybody about this segment. */
 	event.type = AttachPortSegment;
-	strcpy (event.x.shm_name, port_type->shm_info.shm_name);
 	event.y.ptid = ptid;
-	event.z.size = size;
 	jack_deliver_event_to_all (engine, &event);
 }
 
 /* The driver invokes this callback both initially and whenever its
- * buffer size changes. */
+ * buffer size changes. 
+ */
 static int
 jack_driver_buffer_size (jack_engine_t *engine, jack_nframes_t nframes)
 {
 	int i;
 	jack_event_t event;
-	jack_port_type_internal_t *pti;
 	JSList *node;
 
 	VERBOSE (engine, "new buffer size %" PRIu32 "\n", nframes);
 
 	engine->control->buffer_size = nframes;
-
 	if (engine->driver)
 		engine->rolling_interval =
 			jack_rolling_interval (engine->driver->period_usecs);
 
 	for (i = 0; i < engine->control->n_port_types; ++i) {
-		jack_resize_port_segment (engine,
-					  &engine->control->port_types[i],
-					  engine->control->port_max);
+		jack_resize_port_segment (engine, i, engine->control->port_max);
 	}
-
-	/* allocate the first buffer of the audio port segment for a
-	 * zero-filled area */
-	pti = &engine->port_type[0];
-	if (engine->silent_buffer == NULL) {
-		engine->silent_buffer = (jack_port_buffer_info_t *)
-			pti->buffer_freelist->data;
-		pti->buffer_freelist =
-			jack_slist_remove_link (pti->buffer_freelist,
-						pti->buffer_freelist);
-	}
-
-	/* always zero `nframes' samples, it could have changed */
-	memset (engine->port_type[0].seg_addr + engine->silent_buffer->offset,
-		0, sizeof (jack_default_audio_sample_t) * nframes);
 
 	/* update shared client copy of nframes */
 	jack_lock_graph (engine);
@@ -491,15 +530,10 @@ jack_set_buffer_size_request (jack_engine_t *engine, jack_nframes_t nframes)
 		return EINVAL;
 	}
 
-	/* this halts the jack_main_thread() loop while we reset the
-	 * driver's parameters */
-	pthread_mutex_lock (&engine->driver_lock);
-
 	rc = driver->bufsize(driver, nframes);
-	if (rc)
+	if (rc != 0)
 		jack_error("driver does not support %" PRIu32
 			   "-frame buffers", nframes);
-	pthread_mutex_unlock (&engine->driver_lock);
 
 	return rc;
 }
@@ -569,10 +603,10 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 static JSList * 
 jack_process_external(jack_engine_t *engine, JSList *node)
 {
-	/* precondition: caller has driver_lock */
 	int status;
 	char c;
-	float delayed_usecs;
+	struct pollfd pfd[1];
+	int poll_timeout;
 	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
 	jack_time_t now, then;
@@ -604,65 +638,56 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 
 	then = jack_get_microseconds ();
 
-	if (engine->asio_mode) {
-		engine->driver->wait (engine->driver, client->subgraph_wait_fd,
-				      &status, &delayed_usecs);
+	poll_timeout = (engine->control->real_time == 0 ?
+			engine->client_timeout_msecs :
+			engine->driver->period_usecs/1000);
+
+	pfd[0].fd = client->subgraph_wait_fd;
+	pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
+
+	DEBUG ("waiting on fd==%d for process() subgraph to finish",
+	       client->subgraph_wait_fd);
+
+	if (poll (pfd, 1, poll_timeout) < 0) {
+		jack_error ("poll on subgraph processing failed (%s)",
+			    strerror (errno));
+		status = -1; 
+	}
+
+	if (pfd[0].revents & ~POLLIN) {
+		jack_error ("subgraph starting at %s lost client",
+			    client->control->name);
+		status = -2; 
+	}
+
+	if (pfd[0].revents & POLLIN) {
+		status = 0;
 	} else {
-		struct pollfd pfd[1];
-		int poll_timeout = (engine->control->real_time == 0 ?
-				    engine->client_timeout_msecs :
-				    engine->driver->period_usecs/1000);
-
-		pfd[0].fd = client->subgraph_wait_fd;
-		pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
-
-		DEBUG ("waiting on fd==%d for process() subgraph to finish",
-		       client->subgraph_wait_fd);
-
-		if (poll (pfd, 1, poll_timeout) < 0) {
-			jack_error ("poll on subgraph processing failed (%s)",
-				    strerror (errno));
-			status = -1; 
-		}
-
-		if (pfd[0].revents & ~POLLIN) {
-			jack_error ("subgraph starting at %s lost client",
-				    client->control->name);
-			status = -2; 
-		}
-
-		if (pfd[0].revents & POLLIN) {
-			status = 0;
-		} else {
-			jack_error ("subgraph starting at %s timed out "
-				    "(subgraph_wait_fd=%d, status = %d, "
-				    "state = %s)", 
-				    client->control->name,
-				    client->subgraph_wait_fd, status, 
-				    client_state_names[client->control->state]);
-			status = 1;
-		}
+		jack_error ("subgraph starting at %s timed out "
+			    "(subgraph_wait_fd=%d, status = %d, state = %s)", 
+			    client->control->name,
+			    client->subgraph_wait_fd, status, 
+			    client_state_names[client->control->state]);
+		status = 1;
 	}
 
 	now = jack_get_microseconds ();
 
 	if (status != 0) {
-		if (engine->verbose) {
-			fprintf (stderr, "at %" PRIu64
-				 " client waiting on %d took %" PRIu64
-				 " usecs, status = %d sig = %" PRIu64
-				 " awa = %" PRIu64 " fin = %" PRIu64
-				 " dur=%" PRIu64 "\n",
-				 now,
-				 client->subgraph_wait_fd,
-				 now - then,
-				 status,
-				 ctl->signalled_at,
-				 ctl->awake_at,
-				 ctl->finished_at,
-				 ctl->finished_at? (ctl->finished_at -
-						    ctl->signalled_at): 0);
-		}
+		VERBOSE (engine, "at %" PRIu64
+			 " client waiting on %d took %" PRIu64
+			 " usecs, status = %d sig = %" PRIu64
+			 " awa = %" PRIu64 " fin = %" PRIu64
+			 " dur=%" PRIu64 "\n",
+			 now,
+			 client->subgraph_wait_fd,
+			 now - then,
+			 status,
+			 ctl->signalled_at,
+			 ctl->awake_at,
+			 ctl->finished_at,
+			 ctl->finished_at? (ctl->finished_at -
+					    ctl->signalled_at): 0);
 
 		/* we can only consider the timeout a client error if
 		 * it actually woke up.  its possible that the kernel
@@ -708,7 +733,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 static int
 jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
 {
-	/* precondition: caller has graph_lock and driver_lock */
+	/* precondition: caller has graph_lock */
 	jack_client_internal_t *client;
 	JSList *node;
 
@@ -782,11 +807,9 @@ jack_calc_cpu_load(jack_engine_t *engine)
 				 engine->driver->period_usecs)) * 50.0f
 			+ (engine->control->cpu_load * 0.5f);
 
-		if (engine->verbose) {
-			fprintf (stderr, "load = %.4f max usecs: %.3f, "
-				 "spare = %.3f\n", engine->control->cpu_load,
-				 max_usecs, engine->spare_usecs);
-		}
+		VERBOSE (engine, "load = %.4f max usecs: %.3f, "
+			 "spare = %.3f\n", engine->control->cpu_load,
+			 max_usecs, engine->spare_usecs);
 	}
 
 }
@@ -816,30 +839,26 @@ jack_remove_clients (jack_engine_t* engine)
 			   finally remove the client.
 			*/
 			if (client->error >= JACK_ERROR_WITH_SOCKETS) {
-				if (engine->verbose) {
-					fprintf (stderr, "removing failed "
-						 "client %s state = %s errors"
-						 " = %d\n", 
-						 client->control->name,
-						 client_state_names[
-							 client->control->state
-							 ],
-						 client->error);
-				}
+				VERBOSE (engine, "removing failed "
+					 "client %s state = %s errors"
+					 " = %d\n", 
+					 client->control->name,
+					 client_state_names[
+						 client->control->state
+						 ],
+					 client->error);
 				jack_remove_client (engine,
 						    (jack_client_internal_t *)
 						    node->data);
 			} else {
-				if (engine->verbose) {
-					fprintf (stderr, "zombifying failed "
-						 "client %s state = %s errors"
-						 " = %d\n", 
-						 client->control->name,
-						 client_state_names[
-							 client->control->state
-							 ],
-						 client->error);
-				}
+				VERBOSE (engine, "zombifying failed "
+					 "client %s state = %s errors"
+					 " = %d\n", 
+					 client->control->name,
+					 client_state_names[
+						 client->control->state
+						 ],
+					 client->error);
 				jack_zombify_client (engine,
 						     (jack_client_internal_t *)
 						     node->data);
@@ -955,7 +974,6 @@ jack_load_client (jack_engine_t *engine, jack_client_internal_t *client,
 static void
 jack_client_unload (jack_client_internal_t *client)
 {
-	/* precondition: caller has driver_lock */
 	if (client->handle) {
 		if (client->finish) {
 			client->finish (client->control->process_arg);
@@ -989,25 +1007,21 @@ setup_client (jack_engine_t *engine, int client_fd,
 		return 0;
 	}
 	
-	if (engine->verbose) {
-		fprintf (stderr, "new client: %s, id = %" PRIu32
-			 " type %d @ %p fd = %d\n", 
-			 client->control->name, client->control->id, 
-			 req->type, client->control, client_fd);
-	}
+	VERBOSE (engine, "new client: %s, id = %" PRIu32
+		 " type %d @ %p fd = %d\n", 
+		 client->control->name, client->control->id, 
+		 req->type, client->control, client_fd);
 	
 	res->protocol_v = jack_protocol_version;
-	strcpy (res->client_shm_name, client->shm_name);
-	strcpy (res->control_shm_name, engine->control_shm_name);
-	res->control_size = engine->control_size;
+	res->client_shm = client->control_shm;
+	res->engine_shm = engine->control_shm;
 	res->realtime = engine->control->real_time;
 	res->realtime_priority = engine->rtpriority - 1;
-	res->n_port_types = engine->control->n_port_types;
         
 #if defined(__APPLE__) && defined(__POWERPC__) 	
-     /* specific resources for server/client real-time thread
-      * communication */
-     res->portnum = client->portnum; 
+	/* specific resources for server/client real-time thread
+	 * communication */
+	res->portnum = client->portnum;
 #endif
   	
 	if (jack_client_is_internal(client)) {
@@ -1044,27 +1058,12 @@ setup_client (jack_engine_t *engine, int client_fd,
 		*/
 
 		client->control->private_client =
-			jack_client_alloc_internal (client->control,
-						    engine->control);
-		
+			jack_client_alloc_internal (client->control, engine);
+
 		jack_unlock_graph (engine);
 
 		/* call its initialization function */
 		if (client->control->type == ClientInternal) {
-
-			/* tell it about current port types and their
-			 * shared memory information */
-			jack_port_type_id_t i;
-			for (i = 0; i < engine->control->n_port_types; ++i) {
-				jack_port_type_info_t *port_type =
-					&engine->control->port_types[i];
-				jack_client_set_port_segment (
-					client->control->private_client, 
-					port_type->shm_info.shm_name,
-					i,
-					port_type->shm_info.size,
-					engine->port_type[i].seg_addr);
-			}
 
 			if (client->initialize (client->control->private_client,
 						req->object_data)) {
@@ -1098,27 +1097,23 @@ setup_client (jack_engine_t *engine, int client_fd,
 }
 
 static jack_driver_info_t *
-jack_load_driver (jack_engine_t *engine, char *so_name)
+jack_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc)
 {
-	/* precondition: caller has driver_lock */
 	const char *errstr;
-	char path_to_so[PATH_MAX+1];
 	jack_driver_info_t *info;
 
 	info = (jack_driver_info_t *) calloc (1, sizeof (*info));
 
-	snprintf (path_to_so, sizeof (path_to_so), ADDON_DIR "/jack_%s.so",
-		  so_name);
-	
-	info->handle = dlopen (path_to_so, RTLD_NOW|RTLD_GLOBAL);
+
+	info->handle = dlopen (driver_desc->file, RTLD_NOW|RTLD_GLOBAL);
 	
 	if (info->handle == NULL) {
 		if ((errstr = dlerror ()) != 0) {
-			jack_error ("can't load \"%s\": %s", path_to_so,
+			jack_error ("can't load \"%s\": %s", driver_desc->file,
 				    errstr);
 		} else {
 			jack_error ("bizarre error loading driver shared "
-				    "object %s", path_to_so);
+				    "object %s", driver_desc->file);
 		}
 		goto fail;
 	}
@@ -1127,7 +1122,7 @@ jack_load_driver (jack_engine_t *engine, char *so_name)
 
 	if ((errstr = dlerror ()) != 0) {
 		jack_error ("no initialize function in shared object %s\n",
-			    path_to_so);
+			    driver_desc->file);
 		goto fail;
 	}
 
@@ -1135,7 +1130,7 @@ jack_load_driver (jack_engine_t *engine, char *so_name)
 
 	if ((errstr = dlerror ()) != 0) {
 		jack_error ("no finish function in in shared driver object %s",
-			    path_to_so);
+			    driver_desc->file);
 		goto fail;
 	}
 
@@ -1143,7 +1138,7 @@ jack_load_driver (jack_engine_t *engine, char *so_name)
 
 	if ((errstr = dlerror ()) != 0) {
 		jack_error ("no client name in in shared driver object %s",
-			    path_to_so);
+			    driver_desc->file);
 		goto fail;
 	}
 
@@ -1161,13 +1156,12 @@ jack_load_driver (jack_engine_t *engine, char *so_name)
 void
 jack_driver_unload (jack_driver_t *driver)
 {
-	/* precondition: caller has driver_lock */
 	driver->finish (driver);
 	dlclose (driver->handle);
 }
 
 int
-jack_engine_load_driver (jack_engine_t *engine, int argc, char *argv[])
+jack_engine_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc, JSList * driver_params)
 {
 	jack_client_connect_request_t req;
 	jack_client_connect_result_t  res;
@@ -1175,39 +1169,43 @@ jack_engine_load_driver (jack_engine_t *engine, int argc, char *argv[])
 	jack_driver_t *driver;
 	jack_driver_info_t *info;
 
-	pthread_mutex_lock (&engine->driver_lock);
-
-	if ((info = jack_load_driver (engine, argv[0])) == NULL) {
-		goto unlock;
+	if ((info = jack_load_driver (engine, driver_desc)) == NULL) {
+		return -1;
 	}
 
 	req.type = ClientDriver;
 	snprintf (req.name, sizeof (req.name), "%s", info->client_name);
 
 	if ((client = setup_client (engine, -1, &req, &res)) == NULL) {
-		goto unlock;
+		return -1;
 	}
 
 	if ((driver = info->initialize (client->control->private_client,
-					argc, argv)) != 0) {
-		driver->handle = info->handle;
-		driver->finish = info->finish;
+					driver_params)) == NULL) {
+		free (info);
+		return -1;
 	}
 
+	driver->handle = info->handle;
+	driver->finish = info->finish;
 	free (info);
 
 	if (jack_use_driver (engine, driver)) {
 		jack_driver_unload (driver);
 		jack_client_delete (engine, client);
-		goto unlock;
+		return -1;
 	}
 
-	pthread_mutex_unlock (&engine->driver_lock);
-	return 0;
+	engine->driver_desc   = driver_desc;
+	engine->driver_params = driver_params;
 
- unlock:
-	pthread_mutex_unlock (&engine->driver_lock);
-	return -1;
+	if (engine->control->real_time) {
+		if (jack_start_watchdog (engine)) {
+			return -1;
+		}
+		engine->watchdog_check = 1;
+	}
+	return 0;
 }
 
 static int
@@ -1219,9 +1217,7 @@ handle_unload_client (jack_engine_t *engine, int client_fd,
 
 	res.status = -1;
 
-	if (engine->verbose) {
-		fprintf (stderr, "unloading client \"%s\"\n", req->name);
-	}
+	VERBOSE (engine, "unloading client \"%s\"\n", req->name);
 
 	jack_lock_graph (engine);
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
@@ -1245,7 +1241,6 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 	jack_client_internal_t *client;
 	jack_client_connect_request_t req;
 	jack_client_connect_result_t res;
-	unsigned long i;
 
 	if (read (client_fd, &req, sizeof (req)) != sizeof (req)) {
 		jack_error ("cannot read connection request from client");
@@ -1266,25 +1261,13 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 		return -1;
 	}
 	
-	/* give external clients a chance to find out about all known
-	 * port types */
 	switch (client->control->type) {
 	case ClientDriver:
 	case ClientInternal:
 		close (client_fd);
 		break;
-
+		
 	default:
-		for (i = 0; i < engine->control->n_port_types; ++i) {
-			if (write (client->request_fd,
-				   &engine->control->port_types[i],
-				   sizeof (jack_port_type_info_t))
-			    != sizeof (jack_port_type_info_t)) {
-				jack_error ("cannot send port type information"
-					    " to new client");
-				jack_client_delete (engine, client);
-			}
-		}
 		break;
 	}
 
@@ -1331,19 +1314,15 @@ static int check_capabilities (jack_engine_t *engine)
 	int have_all_caps = 1;
 
 	if (caps == NULL) {
-		if (engine->verbose) {
-			fprintf (stderr, "check: could not allocate capability"
-				 " working storage\n");
-		}
+		VERBOSE (engine, "check: could not allocate capability"
+			 " working storage\n");
 		return 0;
 	}
 	pid = getpid ();
 	cap_clear (caps);
 	if (capgetp (pid, caps)) {
-		if (engine->verbose) {
-			fprintf (stderr, "check: could not get capabilities "
-				 "for process %d\n", pid);
-		}
+		VERBOSE (engine, "check: could not get capabilities "
+			 "for process %d\n", pid);
 		return 0;
 	}
 	/* check that we are able to give capabilites to other processes */
@@ -1381,18 +1360,14 @@ static int give_capabilities (jack_engine_t *engine, pid_t pid)
 	cap_value_t cap_list[] = {CAP_SYS_NICE, CAP_SYS_RESOURCE, CAP_IPC_LOCK};
 
 	if (caps == NULL) {
-		if (engine->verbose) {
-			fprintf (stderr, "give: could not allocate capability"
-				 " working storage\n");
-		}
+		VERBOSE (engine, "give: could not allocate capability"
+			 " working storage\n");
 		return -1;
 	}
 	cap_clear(caps);
 	if (capgetp (pid, caps)) {
-		if (engine->verbose) {
-			fprintf (stderr, "give: could not get current "
-				 "capabilities for process %d\n", pid);
-		}
+		VERBOSE (engine, "give: could not get current "
+			 "capabilities for process %d\n", pid);
 		cap_clear(caps);
 	}
 	cap_set_flag(caps, CAP_EFFECTIVE, caps_size, cap_list , CAP_SET);
@@ -1434,11 +1409,9 @@ jack_set_client_capabilities (jack_engine_t *engine, jack_client_id_t id)
 					    "process %d\n",
 					    client->control->pid);
 			} else {
-				if (engine->verbose) {
-					fprintf (stderr, "gave capabilities to"
-						 " process %d\n",
-						 client->control->pid);
-				}
+				VERBOSE (engine, "gave capabilities to"
+					 " process %d\n",
+					 client->control->pid);
 			}
 		}
 	}
@@ -1494,9 +1467,8 @@ jack_client_do_deactivate (jack_engine_t *engine,
 			   jack_client_internal_t *client, int sort_graph)
 
 {
-	/* called must hold engine->client_lock and must have checked
-	   for and/or cleared all connections held by client.
-	*/
+	/* caller must hold engine->client_lock and must have checked for and/or
+	 *   cleared all connections held by client. */
 	client->control->active = FALSE;
 
 	if (!jack_client_is_internal (client) &&
@@ -1593,12 +1565,10 @@ handle_client_socket_error (jack_engine_t *engine, int fd)
         }
 
         if (client) {
-		if (engine->verbose) {
-			fprintf (stderr, "removing failed client %s state = "
-				 "%s errors = %d\n", client->control->name,
-				 client_state_names[client->control->state],
-				 client->error);
-		}
+		VERBOSE (engine, "removing failed client %s state = "
+			 "%s errors = %d\n", client->control->name,
+			 client_state_names[client->control->state],
+			 client->error);
 		jack_remove_client(engine, client);
 		jack_sort_graph (engine);
 	}
@@ -1714,6 +1684,14 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 			/* we have already replied, don't do it again */
 			*reply_fd = -1;
 		}
+		break;
+
+	case FreeWheel:
+		req->status = jack_start_freewheeling (engine);
+		break;
+
+	case StopFreeWheel:
+		req->status = jack_stop_freewheeling (engine);
 		break;
 
 	case SetBufferSize:
@@ -1932,14 +1910,12 @@ jack_server_thread (void *arg)
 }
 
 jack_engine_t *
-jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
+jack_engine_new (int realtime, int rtpriority, int verbose,
+		 int client_timeout, pid_t wait_pid, JSList * drivers)
 {
 	jack_engine_t *engine;
-	void *addr;
 	unsigned int i;
-	int shmid;
-	int perm;
-        
+
 #ifdef USE_CAPABILITIES
 	uid_t uid = getuid ();
 	uid_t euid = geteuid ();
@@ -1948,10 +1924,16 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 
 	engine = (jack_engine_t *) malloc (sizeof (jack_engine_t));
 
-	engine->driver = 0;
+	engine->drivers = drivers;
+	engine->driver = NULL;
+	engine->driver_desc = NULL;
+	engine->driver_params = NULL;
+
 	engine->set_sample_rate = jack_set_sample_rate;
 	engine->set_buffer_size = jack_driver_buffer_size;
         engine->run_cycle = jack_run_cycle;
+	engine->delay = jack_engine_notify_clients_about_delay;
+	engine->driver_exit = jack_engine_driver_exit;
         engine->transport_cycle_start = jack_transport_cycle_start;
 	engine->client_timeout_msecs = client_timeout;
 
@@ -1961,13 +1943,14 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 	engine->silent_buffer = 0;
 	engine->verbose = verbose;
 	engine->asio_mode = FALSE;
+	engine->freewheeling = 0;
+	engine->wait_pid = wait_pid;
 
 	jack_engine_reset_rolling_usecs (engine);
 
 	pthread_mutex_init (&engine->client_lock, 0);
 	pthread_mutex_init (&engine->port_lock, 0);
 	pthread_mutex_init (&engine->request_lock, 0);
-	pthread_mutex_init (&engine->driver_lock, 0);
 
 	engine->clients = 0;
 
@@ -1986,29 +1969,26 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 
 	srandom (time ((time_t *) 0));
 
-	snprintf (engine->control_shm_name,
-		  sizeof (engine->control_shm_name), "/jack-engine");
-	engine->control_size = sizeof (jack_control_t) +
-		(sizeof (jack_port_shared_t) * engine->port_max);
-
 	if (jack_initialize_shm (engine)) {
 		return 0;
 	}
         
-        perm = O_RDWR|O_CREAT;
-
-	if ((addr = jack_get_shm (engine->control_shm_name,
-				  engine->control_size, 
-				  perm, 0644, PROT_READ|PROT_WRITE, &shmid))
-	    == MAP_FAILED) {
+	if (jack_shmalloc ("/jack-engine",
+			   sizeof (jack_control_t) + ((sizeof (jack_port_shared_t) * engine->port_max)),
+			   &engine->control_shm)) {
 		jack_error ("cannot create engine control shared memory "
 			    "segment (%s)", strerror (errno));
 		return 0;
 	}
 
-	jack_register_shm (engine->control_shm_name, addr, shmid);
-	
-	engine->control = (jack_control_t *) addr;
+	if (jack_attach_shm (&engine->control_shm)) {
+		jack_error ("cannot attach to engine control shared memory (%s)",
+			    strerror (errno));
+		jack_destroy_shm (&engine->control_shm);
+		return 0;
+	}
+
+	engine->control = (jack_control_t *) jack_shm_addr (&engine->control_shm);
 
 	/* Setup port type information from builtins. buffer space is
 	 * allocated when the driver calls jack_driver_buffer_size().
@@ -2019,14 +1999,22 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 			&jack_builtin_port_types[i],
 			sizeof (jack_port_type_info_t));
 
+		VERBOSE (engine, "registered builtin port type %s\n",
+			 engine->control->port_types[i].type_name);
+
 		/* the port type id is index into port_types array */
 		engine->control->port_types[i].ptype_id = i;
 
 		/* be sure to initialize mutex correctly */
-		pthread_mutex_init (&engine->port_type[i].buffer_lock, NULL);
+		pthread_mutex_init (&engine->port_buffers[i].lock, NULL);
 
-		/* indicate no shared memory allocation for this port type */
-		engine->control->port_types[i].shm_info.size = 0;
+		/* set buffer list info correctly */
+		engine->port_buffers[i].freelist = NULL;
+		engine->port_buffers[i].info = NULL;
+		
+		/* mark each port segment as not allocated */
+		engine->port_segment[i].index = -1;
+		engine->port_segment[i].attached_at = 0;
 	}
 
 	engine->control->n_port_types = i;
@@ -2059,8 +2047,8 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 	engine->control->cpu_load = 0;
  
 	engine->control->buffer_size = 0;
-	jack_set_sample_rate (engine, 0);
 	jack_transport_init (engine);
+	jack_set_sample_rate (engine, 0);
 	engine->control->internal = 0;
 
 	engine->control->has_capabilities = 0;
@@ -2079,25 +2067,21 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
         
 #ifdef USE_CAPABILITIES
 	if (uid == 0 || euid == 0) {
-		if (engine->verbose) {
-			fprintf (stderr, "running with uid=%d and euid=%d, "
-				 "will not try to use capabilites\n",
-				 uid, euid);
-		}
+		VERBOSE (engine, "running with uid=%d and euid=%d, "
+			 "will not try to use capabilites\n",
+			 uid, euid);
 	} else {
 		/* only try to use capabilities if not running as root */
 		engine->control->has_capabilities = check_capabilities (engine);
 		if (engine->control->has_capabilities == 0) {
-			if (engine->verbose) {
-				fprintf (stderr, "required capabilities not "
-					 "available\n");
-			}
+			VERBOSE (engine, "required capabilities not "
+				 "available\n");
 		}
 		if (engine->verbose) {
 			size_t size;
 			cap_t cap = cap_init();
 			capgetp(0, cap);
-			fprintf (stderr, "capabilities: %s\n",
+			VERBOSE (engine, "capabilities: %s\n",
 				 cap_to_text(cap, &size));
 		}
 	}
@@ -2143,39 +2127,8 @@ jack_become_real_time (pthread_t thread, int priority)
 	return 0;
 }
 
-#ifdef HAVE_ON_EXIT
-static void
-cancel_cleanup (int status, void *arg)
-
-{
-	jack_engine_t *engine = (jack_engine_t *) arg;
-	engine->control->engine_ok = 0;
-	if (pthread_mutex_trylock (&engine->driver_lock) == 0) {
-		engine->driver->stop (engine->driver);
-		engine->driver->finish (engine->driver);
-	}
-}
-#else
-#ifdef HAVE_ATEXIT
-jack_engine_t *global_engine;
-
-static void
-cancel_cleanup (void)
-
-{
-	jack_engine_t *engine = global_engine;
-	if (pthread_mutex_trylock (&engine->driver_lock) == 0) {
-		engine->driver->stop (engine->driver);
-		engine->driver->finish (engine->driver);
-	}
-}
-#else
-#error "Don't know how to make an exit handler"
-#endif /* HAVE_ATEXIT */
-#endif /* HAVE_ON_EXIT */
-
 static void *
-watchdog_thread (void *arg)
+jack_watchdog_thread (void *arg)
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
 	int watchdog_priority = engine->rtpriority + 10;
@@ -2210,6 +2163,11 @@ watchdog_thread (void *arg)
 			kill (-getpgrp(), SIGABRT);
 			/*NOTREACHED*/
 			exit (1);
+
+#if 0  /* suppress watchdog message */
+		} else {
+			VERBOSE(engine, "jackd watchdog: all is well.\n");
+#endif
 		}
 		engine->watchdog_check = 0;
 	}
@@ -2218,13 +2176,12 @@ watchdog_thread (void *arg)
 static int
 jack_start_watchdog (jack_engine_t *engine)
 {
-	pthread_t watchdog;
-
-	if (pthread_create (&watchdog, 0, watchdog_thread, engine)) {
+	if (pthread_create (&engine->watchdog_thread, 0,
+			    jack_watchdog_thread, engine)) {
 		jack_error ("cannot start watchdog thread");
 		return -1;
 	}
-	pthread_detach (watchdog);
+	pthread_detach (engine->watchdog_thread);
 	return 0;
 }
 
@@ -2262,12 +2219,106 @@ jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
 	time->guard2++;
 }
 
+static void*
+jack_engine_freewheel (void *arg)
+{
+	jack_engine_t* engine = (jack_engine_t *) arg;
+
+	VERBOSE (engine, "freewheel thread starting ...\n");
+
+	/* we should not be running SCHED_FIFO, so we don't 
+	   have to do anything about scheduling.
+	*/
+
+	while (engine->freewheeling) {
+
+		jack_lock_graph (engine);
+
+		if (jack_engine_process (engine, engine->control->buffer_size)) {
+			jack_error ("process cycle within freewheel failed");
+			jack_unlock_graph (engine);
+			break;
+		}
+
+		jack_unlock_graph (engine);
+	}
+
+	VERBOSE (engine, "freewheel came to an end, naturally\n");
+	return 0;
+}
+
+static int
+jack_start_freewheeling (jack_engine_t* engine)
+{
+	jack_event_t event;
+
+	if (engine->driver == NULL) {
+		jack_error ("cannot start freewheeling without a driver!");
+		return -1;
+	}
+
+	event.type = StartFreewheel;
+	jack_deliver_event_to_all (engine, &event);
+
+	if (engine->driver->stop (engine->driver)) {
+		jack_error ("could not stop driver for freewheeling");
+		return -1;
+	}
+
+	engine->freewheeling = 1;
+
+	if (pthread_create (&engine->freewheel_thread, NULL,
+			    jack_engine_freewheel, engine)) {
+		jack_error ("could not start create freewheel thread");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+jack_stop_freewheeling (jack_engine_t* engine)
+{
+	jack_event_t event;
+	void *ftstatus;
+
+	if (engine->driver == NULL) {
+		jack_error ("cannot start freewheeling without a driver!");
+		return -1;
+	}
+
+	if (!engine->freewheeling) {
+		VERBOSE (engine, "stop freewheel when not freewheeling\n");
+		return 0;
+	}
+
+	/* tell the freewheel thread to stop, and wait for it
+	   to exit.
+	*/
+
+	engine->freewheeling = 0;
+	VERBOSE (engine, "freewheeling stopped, waiting for thread\n");
+	pthread_join (engine->freewheel_thread, &ftstatus);
+	VERBOSE (engine, "freewheel thread has returned\n");
+
+	/* tell everyone we've stopped */
+
+	event.type = StopFreewheel;
+	jack_deliver_event_to_all (engine, &event);
+
+	/* restart the driver */
+
+	if (engine->driver->start (engine->driver)) {
+		jack_error ("could not restart driver after freewheeling");
+		return -1;
+	}
+	return 0;
+}
+
 static int
 jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		    float delayed_usecs)
 {
-	/* precondition: caller has driver lock */
-	int restart = 0;
 	jack_driver_t* driver = engine->driver;
 	int ret = -1;
 	static int consecutive_excessive_delays = 0;
@@ -2288,19 +2339,8 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 			return -1;	/* will exit the thread loop */
 		}
 		
-		if (driver->stop (driver)) {
-			jack_error ("cannot stop current driver");
-			return -1;	/* will exit the thread loop */
-		}
-		
 		jack_engine_notify_clients_about_delay (engine);
 		
-		if (driver->start (driver)) {
-			jack_error ("cannot restart current driver after "
-				    "delay");
-			return -1;	/* will exit the thread loop */
-		}
-
 		return 0;
 
 	} else {
@@ -2313,35 +2353,37 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		return 0;
 	}
 	
-	if (driver->read (driver, nframes)) {
-		goto unlock;
-	}
-
-	engine->watchdog_check = 1;
-
-	if (jack_engine_process (engine, nframes)) {
-		driver->stop (driver);
-		restart = 1;
-	} else {
-		if (driver->write (driver, nframes)) {
+	if (!engine->freewheeling) {
+		if (driver->read (driver, nframes)) {
 			goto unlock;
 		}
 	}
 
+	engine->watchdog_check = 1;
+
+	if (jack_engine_process (engine, nframes) == 0) {
+		if (!engine->freewheeling) {
+			if (driver->write (driver, nframes)) {
+				goto unlock;
+			}
+		}
+	}
+
 	jack_engine_post_process (engine);
-
 	jack_inc_frame_time (engine, nframes);
-
 	ret = 0;
 
   unlock:
 	jack_unlock_graph (engine);
-	
-	if (restart) {
-		driver->start (driver);
-	}
-	
 	return ret;
+}
+
+static void
+jack_engine_driver_exit (jack_engine_t* engine)
+{
+	/* tell anyone waiting that the driver exited. */
+	kill (engine->wait_pid, SIGUSR2);
+	engine->driver = NULL;
 }
 
 static int
@@ -2353,7 +2395,7 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 
 	if (engine->verbose) {
 		if (nframes != b_size) { 
-			fprintf(stderr,
+			VERBOSE (engine, 
 				"late driver wakeup: nframes to process = %"
 				PRIu32 ".\n", nframes);
 		}
@@ -2370,155 +2412,38 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	return 0;
 }
 
-static void *
-jack_main_thread (void *arg)
-{
-	jack_engine_t *engine = (jack_engine_t *) arg;
-	jack_driver_t *driver = engine->driver;
-	int wait_status;
-	jack_nframes_t nframes;
-	float delayed_usecs;
-
-	if (engine->control->real_time) {
-
-		if (jack_start_watchdog (engine)) {
-			pthread_exit (0);
-		}
-
-		if (jack_become_real_time (pthread_self(),
-					   engine->rtpriority)) {
-			engine->control->real_time = 0;
-		}
-	}
-
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-	engine->watchdog_check = 1;
-
-	while (1) {
-
-		pthread_mutex_lock (&engine->driver_lock);
-
-		nframes = driver->wait (driver, -1, &wait_status,
-					&delayed_usecs);
-
-		if (nframes == 0) {
-
-			/* the driver detected an xrun and restarted */
-			jack_engine_notify_clients_about_delay (engine);
-
-		} else if (wait_status == 0) {
-
-			if (jack_run_cycle (engine, nframes,
-					    delayed_usecs) != 0) {
-				break;
-			}
-
-		} else if (wait_status < 0) {
-
-			break;
-
- 		} else {
-			/* driver restarted, just continue */
-		}
-
-		pthread_mutex_unlock (&engine->driver_lock);
-	}
-
-	pthread_mutex_unlock (&engine->driver_lock);
-	pthread_exit (0);
-        /*NOTREACHED*/
-	return 0;
-}
-
-int
-jack_run (jack_engine_t *engine)
-{
-	int rc;
-	
-#ifdef HAVE_ON_EXIT
-	on_exit (cancel_cleanup, engine);
-#else
-#ifdef HAVE_ATEXIT
-	global_engine = engine;
-	atexit (cancel_cleanup);
-#else
-#error "Don't know how to install an exit handler"
-#endif /* HAVE_ATEXIT */
-#endif /* HAVE_ON_EXIT */
-
-        if (engine->driver == NULL) {
-                jack_error ("engine driver not set; cannot start");
-                return -1;
-        }
-
-	pthread_mutex_lock (&engine->driver_lock);
-        rc = engine->driver->start (engine->driver);
-	pthread_mutex_unlock (&engine->driver_lock);
-        if (rc != 0) {
-                jack_error ("cannot start driver");
-                return -1;
-        }
-        
-#if defined(__APPLE__) && defined(__POWERPC__) 
-        return 0;
-#else
-        return pthread_create (&engine->main_thread, 0,
-			       jack_main_thread, engine);
-#endif
-
-}
-
-
-#if defined(__APPLE__) && defined(__POWERPC__) 
-int
-jack_wait (jack_engine_t *engine)
-{
-        while(1) sleep(1);
-}
-#else
-int
-jack_wait (jack_engine_t *engine)
-{
-	void *ret = 0;
-	int err;
-
-	if ((err = pthread_join (engine->main_thread, &ret)) != 0)  {
-		switch (err) {
-		case EINVAL:
-			jack_error ("cannot join with audio thread (thread "
-				    "detached, or another thread is waiting)");
-			break;
-		case ESRCH:
-			jack_error ("cannot join with audio thread (thread "
-				    "no longer exists)");
-			break;
-		case EDEADLK:
-			jack_error ("programming error: jack_wait() called by"
-				    " audio thread");
-			break;
-		default:
-			jack_error ("cannot join with audio thread (%s)",
-				    strerror (errno));
-		}
-	}
-	return (int) ((intptr_t)ret);
-}
-#endif
-
 int 
 jack_engine_delete (jack_engine_t *engine)
 {
-	if (engine) {
+	int i;
 
-#if defined(__APPLE__) && defined(__POWERPC__) 
-		/* the jack_run_cycle() function is directly called
-		 * from the CoreAudo audio callback */
-		return 0;
-#else
-		return pthread_cancel (engine->main_thread);
-#endif
+	if (engine && engine->driver) {
+		jack_driver_t* driver = engine->driver;
+
+		VERBOSE (engine, "stopping driver\n");
+		driver->stop (driver);
+		VERBOSE (engine, "detaching driver\n");
+		driver->detach (driver, engine);
+		VERBOSE (engine, "unloading driver\n");
+		jack_driver_unload (driver);
+		engine->driver = NULL;
 	}
+
+	for (i = 0; i < engine->control->n_port_types; ++i) {
+		jack_release_shm (&engine->port_segment[i]);
+		jack_destroy_shm (&engine->port_segment[i]);
+	}
+
+	/* stop the other engine threads */
+	pthread_cancel (engine->server_thread);
+	pthread_cancel (engine->watchdog_thread);
+
+	/* free engine control shm segment */
+	engine->control = NULL;
+	jack_release_shm (&engine->control_shm);
+	jack_destroy_shm (&engine->control_shm);
+
+	free (engine);
 	return 0;
 }
 
@@ -2527,33 +2452,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd,
 			  jack_client_connect_request_t *req)
 {
 	jack_client_internal_t *client;
-	shm_name_t shm_name;
-	int shmid;
-	int perm;
-	void *addr = 0;
 
-	switch (req->type) {
-	case ClientInternal:
-	case ClientDriver:
-		break;
-
-	case ClientExternal:
-                
-                perm = O_RDWR|O_CREAT;
-                snprintf (shm_name, sizeof (shm_name), "/jack-c-%s", req->name);
-                
-                if ((addr = jack_get_shm (shm_name,
-					  sizeof (jack_client_control_t), 
-                                          perm, 0666, PROT_READ|PROT_WRITE,
-					  &shmid)) == MAP_FAILED) {
-                        jack_error ("cannot create client control block for %s",
-				    req->name);
-                        return 0;
-                }
-                jack_register_shm (shm_name, addr, shmid);
-                break;
-        }
-                
 	client = (jack_client_internal_t *)
 		malloc (sizeof (jack_client_internal_t));
 
@@ -2573,8 +2472,29 @@ jack_client_internal_new (jack_engine_t *engine, int fd,
 			malloc (sizeof (jack_client_control_t));		
 
 	} else {
-		strcpy (client->shm_name, shm_name);
-		client->control = (jack_client_control_t *) addr;
+
+		char shm_name[PATH_MAX+1];
+
+                snprintf (shm_name, sizeof (shm_name), "/jack-c-%s", req->name);
+                
+                if (jack_shmalloc (shm_name,
+				   sizeof (jack_client_control_t), 
+				   &client->control_shm)) {
+                        jack_error ("cannot create client control block for %s",
+				    req->name);
+			free (client);
+                        return 0;
+                }
+
+		if (jack_attach_shm (&client->control_shm)) {
+			jack_error ("cannot attach to client control block for %s (%s)",
+				    req->name, strerror (errno));
+			jack_destroy_shm (&client->control_shm);
+			free (client);
+			return 0;
+		}
+
+		client->control = (jack_client_control_t *) jack_shm_addr (&client->control_shm);
 	}
 
 	client->control->type = req->type;
@@ -2665,9 +2585,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	/* caller must hold the client_lock */
 
-	if (engine->verbose) {
-		fprintf (stderr, "adios senor %s\n", client->control->name);
-	}
+	VERBOSE (engine, "adios senor %s\n", client->control->name);
 
 	/* if its not already a zombie, make it so */
 
@@ -2716,14 +2634,20 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 static void
 jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 {
-	/* precondition: caller has driver_lock */
 	if (jack_client_is_internal (client)) {
+
 		jack_client_unload (client);
 		free ((char *) client->control);
+
 	} else {
-		jack_destroy_shm (client->shm_name);
-		jack_release_shm ((char*)client->control,
-				  sizeof (jack_client_control_t));
+		
+		/* release the client segment, mark it for
+		   destruction, and free up the shm registry
+		   information so that it can be reused.
+		*/
+
+		jack_release_shm (&client->control_shm);
+		jack_destroy_shm (&client->control_shm);
 	}
 
 	free (client);
@@ -2841,17 +2765,6 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 			}
 			break;
 
-		case AttachPortSegment:
-
-			/* Internal clients don't need to attach, but
-			 * they still need to set the port_segment. */
-			jack_client_set_port_segment
-				(client->control->private_client, 
-				 event->x.shm_name, event->y.ptid,
-				 event->z.size,
-				 engine->port_type[event->y.ptid].seg_addr);
-			break;
-
 		default:
 			/* internal clients don't need to know */
 			break;
@@ -2865,7 +2778,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 			 * it's worth telling the client */
 
 			DEBUG ("engine writing on event fd");
-			
+
 			if (write (client->event_fd, event, sizeof (*event))
 			    != sizeof (*event)) {
 				jack_error ("cannot send event to client [%s]"
@@ -2913,9 +2826,7 @@ jack_rechain_graph (jack_engine_t *engine)
 
 	subgraph_client = 0;
 
-	if (engine->verbose) {
-		fprintf(stderr, "++ jack_rechain_graph():\n");
-	}
+	VERBOSE(engine, "++ jack_rechain_graph():\n");
 
 	event.type = GraphReordered;
 
@@ -2959,25 +2870,20 @@ jack_rechain_graph (jack_engine_t *engine)
 				if (subgraph_client) {
 					subgraph_client->subgraph_wait_fd =
 						jack_get_fifo_fd (engine, n);
-					if (engine->verbose) {
-						fprintf(stderr,
-							"client %s: wait_fd="
-							"%d, execution_order="
-							"%lu.\n", 
-							subgraph_client->
-							control->name,
-							subgraph_client->
-							subgraph_wait_fd, n);
-					}
+					VERBOSE (engine, "client %s: wait_fd="
+						 "%d, execution_order="
+						 "%lu.\n", 
+						 subgraph_client->
+						 control->name,
+						 subgraph_client->
+						 subgraph_wait_fd, n);
 					n++;
 				}
 
-				if (engine->verbose) {
-					fprintf(stderr, "client %s: internal "
-						"client, execution_order="
-						"%lu.\n", 
-						client->control->name, n);
-				}
+				VERBOSE (engine, "client %s: internal "
+					 "client, execution_order="
+					 "%lu.\n", 
+					 client->control->name, n);
 
 				/* this does the right thing for
 				 * internal clients too */
@@ -2998,26 +2904,22 @@ jack_rechain_graph (jack_engine_t *engine)
 					subgraph_client = client;
 					subgraph_client->subgraph_start_fd =
 						jack_get_fifo_fd (engine, n);
-					if (engine->verbose) {
-						fprintf(stderr, "client %s: "
-							"start_fd=%d, execution"
-							"_order=%lu.\n",
-							subgraph_client->
-							control->name,
-							subgraph_client->
-							subgraph_start_fd, n);
-					}
+					VERBOSE (engine, "client %s: "
+						 "start_fd=%d, execution"
+						 "_order=%lu.\n",
+						 subgraph_client->
+						 control->name,
+						 subgraph_client->
+						 subgraph_start_fd, n);
 				} 
 				else {
-					if (engine->verbose) {
-						fprintf(stderr, "client %s: in"
-							" subgraph after %s, "
-							"execution_order="
-							"%lu.\n",
-							client->control->name,
-							subgraph_client->
-							control->name, n);
-					}
+					VERBOSE (engine, "client %s: in"
+						 " subgraph after %s, "
+						 "execution_order="
+						 "%lu.\n",
+						 client->control->name,
+						 subgraph_client->
+						 control->name, n);
 					subgraph_client->subgraph_wait_fd = -1;
 				}
 
@@ -3036,17 +2938,13 @@ jack_rechain_graph (jack_engine_t *engine)
 	if (subgraph_client) {
 		subgraph_client->subgraph_wait_fd =
 			jack_get_fifo_fd (engine, n);
-		if (engine->verbose) {
-			fprintf(stderr, "client %s: wait_fd=%d, "
-				"execution_order=%lu (last client).\n", 
-				subgraph_client->control->name,
-				subgraph_client->subgraph_wait_fd, n);
-		}
+		VERBOSE (engine, "client %s: wait_fd=%d, "
+			 "execution_order=%lu (last client).\n", 
+			 subgraph_client->control->name,
+			 subgraph_client->subgraph_wait_fd, n);
 	}
 
-	if (engine->verbose) {
-		fprintf(stderr, "-- jack_rechain_graph()\n");
-	}
+	VERBOSE (engine, "-- jack_rechain_graph()\n");
 
 	return err;
 }
@@ -3515,18 +3413,16 @@ jack_port_do_connect (jack_engine_t *engine,
 
 	if (dstport->connections && !dstport->shared->has_mixdown) {
 		jack_port_type_info_t *port_type =
-			jack_global_port_type_info (engine, dstport);
+			jack_port_type_info (engine, dstport);
 		jack_error ("cannot make multiple connections to a port of"
 			    " type [%s]", port_type->type_name);
 		free (connection);
 		jack_unlock_graph (engine);
 		return -1;
 	} else {
-		if (engine->verbose) {
-			fprintf (stderr, "connect %s and %s\n",
-				 srcport->shared->name,
-				 dstport->shared->name);
-		}
+		VERBOSE (engine, "connect %s and %s\n",
+			 srcport->shared->name,
+			 dstport->shared->name);
 
 		dstport->connections =
 			jack_slist_prepend (dstport->connections, connection);
@@ -3571,11 +3467,9 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 		if (connect->source == srcport &&
 		    connect->destination == dstport) {
 
-			if (engine->verbose) {
-				fprintf (stderr, "DIS-connect %s and %s\n",
-					 srcport->shared->name,
-					 dstport->shared->name);
-			}
+			VERBOSE (engine, "DIS-connect %s and %s\n",
+				 srcport->shared->name,
+				 dstport->shared->name);
 			
 			srcport->connections =
 				jack_slist_remove (srcport->connections,
@@ -3629,10 +3523,8 @@ jack_port_do_disconnect_all (jack_engine_t *engine,
 		return -1;
 	}
 
-	if (engine->verbose) {
-		fprintf (stderr, "clear connections for %s\n",
-			 engine->internal_ports[port_id].shared->name);
-	}
+	VERBOSE (engine, "clear connections for %s\n",
+		 engine->internal_ports[port_id].shared->name);
 
 	jack_lock_graph (engine);
 	jack_port_clear_connections (engine, &engine->internal_ports[port_id]);
@@ -3694,6 +3586,7 @@ jack_get_fifo_fd (jack_engine_t *engine, unsigned int which_fifo)
 					    strerror (errno));
 				return -1;
 			}
+
 		} else {
 			jack_error ("cannot check on FIFO %d\n", which_fifo);
 			return -1;
@@ -3759,7 +3652,6 @@ jack_clear_fifos (jack_engine_t *engine)
 static int
 jack_use_driver (jack_engine_t *engine, jack_driver_t *driver)
 {
-	/* precondition: caller has driver_lock */
 	if (engine->driver) {
 		engine->driver->detach (engine->driver, engine);
 		engine->driver = 0;
@@ -3776,6 +3668,7 @@ jack_use_driver (jack_engine_t *engine, jack_driver_t *driver)
 	engine->driver = driver;
 	return 0;
 }
+
 
 /* PORT RELATED FUNCTIONS */
 
@@ -3811,14 +3704,14 @@ jack_port_release (jack_engine_t *engine, jack_port_internal_t *port)
 	port->shared->in_use = 0;
 
 	if (port->buffer_info) {
-		jack_port_type_internal_t *info =
-			jack_local_port_type_info (engine, port);
-		pthread_mutex_lock (&info->buffer_lock);
-		info->buffer_freelist =
-			jack_slist_prepend (info->buffer_freelist,
+		jack_port_buffer_list_t *blist =
+			jack_port_buffer_list (engine, port);
+		pthread_mutex_lock (&blist->lock);
+		blist->freelist =
+			jack_slist_prepend (blist->freelist,
 					    port->buffer_info);
 		port->buffer_info = NULL;
-		pthread_mutex_unlock (&info->buffer_lock);
+		pthread_mutex_unlock (&blist->lock);
 	}
 	pthread_mutex_unlock (&engine->port_lock);
 }
@@ -3907,10 +3800,8 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	jack_port_registration_notify (engine, port_id, TRUE);
 	jack_unlock_graph (engine);
 
-	if (engine->verbose) {
-		fprintf (stderr, "registered port %s, offset = %u\n",
-			 shared->name, (unsigned int)shared->offset);
-	}
+	VERBOSE (engine, "registered port %s, offset = %u\n",
+		 shared->name, (unsigned int)shared->offset);
 
 	req->x.port_info.port_id = port_id;
 
@@ -4092,8 +3983,8 @@ jack_port_registration_notify (jack_engine_t *engine,
 int
 jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 {
-	jack_port_type_internal_t *pti =
-		jack_local_port_type_info (engine, port);
+	jack_port_buffer_list_t *blist =
+		jack_port_buffer_list (engine, port);
 	jack_port_buffer_info_t *bi;
 
 	if (port->shared->flags & JackPortIsInput) {
@@ -4101,30 +3992,29 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 		return 0;
 	}
 	
-	pthread_mutex_lock (&pti->buffer_lock);
+	pthread_mutex_lock (&blist->lock);
 
-	if (pti->buffer_freelist == NULL) {
+	if (blist->freelist == NULL) {
 		jack_port_type_info_t *port_type =
-			jack_global_port_type_info (engine, port);
+			jack_port_type_info (engine, port);
 		jack_error ("all %s port buffers in use!",
 			    port_type->type_name);
-		pthread_mutex_unlock (&pti->buffer_lock);
+		pthread_mutex_unlock (&blist->lock);
 		return -1;
 	}
 
-	bi = (jack_port_buffer_info_t *) pti->buffer_freelist->data;
-	pti->buffer_freelist = jack_slist_remove (pti->buffer_freelist, bi);
+	bi = (jack_port_buffer_info_t *) blist->freelist->data;
+	blist->freelist = jack_slist_remove (blist->freelist, bi);
 
 	port->shared->offset = bi->offset;
 	port->buffer_info = bi;
 
-	pthread_mutex_unlock (&pti->buffer_lock);
+	pthread_mutex_unlock (&blist->lock);
 	return 0;
 }
 
 static jack_port_internal_t *
 jack_get_port_by_name (jack_engine_t *engine, const char *name)
-
 {
 	jack_port_id_t id;
 

@@ -31,7 +31,7 @@
 #include <pthread.h>
 #include <getopt.h>
 #include <jack/jack.h>
-#include "ringbuffer.h"
+#include <jack/ringbuffer.h>
 
 typedef struct _thread_info {
     pthread_t thread_id;
@@ -56,7 +56,7 @@ const size_t sample_size = sizeof(jack_default_audio_sample_t);
 
 /* Synchronization between process thread and disk thread. */
 #define DEFAULT_RB_SIZE 16384		/* ringbuffer size in frames */
-ringbuffer_t *rb;
+jack_ringbuffer_t *rb;
 pthread_mutex_t disk_thread_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t  data_ready = PTHREAD_COND_INITIALIZER;
 long overruns = 0;
@@ -81,9 +81,9 @@ disk_thread (void *arg)
 		/* Write the data one frame at a time.  This is
 		 * inefficient, but makes things simpler. */
 		while (info->can_capture &&
-		       (ringbuffer_read_space (rb) >= bytes_per_frame)) {
+		       (jack_ringbuffer_read_space (rb) >= bytes_per_frame)) {
 
-			ringbuffer_read (rb, framebuf, bytes_per_frame);
+			jack_ringbuffer_read (rb, framebuf, bytes_per_frame);
 
 			if (sf_writef_float (info->sf, framebuf, 1) != 1) {
 				char errstr[256];
@@ -129,7 +129,7 @@ process (jack_nframes_t nframes, void *arg)
 	 * just queue interleaved samples to a single ringbuffer. */
 	for (i = 0; i < nframes; i++) {
 		for (chn = 0; chn < nports; chn++) {
-			if (ringbuffer_write (rb, (void *) (in[chn]+i),
+			if (jack_ringbuffer_write (rb, (void *) (in[chn]+i),
 					      sample_size)
 			    < sample_size)
 				overruns++;
@@ -223,7 +223,7 @@ setup_ports (int sources, char *source_names[], thread_info_t *info)
 	ports = (jack_port_t **) malloc (sizeof (jack_port_t *) * nports);
 	in_size =  nports * sizeof (jack_default_audio_sample_t *);
 	in = (jack_default_audio_sample_t **) malloc (in_size);
-	rb = ringbuffer_create (nports * sample_size * info->rb_size);
+	rb = jack_ringbuffer_create (nports * sample_size * info->rb_size);
 
 	/* When JACK is running realtime, jack_activate() will have
 	 * called mlockall() to lock our pages into memory.  But, we
@@ -337,7 +337,7 @@ main (int argc, char *argv[])
 
 	jack_client_close (client);
 
-	ringbuffer_free (rb);
+	jack_ringbuffer_free (rb);
 
 	exit (0);
 }

@@ -31,22 +31,19 @@ typedef struct _dummy_driver dummy_driver_t;
 
 struct _dummy_driver
 {
+    JACK_DRIVER_NT_DECL
 
-  JACK_DRIVER_DECL
+    jack_nframes_t  sample_rate;
+    jack_nframes_t  period_size;
+    unsigned long   wait_time;
 
-  jack_nframes_t sample_rate;
-  jack_nframes_t period_size;
-  unsigned long  wait_time;
+    unsigned int    capture_channels;
+    unsigned int    playback_channels;
 
-  unsigned int   capture_channels;
-  unsigned int   playback_channels;
+    JSList	   *capture_ports;
+    JSList	   *playback_ports;
 
-  JSList *       capture_ports;
-  JSList *       playback_ports;
-
-  struct _jack_engine * engine;
-
-  jack_client_t * client;
+    jack_client_t  *client;
 };
 
 #endif /* __JACK_DUMMY_DRIVER_H__ */

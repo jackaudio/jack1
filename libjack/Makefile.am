@@ -6,6 +6,7 @@ SOURCE_FILES = \
 	     driver.c \
 	     pool.c \
 	     port.c \
+	     ringbuffer.c \
 	     timestamps.c \
 	     transclient.c
 

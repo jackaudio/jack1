@@ -76,7 +76,8 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 			
 		/* It's our port, so initialize the pointers to port
 		 * functions within this address space.  These builtin
-		 * definitions can be overridden by the client. */
+		 * definitions can be overridden by the client. 
+		 */
 
 		if (ptid == JACK_AUDIO_PORT_TYPE) {
 
@@ -96,8 +97,8 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	   port->offset can change if the buffer size or port counts
 	   are changed.
 	*/
-	port->client_segment_base =
-		(void *) &client->port_segment[ptid].address;
+
+	port->client_segment_base = (void **) &client->port_segment[ptid].attached_at;
 	
 	return port;
 }
@@ -374,6 +375,7 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 		if (port->tied) {
 			return jack_port_get_buffer (port->tied, nframes);
 		}
+
 		return jack_output_port_buffer (port);
 	}
 

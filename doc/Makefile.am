@@ -16,7 +16,8 @@ DOC_DIR=$(HTML_DIR)
 all-local: doxygen-build.stamp
 
 doxygen-build.stamp: $(DOX) mainpage.dox transport.dox fsm.png \
-../jack/jack.h ../jack/types.h ../jack/transport.h
+../jack/jack.h ../jack/types.h ../jack/transport.h ../jack/ringbuffer.h ../jack/port.h \
+../example-clients/simple_client.c 
 	@echo '*** Running doxygen ***'
 	doxygen $(DOX)
 	touch doxygen-build.stamp

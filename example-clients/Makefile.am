@@ -35,6 +35,7 @@ bin_PROGRAMS = jack_load \
 	       jack_showtime \
                jack_bufsize \
 	       jack_lsp \
+	       jack_freewheel \
 	       $(JACKREC) \
 	       $(JACK_TRANSPORT)
 
@@ -78,9 +79,12 @@ jack_bufsize_SOURCES = bufsize.c
 jack_bufsize_LDFLAGS =
 jack_bufsize_LDADD = ../libjack/libjack.la
 
+jack_freewheel_SOURCES = freewheel.c
+jack_freewheel_LDFLAGS =
+jack_freewheel_LDADD = ../libjack/libjack.la
 
 if HAVE_SNDFILE
-jackrec_SOURCES = capture_client.c ringbuffer.c ringbuffer.h
+jackrec_SOURCES = capture_client.c
 jackrec_LDFLAGS = @SNDFILE_LIBS@ -lrt -ldl -lpthread
 jackrec_LDADD = ../libjack/libjack.la
 endif

@@ -1,3 +1,4 @@
+/* -*- mode: c; c-file-style: "linux"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
     
@@ -23,21 +24,17 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/mman.h>
+#include <errno.h>
 
 #include <config.h>
 
 #include <jack/driver.h>
 #include <jack/internal.h>
+#include <jack/engine.h>
 
 static int dummy_attach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
 static int dummy_detach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
-static jack_nframes_t dummy_wait (jack_driver_t *drv, int fd,
-				  int *status, float *delayed_usecs)
-{
-	*status = 0;
-	*delayed_usecs = 0;
-	return 0;
-}
 static int dummy_write (jack_driver_t *drv,
 			jack_nframes_t nframes) { return 0; }
 static int dummy_read (jack_driver_t *drv, jack_nframes_t nframes) { return 0; }
@@ -55,11 +52,208 @@ jack_driver_init (jack_driver_t *driver)
 
 	driver->attach = dummy_attach;
 	driver->detach = dummy_detach;
-	driver->wait = dummy_wait;
 	driver->write = dummy_write;
 	driver->read = dummy_read;
 	driver->null_cycle = dummy_null_cycle;
 	driver->bufsize = dummy_bufsize;
 	driver->start = dummy_start;
 	driver->stop = dummy_stop;
+}
+
+
+
+/****************************
+ *** Non-Threaded Drivers ***
+ ****************************/
+
+static int dummy_nt_run_cycle (jack_driver_nt_t *drv) { return 0; }
+static int dummy_nt_attach    (jack_driver_nt_t *drv) { return 0; }
+static int dummy_nt_detach    (jack_driver_nt_t *drv) { return 0; }
+
+
+/*
+ * These are used in driver->nt_run for controlling whether or not
+ * driver->engine->driver_exit() gets called (EXIT = call it, PAUSE = don't)
+ */
+#define DRIVER_NT_RUN   0
+#define DRIVER_NT_EXIT  1
+#define DRIVER_NT_PAUSE 2
+
+static int
+jack_driver_nt_attach (jack_driver_nt_t * driver, jack_engine_t * engine)
+{
+	driver->engine = engine;
+	return driver->nt_attach (driver);
+}
+
+static int
+jack_driver_nt_detach (jack_driver_nt_t * driver, jack_engine_t * engine)
+{
+	int ret;
+
+	ret = driver->nt_detach (driver);
+	driver->engine = NULL;
+
+	return ret;
+}
+
+static int
+jack_driver_nt_become_real_time (jack_driver_nt_t* driver)
+{
+        if (jack_acquire_real_time_scheduling (driver->nt_thread,
+                                               driver->engine->rtpriority)) {
+                return -1;
+        }
+
+        if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
+		jack_error ("cannot lock down memory for RT thread (%s)",
+			    strerror (errno));
+		return -1;
+        }
+
+        return 0;
+}
+
+
+static void *
+jack_driver_nt_thread (void * arg)
+{
+	jack_driver_nt_t * driver = (jack_driver_nt_t *) arg;
+	int rc = 0;
+	int run;
+
+	if (driver->engine->control->real_time)
+		jack_driver_nt_become_real_time (driver);
+
+	pthread_mutex_lock (&driver->nt_run_lock);
+
+	while ( (run = driver->nt_run) == DRIVER_NT_RUN) {
+		pthread_mutex_unlock (&driver->nt_run_lock);
+
+		rc = driver->nt_run_cycle (driver);
+		if (rc) {
+			jack_error ("DRIVER NT: could not run driver cycle");
+			goto out;
+		}
+
+		pthread_mutex_lock (&driver->nt_run_lock);
+	}
+
+	pthread_mutex_unlock (&driver->nt_run_lock);
+
+ out:
+	if (rc || run == DRIVER_NT_EXIT)
+  	  driver->engine->driver_exit (driver->engine);
+
+	pthread_exit (NULL);
+}
+
+static int
+jack_driver_nt_start (jack_driver_nt_t * driver)
+{
+	int err;
+
+	err = driver->nt_start (driver);
+	if (err) {
+		jack_error ("DRIVER NT: could not start driver");
+		return err;
+	}
+
+	driver->nt_run = DRIVER_NT_RUN;
+
+	err = pthread_create (&driver->nt_thread, NULL,
+			      jack_driver_nt_thread, driver);
+	if (err) {
+		jack_error ("DRIVER NT: could not start driver thread!");
+		driver->nt_stop (driver);
+		return err;
+	}
+
+	return 0;
+}
+
+static int
+jack_driver_nt_do_stop (jack_driver_nt_t * driver, int run)
+{
+	int err;
+
+	pthread_mutex_lock (&driver->nt_run_lock);
+	driver->nt_run = run;
+	pthread_mutex_unlock (&driver->nt_run_lock);
+
+	err = pthread_join (driver->nt_thread, NULL);
+	if (err) {
+		jack_error ("DRIVER NT: error waiting for driver thread: %s",
+                            strerror (err));
+		return err;
+	}
+
+	err = driver->nt_stop (driver);
+	if (err) {
+		jack_error ("DRIVER NT: error stopping driver");
+		return err;
+	}
+
+	return 0;
+}
+
+static int
+jack_driver_nt_stop (jack_driver_nt_t * driver)
+{
+	return jack_driver_nt_do_stop (driver, DRIVER_NT_EXIT);
+}
+
+static int
+jack_driver_nt_bufsize (jack_driver_nt_t * driver, jack_nframes_t nframes)
+{
+	int err;
+	int ret;
+
+	err = jack_driver_nt_do_stop (driver, DRIVER_NT_PAUSE);
+	if (err) {
+		jack_error ("DRIVER NT: could not stop driver to change buffer size");
+		driver->engine->driver_exit (driver->engine);
+		return err;
+	}
+
+	ret = driver->nt_bufsize (driver, nframes);
+
+	err = jack_driver_nt_start (driver);
+	if (err) {
+		jack_error ("DRIVER NT: could not restart driver during buffer size change");
+		driver->engine->driver_exit (driver->engine);
+		return err;
+	}
+
+	return ret;
+}
+
+void
+jack_driver_nt_init (jack_driver_nt_t * driver)
+{
+	memset (driver, 0, sizeof (*driver));
+
+	jack_driver_init ((jack_driver_t *) driver);
+
+	driver->attach       = (JackDriverAttachFunction)    jack_driver_nt_attach;
+	driver->detach       = (JackDriverDetachFunction)    jack_driver_nt_detach;
+	driver->bufsize      = (JackDriverBufSizeFunction)   jack_driver_nt_bufsize;
+	driver->stop         = (JackDriverStartFunction)     jack_driver_nt_stop;
+	driver->start        = (JackDriverStopFunction)      jack_driver_nt_start;
+
+	driver->nt_bufsize   = (JackDriverNTBufSizeFunction) dummy_bufsize;
+	driver->nt_start     = (JackDriverNTStartFunction)   dummy_start;
+	driver->nt_stop      = (JackDriverNTStopFunction)    dummy_stop;
+	driver->nt_attach    =                               dummy_nt_attach;
+	driver->nt_detach    =                               dummy_nt_detach;
+	driver->nt_run_cycle =                               dummy_nt_run_cycle;
+
+
+	pthread_mutex_init (&driver->nt_run_lock, NULL);
+}
+
+void
+jack_driver_nt_finish     (jack_driver_nt_t * driver)
+{
+	pthread_mutex_destroy (&driver->nt_run_lock);
 }

@@ -4,11 +4,12 @@ libjackincludedir = $(includedir)/jack
 
 libjackinclude_HEADERS = 	\
 	jack.h			\
-	timestamps.h	\
-	transport.h 	\
+	ringbuffer.h		\
+	timestamps.h		\
+	transport.h		\
 	types.h	
 
-noinst_HEADERS = 	\
+noinst_HEADERS =		\
 	cycles.h 		\
 	driver.h 		\
 	engine.h		\
@@ -20,5 +21,7 @@ noinst_HEADERS = 	\
 	shm.h			\
 	start.h			\
 	time.h			\
-	version.h
+	version.h		\
+	driver_interface.h	\
+	driver_parse.h
 

@@ -1,3 +1,4 @@
+/* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
     
@@ -26,6 +27,9 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <dirent.h>
+#include <dlfcn.h>
 
 #include <config.h>
 
@@ -33,6 +37,7 @@
 #include <jack/internal.h>
 #include <jack/driver.h>
 #include <jack/shm.h>
+#include <jack/driver_parse.h>
 
 #ifdef USE_CAPABILITIES
 
@@ -46,29 +51,14 @@ static struct stat pipe_stat;
 
 #endif
 
+static JSList * drivers = NULL;
 static sigset_t signals;
 static jack_engine_t *engine = 0;
-static int jackd_pid;
 static int realtime = 0;
 static int realtime_priority = 10;
-static int with_fork = 1;
 static int verbose = 0;
 static int asio_mode = 0;
 static int client_timeout = 500; /* msecs */
-
-typedef struct {
-    pid_t  pid;
-    int argc;
-    char **argv;
-} waiter_arg_t;
-
-static void
-signal_handler (int sig)
-{
-	/* this is used by the parent (waiter) process */
-	fprintf (stderr, "jackd: signal %d received\n", sig);
-	kill (jackd_pid, SIGTERM);
-}
 
 static void 
 do_nothing_handler (int sig)
@@ -83,69 +73,20 @@ do_nothing_handler (int sig)
 	write (1, buf, strlen (buf));
 }
 
-static void *
-jack_engine_waiter_thread (void *arg)
-{
-	waiter_arg_t *warg = (waiter_arg_t *) arg;
-
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-	if ((engine = jack_engine_new (realtime, realtime_priority,
-				       verbose, client_timeout)) == 0) {
-		fprintf (stderr, "cannot create engine\n");
-		kill (warg->pid, SIGTERM);
-		return 0;
-	}
-
-	if (warg->argc) {
-
-		fprintf (stderr, "loading driver ..\n");
-		
-		if (jack_engine_load_driver (engine, warg->argc, warg->argv)) {
-			fprintf (stderr, "cannot load driver module %s\n",
-				 warg->argv[0]);
-			kill (warg->pid, SIGTERM);
-			return 0;
-		}
-
-	} else {
-
-		fprintf (stderr, "No driver specified ... hmm. JACK won't do"
-			 " anything when run like this.\n");
-	}
-
-	if (asio_mode) {
-		jack_set_asio_mode (engine, TRUE);
-	} 
-
-	fprintf (stderr, "starting engine\n");
-
-	if (jack_run (engine)) {
-		fprintf (stderr, "cannot start main JACK thread\n");
-		kill (warg->pid, SIGTERM);
-		return 0;
-	}
-
-	jack_wait (engine);
-
-	fprintf (stderr, "telling signal thread that the engine is done\n");
-	kill (warg->pid, SIGHUP);
-
-	return 0; /* nobody cares what this returns */
-}
-
-static void
-jack_main (int argc, char **argv)
+static int
+jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 {
 	int sig;
 	int i;
-	pthread_t waiter_thread;
-	waiter_arg_t warg;
 	sigset_t allsignals;
 	struct sigaction action;
+	int waiting;
 
-	/* remove any existing files from a previous instance */
-	jack_cleanup_files ();
+	/* ensure that we are in our own process group so that
+	   kill (SIG, -pgrp) does the right thing.
+	*/
+
+	setsid ();
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
@@ -182,55 +123,44 @@ jack_main (int argc, char **argv)
 	sigaddset(&signals, SIGPIPE);
 	sigaddset(&signals, SIGTERM);
 	sigaddset(&signals, SIGUSR1);
-
-#if 0				
-	/* POSIX defines these as "synchronous" signals, which must be
-	 * delivered to the offending thread.  I think it's a bad idea
-	 * to block them.  (JOQ) */
-	sigaddset(&signals, SIGILL);
-	sigaddset(&signals, SIGTRAP);
-	sigaddset(&signals, SIGABRT);
-	sigaddset(&signals, SIGIOT);
-	sigaddset(&signals, SIGFPE);
-	sigaddset(&signals, SIGSEGV);
-#endif
+	sigaddset(&signals, SIGUSR2);
 
 	/* all child threads will inherit this mask unless they
-	 * explicitly reset it */
+	 * explicitly reset it 
+	 */
+
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
 	
-	/* what we'd really like to do here is to be able to wait for
-	   either the engine to stop or a POSIX signal, whichever
-	   arrives sooner. but there is no mechanism to do that, so
-	   instead we create a thread to wait for the engine to
-	   finish, and here we stop and wait for any (reasonably
-	   likely) POSIX signal.
+	/* get the engine/driver started */
 
-	   if the engine finishes first, the waiter thread will tell
-	   us about it via a signal.
+	if ((engine = jack_engine_new (realtime, realtime_priority,
+				       verbose, client_timeout,
+				       getpid(), drivers)) == 0) {
+		fprintf (stderr, "cannot create engine\n");
+		return -1;
+	}
 
-	   if a signal arrives, we'll stop the engine and then exit.
+	fprintf (stderr, "loading driver ..\n");
+	
+	if (jack_engine_load_driver (engine, driver_desc, driver_params)) {
+		fprintf (stderr, "cannot load driver module %s\n", driver_desc->name);
+		return -1;
+	}
 
-	   in normal operation, our parent process will be waiting for
-	   us and will cleanup.
-	*/
+	if (asio_mode) {
+		jack_set_asio_mode (engine, TRUE);
+	} 
 
-	warg.pid = getpid();
-	warg.argc = argc;
-	warg.argv = argv;
-
-	if (pthread_create (&waiter_thread, 0, jack_engine_waiter_thread,
-			    &warg)) {
-		fprintf (stderr,
-			 "jackd: cannot create engine waiting thread\n");
-		return;
+        if (engine->driver->start (engine->driver) != 0) {
+                jack_error ("cannot start driver");
+		return -1;
 	}
 
 	/* install a do-nothing handler because otherwise pthreads
 	   behaviour is undefined when we enter sigwait.
 	*/
-	sigfillset (&allsignals);
 
+	sigfillset (&allsignals);
 	action.sa_handler = do_nothing_handler;
 	action.sa_mask = allsignals;
 	action.sa_flags = SA_RESTART|SA_RESETHAND;
@@ -245,15 +175,23 @@ jack_main (int argc, char **argv)
 		fprintf (stderr, "%d waiting for signals\n", getpid());
 	}
 
-	while(1) {
+	waiting = TRUE;
+
+	while (waiting) {
 		sigwait (&signals, &sig);
 
 		fprintf (stderr, "jack main caught signal %d\n", sig);
 		
-		if (sig == SIGUSR1) {
+		switch (sig) {
+		case SIGUSR1:
 			jack_dump_configuration(engine, 1);
-		} else {
-			/* continue to kill engine */
+			break;
+		case SIGUSR2:
+			/* driver exit */
+			waiting = FALSE;
+			break;
+		default:
+			waiting = FALSE;
 			break;
 		}
 	} 
@@ -267,10 +205,131 @@ jack_main (int argc, char **argv)
 		sigprocmask (SIG_UNBLOCK, &signals, 0);
 	}
 
-	pthread_cancel (waiter_thread);
 	jack_engine_delete (engine);
+	return 1;
+}
 
-	return;
+static jack_driver_desc_t *
+jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
+{
+	jack_driver_desc_t * descriptor, * other_descriptor;
+	JackDriverDescFunction so_get_descriptor;
+	JSList * node;
+	void * dlhandle;
+	char * filename;
+	const char * dlerr;
+	int err;
+
+	filename = malloc (strlen (ADDON_DIR) + 1 + strlen (sofile) + 1);
+	sprintf (filename, "%s/%s", ADDON_DIR, sofile);
+
+	if (verbose)
+		printf ("getting driver descriptor from %s\n", filename);
+
+	dlhandle = dlopen (filename, RTLD_NOW|RTLD_GLOBAL);
+	if (!dlhandle) {
+		jack_error ("could not open driver .so '%s': %s\n", filename, dlerror ());
+		free (filename);
+		return NULL;
+	}
+
+	dlerror ();
+
+	so_get_descriptor = (JackDriverDescFunction)
+		dlsym (dlhandle, "driver_get_descriptor");
+
+	dlerr = dlerror ();
+	if (dlerr) {
+		dlclose (dlhandle);
+		free (filename);
+		return NULL;
+	}
+
+	descriptor = so_get_descriptor ();
+	if (!descriptor) {
+		jack_error ("driver from '%s' returned NULL descriptor\n", filename);
+		dlclose (dlhandle);
+		free (filename);
+		return NULL;
+	}
+
+	err = dlclose (dlhandle);
+	if (err) {
+		jack_error ("error closing driver .so '%s': %s\n", filename, dlerror ());
+	}
+
+
+	/* check it doesn't exist already */
+	for (node = drivers; node; node = jack_slist_next (node)) {
+		other_descriptor = (jack_driver_desc_t *) node->data;
+
+		if (strcmp (descriptor->name, other_descriptor->name) == 0) {
+			jack_error ("the drivers in '%s' and '%s' both have the name '%s'; using the first\n",
+				    other_descriptor->file, filename, other_descriptor->name);
+			/* FIXME: delete the descriptor */
+			free (filename);
+			return NULL;
+		}
+	}
+
+	strncpy (descriptor->file, filename, PATH_MAX);
+	free (filename);
+
+	return descriptor;
+  
+}
+
+static JSList *
+jack_drivers_load ()
+{
+	struct dirent * dir_entry;
+	DIR * dir_stream;
+	const char * ptr;
+	int err;
+	JSList * driver_list = NULL;
+	jack_driver_desc_t * desc;
+
+	/* search through the ADDON_DIR and add get descriptors
+	   from the .so files in it */
+	dir_stream = opendir (ADDON_DIR);
+	if (!dir_stream) {
+		jack_error ("could not open driver directory %s: %s\n", ADDON_DIR, strerror (errno));
+		return NULL;
+	}
+  
+	while ( (dir_entry = readdir (dir_stream)) ) {
+		/* check the filename is of the right format */
+		if (strncmp ("jack_", dir_entry->d_name, 5) != 0) {
+			continue;
+		}
+
+		ptr = strrchr (dir_entry->d_name, '.');
+		if (!ptr) {
+			continue;
+		}
+		ptr++;
+		if (strncmp ("so", ptr, 2) != 0) {
+			continue;
+		}
+
+		desc = jack_drivers_get_descriptor (drivers, dir_entry->d_name);
+		if (desc) {
+			driver_list = jack_slist_append (driver_list, desc);
+		}
+
+	}
+
+	err = closedir (dir_stream);
+	if (err) {
+		jack_error ("error closing driver directory %s: %s\n", ADDON_DIR, strerror (errno));
+	}
+
+	if (!driver_list) {
+		jack_error ("could not find any drivers in %s!\n", ADDON_DIR);
+		return NULL;
+	}
+
+	return driver_list;
 }
 
 static void copyright (FILE* file)
@@ -295,10 +354,30 @@ static void usage (FILE *file)
 "         -d driver [ ... driver args ... ]\n");
 }	
 
+static jack_driver_desc_t *
+jack_find_driver_descriptor (const char * name)
+{
+	jack_driver_desc_t * desc;
+	JSList * node;
+
+	for (node = drivers; node; node = jack_slist_next (node)) {
+		desc = (jack_driver_desc_t *) node->data;
+
+		if (strcmp (desc->name, name) != 0) {
+			desc = NULL;
+		} else {
+			break;
+		}
+	}
+
+	return desc;
+}
+
 int	       
 main (int argc, char *argv[])
 
 {
+        jack_driver_desc_t * desc;
 	const char *options = "-ad:D:P:vhVRFl:t:";
 	struct option long_options[] = 
 	{ 
@@ -310,7 +389,6 @@ main (int argc, char *argv[])
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
 		{ "timeout", 1, 0, 't' },
-		{ "spoon", 0, 0, 'F' },
 		{ "version", 0, 0, 'V' },
 		{ 0, 0, 0, 0 }
 	};
@@ -319,6 +397,7 @@ main (int argc, char *argv[])
 	int seen_driver = 0;
 	char *driver_name = 0;
 	char **driver_args = 0;
+	JSList * driver_params;
 	int driver_nargs = 1;
 	int show_version = 0;
 	int i;
@@ -359,7 +438,6 @@ main (int argc, char *argv[])
 		}
 	}
 #endif
-
 	opterr = 0;
 	while (!seen_driver && (opt = getopt_long (argc, argv, options,
 						   long_options,
@@ -380,10 +458,6 @@ main (int argc, char *argv[])
 
 		case 'v':
 			verbose = 1;
-			break;
-
-		case 'F':
-			with_fork = 0;
 			break;
 
 		case 'P':
@@ -427,10 +501,31 @@ main (int argc, char *argv[])
 		exit (1);
 	}
 
+
+	drivers = jack_drivers_load ();
+	if (!drivers)
+	{
+		fprintf (stderr, "jackd: no drivers found; exiting\n");
+		exit (1);
+	}
+
+	desc = jack_find_driver_descriptor (driver_name);
+	if (!desc)
+	{
+		fprintf (stderr, "jackd: unknown driver '%s'\n", driver_name);
+		exit (1);
+	}
+
 	if (optind < argc) {
 		driver_nargs = 1 + argc - optind;
 	} else {
 		driver_nargs = 1;
+	}
+
+	if (driver_nargs == 0) {
+		fprintf (stderr, "No driver specified ... hmm. JACK won't do"
+			 " anything when run like this.\n");
+		return -1;
 	}
 
 	driver_args = (char **) malloc (sizeof (char *) * driver_nargs);
@@ -440,41 +535,22 @@ main (int argc, char *argv[])
 		driver_args[i] = argv[optind++];
 	}
 
+	i = jack_parse_driver_params (desc, driver_nargs, driver_args, &driver_params);
+	if (i)
+		exit (0);
+
 	copyright (stdout);
-
-	if (!with_fork) {
-
-		/* This is really here so that we can run gdb easily */
-		jack_main (driver_nargs, driver_args);
-
-	} else {
-
-		int pid = fork ();
-		
-		if (pid < 0) {
-
-			fprintf (stderr, "could not fork jack server (%s)",
-				 strerror (errno));
-			exit (1);
-
-		} else if (pid == 0) {
-
-			jack_main (driver_nargs, driver_args);
-
-		} else {
-			jackd_pid = pid;
-
-			signal (SIGHUP, signal_handler);
-			signal (SIGINT, signal_handler);
-			signal (SIGQUIT, signal_handler);
-			signal (SIGTERM, signal_handler);
-
-			waitpid (pid, NULL, 0);
-		}
-	}
 
 	jack_cleanup_shm ();
 	jack_cleanup_files ();
 
-	return 0;
+	jack_main (desc, driver_params);
+
+	jack_cleanup_shm ();
+	jack_cleanup_files ();
+
+	exit (0);
 }
+
+
+

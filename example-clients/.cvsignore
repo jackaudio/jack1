@@ -5,7 +5,7 @@ Makefile.in
 jack_cache_killer
 jack_connect
 jack_disconnect
-jack_fltk_client
+jack_freewheel
 jack_impulse_grabber
 jack_monitor_client
 jack_simple_client

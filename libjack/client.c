@@ -1,3 +1,4 @@
+/* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
     
@@ -138,7 +139,6 @@ jack_client_t *
 jack_client_alloc ()
 {
 	jack_client_t *client;
-	jack_port_type_id_t ptid;
 
 	client = (jack_client_t *) malloc (sizeof (jack_client_t));
 	client->pollfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 2);
@@ -149,30 +149,29 @@ jack_client_alloc ()
 	client->graph_next_fd = -1;
 	client->ports = NULL;
 	client->engine = NULL;
-	client->control = 0;
+	client->control = NULL;
 	client->thread_ok = FALSE;
 	client->first_active = TRUE;
 	client->on_shutdown = NULL;
-
 	client->n_port_types = 0;
-	for (ptid = 0; ptid < JACK_MAX_PORT_TYPES; ++ptid) {
-		client->port_segment[ptid].shm_name[0] = '\0';
-		client->port_segment[ptid].address = NULL;
-		client->port_segment[ptid].size = 0;
-	}
+	client->port_segment = NULL;
 
 	return client;
 }
 
 jack_client_t *
-jack_client_alloc_internal (jack_client_control_t *cc, jack_control_t *ec)
+jack_client_alloc_internal (jack_client_control_t *cc, jack_engine_t* engine)
 {
 	jack_client_t* client;
 
 	client = jack_client_alloc ();
+
 	client->control = cc;
-	client->engine = ec;
+	client->engine = engine->control;
 	
+	client->n_port_types = client->engine->n_port_types;
+	client->port_segment = &engine->port_segment[0];
+
 	return client;
 }
 
@@ -459,35 +458,67 @@ jack_request_client (ClientType type, const char* client_name, const char* so_na
 	return -1;
 }
 
-void
-jack_attach_port_segment (jack_client_t *client, shm_name_t shm_name,
-			  jack_port_type_id_t ptid, jack_shmsize_t size)
+int
+jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 {
-	int shmid;
-	void *addr;
-
 	/* Lookup, attach and register the port/buffer segments in use
-	 * right now. */
+	 * right now. 
+	 */
+
 	if (client->control->type != ClientExternal) {
 		jack_error("Only external clients need attach port segments");
 		abort();
 	}
 
-	/* release any previous segment */
-	if (client->port_segment[ptid].size) {
-		jack_release_shm (client->port_segment[ptid].address,
-				  client->port_segment[ptid].size);
-		client->port_segment[ptid].size = 0;
+	/* make sure we have space to store the port
+	   segment information.
+	*/
+
+	if (ptid >= client->n_port_types) {
+		
+		client->port_segment = (jack_shm_info_t*)
+			realloc (client->port_segment,
+				 sizeof (jack_shm_info_t) * (ptid+1));
+		
+		memset (&client->port_segment[client->n_port_types],
+			0,
+			sizeof (jack_shm_info_t) * 
+			(ptid - client->n_port_types));
+		
+		client->n_port_types = ptid + 1;
+
+	} else {
+
+		/* release any previous segment */
+		
+		jack_release_shm (&client->port_segment[ptid]);
 	}
 
-	if ((addr = jack_get_shm (shm_name, size, O_RDWR, 0,
-				  (PROT_READ|PROT_WRITE),
-				  &shmid)) == MAP_FAILED) {
+	/* get the index into the shm registry */
+
+	client->port_segment[ptid].index =
+		client->engine->port_types[ptid].shm_registry_index;
+
+	/* attach the relevant segment */
+
+	if (jack_attach_shm (&client->port_segment[ptid])) {
 		jack_error ("cannot attach port segment shared memory"
 			    " (%s)", strerror (errno));
+		return -1;
 	}
 
-	jack_client_set_port_segment (client, shm_name, ptid, size, addr);
+	/* The first chunk of the audio port segment will be set by
+	 * the engine to be a zero-filled buffer.  This hasn't been
+	 * done yet, but it will happen before the process cycle
+	 * (re)starts. 
+	 */
+
+	if (ptid == JACK_AUDIO_PORT_TYPE) {
+		jack_zero_filled_buffer =
+			jack_shm_addr (&client->port_segment[ptid]);
+	}
+
+	return 0;
 }
 
 jack_client_t *
@@ -497,15 +528,13 @@ jack_client_new (const char *client_name)
 	int ev_fd = -1;
 	jack_client_connect_result_t  res;
 	jack_client_t *client;
-	void *addr;
-	int shmid;
-	jack_port_type_info_t* type_info;
 	jack_port_type_id_t ptid;
 
 	/* external clients need this initialized; internal clients
 	   will use the setup in the server's address space.
 	*/
 	jack_init_time ();
+	jack_initialize_shm ();
 
 	if (jack_request_client (ClientExternal, client_name, "", "",
 				 &res, &req_fd)) {
@@ -521,61 +550,44 @@ jack_client_new (const char *client_name)
 	client->pollfd[1].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
 
 	/* attach the engine control/info block */
-	if ((addr = jack_get_shm (res.control_shm_name, res.control_size,
-				  O_RDWR, 0, (PROT_READ|PROT_WRITE),
-				  &shmid)) == MAP_FAILED) {
+	client->engine_shm = res.engine_shm;
+	if (jack_attach_shm (&client->engine_shm)) {
 		jack_error ("cannot attached engine control shared memory"
 			    " segment");
 		goto fail;
 	}
 	
-
-	client->engine = (jack_control_t *) addr;
+	client->engine = (jack_control_t *) jack_shm_addr (&client->engine_shm);
 
 	/* now attach the client control block */
-	if ((addr = jack_get_shm (res.client_shm_name,
-				  sizeof (jack_client_control_t), O_RDWR,
-				  0, (PROT_READ|PROT_WRITE),
-				  &shmid)) == MAP_FAILED) {
+	client->control_shm = res.client_shm;
+	if (jack_attach_shm (&client->control_shm)) {
 		jack_error ("cannot attached client control shared memory"
 			    " segment");
 		goto fail;
 	}
-
-	client->control = (jack_client_control_t *) addr;
+	
+	client->control = (jack_client_control_t *) jack_shm_addr (&client->control_shm);
 
 	/* nobody else needs to access this shared memory any more, so
-	   destroy it. because we have our own link to it, it won't
-	   vanish till we exit.
+	   destroy it. because we have our own attachment to it, it won't
+	   vanish till we exit (and release it).
 	*/
-	jack_destroy_shm (res.client_shm_name);
+	jack_destroy_shm (&client->control_shm);
 
-	/* read incoming port type information so that we can get
-	   shared memory information for each one.
-	*/
-	type_info = (jack_port_type_info_t *)
-		malloc (sizeof (jack_port_type_info_t) * res.n_port_types);
-
-	if (read (req_fd, type_info,
-		  sizeof (jack_port_type_info_t) * res.n_port_types) != 
-	    sizeof (jack_port_type_info_t) * res.n_port_types) {
-		jack_error ("cannot read port type information during client"
-			    " connection");
-		free (type_info);
-		goto fail;
+	client->n_port_types = client->engine->n_port_types;
+	client->port_segment = (jack_shm_info_t *) malloc (sizeof (jack_shm_info_t) * 
+							   client->n_port_types);
+	
+	for (ptid = 0; ptid < client->n_port_types; ++ptid) {
+		client->port_segment[ptid].index =
+			client->engine->port_types[ptid].shm_registry_index;
+		jack_attach_port_segment (client, ptid);
 	}
-
-	client->n_port_types = res.n_port_types;
-	for (ptid = 0; ptid < res.n_port_types; ++ptid) {
-		jack_attach_port_segment (client,
-					  type_info[ptid].shm_info.shm_name,
-					  ptid, type_info[ptid].shm_info.size);
-	}
-
-	free (type_info);
 
 	/* set up the client so that it does the right thing for an
-	 * external client */
+	 * external client 
+	 */
 	client->control->deliver_request = oop_client_deliver_request;
 	client->control->deliver_arg = client;
 
@@ -606,11 +618,12 @@ jack_client_new (const char *client_name)
 	
   fail:
 	if (client->engine) {
-		munmap ((char *) client->engine, res.control_size);
+		jack_release_shm (&client->engine_shm);
+		client->engine = 0;
 	}
 	if (client->control) {
-		munmap ((char *) client->control,
-			sizeof (jack_client_control_t));
+		jack_release_shm (&client->control_shm);
+		client->control = 0;
 	}
 	if (req_fd >= 0) {
 		close (req_fd);
@@ -655,23 +668,59 @@ jack_internal_client_close (const char *client_name)
 	return;
 }
 
-void
-jack_client_set_port_segment (jack_client_t *client, shm_name_t shm_name,
-			      jack_port_type_id_t ptid, jack_shmsize_t size,
-			      void *addr)
+int
+jack_drop_real_time_scheduling (pthread_t thread)
 {
-	client->port_segment[ptid].address = addr;
-	client->port_segment[ptid].size = size;
-	strncpy (client->port_segment[ptid].shm_name,
-		 shm_name, sizeof (shm_name_t));
-
-	/* The first chunk of the audio port segment will be set by
-	 * the engine to be a zero-filled buffer.  This hasn't been
-	 * done yet, but it will happen before the process cycle
-	 * (re)starts. */
-	if (ptid == JACK_AUDIO_PORT_TYPE) {
-		jack_zero_filled_buffer = client->port_segment[ptid].address;
+	struct sched_param rtparam;
+	int x;
+	
+	memset (&rtparam, 0, sizeof (rtparam));
+	rtparam.sched_priority = 0;
+	
+	if ((x = pthread_setschedparam (thread, SCHED_OTHER, &rtparam)) != 0) {
+		jack_error ("cannot switch to normal scheduling priority(%s)\n", strerror (errno));
+		return -1;
 	}
+        return 0;
+}
+
+int
+jack_acquire_real_time_scheduling (pthread_t thread, int priority)
+{
+	struct sched_param rtparam;
+	int x;
+	
+	memset (&rtparam, 0, sizeof (rtparam));
+	rtparam.sched_priority = priority;
+	
+	if ((x = pthread_setschedparam (thread, SCHED_FIFO, &rtparam)) != 0) {
+		jack_error ("cannot use real-time scheduling (FIFO/%d) "
+			    "(%d: %s)", rtparam.sched_priority, x,
+			    strerror (errno));
+		return -1;
+	}
+        return 0;
+}
+
+int
+jack_set_freewheel (jack_client_t* client, int onoff)
+{
+	jack_request_t request;
+	request.type = onoff ? FreeWheel : StopFreeWheel;
+	return jack_client_deliver_request (client, &request);
+}
+
+void
+jack_start_freewheel (jack_client_t* client)
+{
+	jack_drop_real_time_scheduling (client->thread);
+}
+
+void
+jack_stop_freewheel (jack_client_t* client)
+{
+	jack_acquire_real_time_scheduling (client->thread,
+					   client->engine->client_priority);
 }
 
 static void *
@@ -722,15 +771,21 @@ jack_client_thread (void *arg)
 			break;
 		}
                 
-		pthread_testcancel();
-
 		/* get an accurate timestamp on waking from poll for a
-		 * process() cycle. */
+		 * process() cycle. 
+		 */
+
 		if (client->pollfd[1].revents & POLLIN) {
 			control->awake_at = jack_get_microseconds();
 		}
 
-		if (client->pollfd[0].revents & ~POLLIN ||
+		DEBUG ("pfd[0].revents = 0x%x pfd[1].revents = 0x%x",
+		       client->pollfd[0].revents,
+		       client->pollfd[1].revents);
+
+		pthread_testcancel();
+
+		if ((client->pollfd[0].revents & ~POLLIN) ||
 		    client->control->dead) {
 			goto zombie;
 		}
@@ -806,10 +861,15 @@ jack_client_thread (void *arg)
 				break;
 
 			case AttachPortSegment:
-				jack_attach_port_segment (client,
-							  event.x.shm_name,
-							  event.y.ptid,
-							  event.z.size);
+				jack_attach_port_segment (client, event.y.ptid);
+				break;
+				
+			case StartFreewheel:
+				jack_start_freewheel (client);
+				break;
+
+			case StopFreewheel:
+				jack_stop_freewheel (client);
 				break;
 			}
 
@@ -823,6 +883,10 @@ jack_client_thread (void *arg)
 				err++;
 				break;
 			}
+		}
+
+		if (client->pollfd[1].revents & ~POLLIN) {
+			goto zombie;
 		}
 
 		if (client->pollfd[1].revents & POLLIN) {
@@ -929,7 +993,8 @@ jack_client_thread (void *arg)
 		jack_error ("zombified - exiting from JACK");
 		jack_client_close (client);
 		/* Need a fix : possibly make client crash if
-		 * zombified without shutdown handler */
+		 * zombified without shutdown handler 
+		 */
 	}
 
 	pthread_exit (0);
@@ -1023,7 +1088,7 @@ jack_start_thread (jack_client_t *client)
 #endif
 
 	if (client->engine->real_time) {
-
+		
 		/* Get the client thread to run as an RT-FIFO
 		   scheduled thread of appropriate priority.
 		*/
@@ -1300,23 +1365,29 @@ jack_client_close (jack_client_t *client)
 	if (client->control->type == ClientExternal) {
 	
 		/* stop the thread that communicates with the jack
-		 * server, only if it was actually running */
+		 * server, only if it was actually running 
+		 */
 		
 		if (client->thread_ok){
 			pthread_cancel (client->thread);
 			pthread_join (client->thread, &status);
 		}
 
-		munmap ((char *) client->control,
-			sizeof (jack_client_control_t));
-		munmap ((char *) client->engine,
-			sizeof (jack_control_t));
+		if (client->port_segment) {
+			free (client->port_segment);
+		}
+
+		if (client->control) {
+			jack_release_shm (&client->control_shm);
+			client->control = NULL;
+		}
+		if (client->engine) {
+			jack_release_shm (&client->engine_shm);
+			client->engine = NULL;
+		}
 
 		for (ptid = 0; ptid < client->n_port_types; ++ptid) {
-			if (client->port_segment[ptid].size) {
-				munmap (client->port_segment[ptid].address,
-					client->port_segment[ptid].size);
-			}
+			jack_release_shm (&client->port_segment[ptid]);
 		}
 
 		if (client->graph_wait_fd) {

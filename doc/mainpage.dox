@@ -8,20 +8,75 @@
 
 @section intro Introduction
 
-JACK is a low-latency audio server, written primarily for the
-GNU/Linux operating system.  It can connect several client
-applications to an audio device, and allow them to share audio with
-each other.  Clients can run as separate processes like normal
-applications, or within the JACK server as "plugins".
+JACK is a low-latency audio server, written for POSIX conformant
+operating systems such as GNU/Linux and Apple's OS X.  It can connect
+several client applications to an audio device, and allow them to
+share audio with each other.  Clients can run as separate processes
+like normal applications, or within the JACK server as "plugins".
 
-JACK differs from other audio servers in being designed from the
-ground up for professional audio work, focusing on two key areas:
-synchronous execution of all clients, and low latency operation.
+JACK was designed from the ground up for professional audio work, and
+its design focuses on two key areas: synchronous execution of all
+clients, and low latency operation.
 
 @see <http://jackit.sourceforge.net>
 
 
-@section contents Contents
+@section jack_overview JACK Overview
+
+Traditionally it has been hard if not impossible to write audio
+applications that can share data with each other. In addition,
+configuring and managing audio interface hardware has often been one
+of the most complex aspect of writing audio software.
+
+JACK changes all this by providing an API that does several things:
+
+    1. provides a high level abstraction for programmers that
+       removes the audio interface hardware from the picture and
+       allows them to concentrate on the core functionality of
+       their software.
+
+    2. allows applications to send and receive audio data to/from
+       each other as well as the audio interface. There is
+       difference in how an application sends or receives
+       data regardless of whether it comes from another application 
+       or an audio interface.
+
+For programmers with experience of several other audio APIs such as
+PortAudio, Apple's CoreAudio, Steinberg's VST and ASIO as well as many
+others, JACK presents a familiar model: your program provides a
+"callback" function that will be executed at the right time. Your
+callback can send and receive data as well as do other signal
+processing tasks. You are not responsible for managing audio
+interfaces or threading, and there is no "format negotiation": all
+audio data within JACK is represented as 32 bit floating point values.
+
+For those with experiences rooted in the Unix world, JACK presents a
+somewhat unfamiliar API. Most Unix APIs are based on the read/write
+model spawned by the "everything is a file" abstraction that Unix is
+rightly famous for. The problem with this design is that it fails to
+take the realtime nature of audio interfaces into account, or more
+precisely, it fails to force application developers to pay sufficient
+attention to this aspect of their task. In addition, it becomes rather
+difficult to facilitate inter-application audio routing when different
+programs are not all running synchronously.
+
+Using JACK within your program is very simple, and typically consists
+of just:
+
+   - calling @ref jack_client_new to connect to the JACK server.
+   - registering "ports" to enable data to be moved to and from
+       your application.
+   - registering a "process callback" which will be called at the
+       right time by the JACK server.
+   - telling JACK that your application is ready to start processing
+       data.
+
+There is a lot more that you can do with JACK's interfaces, but for
+many applications, this is all that is needed. This <simple_client.c>
+demonstrates a complete (simple!) JACK application that just copies
+the signal arriving at its input port to its output port.
+
+@section reference Reference
 
 The JACK programming interfaces are described in several header files:
 
@@ -30,7 +85,23 @@ The JACK programming interfaces are described in several header files:
   for starting, stopping and repositioning clients.  This is described
   in the @ref transport-design document.
   - <jack/types.h> defines most of the data types for JACK.
+  - <jack/ringbuffer.h> defines a simple API for using lock-free
+  ringbuffers, a very valuable and common data structure in real
+  time streaming media software. It is critical for use in
+  applications that do disk I/O such as audio file players and
+  recording software.
 
+In addition, the example_clients directory provides numerous examples
+of simple JACK clients that nevertheless use the API to do something
+useful. It includes
+
+  - a metronome.
+  - a recording client that can capture any number of channels
+      from any JACK sources and store them as an audio file.
+  - command line clients to control the transport mechanism,
+       change the buffer size and more.      
+  - simple examples of wrapping a GUI around a JACK application.
+  - tools for checking the status of a running JACK system.
 
 @section license License
 
@@ -38,10 +109,10 @@ Copyright (C) 2001-2003 by Paul Davis and others.
 
 JACK is free software; you can redistribute it and/or modify it under
 the terms of the GNU GPL and LGPL licenses as published by the Free
-Software Foundation, <http://www.gnu.org>.  Most of JACK uses the GPL,
-as noted in the source file headers.  But, the library interfaces are
-licensed under the LGPL, allowing proprietary programs to link with
-JACK and call its services.  You should have received a copy of these
+Software Foundation, <http://www.gnu.org>.  The JACK server uses the
+GPL, as noted in the source file headers.  However, the JACK library
+is licensed under the LGPL, allowing proprietary programs to link with
+it and use JACK services.  You should have received a copy of these
 Licenses along with the program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
 USA.

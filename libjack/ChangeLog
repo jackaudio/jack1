@@ -1,3 +1,14 @@
+2003-10-15  Paul Davis <paul@linuxaudiosystems.com>
+
+	* new ring buffer interface: <jack/ringbuffer.h>
+
+2003-10-07  Paul Davis <paul@linuxaudiosystems.com>
+
+	* new function jack_set_freewheel().
+
+	No compatibility issues: this introduces new functionality to 
+	JACK and doesn't alter any existing functionality.
+	
 2003-09-18  Jack O'Quin  <joq@io.com>
 
 	* new function jack_set_buffer_size().  

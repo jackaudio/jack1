@@ -46,6 +46,8 @@ typedef struct {
         jack_nframes_t    frame_rate;
         jack_nframes_t    frames_per_cycle;
         unsigned long     user_nperiods;
+	int		  capturing;
+	int		  playing;
 
         channel_t    playback_nchannels;
         channel_t    capture_nchannels;

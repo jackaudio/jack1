@@ -1,3 +1,4 @@
+/* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
     Copyright © Grame 2003
 
@@ -23,6 +24,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <getopt.h>
 #include <jack/engine.h>
 #include "portaudio_driver.h"
 
@@ -144,12 +146,6 @@ portaudio_driver_null_cycle (portaudio_driver_t* driver, jack_nframes_t nframes)
 }
 
 static int
-portaudio_driver_bufsize (portaudio_driver_t* driver, jack_nframes_t nframes)
-{
-        return ENOSYS;			/* function not implemented */
-}
-
-static int
 portaudio_driver_read (portaudio_driver_t *driver, jack_nframes_t nframes)
 {
         jack_default_audio_sample_t *buf;
@@ -219,6 +215,99 @@ portaudio_driver_audio_stop (portaudio_driver_t *driver)
         return (err != paNoError) ? -1 : 0;
 }
 
+static int
+portaudio_driver_set_parameters (portaudio_driver_t* driver,
+				   jack_nframes_t nframes,
+				   jack_nframes_t rate)
+{
+	int capturing = driver->capturing;
+	int playing = driver->playing;
+
+	int err = Pa_OpenStream(
+		&driver->stream,
+		((capturing) ? Pa_GetDefaultInputDeviceID() : paNoDevice),	
+		((capturing) ? driver->capture_nchannels : 0),             
+		paFloat32,		/* 32-bit float input */
+		NULL,
+		((playing) ? Pa_GetDefaultOutputDeviceID() : paNoDevice),
+		((playing) ?  driver->playback_nchannels : 0),        
+		paFloat32,		/* 32-bit float output */
+		NULL,
+		rate,			/* sample rate */
+		nframes,		/* frames per buffer */
+		0,			/* number of buffers = default min */
+		paClipOff,		/* we won't output out of
+					 * range samples so don't
+					 * bother clipping them */
+		paCallback,
+		driver);
+    
+        if (err == paNoError) {
+        
+		driver->period_usecs = (((float) driver->frames_per_cycle)
+					/ driver->frame_rate) * 1000000.0f;
+		driver->frame_rate = rate;
+		driver->frames_per_cycle = nframes;
+
+		/* tell engine about buffer size */
+		if (driver->engine) {
+			driver->engine->set_buffer_size (
+				driver->engine, driver->frames_per_cycle);
+		}
+		return 0;
+
+	} else { 
+
+		// JOQ: this driver is dead.  How do we terminate it?
+		// Pa_Terminate();
+		fprintf(stderr, "Unable to set portaudio parameters\n"); 
+		fprintf(stderr, "Error number: %d\n", err);
+		fprintf(stderr, "Error message: %s\n", Pa_GetErrorText(err));
+		return EIO;
+	}
+}
+
+static int
+portaudio_driver_reset_parameters (portaudio_driver_t* driver,
+				   jack_nframes_t nframes,
+				   jack_nframes_t rate)
+{
+	if (!jack_power_of_two(nframes)) {
+		printf("PA: frames must be a power of two "
+		       "(64, 512, 1024, ...)\n");
+		return EINVAL;
+	}
+
+        Pa_CloseStream(driver->stream);
+
+	return portaudio_driver_set_parameters (driver, nframes, rate);
+}
+
+static int
+portaudio_driver_bufsize (portaudio_driver_t* driver, jack_nframes_t nframes)
+{
+	int rc;
+
+	/* This gets called from the engine server thread, so it must
+	 * be serialized with the driver thread.  Stopping the audio
+	 * also stops that thread. */
+
+	if (portaudio_driver_audio_stop (driver)) {
+		jack_error ("PA: cannot stop to set buffer size");
+		return EIO;
+	}
+
+	rc = portaudio_driver_reset_parameters (driver, nframes,
+						driver->frame_rate);
+
+	if (portaudio_driver_audio_start (driver)) {
+		jack_error ("PA: cannot restart after setting buffer size");
+		rc = EIO;
+	}
+
+	return rc;
+}
+
 //== instance creation/destruction =============================================
 
 /** create a new driver instance
@@ -245,19 +334,19 @@ portaudio_driver_new (char *name,
 	driver = (portaudio_driver_t *) calloc (1, sizeof (portaudio_driver_t));
 
 	jack_driver_init ((jack_driver_t *) driver);
-        
-        driver->frame_rate = rate;
 
 	if (!jack_power_of_two(frames_per_cycle)) {
-		printf("JACK: frames must be a power of two (64, 512, 1024, ...)\n");
+		printf("PA: -p must be a power of two.\n");
 		goto error;
 	}
 
 	driver->frames_per_cycle = frames_per_cycle;
+        driver->frame_rate = rate;
+	driver->capturing = capturing;
+	driver->playing = playing;
 
 	driver->attach = (JackDriverAttachFunction) portaudio_driver_attach;
 	driver->detach = (JackDriverDetachFunction) portaudio_driver_detach;
-	driver->wait = (JackDriverWaitFunction) portaudio_driver_wait;
         driver->read = (JackDriverReadFunction) portaudio_driver_read;
 	driver->write = (JackDriverReadFunction) portaudio_driver_write;
 	driver->null_cycle = (JackDriverNullCycleFunction) portaudio_driver_null_cycle;
@@ -320,7 +409,8 @@ portaudio_driver_new (char *name,
             driver->capture_nchannels = (driver->capture_nchannels < chan) ? driver->capture_nchannels : chan;
             driver->playback_nchannels = (driver->playback_nchannels < chan) ? driver->playback_nchannels : chan;
         }
-	
+
+	// JOQ: should use portaudio_driver_set_parameters(), instead
         err = Pa_OpenStream(&driver->stream,
                             ((capturing) ? Pa_GetDefaultInputDeviceID() : paNoDevice),	
                             ((capturing) ? driver->capture_nchannels : 0),             
@@ -371,107 +461,166 @@ portaudio_driver_delete (portaudio_driver_t *driver)
 
 /* DRIVER "PLUGIN" INTERFACE */
 
-const char driver_client_name[] = "portaudio";
-
-static void
-portaudio_usage ()
+jack_driver_desc_t *
+driver_get_descriptor ()
 {
-	fprintf (stderr, "\n"
-    
-        "portaudio PCM driver args:\n"
-        "    -r sample-rate (default: 44.1kHz)\n"
-        "    -c chan (default: harware)\n"
-        "    -p frames-per-period (default: 128)\n"
-        "    -D (duplex, default: yes)\n"
-        "    -C (capture, default: duplex)\n"
-        "    -P (playback, default: duplex)\n"
-        "    -z[r|t|s|-] (dither, rect|tri|shaped|off, default: off)\n"
-        );
+	jack_driver_desc_t * desc;
+	unsigned int i;
+	desc = calloc (1, sizeof (jack_driver_desc_t));
+
+	strcpy (desc->name, "portaudio");
+	desc->nparams = 7;
+	desc->params = calloc (desc->nparams,
+			       sizeof (jack_driver_param_desc_t));
+
+	i = 0;
+	strcpy (desc->params[i].name, "channel");
+	desc->params[i].character  = 'c';
+	desc->params[i].has_arg    = required_argument;
+	desc->params[i].type       = JackDriverParamInt;
+	desc->params[i].value.ui   = 0;
+	strcpy (desc->params[i].short_desc, "Maximium number of channels");
+	strcpy (desc->params[i].long_desc, desc->params[i].short_desc);
+
+	i++;
+	strcpy (desc->params[i].name, "capture");
+	desc->params[i].character  = 'C';
+	desc->params[i].has_arg    = no_argument;
+	desc->params[i].type       = JackDriverParamBool;
+	desc->params[i].value.i    = TRUE;
+	strcpy (desc->params[i].short_desc, "Whether or not to capture");
+	strcpy (desc->params[i].long_desc, desc->params[i].short_desc);
+
+	i++;
+	strcpy (desc->params[i].name, "playback");
+	desc->params[i].character  = 'P';
+	desc->params[i].has_arg    = no_argument;
+	desc->params[i].type       = JackDriverParamBool;
+	desc->params[i].value.i    = TRUE;
+	strcpy (desc->params[i].short_desc, "Whether or not to playback");
+	strcpy (desc->params[i].long_desc, desc->params[i].short_desc);
+
+	i++;
+	strcpy (desc->params[i].name, "duplex");
+	desc->params[i].character  = 'D';
+	desc->params[i].has_arg    = no_argument;
+	desc->params[i].type       = JackDriverParamBool;
+	desc->params[i].value.i    = TRUE;
+	strcpy (desc->params[i].short_desc, "Capture and playback");
+	strcpy (desc->params[i].long_desc, desc->params[i].short_desc);
+
+	i++;
+	strcpy (desc->params[i].name, "rate");
+	desc->params[i].character  = 'r';
+	desc->params[i].has_arg    = required_argument;
+	desc->params[i].type       = JackDriverParamUInt;
+	desc->params[i].value.ui   = 48000U;
+	strcpy (desc->params[i].short_desc, "Sample rate");
+	strcpy (desc->params[i].long_desc, desc->params[i].short_desc);
+
+	i++;
+	strcpy (desc->params[i].name, "period");
+	desc->params[i].character  = 'p';
+	desc->params[i].has_arg    = required_argument;
+	desc->params[i].type       = JackDriverParamUInt;
+	desc->params[i].value.ui   = 128U;
+	strcpy (desc->params[i].short_desc, "Frames per period");
+	strcpy (desc->params[i].long_desc, desc->params[i].short_desc);
+
+	i++;
+	strcpy (desc->params[i].name, "dither");
+	desc->params[i].character  = 'z';
+	desc->params[i].has_arg    = optional_argument;
+	desc->params[i].type       = JackDriverParamChar;
+	desc->params[i].value.c    = '-';
+	strcpy (desc->params[i].short_desc, "Dithering mode");
+	strcpy (desc->params[i].long_desc,
+		"  Dithering Mode:\n"
+		"    r : rectangular\n"
+		"    t : triangular\n"
+		"    s : shaped\n"
+		"    - : no dithering");
+
+
+	return desc;
 }
 
+const char driver_client_name[] = "portaudio";
+
 jack_driver_t *
-driver_initialize (jack_client_t *client, int argc, char **argv)
+driver_initialize (jack_client_t *client, const JSList * params)
 {
-	jack_nframes_t srate = 44100;
-	jack_nframes_t frames_per_interrupt = 128;
+	jack_nframes_t srate = 48000;
+	jack_nframes_t frames_per_interrupt = 1024;
 	int capture = FALSE;
 	int playback = FALSE;
         int chan = -1;
 	DitherAlgorithm dither = None;
-	int i;
+	const JSList * node;
+	const jack_driver_param_t * param;
    
-	for (i = 1; i < argc; i++) {
-		if (argv[i][0] == '-') {
-                
-			switch (argv[i][1]) {
+
+	for (node = params; node; node = jack_slist_next (node)) {
+		param = (const jack_driver_param_t *) node->data;
+
+		switch (param->character) {
                         
-                            case 'D':
-                                    capture = TRUE;
-                                    playback = TRUE;
-                                    break;
+		case 'D':
+			capture = TRUE;
+			playback = TRUE;
+			break;
                                     
-                            case 'c':
-                                    chan = atoi (argv[i+1]);
-                                    i++;
-                                    break;
+		case 'c':
+			chan = (int) param->value.ui;
+			break;
     
-                            case 'C':
-                                    capture = TRUE;
-                                    break;
+		case 'C':
+			capture = param->value.i;
+			break;
     
-                            case 'P':
-                                    playback = TRUE;
-                                    break;
+		case 'P':
+			playback = param->value.i;
+			break;
+
+		case 'r':
+			srate = param->value.ui;
+			break;
                                     
-                            case 'r':
-                                    srate = atoi (argv[i+1]);
-                                    i++;
-                                    break;
+		case 'p':
+			frames_per_interrupt = (unsigned int) param->value.ui;
+			break;
                                     
-                            case 'p':
-                                    frames_per_interrupt = atoi (argv[i+1]);
-                                    i++;
-                                    break;
-                                    
-                            case 'z':
-                                    switch (argv[i][2]) {
-                                            case '-':
-                                            dither = None;
-                                            break;
+		case 'z':
+			switch ((int) param->value.c) {
+			case '-':
+				dither = None;
+				break;
     
-                                            case 'r':
-                                            dither = Rectangular;
-                                            break;
+			case 'r':
+				dither = Rectangular;
+				break;
     
-                                            case 's':
-                                            dither = Shaped;
-                                            break;
+			case 's':
+				dither = Shaped;
+				break;
     
-                                            case 't':
-                                            default:
-                                            dither = Triangular;
-                                            break;
-                                    }
-                                    break;
-                                    
-                            default:
-                                    portaudio_usage ();
-                                    return NULL;
+			case 't':
+			default:
+				dither = Triangular;
+				break;
 			}
-		} else {
-			portaudio_usage ();
-			return NULL;
+			break;
 		}
 	}
 
-	/* duplex is the default */
-
+        /* duplex is the default */
 	if (!capture && !playback) {
 		capture = TRUE;
 		playback = TRUE;
 	}
 
-	return portaudio_driver_new ("portaudio", client, frames_per_interrupt, srate, capture, playback, chan, dither);
+	return portaudio_driver_new ("portaudio", client, frames_per_interrupt,
+				     srate, capture, playback, chan, dither);
 }
 
 void
