@@ -1,3 +1,19 @@
+2002-12-20  Paul Davis  <paul>
+
+	* error.h (jack_set_error_function): added
+
+2002-12-16  Paul Davis  <paul>
+
+	* jack.h: added inclusion of pthread.h
+
+2002-12-09  Paul Davis  <paul>
+	
+	* jack.h (jack_client_new_inprocess): prototype for in-process client creation (not implemented)
+
+	* jack.h (jack_client_thread_id): added so that clients can easily
+	find out the pthread_t that is running the JACK client code. this
+	turns out to be critical to handling the SIGHUP.
+
 2002-11-15  Paul Davis  <paul>
 
 	* client.c: added port alias functions. untested.
