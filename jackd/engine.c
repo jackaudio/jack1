@@ -1927,7 +1927,7 @@ jack_server_thread (void *arg)
 
 jack_engine_t *
 jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
-		 int verbose, int client_timeout, pid_t wait_pid,
+		 int verbose, int client_timeout, unsigned int port_max, pid_t wait_pid,
 		 JSList *drivers)
 {
 	jack_engine_t *engine;
@@ -1955,7 +1955,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
 	engine->client_timeout_msecs = client_timeout;
 
 	engine->next_client_id = 1;
-	engine->port_max = 128;
+	engine->port_max = port_max;
 	engine->rtpriority = rtpriority;
 	engine->silent_buffer = 0;
 	engine->verbose = verbose;

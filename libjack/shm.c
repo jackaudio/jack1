@@ -119,7 +119,9 @@ jack_cleanup_shm (void)
 		
 		if (destroy) {
 
-			jack_destroy_shm (&copy);
+			if (copy.index >= 0  && copy.index < MAX_SHM_ID) {
+				jack_destroy_shm (&copy);
+			}
 			r->size = 0;
 			r->allocator = 0;
 		}

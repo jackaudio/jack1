@@ -60,6 +60,7 @@ static int do_mlock = 1;
 static int temporary = 0;
 static int verbose = 0;
 static int client_timeout = 500; /* msecs */
+static unsigned int port_max = 128;
 
 static void 
 do_nothing_handler (int sig)
@@ -135,7 +136,7 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	/* get the engine/driver started */
 
 	if ((engine = jack_engine_new (realtime, realtime_priority, do_mlock,
-				       temporary, verbose, client_timeout,
+				       temporary, verbose, client_timeout, port_max,
 				       getpid(), drivers)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
 		return -1;
@@ -345,6 +346,7 @@ static void usage (FILE *file)
 "usage: jackd [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
 "             [ --no-mlock OR -m ]\n"
 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
+"             [ --port-max OR -p maximum-number-of-ports]\n"
 "             [ --verbose OR -v ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
@@ -384,6 +386,7 @@ main (int argc, char *argv[])
 		{ "driver", 1, 0, 'd' },
 		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
+		{ "port-max", 1, 0, 'p' },
 		{ "no-mlock", 0, 0, 'm' },
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
@@ -463,6 +466,10 @@ main (int argc, char *argv[])
 
 		case 'm':
 			do_mlock = 0;
+			break;
+
+		case 'p':
+			port_max = (unsigned int) atol (optarg);
 			break;
 
 		case 'P':

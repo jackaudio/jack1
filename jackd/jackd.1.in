@@ -45,6 +45,10 @@ These do not include driver options, which are obtained using the
 \fB\-m, \-\-no\-mlock\fR
 Do not attempt to lock memory, even if \fB\-\-realtime\fR.
 .TP
+\fB\-p, \-\-port\-max \fI n\fR
+Set the maximum number of ports the JACK server can manage.  
+The default value is 128.
+.TP
 \fB\-R, \-\-realtime\fR 
 .br
 Use realtime scheduling.  This is needed for reliable low-latency
