@@ -284,9 +284,9 @@ main (int argc, char *argv[])
 			hw_monitoring = 1;
 			break;
 
-		case 'h':
 		default:
 			fprintf (stderr, "unknown option character %c\n", opt);
+		case 'h':
 			usage();
 			return -1;
 		}

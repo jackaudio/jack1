@@ -731,7 +731,7 @@ jack_client_close (jack_client_t *client)
 	req.type = DropClient;
 	req.x.client_id = client->control->id;
 
-	/* stop the thread */
+	/* stop the thread that communicates with the jack server */
 
 	pthread_cancel (client->thread);
 	pthread_join (client->thread, &status);
@@ -740,13 +740,14 @@ jack_client_close (jack_client_t *client)
 	shmdt (client->engine);
 
 	for (node = client->port_segments; node; node = g_slist_next (node)) {
-		jack_port_segment_info_t *si;
-		si = (jack_port_segment_info_t *) node->data;
-		shmdt (si->address);
-		free (si);
+		shmdt (((jack_port_segment_info_t *) node->data)->address);
+		free (node->data);
 	}
-
 	g_slist_free (client->port_segments);
+
+	for (node = client->ports; node; node = g_slist_next (node)) {
+		free (node->data);
+	}
 	g_slist_free (client->ports);
 
 	if (client->graph_wait_fd) {

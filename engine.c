@@ -192,15 +192,16 @@ jack_cleanup_clients (jack_engine_t *engine)
 {
 	jack_client_control_t *ctl;
 	jack_client_internal_t *client;
-	GSList *node;
-	GSList *remove = 0;
+	GSList *node, *tmp;
 	static int x = 0;
 
 	x++;
 
 	pthread_mutex_lock (&engine->graph_lock); 
 
-	for (node = engine->clients; node; node = g_slist_next (node)) {
+	for (node = engine->clients; node; ) {
+
+		tmp = g_slist_next (node);
 		
 		client = (jack_client_internal_t *) node->data;
 		ctl = client->control;
@@ -210,20 +211,18 @@ jack_cleanup_clients (jack_engine_t *engine)
 		}
 
 		if (ctl->state > NotTriggered) {
-			remove = g_slist_prepend (remove, node->data);
+
 			if (engine->verbose) {
 				fprintf (stderr, "%d: removing failed client %s\n", x, ctl->name);
 			}
-		}
-	}
-	pthread_mutex_unlock (&engine->graph_lock);
-	
-	if (remove) {
-		for (node = remove; node; node = g_slist_next (node)) {
+
 			jack_remove_client (engine, (jack_client_internal_t *) node->data);
 		}
-		g_slist_free (remove);
+
+		node = tmp;
 	}
+
+	pthread_mutex_unlock (&engine->graph_lock);
 }	
 
 static int
@@ -840,14 +839,14 @@ handle_client_jack_error (jack_engine_t *engine, int fd)
 		}
 	}
 
-	pthread_mutex_unlock (&engine->graph_lock);
-
 	if (client == 0) {
+		pthread_mutex_unlock (&engine->graph_lock);
 		jack_error ("i/o error on unknown client fd %d", fd);
 		return -1;
 	} 
 
 	jack_remove_client (engine, client);
+	pthread_mutex_unlock (&engine->graph_lock);
 	return 0;
 }
 
@@ -1384,8 +1383,6 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 		fprintf (stderr, "removing client %s\n", client->control->name);
 	}
 
-	pthread_mutex_lock (&engine->graph_lock);
-	
 	client->control->dead = TRUE;
 
 	if (client == engine->timebase_client) {
@@ -1422,8 +1419,6 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	close (client->request_fd);
 
 	jack_client_delete (engine, client);
-
-	pthread_mutex_unlock (&engine->graph_lock);
 }
 
 static void
@@ -1875,9 +1870,9 @@ jack_port_do_connect (jack_engine_t *engine,
 
 		dstport->connections = g_slist_prepend (dstport->connections, connection);
 		srcport->connections = g_slist_prepend (srcport->connections, connection);
-
-		jack_sort_graph (engine, FALSE);
 		
+		jack_sort_graph (engine, FALSE);
+
 		jack_send_connection_notification (engine, srcport->shared->client_id, src_id, dst_id, TRUE);
 		jack_send_connection_notification (engine, dstport->shared->client_id, dst_id, src_id, TRUE);
 	}
