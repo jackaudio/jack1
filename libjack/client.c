@@ -784,7 +784,7 @@ jack_client_thread (void *arg)
 			jack_reset_timestamps ();
 #endif
 
-			DEBUG ("client %d signalled at %Lu, awake for process at %Lu (delay = %f usecs) (wakeup on graph_wait_fd==%d)", 
+			DEBUG ("client %d signalled at %Lu, awake for process at %Lu (delay = %Lu usecs) (wakeup on graph_wait_fd==%d)", 
 			       getpid(),
 			       control->signalled_at, 
 			       control->awake_at, 
@@ -808,9 +808,9 @@ jack_client_thread (void *arg)
 #endif
 			/* pass the execution token along */
 
-			DEBUG ("client finished processing at %Lu (elapsed = %f usecs), writing on graph_next_fd==%d", 
+			DEBUG ("client finished processing at %Lu (elapsed = %Lu usecs), writing on graph_next_fd==%d", 
 			       control->finished_at, 
-			       ((float)(control->finished_at - control->awake_at)/client->cpu_mhz),
+			       control->finished_at - control->awake_at,
 			       client->graph_next_fd);
 
 			if (write (client->graph_next_fd, &c, sizeof (c)) != sizeof (c)) {

@@ -126,9 +126,6 @@ static void jack_port_registration_notify (jack_engine_t *, jack_port_id_t, int)
 static int  jack_send_connection_notification (jack_engine_t *, jack_client_id_t, jack_port_id_t, jack_port_id_t, int);
 static int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_event_t *);
 static void jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event);
-
-static int  jack_engine_process_lock (jack_engine_t *);
-static void jack_engine_process_unlock (jack_engine_t *);
 static int  jack_engine_post_process (jack_engine_t *);
 
 static int  internal_client_request (void*, jack_request_t *);
@@ -156,15 +153,22 @@ jack_client_is_internal (jack_client_internal_t *client)
 	return (client->control->type == ClientInternal) || (client->control->type == ClientDriver);
 }
 
-#define jack_lock_graph(engine) do { 		\
-	DEBUG ("acquiring graph lock");			\
-	pthread_mutex_lock (&engine->client_lock);	\
-} while(0)
+static inline void jack_lock_graph (jack_engine_t* engine) {
+	DEBUG ("acquiring graph lock");
+	pthread_mutex_lock (&engine->client_lock);
+}
 
-#define jack_unlock_graph(engine) do {		\
-	DEBUG ("releasing graph lock");			\
-	pthread_mutex_unlock (&engine->client_lock);	\
-} while(0)
+static inline int jack_try_lock_graph (jack_engine_t *engine)
+{
+	DEBUG ("TRYING to acquiring graph lock");
+	return pthread_mutex_trylock (&engine->client_lock);
+}
+
+static inline void jack_unlock_graph (jack_engine_t* engine) 
+{
+	DEBUG ("releasing graph lock");
+	pthread_mutex_unlock (&engine->client_lock);
+}
 
 static inline void
 jack_engine_reset_rolling_usecs (jack_engine_t *engine)
@@ -510,18 +514,6 @@ jack_set_sample_rate (jack_engine_t *engine, jack_nframes_t nframes)
 	return 0;
 }
 
-int
-jack_engine_process_lock (jack_engine_t *engine)
-{
-	return pthread_mutex_trylock (&engine->client_lock);
-}
-
-void
-jack_engine_process_unlock (jack_engine_t *engine)
-{
-	pthread_mutex_unlock (&engine->client_lock);
-}
-
 static JSList * 
 jack_process_internal(jack_engine_t *engine, JSList *node, jack_nframes_t nframes)
 {
@@ -628,15 +620,16 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 
 	if (status != 0) {
 		if (engine->verbose) {
-			fprintf (stderr, "at %Lu client waiting on %d took %Lu usecs, status = %d sig = %Lu awa = %Lu fin = %Lu dur=%Lu\n",
-				now,
-				client->subgraph_wait_fd,
-				now - then,
-				status,
-				ctl->signalled_at,
-				ctl->awake_at,
-				ctl->finished_at,
-				ctl->finished_at - ctl->signalled_at);
+			fprintf (stderr, "at %Lu client waiting on %d took %Lu usecs, status = %d sig = %Lu "
+				 "awa = %Lu fin = %Lu dur=%Lu\n",
+				 now,
+				 client->subgraph_wait_fd,
+				 now - then,
+				 status,
+				 ctl->signalled_at,
+				 ctl->awake_at,
+				 ctl->finished_at,
+				 ctl->finished_at ? ctl->finished_at - ctl->signalled_at : 0);
 		}
 
 		/* we can only consider the timeout a client error if it actually woke up.
@@ -750,6 +743,66 @@ jack_calc_cpu_load(jack_engine_t *engine)
 
 }
 
+static void*
+jack_removal_thread (void *arg)
+{
+	JSList *tmp, *node;
+	int need_sort = FALSE;
+	jack_engine_t* engine = (jack_engine_t*) arg;
+	jack_client_internal_t *client;
+	
+	fprintf (stderr, "@_@_@_@_@ REMOVAL THREAD\n");
+	
+	/* remove all dead clients */
+
+	for (node = engine->clients; node; ) {
+		
+		tmp = jack_slist_next (node);
+		
+		client = (jack_client_internal_t *) node->data;
+		
+		if (client->error) {
+			
+			/* if we have a communication problem with the client,
+			   remove it. otherwise, turn it into a zombie. the client
+			   will/should realize this and will close it sockets.
+			   then we'll end up back here again and will finally
+			   remove the client.
+			*/
+			
+			if (client->error >= JACK_ERROR_WITH_SOCKETS) {
+				if (engine->verbose) {
+					fprintf (stderr, "removing failed client %s state = %s errors = %d\n", 
+						 client->control->name, client_state_names[client->control->state],
+						 client->error);
+				}
+				jack_remove_client (engine, (jack_client_internal_t *) node->data);
+			} else {
+				if (engine->verbose) {
+					fprintf (stderr, "zombifying failed client %s state = %s errors = %d\n", 
+						 client->control->name, client_state_names[client->control->state],
+						 client->error);
+				}
+				jack_zombify_client (engine, (jack_client_internal_t *) node->data);
+				client->error = 0;
+			}
+			
+			need_sort = TRUE;
+		}
+		
+		node = tmp;
+	}
+	
+	if (need_sort) {
+		jack_sort_graph (engine);
+	}
+	
+	jack_engine_reset_rolling_usecs (engine);
+	jack_unlock_graph (engine);
+
+	return 0;
+}
+
 static int
 jack_engine_post_process (jack_engine_t *engine)
 {
@@ -757,7 +810,8 @@ jack_engine_post_process (jack_engine_t *engine)
 	jack_client_internal_t *client;
 	JSList *node;
 	int need_remove = FALSE;
-	
+	int ret;
+
 	/* maintain the current_time.usecs and frame_rate values, since clients
 	   are not permitted to set these.
 	*/
@@ -792,63 +846,19 @@ jack_engine_post_process (jack_engine_t *engine)
 			need_remove = TRUE;
 		}
 	}
-
+	
 	if (need_remove) {
-		
-		JSList *tmp;
-		int need_sort = FALSE;
-		
-		/* remove all dead clients */
-		
-		for (node = engine->clients; node; ) {
-			
-			tmp = jack_slist_next (node);
-			
-			client = (jack_client_internal_t *) node->data;
-			
-			if (client->error) {
-
-				/* if we have a communication problem with the client,
-				   remove it. otherwise, turn it into a zombie. the client
-				   will/should realize this and will close it sockets.
-				   then we'll end up back here again and will finally
-				   remove the client.
-				*/
-
-				if (client->error >= JACK_ERROR_WITH_SOCKETS) {
-					if (engine->verbose) {
-						fprintf (stderr, "removing failed client %s state = %s errors = %d\n", 
-							 client->control->name, client_state_names[client->control->state],
-							 client->error);
-					}
-					jack_remove_client (engine, (jack_client_internal_t *) node->data);
-				} else {
-					if (engine->verbose) {
-						fprintf (stderr, "zombifying failed client %s state = %s errors = %d\n", 
-							 client->control->name, client_state_names[client->control->state],
-							 client->error);
-					}
-					jack_zombify_client (engine, (jack_client_internal_t *) node->data);
-					client->error = 0;
-				}
-
-				need_sort = TRUE;
-			}
-			
-			node = tmp;
-		}
-			
-		if (need_sort) {
-			jack_sort_graph (engine);
-		}
-
-		jack_engine_reset_rolling_usecs (engine);
-
+		pthread_t removal_thread;
+		pthread_create (&removal_thread, NULL, jack_removal_thread, engine);
+		pthread_detach (removal_thread);
+		ret = 1;
+	} else {
+		ret = 0;
 	}
 
-	jack_calc_cpu_load(engine);
+	jack_calc_cpu_load (engine);
 
-	return 0;
+	return ret;
 }
 
 static int
@@ -1997,6 +2007,12 @@ jack_engine_notify_clients_about_delay (jack_engine_t *engine)
 	jack_unlock_graph (engine);
 }
 
+#if defined(linux)
+static inline jack_time_t jack_get_wait_timestamp (jack_engine_t *engine) {
+	return engine->driver->last_wait_ust;
+}
+#endif
+
 static inline void
 jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
 {
@@ -2007,7 +2023,7 @@ jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
 
 	time->guard1++;
 	time->frames += amount;
-	time->stamp = jack_get_microseconds ();
+	time->stamp = jack_get_wait_timestamp (engine);
 
 	// atomic_inc (&time->guard2, 1);
 	// might need a memory barrier here
@@ -2015,26 +2031,19 @@ jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
 }
 
 static int
-jack_engine_wait (jack_engine_t *engine, jack_nframes_t* nframes)
+jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes, float delayed_usecs)
 {
-	jack_driver_t *driver = engine->driver;
-	float delayed_usecs;
-	int status;
+	int restart = 0;
+	jack_driver_t* driver = engine->driver;
+	int ret = -1;
 	static int consecutive_excessive_delays = 0;
-
-	if ((*nframes = driver->wait (driver, -1, &status, &delayed_usecs)) == 0) {
-		/* the driver detected an xrun, and restarted */
-		return 1; /* will continue */
-	}
-
-	jack_inc_frame_time (engine, *nframes);
 
 	engine->watchdog_check = 1;
 
 #define WORK_SCALE 1.0f
 
-	if (engine->control->real_time != 0 && engine->spare_usecs && ((WORK_SCALE * engine->spare_usecs) <= delayed_usecs)) {
-
+	if (engine->control->real_time && engine->spare_usecs && ((WORK_SCALE * engine->spare_usecs) <= delayed_usecs)) {
+		
 		fprintf (stderr, "delay of %.3f usecs exceeds estimated spare time of %.3f; restart ...\n",
 			 delayed_usecs, WORK_SCALE * engine->spare_usecs);
 		
@@ -2055,29 +2064,23 @@ jack_engine_wait (jack_engine_t *engine, jack_nframes_t* nframes)
 			return -1; /* will exit the thread loop */
 		}
 
-		return 1; /* will continue */
+		return 0;
 
 	} else {
 		consecutive_excessive_delays = 0;
 	}
-	
-	return status;
-}
 
-static int
-jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes)
-{
-	int restart = 0;
-	jack_driver_t* driver = engine->driver;
-	
-	if (jack_engine_process_lock (engine)) {
+	jack_inc_frame_time (engine, nframes);
+
+	if (jack_try_lock_graph (engine)) {
 		/* engine can't run. just throw away an entire cycle */
+		fprintf (stderr, "#*#*#*#*# NULL CYCLE\n");
 		driver->null_cycle (driver, nframes);
 		return 0;
 	}
 	
 	if (driver->read (driver, nframes)) {
-		return -1;
+		goto unlock;
 	}
 
 	if (jack_engine_process (engine, nframes)) {
@@ -2086,25 +2089,36 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes)
 		fprintf (stderr, "restart\n");
 	} else {
 		if (driver->write (driver, nframes)) {
-			return -1;
+			goto unlock;
 		}
 	}
 
-	jack_engine_post_process (engine);
-	jack_engine_process_unlock (engine);
+	if ((ret = jack_engine_post_process (engine)) > 0) {
+		ret = 0; 
+		goto maybe_restart;  /* leave engine locked */
+	}
 
+	ret = 0;
+
+  unlock:
+	jack_unlock_graph (engine);
+	
+  maybe_restart:
 	if (restart) {
 		driver->start (driver);
 	}
 	
-	return 0;
+	return ret;
 }
 
 static void *
 jack_main_thread (void *arg)
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
+	jack_driver_t *driver = engine->driver;
+	int wait_status;
 	jack_nframes_t nframes;
+	float delayed_usecs;
 
 	if (engine->control->real_time) {
 
@@ -2119,28 +2133,24 @@ jack_main_thread (void *arg)
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
-	engine->watchdog_check = 1; /* really needed here ? */
-	nframes = 0; /* really needed here ? */
+	engine->watchdog_check = 1;
 
 	while (1) {
 	
-		int wait_status = jack_engine_wait (engine, &nframes);
-			
-		if (wait_status == -1) {
-			
-			break;
-			
-		} else if (wait_status == 0) {
-			
-			if (jack_run_cycle (engine, nframes)) {
+		if ((nframes = driver->wait (driver, -1, &wait_status, &delayed_usecs)) == 0) {
+			/* the driver detected an xrun, and restarted */
+			continue;
+		}
+
+		if (wait_status == 0) {
+			if (jack_run_cycle (engine, nframes, delayed_usecs)) {
 				jack_error ("cycle execution failure, exiting");
 				break;
 			}
-
+		} else if (wait_status < 0) {
+			break;
  		} else {
-
 			/* driver restarted, just continue */
-			
 		}
 	}
 

@@ -565,7 +565,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 							      (driver->capture_nchannels > driver->playback_nchannels ?
 							       driver->capture_nchannels : driver->playback_nchannels));
 
-	driver->period_usecs = (((float) driver->frames_per_cycle) / driver->frame_rate) * 1000000.0f;
+	driver->period_usecs = (jack_time_t) floor ((((float) driver->frames_per_cycle) / driver->frame_rate) * 1000000.0f);
+	driver->poll_timeout = (int) floor (1.5f * driver->period_usecs);
 
 	if (driver->engine) {
 		driver->engine->set_buffer_size (driver->engine, driver->frames_per_cycle);
@@ -821,7 +822,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 	int need_capture;
 	int need_playback;
 	unsigned int i;
-	unsigned long long poll_enter, poll_ret;
+	jack_time_t poll_enter, poll_ret;
 
 	*status = -1;
 	*delayed_usecs = 0;
@@ -869,7 +870,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 
 		poll_enter = jack_get_microseconds ();
 
-		if (poll (driver->pfd, nfds, (int) floor ((1.5f * driver->period_usecs) / 1000.0f)) < 0) {
+		if (poll (driver->pfd, nfds, driver->poll_timeout) < 0) {
+
 			if (errno == EINTR) {
 				printf ("poll interrupt\n");
 				// this happens mostly when run
@@ -891,18 +893,18 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 
 		if (extra_fd < 0) {
 			if (driver->poll_next && poll_ret > driver->poll_next) {
-				*delayed_usecs = (float) (poll_ret - driver->poll_next) / driver->cpu_mhz;
+				*delayed_usecs = poll_ret - driver->poll_next;
 			} 
 			driver->poll_last = poll_ret;
-			driver->poll_next = poll_ret + (unsigned long long) floor ((driver->period_usecs * driver->cpu_mhz));
+			driver->poll_next = poll_ret + driver->period_usecs;
 			driver->engine->control->current_time.usecs = poll_ret;
 		}
 
 #ifdef DEBUG_WAKEUP
-		fprintf (stderr, "%Lu: checked %d fds, %.9f usecs since poll entered\n", 
-			poll_ret, 
-			nfds,
-			(float) (poll_ret - poll_enter) / driver->cpu_mhz);
+		fprintf (stderr, "%Lu: checked %d fds, %Lu usecs since poll entered\n", 
+			 poll_ret, 
+			 nfds,
+			 poll_ret - poll_enter);
 #endif
 
 		/* check to see if it was the extra FD that caused us to return from poll
@@ -973,7 +975,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 		
 		if ((p_timed_out && (p_timed_out == driver->playback_nfds)) &&
 		    (c_timed_out && (c_timed_out == driver->capture_nfds))){
-			jack_error ("ALSA: poll time out polled for %.6f", ((float) (poll_ret - poll_enter) / driver->cpu_mhz));
+			jack_error ("ALSA: poll time out, polled for %Lu usecs", poll_ret - poll_enter);
 			*status = -5;
 			return 0;
 		}		
@@ -1010,6 +1012,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 	}
 
 	*status = 0;
+	driver->last_wait_ust = poll_ret;
 
 	avail = capture_avail < playback_avail ? capture_avail : playback_avail;
 
@@ -1035,10 +1038,7 @@ alsa_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 	jack_nframes_t nf;
 	snd_pcm_uframes_t offset;
 	snd_pcm_uframes_t contiguous;
-
-	fprintf (stderr, "C: %p area %p P: %p area %p\n",
-		 driver->capture_handle, driver->capture_areas, 
-		 driver->playback_handle, driver->playback_areas);
+	int chn;
 
 	if (driver->capture_handle) {
 		nf = nframes;
@@ -1073,6 +1073,10 @@ alsa_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 				return -1;
 			}
 			
+			for (chn = 0; chn < driver->playback_nchannels; chn++) {
+				alsa_driver_silence_on_channel (driver, chn, contiguous);
+			}
+		
 			if (snd_pcm_mmap_commit (driver->playback_handle, offset, contiguous) < 0) {
 				return -1;
 			}
@@ -1192,9 +1196,14 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 			
 			buf = jack_port_get_buffer (port, contiguous);
 
-			if (driver->all_monitor_in || (driver->input_monitor_mask & (1<<chn))) {	
+			if (driver->all_monitor_in || (driver->input_monitor_mask & (1<<chn))) {
 				if (!driver->hw_monitoring) {
 					alsa_driver_copy_channel (driver, chn, chn, contiguous);
+				} else {
+					/* allow systems with mixdown for monitoring to playback
+					   the stream even if monitoring is enabled (e.g. ice1712, hdsp)
+					*/
+					alsa_driver_write_to_channel (driver, chn, buf + nwritten, contiguous);
 				}
 			} else {
 				alsa_driver_write_to_channel (driver, chn, buf + nwritten, contiguous);
@@ -1262,6 +1271,8 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 	port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
 
 	for (chn = 0; chn < driver->playback_nchannels; chn++) {
+		jack_port_t *monitor_port;
+
 		snprintf (buf, sizeof(buf) - 1, "playback_%lu", chn+1);
 
 		if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
@@ -1280,6 +1291,16 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 		jack_port_set_latency (port, driver->frames_per_cycle * driver->nfragments);
 
 		driver->playback_ports = jack_slist_append (driver->playback_ports, port);
+
+		if (driver->with_monitor_ports) {
+			snprintf (buf, sizeof(buf) - 1, "monitor_%lu", chn+1);
+			
+			if ((monitor_port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0)) == NULL) {
+				jack_error ("ALSA: cannot register monitor port for %s", buf);
+			} else {
+				jack_port_tie (port, monitor_port);
+			}
+		}
 	}
 
 	jack_activate (driver->client);
@@ -1429,7 +1450,8 @@ alsa_driver_new (char *name, char *alsa_device,
 		 int capturing,
 		 int playing,
 		 DitherAlgorithm dither,
-		 int soft_mode)
+		 int soft_mode, 
+		 int monitor)
 {
 	int err;
 
@@ -1466,7 +1488,7 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->capture_addr = 0;
 	driver->silent = 0;
 	driver->all_monitor_in = FALSE;
-	driver->cpu_mhz = jack_get_mhz();
+	driver->with_monitor_ports = monitor;
 
 	driver->clock_mode = ClockMaster; /* XXX is it? */
 	driver->input_monitor_mask = 0;   /* XXX is it? */
@@ -1668,6 +1690,7 @@ alsa_usage ()
 "    -C,--capture \tcapture input (default: duplex)\n"
 "    -P,--playback\tplayback output (default: duplex)\n"
 "    -s,--softmode\tsoft-mode, no xrun handling (default: off)\n"
+"    -m,--monitor \tprovide monitor ports for the output (default: off)\n"
 "    -z,--dither  \tdithering mode:\n"
 "        -z-,--dither (off, the default)\n"
 "        -zr,--dither=rectangular\n"
@@ -1727,6 +1750,7 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 	int capture = FALSE;
 	int playback = FALSE;
 	int soft_mode = FALSE;
+	int monitor = FALSE;
 	DitherAlgorithm dither = None;
 	int opt;
 	char *envvar;
@@ -1745,6 +1769,7 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 		{ "nperiods",	1, NULL, 'n' },
 		{ "softmode",	1, NULL, 's' },
 		{ "dither",	2, NULL, 'z' },
+		{ "monitor",    0, NULL, 'm' },
 		{ 0, 0, 0, 0 }
 	};
 
@@ -1790,6 +1815,10 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 		playback = atoi (envvar);
 	}
 		
+	if ((envvar = getenv ("JACK_ALSA_MONITOR")) != NULL) {
+		monitor = atoi (envvar);
+	}
+		
 	/*
 	 * Setting optind back to zero is a hack to reinitialize a new
 	 * getopts() loop.  See declaration in <getopt.h>.
@@ -1798,7 +1827,7 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 	optind = 0;
 	opterr = 0;
 
-	while ((opt = getopt_long(argc, argv, "-CDd:HMPp:r:n:sz::",
+	while ((opt = getopt_long(argc, argv, "-CDd:HMPp:r:n:msz::",
 				  long_options, NULL))
 	       != EOF) {
 		switch (opt) {
@@ -1823,6 +1852,10 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 		case 'h':
 			alsa_usage();
 			return NULL;
+
+		case 'm':
+			monitor = TRUE;
+			break;
 
 		case 'M':
 			hw_metering = TRUE;
@@ -1879,7 +1912,7 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 
 	return alsa_driver_new ("alsa_pcm", pcm_name, client, frames_per_interrupt, 
 				user_nperiods, srate, hw_monitoring, hw_metering, capture,
-			        playback, dither, soft_mode);
+			        playback, dither, soft_mode, monitor);
 }
 
 void

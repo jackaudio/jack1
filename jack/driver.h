@@ -80,9 +80,17 @@ typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, 
 #define JACK_DRIVER_DECL
 
 /* the driver should set this to be the interval it expects to elapse
-   between returning from the `wait' function.
+   between returning from the `wait' function. if set to zero, it
+   implies that the driver does not expect regular periodic wakeups.
  */
-    nframes_t period_usecs;
+    jack_time_t period_usecs;
+
+/* the driver should set this within its "wait" function to indicate
+   the UST of the most recent determination that the engine cycle
+   should run. it should not be set if the "extra_fd" argument of
+   the wait function is set to a non-zero value.
+ */
+    jack_time_t last_wait_ust;
 
 /* this is not used by the driver. it should not be written to or
    modified in any way
@@ -180,7 +188,8 @@ typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, 
 #else
 
 #define JACK_DRIVER_DECL \
-    jack_nframes_t period_usecs; \
+    jack_time_t period_usecs; \
+    jack_time_t last_wait_ust; \
     void *handle; \
     void (*finish)(struct _jack_driver *);\
     JackDriverAttachFunction attach; \

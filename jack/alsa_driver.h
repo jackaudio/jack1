@@ -45,8 +45,9 @@ typedef struct {
 
     JACK_DRIVER_DECL
 
-    unsigned long long            poll_last;
-    unsigned long long            poll_next;
+    int                           poll_timeout;
+    jack_time_t                   poll_last;
+    jack_time_t                   poll_next;
     char                        **playback_addr;
     char                        **capture_addr;
     const snd_pcm_channel_area_t *capture_areas;
@@ -63,11 +64,10 @@ typedef struct {
     channel_t                     capture_nchannels;
     unsigned long                 sample_bytes;
 
-    jack_nframes_t                     frame_rate;
-    jack_nframes_t                     frames_per_cycle;
-    float                         cpu_mhz;
-    jack_nframes_t                     capture_frame_latency;
-    jack_nframes_t                     playback_frame_latency;
+    jack_nframes_t                frame_rate;
+    jack_nframes_t                frames_per_cycle;
+    jack_nframes_t                capture_frame_latency;
+    jack_nframes_t                playback_frame_latency;
 
     unsigned long                *silent;
     char                         *alsa_name;
@@ -102,6 +102,7 @@ typedef struct {
     char   all_monitor_in : 1;
     char   capture_and_playback_not_synced : 1;
     char   interleaved : 1;
+    char   with_monitor_ports : 1;
 
     ReadCopyFunction read_via_copy;
     WriteCopyFunction write_via_copy;
