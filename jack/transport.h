@@ -63,22 +63,22 @@ typedef struct {
     
     /* these two cannot be set from clients: the server sets them */
 
-    jack_nframes_t frame_rate;               // current frame rate (per second)
-    jack_time_t    usecs;                    // monotonic, free-rolling
+    jack_nframes_t frame_rate;               /**< current frame rate (per second) */
+    jack_time_t    usecs;                    /**< monotonic, free-rolling */
 
-    jack_transport_bits_t  valid;            // which fields are legal to read
+    jack_transport_bits_t  valid;            /**< which fields are legal to read */
     jack_transport_state_t transport_state;         
     jack_nframes_t         frame;
     jack_nframes_t         loop_start;
     jack_nframes_t         loop_end;
 
-    long           smpte_offset;             // SMPTE offset (SMPTE frame when frame = 0)
-    float          smpte_frame_rate;         // 29.97, 30, 24 etc.
+    long           smpte_offset;             /**< SMPTE offset (SMPTE frame when frame = 0) */
+    float          smpte_frame_rate;         /**< 29.97, 30, 24 etc. */
 
-    int            bar;                      // current bar
-    int            beat;                     // current beat-within-bar
-    int            tick;                     // current tick-within-beat
-    double         bar_start_tick;           // 
+    int            bar;                      /**< current bar */
+    int            beat;                     /**< current beat-within-bar */
+    int            tick;                     /**< current tick-within-beat */
+    double         bar_start_tick;            
 
     float          beats_per_bar;
     float          beat_type;
