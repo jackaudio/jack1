@@ -1611,14 +1611,19 @@ jack_activate (jack_client_t *client)
 
 int 
 jack_deactivate (jack_client_t *client)
-
 {
 	jack_request_t req;
+	int rc = ESRCH;			/* already shut down */
 
-	req.type = DeactivateClient;
-	req.x.client_id = client->control->id;
-
-	return jack_client_deliver_request (client, &req);
+	if (client && client->control) { /* not shut down? */
+		rc = 0;
+		if (client->control->active) { /* still active? */
+			req.type = DeactivateClient;
+			req.x.client_id = client->control->id;
+			rc = jack_client_deliver_request (client, &req);
+		}
+	}
+	return rc;
 }
 
 int
@@ -1626,9 +1631,11 @@ jack_client_close (jack_client_t *client)
 {
 	JSList *node;
 	void *status;
-	
- 	if (client->control->active) {
-		jack_deactivate (client);
+	int rc;
+
+	rc = jack_deactivate (client);
+	if (rc == ESRCH) {		/* already shut down? */
+		return rc;
 	}
 
 	if (client->control->type == ClientExternal) {
@@ -1698,7 +1705,7 @@ jack_client_close (jack_client_t *client)
 	jack_slist_free (client->ports_ext);
 	jack_client_free (client);
 
-	return 0;
+	return rc;
 }	
 
 int 
