@@ -1,4 +1,4 @@
-.TH JACKD "1" @VERSION@ "May 2003"
+.TH JACKD "1" @VERSION@ "June 2003"
 .SH NAME
 jackd, jackstart \- JACK Audio Connection Kit sound server
 .SH SYNOPSYS
@@ -146,8 +146,8 @@ Ignore xruns reported by the ALSA driver.  This makes JACK less likely
 to disconnect unresponsive ports when running without
 \fB\-\-realtime\fR.
 .TP
-\fB\-z, --dither [rectangular,triangular,shaped,-]
-Set dithering mode.  If \fB\-\fR or unspecified, dithering is off.
+\fB\-z, --dither [rectangular,triangular,shaped,none]
+Set dithering mode.  If \fBnone\fR or unspecified, dithering is off.
 Only the first letter of the mode name is required.
 .SH EXAMPLES
 .PP

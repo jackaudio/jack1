@@ -1708,7 +1708,7 @@ alsa_usage ()
 "    -s,--softmode\tsoft-mode, no xrun handling (default: off)\n"
 "    -m,--monitor \tprovide monitor ports for the output (default: off)\n"
 "    -z,--dither  \tdithering mode:\n"
-"        -z-,--dither (off, the default)\n"
+"        -zn,--dither=none (off, the default)\n"
 "        -zr,--dither=rectangular\n"
 "        -zs,--dither=shaped\n"
 "        -zt,--dither=triangular\n"
@@ -1727,6 +1727,7 @@ dither_opt (char c, DitherAlgorithm* dither)
 {
 	switch (*optarg) {
 	case '-':
+	case 'n':
 		*dither = None;
 		break;
 		
