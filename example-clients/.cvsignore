@@ -13,3 +13,7 @@ jackrec
 jack_showtime
 jack_lsp
 jack_metro
+jack_unload
+jack_load
+inprocess.la
+inprocess.lo

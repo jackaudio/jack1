@@ -4,3 +4,4 @@ Makefile
 Makefile.in
 *.lo
 jack_alsa.la
+jack_alsa_pcm.la
