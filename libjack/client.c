@@ -42,6 +42,7 @@
 #include <jack/error.h>
 #include <jack/cycles.h>
 #include <jack/jslist.h>
+#include <jack/version.h>
 
 #ifdef WITH_TIMESTAMPS
 #include <jack/timestamps.h>
@@ -421,6 +422,12 @@ jack_client_new (const char *client_name)
 	if (res.status) {
 		close (req_fd);
 		jack_error ("could not attach as client (duplicate client name?)");
+		return NULL;
+	}
+
+	if (res.protocol_v != jack_protocol_version){
+		close (req_fd);
+		jack_error ("application linked against too old of a version of libjack.");
 		return NULL;
 	}
 

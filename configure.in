@@ -13,8 +13,18 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=50
+JACK_MINOR_VERSION=51
 JACK_MICRO_VERSION=0
+
+dnl ---
+dnl HOWTO: updating the jack protocal version
+dnl
+dnl increment the protocol version whenever a change is
+dnl made to the way libjack communicates with jackd
+dnl that would break applications linked with an older
+dnl version of libjack.
+dnl ---
+JACK_PROTOCOL_VERSION=1
 
 dnl ---
 dnl HOWTO: updating the libjack interface version
@@ -37,6 +47,8 @@ JACK_API_AGE=0
 AC_SUBST(JACK_MAJOR_VERSION)
 AC_SUBST(JACK_MINOR_VERSION)
 AC_SUBST(JACK_MICRO_VERSION)
+
+AC_SUBST(JACK_PROTOCOL_VERSION)
 
 AC_SUBST(JACK_API_MAJOR_VERSION)
 AC_SUBST(JACK_API_MINOR_VERSION)
@@ -220,6 +232,7 @@ Makefile
 jack.pc
 jack.spec
 jack/Makefile
+jack/version.h
 jackd/Makefile
 libjack/Makefile
 drivers/Makefile

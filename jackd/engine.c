@@ -44,6 +44,7 @@
 #include <jack/engine.h>
 #include <jack/driver.h>
 #include <jack/cycles.h>
+#include <jack/version.h>
 
 #ifdef USE_CAPABILITIES
 /* capgetp and capsetp are linux only extensions, not posix */
@@ -762,6 +763,7 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 				 req.type, client->control, client_fd);
 		}
 
+		res.protocol_v = jack_protocol_version;
 		res.client_key = client->shm_key;
 		res.control_key = engine->control_key;
 		res.port_segment_key = engine->port_segment_key;

@@ -1,0 +1,3 @@
+2003-2-10 Taybin Rutkin <trutkin@physics.clarku.edu>
+	* Initial Changelog
+	* engine.c (handle_new_client): Returns protocol version for checking.

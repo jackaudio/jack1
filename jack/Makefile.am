@@ -1,4 +1,4 @@
-MAINTAINERCLEANFILES = Makefile.in
+MAINTAINERCLEANFILES = Makefile.in version.h
 
 libjackincludedir = $(includedir)/jack
 
@@ -24,5 +24,6 @@ noinst_HEADERS = 		\
 	port.h			\
 	start.h			\
 	jslist.h		\
-	hdsp.h
+	hdsp.h			\
+	version.h
 

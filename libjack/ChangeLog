@@ -1,3 +1,8 @@
+2003-02-10  Taybin Rutkin <trutkin@physics.clarku.edu>
+
+	* client.c (jack_client_new): Checks jack_protocol_version returned
+	from jackd.
+
 2003-02-05  Kai Vehmanen  <kai.vehmanen@wakkanet.fi>
 
 	* client.c (jack_set_buffer_size_callback): This function is now 

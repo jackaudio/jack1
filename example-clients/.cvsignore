@@ -10,3 +10,6 @@ jack_impulse_grabber
 jack_monitor_client
 jack_simple_client
 jackrec
+jack_showtime
+jack_lsp
+jack_metro

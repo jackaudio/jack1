@@ -203,6 +203,8 @@ typedef struct {
 
     int status;
 
+	unsigned int protocol_v;
+
     int client_key;
     int control_key;
 
