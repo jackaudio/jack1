@@ -1,12 +1,13 @@
 ## Process this file with automake to produce Makefile.in
-MAINTAINERCLEANFILES=Makefile.in
+MAINTAINERCLEANFILES=Makefile.in 
+
+CLEANFILES=doxygen-build.stamp
 
 DOX=reference.doxygen
 
+EXTRA_DIST=mainpage.dox transport.dox fsm.png
 
-EXTRA_DIST=
-
-INSTIMAGES=html/doxygen.png /html/fsm.png
+INSTIMAGES=html/doxygen.png html/fsm.png
 
 DOC_STAMPS=html-build.stamp
 
@@ -14,14 +15,15 @@ DOC_DIR=$(HTML_DIR)
 
 all-local: doxygen-build.stamp
 
-doxygen-build.stamp: $(DOX) mainpage.dox transport.dox fsm.png \
-../jack/jack.h ../jack/types.h ../jack/transport.h
+doxygen-build.stamp: $(DOX) 
 	@echo '*** Running doxygen ***'
 	doxygen $(DOX)
 	touch doxygen-build.stamp
 
 clean-local:
 	rm -f *~ *.bak $(DOC_STAMPS) || true
+	if test -d html; then rm -fr html; fi
+	if test -d latex; then rm -fr latex; fi
 
 distclean-local: clean
 	rm -f *.stamp || true

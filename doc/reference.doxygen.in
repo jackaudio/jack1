@@ -17,7 +17,7 @@
 # The PROJECT_NAME tag is a single word (or a sequence of words surrounded 
 # by quotes) that should identify the project.
 
-PROJECT_NAME           = JACK
+PROJECT_NAME           = JACK-AUDIO-CONNECTION-KIT
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number. 
 # This could be handy for archiving the generated documentation or 
@@ -301,7 +301,8 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT                  = mainpage.dox transport.dox \
+INPUT                  = @top_srcdir@/doc/mainpage.dox \
+			 @top_srcdir@/doc/transport.dox \
                          @top_srcdir@/jack/jack.h \
                          @top_srcdir@/jack/types.h \
                          @top_srcdir@/jack/transport.h
