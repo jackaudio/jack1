@@ -131,12 +131,21 @@ jack_client_alloc ()
 jack_port_t *
 jack_port_by_id (jack_client_t *client, jack_port_id_t id)
 {
+/*	
         if (id >= client->engine->port_max)
                 return NULL;
 
         if (client->engine->ports[id].in_use)
                 return jack_port_new (client, id, client->engine);
-        
+*/
+	GSList *node;
+
+	for (node = client->ports; node; node = g_slist_next (node)) {
+		if (((jack_port_t *) node->data)->shared->id == id) {
+			return (jack_port_t *) node->data;
+		}
+	}
+
 	return NULL;
 }
 
