@@ -21,13 +21,17 @@
 #ifndef __jack_types_h__
 #define __jack_types_h__
 
-#include <limits.h>
+#include <limits.h> /* ULONG_MAX */
 
-
+/**
+ * Type used to represent sample frame counts.
+ */
 typedef unsigned long        jack_nframes_t;
 
+/**
+ * Maximum value that can be stored in jack_nframes_t
+ */
 #define JACK_MAX_FRAMES ULONG_MAX;
-
 
 /**
  *  jack_port_t is an opaque type. You may only access it using the API provided.
@@ -45,12 +49,70 @@ typedef struct _jack_client  jack_client_t;
  */
 typedef long                 jack_port_id_t;
 
-typedef int  (*JackProcessCallback)(jack_nframes_t, void *);
-typedef int  (*JackGraphOrderCallback)(void *);
-typedef int  (*JackXRunCallback)(void *);
-typedef int  (*JackBufferSizeCallback)(jack_nframes_t, void *);
-typedef int  (*JackSampleRateCallback)(jack_nframes_t, void *);
-typedef void (*JackPortRegistrationCallback)(jack_port_id_t,int,void*);
+/**
+ * Prototype for the client supplied function that is called 
+ * by the engine anytime there is work to be done.
+ *
+ * @pre nframes == jack_get_buffer_size()
+ *
+ * @param nframes number of frames to process
+ * @param arg pointer to a client supplied structure
+ *
+ * @return zero on success, non-zero on error
+ */ 
+typedef int  (*JackProcessCallback)(jack_nframes_t nframes, void *arg);
+
+/**
+ * Prototype for the client supplied function that is called 
+ * whenever the processing graph is reordered.
+ *
+ * @param arg pointer to a client supplied structure
+ *
+ * @return zero on success, non-zero on error
+ */ 
+typedef int  (*JackGraphOrderCallback)(void *arg);
+
+/**
+ * Prototype for the client supplied function that is called 
+ * whenever an xrun has occured.
+ *
+ * @param arg pointer to a client supplied structure
+ *
+ * @return zero on success, non-zero on error
+ */ 
+typedef int  (*JackXRunCallback)(void *arg);
+
+/**
+ * Prototype for the client supplied function that is called 
+ * when the engine buffersize changes.
+ *
+ * Note! Use of this callback function is deprecated!
+ *
+ * @param nframes new engine buffer size
+ * @param arg pointer to a client supplied structure
+ *
+ * @return zero on success, non-zero on error
+ */ 
+typedef int  (*JackBufferSizeCallback)(jack_nframes_t nframes, void *arg);
+
+/**
+ * Prototype for the client supplied function that is called 
+ * when the engine sample rate changes.
+ *
+ * @param nframes new engine sample rate
+ * @param arg pointer to a client supplied structure
+ *
+ * @return zero on success, non-zero on error
+ */ 
+typedef int  (*JackSampleRateCallback)(jack_nframes_t nframes, void *arg);
+
+/**
+ * Prototype for the client supplied function that is called 
+ * whenever a port is registered or unregistered.
+ *
+ * @param arg pointer to a client supplied structure
+ */ 
+typedef void (*JackPortRegistrationCallback)(jack_port_id_t port, int, void *arg);
 
 /**
  * Used for the type argument of jack_port_register().
@@ -63,7 +125,6 @@ typedef void (*JackPortRegistrationCallback)(jack_port_id_t,int,void*);
  * jack_default_audio_sample_t in your application.
  */
 typedef float jack_default_audio_sample_t;
-
 
 /**
  *  A port has a set of flags that are formed by AND-ing together the
@@ -122,6 +183,5 @@ enum JackPortFlags {
       */
      JackPortIsTerminal = 0x10
 };	    
-
 
 #endif /* __jack_types_h__ */
