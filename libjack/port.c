@@ -62,7 +62,6 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control
 		si = (jack_port_segment_info_t *) node->data;
 
 		if (strcmp (si->shm_name, port->shared->shm_name) == 0) {
-			fprintf (stderr, "found port segment for %s\n", port->shared->name);
 			break;
 		}
 	}
