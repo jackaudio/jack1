@@ -18,7 +18,7 @@
     $Id$
 */
 
-#include <stdio.h>
+#include <stdio.>
 #include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -86,7 +86,6 @@ jack_driver_load (int argc, char **argv)
 	if ((errstr = dlerror ()) != 0) {
 		jack_error ("no finish function in in shared driver object %s", path_to_so);
 		dlclose (handle);
-		va_end (ap);
 		return 0;
 	}
 
@@ -94,8 +93,6 @@ jack_driver_load (int argc, char **argv)
 		driver->handle = handle;
 		driver->finish = finish;
 	}
-
-	va_end (ap);
 
 	return driver;
 
