@@ -9,9 +9,11 @@ Version: $Id$
 TO BE DECIDED (owner)
 
 - dropping the use of CAP_RESOURCE (nando)
+- whether to default to triangular dithering the at 16bit (swh)
 
 TODO (owner)
 
+- server<->libjack interface version handshake (kaiv)
 - figure out how to have pools of buffers for ports by type (pbd)
 - proper handling of client return values in libjack (kaiv)
 - passing args to drivers and clients? (pbd)
