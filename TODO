@@ -19,7 +19,7 @@ TODO (owner)
 
 - don't build static libraries of drivers and ip-clients (kaiv)
 - add explanation of protocol versioning to README.developers (kaiv)
-- add Pauls graph/subgraph explanation to the design doc (kaiv)
+- add Paul's graph/subgraph explanation to the design doc (kaiv)
 - add support for custom jackd --tmpdir in libjack (pbd)
 - add a sane way handle situations where the unix sockets already 
   exist when jackd is started (kaiv)
