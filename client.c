@@ -1737,3 +1737,25 @@ jack_set_transport_info (jack_client_t *client,
 
 	return 0;
 }	
+
+nframes_t
+jack_port_get_total_latency (jack_client_t *client,
+			     jack_port_t *port)
+{
+	jack_request_t req;
+
+	req.type = GetPortTotalLatency;
+	strcpy (req.x.port_info.name, port->shared->name);
+	
+	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot send port total latency request to server");
+		return 0;
+	}
+
+	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot read port total latency result from server (%s)", strerror (errno));
+		return 0;
+	}
+	
+	return req.x.nframes;
+}

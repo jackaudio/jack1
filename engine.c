@@ -79,7 +79,7 @@ static jack_client_internal_t *jack_client_internal_new (jack_engine_t *engine, 
 static jack_client_internal_t *jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
 
 static void jack_sort_graph (jack_engine_t *engine);
-static int  jack_rechain_graph (jack_engine_t *engine, int take_lock);
+static int  jack_rechain_graph (jack_engine_t *engine);
 static int  jack_get_fifo_fd (jack_engine_t *engine, int which_fifo);
 static void jack_clear_fifos (jack_engine_t *engine);
 
@@ -1592,16 +1592,12 @@ jack_client_set_order (jack_engine_t *engine, jack_client_internal_t *client)
 }
 
 int
-jack_rechain_graph (jack_engine_t *engine, int take_lock)
+jack_rechain_graph (jack_engine_t *engine)
 {
 	GSList *node, *next;
 	unsigned long n;
 	int err = 0;
 	jack_client_internal_t *client, *subgraph_client, *next_client;
-
-	if (take_lock) {
-		pthread_mutex_lock (&engine->graph_lock);
-	}
 
 	jack_clear_fifos (engine);
 
@@ -1703,10 +1699,6 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 			fprintf(stderr, "client %s: wait_fd=%d, execution_order=%lu (last client).\n", 
 				subgraph_client->control->name, subgraph_client->subgraph_wait_fd, n);
 		}
-	}
-
-	if (take_lock) {
-		pthread_mutex_unlock (&engine->graph_lock);
 	}
 
 	return err;
@@ -1891,7 +1883,7 @@ jack_sort_graph (jack_engine_t *engine)
 	}
 
 	engine->clients = g_slist_sort (engine->clients, (GCompareFunc) jack_client_sort);
-	jack_rechain_graph (engine, FALSE);
+	jack_rechain_graph (engine);
 }
 
 /**
@@ -2138,14 +2130,16 @@ jack_port_do_disconnect (jack_engine_t *engine,
 	return ret;
 }
 
-static int
-jack_port_get_total_latency (jack_engine_t *engine, jack_port_internal_t *port, nframes_t *latency)
+static nframes_t
+jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port)
 {
 	GSList *node;
+	nframes_t latency;
+	nframes_t max_latency = 0;
 
-	/* call tree should hold engine->graph_lock. */
+	/* call tree must hold engine->graph_lock. */
 	
-	(*latency) = port->shared->latency;
+	latency = port->shared->latency;
 
 	for (node = port->connections; node; node = g_slist_next (node)) {
 
@@ -2160,15 +2154,29 @@ jack_port_get_total_latency (jack_engine_t *engine, jack_port_internal_t *port, 
 		
 		if (connection->destination == port) {
 
-			jack_port_get_total_latency (engine, connection->source, &this_latency);
-			
-			if (this_latency > *latency) {
-				(*latency) = this_latency;
+			if (connection->source->shared->flags & JackPortIsTerminal) {
+				this_latency = connection->source->shared->latency;
+			} else {
+				this_latency = jack_get_port_total_latency (engine, connection->source);
 			}
+
+		} else {
+
+			/* "port" is the source, so get the latency of the destination */
+
+			if (connection->destination->shared->flags & JackPortIsTerminal) {
+				this_latency = connection->destination->shared->latency;
+			} else {
+				this_latency = jack_get_port_total_latency (engine, connection->destination);
+			}
+		}
+
+		if (this_latency > max_latency) {
+			max_latency = this_latency;
 		}
 	}
 
-	return 0;
+	return latency + max_latency;
 }
 
 static int
@@ -2176,11 +2184,18 @@ jack_get_total_latency (jack_engine_t *engine, const char *portname, nframes_t *
 {
 	jack_port_internal_t *port;
 
+	pthread_mutex_lock (&engine->graph_lock);
+
 	if ((port = jack_get_port_by_name (engine, portname)) == NULL) {
+		pthread_mutex_unlock (&engine->graph_lock);
 		return -1;
 	}
 
-	return jack_port_get_total_latency (engine, port, latency);
+	*latency = jack_get_port_total_latency (engine, port);
+
+	pthread_mutex_unlock (&engine->graph_lock);
+
+	return 0;
 }
 
 static int 

@@ -1074,7 +1074,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 		snprintf (buf, sizeof(buf) - 1, "in_%lu", chn+1);
 		port = jack_port_register (driver->client, buf, 
 					   JACK_DEFAULT_AUDIO_TYPE,
-					   JackPortIsOutput|JackPortIsPhysical|JackPortCanMonitor, 0);
+					   JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal|JackPortCanMonitor, 0);
 		if (port == 0) {
 			jack_error ("ALSA: cannot register port for %s", buf);
 			break;
@@ -1083,7 +1083,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 		/* XXX fix this so that it can handle: systemic (external) latency
 		*/
 
-		jack_port_set_latency (port, driver->frames_per_cycle * driver->nfragments);
+		jack_port_set_latency (port, driver->frames_per_cycle);
 
 		driver->capture_ports = g_slist_append (driver->capture_ports, port);
 	}
@@ -1092,7 +1092,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 		snprintf (buf, sizeof(buf) - 1, "out_%lu", chn+1);
 		port = jack_port_register (driver->client, buf, 
 					    JACK_DEFAULT_AUDIO_TYPE,
-					    JackPortIsInput|JackPortIsPhysical, 0);
+					    JackPortIsInput|JackPortIsTerminal|JackPortIsPhysical, 0);
 		if (port == 0) {
 			jack_error ("ALSA: cannot register port for %s", buf);
 			break;

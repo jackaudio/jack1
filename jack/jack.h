@@ -269,6 +269,13 @@ int jack_port_unlock (jack_client_t *, jack_port_t *);
 
 nframes_t jack_port_get_latency (jack_port_t *port);
 
+/* this returns the maximum of the sum of the latencies in every
+   connection path that can be drawn between the port and other
+   ports with the JackPortIsTerminal flag set.
+*/
+
+nframes_t jack_port_get_total_latency (jack_client_t *, jack_port_t *port);
+
 /* the port latency is zero by default. clients that control
    physical hardware with non-zero latency should call this
    to set the latency to its correct value. note that the value
