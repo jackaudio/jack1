@@ -274,7 +274,8 @@ jack_port_get_connections (const jack_port_t *port)
 /* SERVER-SIDE (all) connection querying */
 
 const char **
-jack_port_get_all_connections (const jack_client_t *client, const jack_port_t *port)
+jack_port_get_all_connections (const jack_client_t *client,
+			       const jack_port_t *port)
 {
 	const char **ret;
 	jack_request_t req;
@@ -304,12 +305,14 @@ jack_port_get_all_connections (const jack_client_t *client, const jack_port_t *p
 		return req.x.port_connections.ports;
 	}
 
-	ret = (const char **) malloc (sizeof (char *) * (req.x.port_connections.nports + 1));
+	ret = (const char **)
+		malloc (sizeof (char *) * (req.x.port_connections.nports + 1));
 
 	for (i = 0; i < req.x.port_connections.nports; ++i ) {
 		jack_port_id_t port_id;
 		
-		if (read (client->request_fd, &port_id, sizeof (port_id)) != sizeof (port_id)) {
+		if (read (client->request_fd, &port_id, sizeof (port_id))
+		    != sizeof (port_id)) {
 			jack_error ("cannot read port id from server");
 			return 0;
 		}
@@ -353,7 +356,8 @@ jack_port_by_name (jack_client_t *client, const char *port_name)
 	
 	for (i = 0; i < limit; i++) {
 		if (port[i].in_use && strcmp (port[i].name, port_name) == 0) {
-			return jack_port_new (client, port[i].id, client->engine);
+			return jack_port_new (client, port[i].id,
+					      client->engine);
 		}
 	}
 
@@ -389,7 +393,8 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 
 	if (port->shared->flags & JackPortIsOutput) {
 		if (port->shared->tied) {
-			return jack_port_get_buffer (port->shared->tied, nframes);
+			return jack_port_get_buffer (port->shared->tied,
+						     nframes);
 		}
 		return jack_port_buffer (port);
 	}
@@ -416,7 +421,8 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 		   the buffer of the connected (output) port.
 		*/
 
-		return jack_port_get_buffer (((jack_port_t *) node->data), nframes);
+		return jack_port_get_buffer (((jack_port_t *) node->data),
+					     nframes);
 	}
 
 	/* multiple connections. use a local buffer and mixdown
@@ -432,8 +438,11 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 	*/
 
 	if (port->shared->offset == 0) {
-		port->shared->offset = (size_t) jack_pool_alloc (port->shared->type_info.buffer_scale_factor * 
-								 sizeof (jack_default_audio_sample_t) * nframes);
+		port->shared->offset = (size_t)
+			jack_pool_alloc (
+				port->shared->type_info.buffer_scale_factor
+				* sizeof (jack_default_audio_sample_t)
+				* nframes);
 		port->client_segment_base = 0;
 	}
 	port->shared->type_info.mixdown (port, nframes);
@@ -489,7 +498,8 @@ jack_port_request_monitor (jack_port_t *port, int onoff)
 		 */
 
 		pthread_mutex_lock (&port->connection_lock);
-		for (node = port->connections; node; node = jack_slist_next (node)) {
+		for (node = port->connections; node;
+		     node = jack_slist_next (node)) {
 			
 			/* drop the lock because if there is a feedback loop,
 			   we will deadlock. XXX much worse things will
@@ -497,7 +507,8 @@ jack_port_request_monitor (jack_port_t *port, int onoff)
 			*/
 
 			pthread_mutex_unlock (&port->connection_lock);
-			jack_port_request_monitor ((jack_port_t *) node->data, onoff);
+			jack_port_request_monitor ((jack_port_t *) node->data,
+						   onoff);
 			pthread_mutex_lock (&port->connection_lock);
 		}
 		pthread_mutex_unlock (&port->connection_lock);
@@ -507,7 +518,8 @@ jack_port_request_monitor (jack_port_t *port, int onoff)
 }
 	
 int 
-jack_port_request_monitor_by_name (jack_client_t *client, const char *port_name, int onoff)
+jack_port_request_monitor_by_name (jack_client_t *client,
+				   const char *port_name, int onoff)
 
 {
 	jack_port_t *port;
@@ -518,8 +530,10 @@ jack_port_request_monitor_by_name (jack_client_t *client, const char *port_name,
 	ports = &client->engine->ports[0];
 	
 	for (i = 0; i < limit; i++) {
-		if (ports[i].in_use && strcmp (ports[i].name, port_name) == 0) {
-			port = jack_port_new (client, ports[i].id, client->engine);
+		if (ports[i].in_use &&
+		    strcmp (ports[i].name, port_name) == 0) {
+			port = jack_port_new (client, ports[i].id,
+					      client->engine);
 			return jack_port_request_monitor (port, onoff);
 			free (port);
 			return 0;
@@ -592,20 +606,23 @@ jack_port_set_name (jack_port_t *port, const char *new_name)
 	int len;
 
 	colon = strchr (port->shared->name, ':');
-	len = sizeof (port->shared->name) - ((int) (colon - port->shared->name)) - 2;
+	len = sizeof (port->shared->name) -
+		((int) (colon - port->shared->name)) - 2;
 	snprintf (colon+1, len, "%s", new_name);
 	
 	return 0;
 }
 
 void
-jack_port_set_peak_function (jack_port_t *port, double (*func)(jack_port_t* port, jack_nframes_t))
+jack_port_set_peak_function (jack_port_t *port,
+			     double (*func)(jack_port_t* port, jack_nframes_t))
 {
 	port->shared->type_info.peak = func;
 }
 
 void
-jack_port_set_power_function (jack_port_t *port, double (*func)(jack_port_t* port, jack_nframes_t))
+jack_port_set_power_function (jack_port_t *port,
+			      double (*func)(jack_port_t* port, jack_nframes_t))
 {
 	port->shared->type_info.power = func;
 }
@@ -646,7 +663,8 @@ static double
 jack_audio_port_peak (jack_port_t *port, jack_nframes_t nframes)
 {
 	jack_nframes_t n;
-	jack_default_audio_sample_t *buf = (jack_default_audio_sample_t *) jack_port_get_buffer (port, nframes);
+	jack_default_audio_sample_t *buf = (jack_default_audio_sample_t *)
+		jack_port_get_buffer (port, nframes);
 	float max = 0;
 
 	for (n = 0; n < nframes; ++n) {
@@ -679,9 +697,11 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 	input = (jack_port_t *) node->data;
 	buffer = jack_port_buffer (port);
 
-	memcpy (buffer, jack_port_buffer (input), sizeof (jack_default_audio_sample_t) * nframes);
+	memcpy (buffer, jack_port_buffer (input),
+		sizeof (jack_default_audio_sample_t) * nframes);
 
-	for (node = jack_slist_next (node); node; node = jack_slist_next (node)) {
+	for (node = jack_slist_next (node); node;
+	     node = jack_slist_next (node)) {
 
 		input = (jack_port_t *) node->data;
 
