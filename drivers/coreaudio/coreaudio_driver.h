@@ -28,6 +28,10 @@
 #ifndef __jack_coreaudio_driver_h__
 #define __jack_coreaudio_driver_h__
 
+#include <AudioToolbox/AudioConverter.h>
+#include <AudioUnit/AudioUnit.h>
+#include <CoreAudio/CoreAudio.h>
+
 #include <jack/types.h>
 #include <jack/hardware.h>
 #include <jack/driver.h>
@@ -51,16 +55,15 @@ typedef struct {
     JSList *capture_ports;
     JSList *playback_ports;
 
-    float **incoreaudio;
-    float **outcoreaudio;
-    int isInterleaved;
-    int numberOfInputStreams;
-    int numberOfOuputStreams;
-    int *channelsPerInputStream, *channelsPerOuputStream;
-    char driver_name[256];
-    void *stream;
+	char driver_name[256];
+ 	
+	AudioUnit au_hal;
+	AudioBufferList* input_list;
+	AudioBufferList* output_list;
+	AudioDeviceID device_id;
 	
 	int xrun_detected;
+	int null_cycle_occured;
 
 } coreaudio_driver_t;
 
