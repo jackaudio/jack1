@@ -2118,7 +2118,7 @@ driver_get_descriptor ()
 	desc = calloc (1, sizeof (jack_driver_desc_t));
 
 	strcpy (desc->name,"alsa");
-	desc->nparams = 14;
+	desc->nparams = 15;
   
 	params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
@@ -2189,6 +2189,15 @@ driver_get_descriptor ()
 	strcpy (params[i].long_desc, params[i].short_desc);
 
 	i++;
+	strcpy (params[i].name, "duplex");
+	params[i].character  = 'D';
+	params[i].type       = JackDriverParamBool;
+	params[i].value.i    = 1;
+	strcpy (params[i].short_desc,
+		"Provide both capture and playback ports");
+	strcpy (params[i].long_desc, params[i].short_desc);
+
+	i++;
 	strcpy (params[i].name, "softmode");
 	params[i].character  = 's';
  	params[i].type       = JackDriverParamBool;
@@ -2239,7 +2248,7 @@ driver_get_descriptor ()
 	strcpy (params[i].name, "shorts");
 	params[i].character  = 'S';
 	params[i].type       = JackDriverParamBool;
-	params[i].value.i    = 0;
+	params[i].value.i    = FALSE;
 	strcpy (params[i].short_desc, "Try 16-bit samples before 32-bit");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
@@ -2348,6 +2357,11 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			if (strcmp (param->value.str, "none") != 0) {
 				playback_pcm_name = strdup (param->value.str);
 			}
+			break;
+
+		case 'D':
+			playback = TRUE;
+			capture = TRUE;
 			break;
 
 		case 'd':
