@@ -13,6 +13,8 @@ TO BE DECIDED (owner)
 
 TODO (owner)
 
+- capture_client has pthread_mutex_lock() in its process() (pbd)
+- jack_deactive called unconditionally in jack_client_close (kaiv)
 - server<->libjack interface version handshake (kaiv)
 - figure out how to have pools of buffers for ports by type (pbd)
 - proper handling of client return values in libjack (kaiv)
