@@ -49,7 +49,7 @@ upload-images: build-updir
 
 build-updir:
 	if [ ! -d updir ] ; then mkdir updir ; else rm -rf updir/* ; fi ; \
-        if [ ! -f last-upload ] ; then touch --date="Jan 1st 1970" last-upload; fi  ; \
+        if [ ! -f last-upload ] ; then touch --date="Jan 1 00:00:01 EST 1970" last-upload; fi  ; \
 	uptime=`ls -l --full-time last-upload | awk '{printf ("%s %s %s %s %s\n", $$6, $$7, $$8, $$9, $$10)}'`; \
 	tar -chf - --newer="$$uptime" \
 	      --exclude=updir \
