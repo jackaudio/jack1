@@ -16,7 +16,6 @@ TO BE DECIDED (owner)
 
 TODO for 1.0 (owner)
 
-- ensure that UST/MSC pairs work for transport API
 - resolve helper thread design question?
 - API to change buffer size (joq)
 
@@ -26,15 +25,16 @@ TODO post-1.0
 
 TODO general (owner)
 
+- alsa_pcm: make sure that returned nframes is less than buffersize
 - don't build static libraries of drivers and ip-clients (kaiv)
 - add explanation of protocol versioning to README.developers (kaiv)
-- add Paul's graph/subgraph explanation to the design doc (kaiv)
 - add code to enforce the 'bufsize==2^x' rule (kaiv)
 - proper handling of client return values in libjack (kaiv)
 - pool based malloc for rt client-local mem allocation (paul, moved back here)
 
 TO THINK ABOUT
 
+- ensure that UST/MSC pairs work for transport API
 - whether we want to support varispeed (resampling and/or changing
   the actual rate)
 - per-block timestamping against system clock (UST stamps at driver level)
@@ -43,6 +43,7 @@ TO THINK ABOUT
 
 CLOSED (date,who,comment)
 
+- add Paul's graph/subgraph explanation to the design doc (2003/08/27,done,kaiv)
 - add support for custom jackd --tmpdir in libjack (2003/05/06,done,jesse)
 - capture_client has pthread_mutex_lock() in its process() (2003/05/30,fixed,joq)
 - update at least the user-visible copyrights with year 2003 (2003/04/05,done,paul)
