@@ -339,11 +339,11 @@ server_connect (const char *server_name)
 	}
 
 	//JOQ: temporary debug message
-	fprintf (stderr, "DEBUG: connecting to `%s' server\n", server_name);
+	//fprintf (stderr, "DEBUG: connecting to `%s' server\n", server_name);
 
 	addr.sun_family = AF_UNIX;
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d_%d",
-		  jack_server_dir (server_name), getuid (), which);
+	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d",
+		  jack_server_dir (server_name), which);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		close (fd);
@@ -368,8 +368,8 @@ server_event_connect (jack_client_t *client, const char *server_name)
 	}
 
 	addr.sun_family = AF_UNIX;
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d_ack_0",
-		  jack_server_dir (server_name), getuid () );
+	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0",
+		  jack_server_dir (server_name));
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server for events",
@@ -760,13 +760,14 @@ jack_client_open (const char *client_name,
 	 */
 	jack_init_time ();
 
-	if (jack_initialize_shm (va.server_name)) {
-		jack_error ("Unable to initialize shared memory.");
+	if (jack_request_client (ClientExternal, client_name, options, status,
+				 &va, &res, &req_fd)) {
 		return NULL;
 	}
 
-	if (jack_request_client (ClientExternal, client_name, options, status,
-				 &va, &res, &req_fd)) {
+	/* don't access shared memory until server connected */
+	if (jack_initialize_shm ()) {
+		jack_error ("Unable to initialize shared memory.");
 		return NULL;
 	}
 

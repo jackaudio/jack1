@@ -303,7 +303,8 @@ jack_drivers_load ()
 	   from the .so files in it */
 	dir_stream = opendir (driver_dir);
 	if (!dir_stream) {
-		jack_error ("could not open driver directory %s: %s\n", driver_dir, strerror (errno));
+		jack_error ("could not open driver directory %s: %s\n",
+			    driver_dir, strerror (errno));
 		return NULL;
 	}
   
@@ -330,7 +331,8 @@ jack_drivers_load ()
 
 	err = closedir (dir_stream);
 	if (err) {
-		jack_error ("error closing driver directory %s: %s\n", driver_dir, strerror (errno));
+		jack_error ("error closing driver directory %s: %s\n",
+			    driver_dir, strerror (errno));
 	}
 
 	if (!driver_list) {
@@ -389,6 +391,70 @@ jack_find_driver_descriptor (const char * name)
 	return desc;
 }
 
+static void
+jack_cleanup_files (const char *server_name)
+{
+	DIR *dir;
+	struct dirent *dirent;
+	char *dir_name = jack_server_dir (server_name);
+
+	/* On termination, we remove all files that jackd creates so
+	 * subsequent attempts to start jackd will not believe that an
+	 * instance is already running.  If the server crashes or is
+	 * terminated with SIGKILL, this is not possible.  So, cleanup
+	 * is also attempted when jackd starts.
+	 *
+	 * There are several tricky issues.  First, the previous JACK
+	 * server may have run for a different user ID, so its files
+	 * may be inaccessible.  This is handled by using a separate
+	 * JACK_TMP_DIR subdirectory for each user.  Second, there may
+	 * be other servers running with different names.  Each gets
+	 * its own subdirectory within the per-user directory.  The
+	 * current process has already registered as `server_name', so
+	 * we know there is no other server actively using that name.
+	 */
+
+	/* nothing to do if the server directory does not exist */
+	if ((dir = opendir (dir_name)) == NULL) {
+		return;
+	}
+
+	/* unlink all the files in this directory, they are mine */
+	while ((dirent = readdir (dir)) != NULL) {
+
+		char fullpath[PATH_MAX];
+
+		if ((strcmp (dirent->d_name, ".") == 0)
+		    || (strcmp (dirent->d_name, "..") == 0)) {
+			continue;
+		}
+
+		snprintf (fullpath, sizeof (fullpath), "%s/%s",
+			  dir_name, dirent->d_name);
+
+		if (unlink (fullpath)) {
+			jack_error ("cannot unlink `%s' (%s)", fullpath,
+				    strerror (errno));
+		}
+	} 
+
+	closedir (dir);
+
+	/* now, delete the per-server subdirectory, itself */
+	if (rmdir (dir_name)) {
+ 		jack_error ("cannot remove `%s' (%s)", dir_name,
+			    strerror (errno));
+	}
+
+	/* finally, delete the per-user subdirectory, if empty */
+	if (rmdir (jack_user_dir ())) {
+		if (errno != ENOTEMPTY) {
+			jack_error ("cannot remove `%s' (%s)",
+				    jack_user_dir (), strerror (errno));
+		}
+	}
+}
+
 int	       
 main (int argc, char *argv[])
 
@@ -421,6 +487,7 @@ main (int argc, char *argv[])
 	int driver_nargs = 1;
 	int show_version = 0;
 	int i;
+	int rc;
 #ifdef USE_CAPABILITIES
 	int status;
 #endif
@@ -531,6 +598,7 @@ main (int argc, char *argv[])
 				" tmpdir " DEFAULT_TMP_DIR 
 				" protocol " PROTOCOL_VERSION
 				"\n");
+		return -1;
 	}
 
 	if (!seen_driver) {
@@ -579,13 +647,42 @@ main (int argc, char *argv[])
 
 	copyright (stdout);
 
-	jack_cleanup_shm (server_name);
+	if (jack_initialize_shm ()) {
+		fprintf (stderr, "no access to shared memory registry");
+		exit (1);
+	}
+	rc = jack_register_server (server_name);
+	switch (rc) {
+	case EEXIST:
+		fprintf (stderr, "`%s' server already active\n", server_name);
+		exit (1);
+	case ENOSPC:
+		fprintf (stderr, "too many servers already active\n");
+		exit (2);
+	default:
+		if (verbose)
+			fprintf (stderr, "server `%s' registered\n",
+				 server_name);
+	}
+
+	/* clean up shared memory and files from any previous
+	 * instance of this server name */
+	jack_cleanup_shm ();
 	jack_cleanup_files (server_name);
 
+	/* run the server engine until it terminates */
 	jack_main (desc, driver_params);
 
-	jack_cleanup_shm (server_name);
+	/* clean up shared memory and files from this server instance */
+	if (verbose)
+		fprintf (stderr, "cleaning up shared memory\n");
+	jack_cleanup_shm ();
+	if (verbose)
+		fprintf (stderr, "cleaning up files\n");
 	jack_cleanup_files (server_name);
+	if (verbose)
+		fprintf (stderr, "unregistering server `%s'\n", server_name);
+	jack_unregister_server (server_name);
 
 	exit (0);
 }

@@ -149,10 +149,13 @@ main (int argc, char *argv[])
 		exit (1);
 	}
 
-	/* connect the ports. Note: you can't do this before the
-	   client is activated, because we can't allow connections to
-	   be made to clients that aren't running.
-	*/
+	/* Connect the ports.  You can't do this before the client is
+	 * activated, because we can't make connections to clients
+	 * that aren't running.  Note the confusing (but necessary)
+	 * orientation of the driver backend ports: playback ports are
+	 * "input" to the backend, and capture ports are "output" from
+	 * it.
+	 */
 
 	ports = jack_get_ports (client, NULL, NULL,
 				JackPortIsPhysical|JackPortIsOutput);

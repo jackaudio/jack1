@@ -239,8 +239,7 @@ make_sockets (const char *server_name, int fd[2])
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
 		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1,
-			  "%s/jack_%d_%d", jack_server_dir (server_name),
-			  getuid (), i);
+			  "%s/jack_%d", jack_server_dir (server_name), i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -278,8 +277,7 @@ make_sockets (const char *server_name, int fd[2])
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
 		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1,
-			  "%s/jack_%d_ack_%d", jack_server_dir (server_name),
-			  getuid (), i);
+			  "%s/jack_ack_%d", jack_server_dir (server_name), i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -309,56 +307,6 @@ make_sockets (const char *server_name, int fd[2])
 	}
 
 	return 0;
-}
-
-void
-jack_cleanup_files (const char *server_name)
-{
-	DIR *dir;
-	struct dirent *dirent;
-
-	/* On termination, we remove all files that jackd creates so
-	 * subsequent attempts to start jackd will not believe that an
-	 * instance is already running.  If the server crashes or is
-	 * terminated with SIGKILL, this is not possible.  So, cleanup
-	 * is also attempted when jackd starts.
-	 *
-	 * There are several tricky issues.  First, the previous JACK
-	 * server may have run for a different user ID, so its files
-	 * may be inaccessible.  This is handled by using a separate
-	 * JACK_TMP_DIR subdirectory for each user.  Second, there may
-	 * be other servers running with different names.  So, they
-	 * get separate subdirectories, too.
-	 */
-
-	if ((dir = opendir (jack_server_dir (server_name))) == NULL) {
-		//JOQ: is this really an error?
-		//fprintf (stderr, "jack(%d): cannot open jack FIFO directory "
-		//	 "(%s)\n", getpid(), strerror (errno));
-		return;
-	}
-
-	while ((dirent = readdir (dir)) != NULL) {
-		/* jack-99999999- is 14 chars long */
-		char name_prefix1[15];
-		char name_prefix2[15];
-		snprintf (name_prefix1, sizeof (name_prefix1),
-			  "jack-%d-", getuid ());
-		snprintf (name_prefix2, sizeof (name_prefix2),
-			  "jack_%d_", getuid ());
-		if (strncmp (dirent->d_name, name_prefix1,
-			     strlen(name_prefix1)) == 0
-		    || strncmp (dirent->d_name, name_prefix2,
-				strlen(name_prefix2)) == 0) {
-			char fullpath[PATH_MAX+1];
-			snprintf (fullpath, sizeof (fullpath), "%s/%s",
-				  jack_server_dir (server_name),
-				  dirent->d_name);
-			unlink (fullpath);
-		} 
-	}
-
-	closedir (dir);
 }
 
 void
@@ -1598,24 +1546,20 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	srandom (time ((time_t *) 0));
 
-	if (jack_initialize_shm (engine->server_name)) {
-		return 0;
-	}
-        
 	if (jack_shmalloc ("/jack-engine",
 			   sizeof (jack_control_t)
 			   + ((sizeof (jack_port_shared_t) * engine->port_max)),
 			   &engine->control_shm)) {
 		jack_error ("cannot create engine control shared memory "
 			    "segment (%s)", strerror (errno));
-		return 0;
+		return NULL;
 	}
 
 	if (jack_attach_shm (&engine->control_shm)) {
 		jack_error ("cannot attach to engine control shared memory"
 			    " (%s)", strerror (errno));
 		jack_destroy_shm (&engine->control_shm);
-		return 0;
+		return NULL;
 	}
 
 	engine->control = (jack_control_t *)
@@ -1669,7 +1613,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	if (make_sockets (engine->server_name, engine->fds) < 0) {
 		jack_error ("cannot create server sockets");
-		return 0;
+		return NULL;
 	}
 
 	engine->control->port_max = engine->port_max;
@@ -1695,7 +1639,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->servertask = mach_task_self();
 	if (task_get_bootstrap_port(engine->servertask, &engine->bp)){
 		jack_error("Jackd: Can't find bootstrap mach port");
-		return 0;
+		return NULL;
         }
         engine->portnum = 0;
 #endif /* JACK_USE_MACH_THREADS */
@@ -1737,9 +1681,8 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->control->engine_ok = 1;
 
 	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix),
-		  "%s/jack-%d-ack-fifo-%d",
-		  jack_server_dir (engine->server_name),
-		  getuid (), getpid ());
+		  "%s/jack-ack-fifo-%d",
+		  jack_server_dir (engine->server_name), getpid ());
 
 	(void) jack_get_fifo_fd (engine, 0);
 
@@ -2077,6 +2020,8 @@ jack_engine_delete (jack_engine_t *engine)
 
 	if (engine == NULL)
 		return;
+
+	VERBOSE (engine, "starting server engine shutdown\n");
 
 	engine->control->engine_ok = 0;	/* tell clients we're going away */
 

@@ -380,8 +380,6 @@ typedef struct _jack_client_internal {
     
 } jack_client_internal_t;
 
-extern void jack_cleanup_files (const char *server_name);
-
 extern int  jack_client_handle_port_connection (jack_client_t *client,
 						jack_event_t *event);
 extern jack_client_t *jack_driver_client_new (jack_engine_t *,

@@ -5,7 +5,10 @@
 #include <sys/types.h>
 #include <jack/types.h>
 
-#define MAX_SHM_ID 256 /* likely use is more like 16 per jackd */
+#define MAX_SERVERS 8			/* maximum concurrent servers */
+#define MAX_SHM_ID 256			/* generally about 16 per server */
+#define JACK_SERVER_NAME_SIZE PATH_MAX	/* maximum length of server name */
+#define JACK_SHM_MAGIC 0x4a41434b	/* shm magic number: "JACK" */
 
 #ifdef USE_POSIX_SHM
 typedef shm_name_t jack_shm_id_t;
@@ -13,21 +16,47 @@ typedef shm_name_t jack_shm_id_t;
 typedef int jack_shm_id_t;
 #endif /* !USE_POSIX_SHM */
 
+/* shared memory type */
+typedef enum {
+	shm_POSIX = 1,			/* POSIX shared memory */
+	shm_SYSV = 2			/* System V shared memory */
+} jack_shmtype_t;
+
 typedef int16_t jack_shm_registry_index_t;
 
 /** 
- * A structure holding information about shared memory
- * allocated by JACK. this version persists across
- * invocations of JACK, and can be used by multiple
- * JACK servers. It contains no pointers and is valid
- * across address spaces.
+ * A structure holding information about shared memory allocated by
+ * JACK. this persists across invocations of JACK, and can be used by
+ * multiple JACK servers.  It contains no pointers and is valid across
+ * address spaces.
+ *
+ * The registry consists of two parts: a header including an array of
+ * server names, followed by an array of segment registry entries.
  */
+typedef struct _jack_shm_server {
+    pid_t                     pid;	/* process ID */
+    char		      name[JACK_SERVER_NAME_SIZE];
+} jack_shm_server_t;
+
+typedef struct _jack_shm_header {
+    uint32_t		      magic;	/* magic number */
+    uint16_t		      protocol;	/* JACK protocol version */
+    jack_shmtype_t	      type;	/* shm type */
+    jack_shmsize_t	      size;	/* total registry segment size */
+    jack_shmsize_t	      hdr_len;	/* size of header */
+    jack_shmsize_t	      entry_len; /* size of registry entry */
+    jack_shm_server_t server[MAX_SERVERS]; /* current server array */
+} jack_shm_header_t;
+
 typedef struct _jack_shm_registry {
     pid_t                     allocator; /* PID that created shm segment */
-    jack_shmsize_t            size;      /* needed for POSIX unattach */
+    jack_shmsize_t            size;      /* for POSIX unattach */
     jack_shm_registry_index_t index;     /* offset into the registry */
     jack_shm_id_t             id;        /* API specific, see above */
 } jack_shm_registry_t;
+
+#define JACK_SHM_REGISTRY_SIZE (sizeof (jack_shm_header_t) \
+				+ sizeof (jack_shm_registry_t) * MAX_SHM_ID)
 
 /** 
  * a structure holding information about shared memory
@@ -55,10 +84,14 @@ static inline char* jack_shm_addr (jack_shm_info_t* si) {
 
 /* here beginneth the API */
 
-extern int  jack_initialize_shm (const char *server_name);
-extern void jack_cleanup_shm (const char *server_name);
+extern int  jack_register_server (const char *server_name);
+extern void jack_unregister_server (const char *server_name);
 
-extern int  jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* result);
+extern int  jack_initialize_shm (void);
+extern int  jack_cleanup_shm (void);
+
+extern int  jack_shmalloc (const char *shm_name, jack_shmsize_t size,
+			   jack_shm_info_t* result);
 extern void jack_release_shm (jack_shm_info_t*);
 extern void jack_destroy_shm (jack_shm_info_t*);
 extern int  jack_attach_shm (jack_shm_info_t*);
