@@ -29,7 +29,23 @@ extern "C" {
 #include <jack/error.h>
 
 jack_client_t *jack_client_new (const char *client_name);
-int             jack_client_close (jack_client_t *client);
+int            jack_client_close (jack_client_t *client);
+
+/* register a function (and argument) to be called if and when the
+   JACK server shuts down the client thread. the function must
+   be written as if it were an asynchonrous POSIX signal
+   handler - use only async functions, and remember that it
+   is executed from another thread. a typical function might
+   set a flag or write to a pipe so that the rest of the
+   application knows that the JACK client thread has shut
+   down.
+
+   NOTE: clients do not need to call this. it exists only
+   to help more complex clients understand what is going
+   on. if called, it must be called before jack_client_activate().
+*/
+
+void  jack_on_shutdown (jack_client_t *, void (*function)(void *arg), void *arg);
 
 int jack_set_process_callback (jack_client_t *, JackProcessCallback, void *arg);
 int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback, void *arg);
@@ -106,6 +122,10 @@ jack_port_register (jack_client_t *,
 /* this removes the port from the client */
 
 int jack_port_unregister (jack_client_t *, jack_port_t *);
+
+/* a port is an opaque type, and its name is not inferable */
+
+const char * jack_port_name (const jack_port_t *port);
 
 /* This returns a pointer to the memory area associated with the
    specified port. It can only be called from within the client's
@@ -216,6 +236,7 @@ jack_port_t **jack_get_ports (jack_client_t *,
 
 int  jack_engine_takeover_timebase (jack_client_t *);
 void jack_update_time (jack_client_t *, nframes_t);
+
 
 #ifdef __cplusplus
 }

@@ -7,6 +7,7 @@ libtool
 jackd
 jack_simple_client
 jack_monitor_client
+jackrec
 *.la
 *.pc
 Makefile

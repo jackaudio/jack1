@@ -53,6 +53,8 @@ struct _jack_client {
     GSList *ports;
     pthread_t thread;
     char fifo_prefix[FIFO_NAME_SIZE+1];
+    void (*on_shutdown)(void *arg);
+    void *on_shutdown_arg;
     char thread_ok : 1;
     char first_active : 1;
 };
@@ -100,7 +102,7 @@ jack_client_alloc ()
 	client->control = 0;
 	client->thread_ok = FALSE;
 	client->first_active = TRUE;
-
+	client->on_shutdown = NULL;
 	return client;
 }
 
@@ -234,7 +236,7 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 		jack_error ("cannot open specified fifo [%s] for writing (%s)", path, strerror (errno));
 		return -1;
 	}
-	
+
 	return 0;
 }
 		
@@ -478,6 +480,9 @@ jack_client_thread (void *arg)
 
 		if (client->pollfd[0].revents & ~POLLIN) {
 			jack_error ("engine has shut down socket; thread exiting");
+			if (client->on_shutdown) {
+				client->on_shutdown (client->on_shutdown_arg);
+			}
 			pthread_exit (0);
 		}
 
@@ -575,11 +580,11 @@ jack_client_thread (void *arg)
 			}
 
 			/* this may fail. if it does, the engine will discover
-			   that for itcontrol due a cycle timeout, which is about
+			   it due a cycle timeout, which is about
 			   the best we can do without a lot of mostly wasted
 			   effort.
 			*/
-			
+
 			write (client->graph_next_fd, &c, 1);
 		}
 	}
@@ -960,7 +965,7 @@ jack_port_connect (jack_client_t *client, const char *source_port, const char *d
 		jack_error ("cannot read port connection result from server");
 		return -1;
 	}
-	
+
 	return req.status;
 }
 
@@ -1220,3 +1225,15 @@ jack_port_request_monitor (jack_client_t *client, const char *port_name, int ono
 	return req.status;
 }
 	
+const char *
+jack_port_name (const jack_port_t *port)
+{
+	return port->shared->name;
+}
+
+void
+jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg)
+{
+	client->on_shutdown = function;
+	client->on_shutdown_arg = arg;
+}

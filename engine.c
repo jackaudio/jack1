@@ -57,12 +57,13 @@ typedef struct _jack_client_internal {
     int      subgraph_start_fd;
     int      subgraph_wait_fd;
     GSList  *ports;    /* protected by engine->graph_lock */
+    GSList  *fed_by;   /* protected by engine->graph_lock */
     int      shm_id;
     int      shm_key;
     unsigned long rank;
     struct _jack_client_internal *next_client; /* not a linked list! */
     dlhandle handle;
-
+    
 } jack_client_internal_t;
 
 static int                    jack_port_assign_buffer (jack_engine_t *, jack_port_internal_t *);
@@ -246,14 +247,17 @@ jack_cleanup_clients (jack_engine_t *engine)
 	x++;
 
 	pthread_mutex_lock (&engine->graph_lock); 
-	for (node = engine->clients; node; node = g_slist_next (node)) {
 
+	for (node = engine->clients; node; node = g_slist_next (node)) {
+		
 		client = (jack_client_internal_t *) node->data;
 		ctl = client->control;
 		
+		printf ("client %s state = %d\n", ctl->name, ctl->state);
+		
 		if (ctl->state > JACK_CLIENT_STATE_NOT_TRIGGERED) {
 			remove = g_slist_prepend (remove, node->data);
-			printf ("%d: removing failed client %s\n", x, client->control->name);
+			printf ("%d: removing failed client %s\n", x, ctl->name);
 		}
 	}
 	pthread_mutex_unlock (&engine->graph_lock);
@@ -370,7 +374,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 	struct pollfd pollfd[1];
 	char c;
 
-//	unsigned long then, now;
+	unsigned long then, now;
 //	rdtscl (then);
 
 	if (pthread_mutex_trylock (&engine->graph_lock) != 0) {
@@ -430,15 +434,18 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 			pollfd[0].fd = client->subgraph_wait_fd;
 			pollfd[0].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
 
+			rdtscl (then);
 			if (poll (pollfd, 1, engine->driver->period_interval) < 0) {
 				jack_error ("engine cannot poll for graph completion (%s)", strerror (errno));
 				err++;
 				break;
 			}
-
+			rdtscl (now);
+			
 			if (pollfd[0].revents == 0) {
-				jack_error ("subgraph starting at %s timed out (state = %d)", 
-					     client->control->name, client->control->state);
+				jack_error ("subgraph starting at %s timed out (state = %d) (time = %f usecs)", 
+					     client->control->name, client->control->state,
+					    ((float)(now - then))/450.0f);
 				err++;
 				break;
 			} else if (pollfd[0].revents & ~POLLIN) {
@@ -463,7 +470,6 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 			}
 		}
 	}
-	
 	pthread_mutex_unlock (&engine->graph_lock);
 	
 	if (err) {
@@ -726,6 +732,8 @@ jack_client_disconnect (jack_engine_t *engine, jack_client_internal_t *client)
 	}
 
 	g_slist_free (client->ports);
+	g_slist_free (client->fed_by);
+	client->fed_by = 0;
 	client->ports = 0;
 }			
 
@@ -738,16 +746,12 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id, int to_wait)
 
 	pthread_mutex_lock (&engine->graph_lock);
 
-	printf ("trying ... deactivating client id %d\n", id);
-
 	for (node = engine->clients; node; node = g_slist_next (node)) {
 
 		jack_client_internal_t *client = (jack_client_internal_t *) node->data;
 
 		if (client->control->id == id) {
 			
-			printf ("deactivating client id %d\n", id);
-
 			if (client == engine->timebase_client) {
 				engine->timebase_client = 0;
 				engine->control->frame_time = 0;
@@ -1192,7 +1196,7 @@ jack_audio_thread (void *arg)
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
 	jack_driver_t *driver = engine->driver;
-	unsigned long start, end;
+//	unsigned long start, end;
 
 	if (engine->control->real_time) {
 		jack_become_real_time (pthread_self(), engine->rtpriority);
@@ -1207,11 +1211,11 @@ jack_audio_thread (void *arg)
 	}
 
 	while (1) {
-		start = end;
+//		start = end;
 		if (driver->wait (driver)) {
 			break;
 		}
-		rdtscl (end);
+//		rdtscl (end);
 //		printf ("driver cycle time: %.6f usecs\n", ((float) (end - start)) / 450.00f);
 	}
 
@@ -1298,6 +1302,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	client->request_fd = fd;
 	client->event_fd = -1;
 	client->ports = 0;
+	client->fed_by = 0;
 	client->rank = UINT_MAX;
 	client->next_client = NULL;
 	client->handle = NULL;
@@ -1378,7 +1383,6 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	}
 
 	jack_client_disconnect (engine, client);
-	jack_client_do_deactivate (engine, client);
 
 	for (node = engine->clients; node; node = g_slist_next (node)) {
 		if (((jack_client_internal_t *) node->data)->control->id == client->control->id) {
@@ -1388,6 +1392,8 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 		}
 	}
 
+	jack_client_do_deactivate (engine, client);
+
 	/* rearrange the pollfd array so that things work right the 
 	   next time we go into poll(2).
 	*/
@@ -1395,7 +1401,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	for (i = 0; i < engine->pfd_max; i++) {
 		if (engine->pfd[i].fd == client->request_fd) {
 			if (i+1 < engine->pfd_max) {
-				memcpy (&engine->pfd[i], &engine->pfd[i+1], sizeof (struct pollfd) * (engine->pfd_max - i));
+				memmove (&engine->pfd[i], &engine->pfd[i+1], sizeof (struct pollfd) * (engine->pfd_max - i));
 			}
 			engine->pfd_max--;
 		}
@@ -1584,6 +1590,12 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 		}
 
 		if (jack_client_is_inprocess (client)) {
+
+			/* break the chain for the current subgraph. the server
+			   will wait for chain on the nth FIFO, and will
+			   then execute this in-process client.
+			*/
+
 			if (subgraph_client) {
 				subgraph_client->subgraph_wait_fd = jack_get_fifo_fd (engine, n);
 			}
@@ -1593,10 +1605,15 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 		} else {
 
 			if (subgraph_client == 0) {
+
+				/* start a new subgraph. the engine will start the chain
+				   by writing to the nth FIFO.
+				*/
+
 				subgraph_client = client;
 				subgraph_client->subgraph_start_fd = jack_get_fifo_fd (engine, n);
-			}
-			
+			} 
+
 			if (set) {
 				jack_client_set_order (engine, client);
 			}
@@ -1631,73 +1648,138 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 	return err;
 }
 
-int 
-jack_client_connected (jack_client_internal_t *a, jack_client_internal_t *b)
-
+static void
+jack_trace_terminal (jack_client_internal_t *c1, jack_client_internal_t *rbase)
 {
-	GSList *pnode, *cnode;
-	int ret = 0;
+	jack_client_internal_t *c2;
 
-	/* Check every port on the first client for a connection to
-	   the second client.
+	/* make a copy of the existing list of routes that feed c1 */
 
-	   Return -1 if a should execute before b
-	   Return  1 if a should execute after b
-	   Return  0 if they are not connected (ie. it doesn't matter)
+	GSList *existing;
+	GSList *node;
 
-	   If there is a feedback loop between a and b, the result
-	   is undefined (the first connected port will be used to
-	   determine the result). This is "OK", since there is no
-	   correct execution order in that case.
+	if (c1->fed_by == 0) {
+		return;
+	}
+
+	existing = g_slist_copy (c1->fed_by);
+
+	/* for each route that feeds c1, recurse, marking it as feeding
+	   rbase as well.
 	*/
 
-	for (pnode = a->ports; pnode; pnode = g_slist_next (pnode)) {
+	for (node = existing; node; node = g_slist_next  (node)) {
+
+		c2 = (jack_client_internal_t *) node->data;
+
+		/* c2 is a route that feeds c1 which somehow feeds base. mark
+		   base as being fed by c2
+		*/
+
+		rbase->fed_by = g_slist_prepend (rbase->fed_by, c2);
+
+		if (c2 != rbase && c2 != c1) {
+
+			/* now recurse, so that we can mark base as being fed by
+			   all routes that feed c2
+			*/
+
+			jack_trace_terminal (c2, rbase);
+		}
+
+	}
+}
+
+static int 
+jack_client_sort (jack_client_internal_t *a, jack_client_internal_t *b)
+
+{
+	/* the driver client always comes after everything else */
+
+	if (a->control->type == ClientDriver) {
+		return 1;
+	}
+
+	if (b->control->type == ClientDriver) {
+		return -1;
+	}
+
+	if (g_slist_find (a->fed_by, b)) {
+		/* a comes after b */
+		return 1;
+	} else if (g_slist_find (b->fed_by, a)) {
+		/* b comes after a */
+		return -1;
+	} else {
+		/* we don't care */
+		return 0;
+	}
+}
+
+static int
+jack_client_feeds (jack_client_internal_t *might, jack_client_internal_t *target)
+{
+	GSList *pnode, *cnode;
+
+	/* Check every port of `might' for an outbound connection to `target'
+	*/
+
+	for (pnode = might->ports; pnode; pnode = g_slist_next (pnode)) {
+
 		jack_port_internal_t *port;
 		
 		port = (jack_port_internal_t *) pnode->data;
 
 		for (cnode = port->connections; cnode; cnode = g_slist_next (cnode)) {
+
 			jack_connection_internal_t *c;
 
 			c = (jack_connection_internal_t *) cnode->data;
-			
-			if (c->source->shared->client_id == b->control->id) {
-				
-				/* b is the source, so a should be
-				   executed *after* b.
-				*/
 
-				ret = 1;
-				break;
-
-			} else if (c->source->shared->client_id == a->control->id) {
-
-				/* a is the source, so a should be
-				   executed *before* b
-				*/
-
-				ret = -1;
-				break;
+			if (c->source->shared->client_id == might->control->id &&
+			    c->destination->shared->client_id == target->control->id) {
+				return 1;
 			}
-		}
-
-		if (ret) {
-			break;
 		}
 	}
 	
-	return ret;
+	return 0;
 }
 
 static void
 jack_sort_graph (jack_engine_t *engine, int take_lock)
-
 {
+	GSList *node, *onode;
+	jack_client_internal_t *client;
+	jack_client_internal_t *oclient;
+
 	if (take_lock) {
 		pthread_mutex_lock (&engine->graph_lock);
 	}
 
-	engine->clients = g_slist_sort (engine->clients, (GCompareFunc) jack_client_connected);
+	for (node = engine->clients; node; node = g_slist_next (node)) {
+
+		client = (jack_client_internal_t *) node->data;
+
+		g_slist_free (client->fed_by);
+		client->fed_by = 0;
+
+		for (onode = engine->clients; onode; onode = g_slist_next (onode)) {
+			
+			oclient = (jack_client_internal_t *) onode->data;
+
+			if (jack_client_feeds (oclient, client)) {
+				client->fed_by = g_slist_prepend (client->fed_by, oclient);
+			}
+		}
+	}
+
+	for (node = engine->clients; node; node = g_slist_next (node)) {
+		jack_trace_terminal ((jack_client_internal_t *) node->data,
+				     (jack_client_internal_t *) node->data);
+	}
+
+	engine->clients = g_slist_sort (engine->clients, (GCompareFunc) jack_client_sort);
 	jack_rechain_graph (engine, FALSE);
 
 	if (take_lock) {
@@ -1755,6 +1837,7 @@ jack_port_do_connect (jack_engine_t *engine,
 	if (dstport->shared->type_info.mixdown == NULL && dstport->connections) {
 		jack_error ("cannot make multiple connections to a port of type [%s]", dstport->shared->type_info.type_name);
 		free (connection);
+		return -1;
 	} else {
 		dstport->connections = g_slist_prepend (dstport->connections, connection);
 		srcport->connections = g_slist_prepend (srcport->connections, connection);
@@ -1809,6 +1892,10 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 
 	if (sort_graph) {
 		jack_sort_graph (engine, FALSE);
+	}
+
+	if (ret == -1) {
+		printf ("disconnect failed\n");
 	}
 
 	return ret;
@@ -1887,7 +1974,7 @@ jack_get_fifo_fd (jack_engine_t *engine, int which_fifo)
 			return -1;
 		}
 	}
-	
+
 	return engine->fifo[which_fifo];
 }
 
@@ -2190,8 +2277,6 @@ jack_send_connection_notification (jack_engine_t *engine, jack_client_id_t clien
 		jack_error ("no such client %d during connection notification", client_id);
 		return -1;
 	}
-
-	fprintf (stderr, "sending connection to client %s\n", client->control->name);
 
 	event.type = (connected ? PortConnected : PortDisconnected);
 	event.x.self_id = self_id;

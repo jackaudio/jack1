@@ -11,8 +11,8 @@ extern "C"
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Slider.H>
 
-jack_port_t *my_input_port;
-jack_port_t *my_output_port;
+jack_port_t *input_port;
+jack_port_t *output_port;
 
 float gain = 0.0; /* slider starts out with zero gain */
 
@@ -20,8 +20,8 @@ int
 process (nframes_t nframes, void *arg)
 
 {
-	sample_t *out = (sample_t *) jack_port_get_buffer (my_output_port, nframes);
-	sample_t *in = (sample_t *) jack_port_get_buffer (my_input_port, nframes);
+	sample_t *out = (sample_t *) jack_port_get_buffer (output_port, nframes);
+	sample_t *in = (sample_t *) jack_port_get_buffer (input_port, nframes);
 
 	while (nframes--)
 		out[nframes] = in[nframes] * gain;
@@ -72,8 +72,8 @@ main (int argc, char *argv[])
 
 	printf ("engine sample rate: %lu\n", jack_get_sample_rate (client));
 
-	my_input_port = jack_port_register (client, "myinput", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
-	my_output_port = jack_port_register (client, "myoutput", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+	input_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+	output_port = jack_port_register (client, "output", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 
 	if (jack_activate (client)) {
 		fprintf (stderr, "cannot activate client");
@@ -81,12 +81,11 @@ main (int argc, char *argv[])
 
 	printf ("client activated\n");
 
-
-	if (jack_port_connect (client, "ALSA I/O:Input 1", "myinput")) {
+	if (jack_port_connect (client, "ALSA I/O:Input 1", jack_port_name (input_port))) {
 		fprintf (stderr, "cannot connect input ports\n");
 	} 
 
-	if (jack_port_connect (client, "myoutput", "ALSA I/O:Output 1")) {
+	if (jack_port_connect (client, jack_port_name (output_port), "ALSA I/O:Output 1")) {
 		fprintf (stderr, "cannot connect output ports\n");
 	} 
 

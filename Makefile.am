@@ -4,9 +4,9 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure config.h.in \
                           missing install-sh config.sub ltconfig \
                           ltmain.sh acinclude.m4
 
-SUBDIRS = jack doc
+SUBDIRS = jack
 
-EXTRA_PROGRAMS = jack_fltk_client
+EXTRA_PROGRAMS = jack_fltk_client jackrec
 
 bin_PROGRAMS = jackd jack_simple_client jack_monitor_client @XTRA@
 
@@ -25,6 +25,9 @@ jack_monitor_client_LDFLAGS = -L. -ljack -lltdl -lpthread
 
 jack_fltk_client_SOURCES = fltk_client.cc
 jack_fltk_client_LDFLAGS = -L. -L/usr/X11R6/lib -lfltk -lX11 -lXext -ljack -lltdl -lpthread
+
+jackrec_SOURCES = capture_client.c
+jackrec_LDFLAGS = -L. -lsndfile -ljack -lltdl -lpthread
 
 lib_LTLIBRARIES    = libjack.la jack_alsa.la
 

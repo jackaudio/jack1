@@ -38,9 +38,9 @@
 static int  config_max_level = 0;
 static int  config_min_level = 0;
 
-static unsigned long current_usecs () {
-	unsigned long now;
-	rdtscl (now);
+static unsigned long long current_usecs () {
+	unsigned long long now;
+	rdtscll (now);
 	return now / 450;
 }
 
@@ -704,6 +704,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 	channel_t chn;
 	GSList *node;
 	sample_t *buffer;
+//	unsigned long long end;
 
   again:
 	if (poll (&driver->pfd, 1, 1000) < 0) {
@@ -843,6 +844,9 @@ alsa_driver_wait (alsa_driver_t *driver)
 		
 		avail -= contiguous;
 	}
+
+//	end = current_usecs();
+//	printf ("entire cycle took %f usecs\n", ((float)(end - driver->time_at_interrupt))/450.0f);
 
 	return 0;
 }

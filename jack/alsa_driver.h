@@ -49,7 +49,7 @@ typedef struct {
     char                        **capture_addr;
     const snd_pcm_channel_area_t *capture_areas;
     const snd_pcm_channel_area_t *playback_areas;
-    unsigned long                 time_at_interrupt;
+    unsigned long long            time_at_interrupt;
     struct pollfd                 pfd;
     unsigned long                 interleave_unit;
     unsigned long                 capture_interleave_skip;
