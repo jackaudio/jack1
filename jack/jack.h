@@ -569,19 +569,6 @@ int jack_disconnect (jack_client_t *,
 		     const char *destination_port);
 
 /**
- * Perform the same function as jack_connect() using port handles
- * rather than names.  This avoids the name lookup inherent in the
- * name-based version.
- *
- * Clients connecting their own ports are likely to use this function,
- * while generic connection clients (e.g. patchbays) would use
- * jack_connect().
- *
- * @return 0 on success, otherwise a non-zero error code.
- */
-int jack_port_connect (jack_client_t *, jack_port_t *src, jack_port_t *dst);
-
-/**
  * Perform the same function as jack_disconnect() using port handles
  * rather than names.  This avoids the name lookup inherent in the
  * name-based version.
