@@ -1969,6 +1969,8 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		consecutive_excessive_delays = 0;
 	}
 
+	jack_inc_frame_time (engine, nframes);
+
 	if (jack_try_lock_graph (engine)) {
 		/* engine can't run. just throw away an entire cycle */
 		driver->null_cycle (driver, nframes);
@@ -2021,7 +2023,6 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	}
 
 	jack_engine_post_process (engine);
-	jack_inc_frame_time (engine, nframes);
 	ret = 0;
 
   unlock:

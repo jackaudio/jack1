@@ -43,15 +43,29 @@ static inline void
 jack_read_frame_time (const jack_client_t *client, jack_frame_timer_t *copy)
 {
 	int tries = 0;
+	long timeout = 1000;
 
 	do {
 		/* throttle the busy wait if we don't get 
 		   the answer very quickly.
+
+		   XXX This is disgusting. on a UP
+		   system, it needs to sleep
+		   if the first try didn't work. on an SMP
+		   system, it should wait for half of
+		   the context switch time before
+		   sleeping.
 		*/
 
 		if (tries > 10) {
 			usleep (20);
 			tries = 0;
+
+			/* debug code to avoid system hangs... */
+			if (--timeout == 0) {
+				jack_error ("hung in loop copying position A");
+				abort();
+			}
 		}
 
 		*copy = client->engine->frame_timer;
@@ -70,14 +84,16 @@ jack_transport_copy_position (jack_position_t *from, jack_position_t *to)
 
 	do {
 		/* throttle the busy wait if we don't get the answer
-		 * very quickly. */
+		 * very quickly. See comment above about this
+		 * design.
+		 */
 		if (tries > 10) {
 			usleep (20);
 			tries = 0;
 
 			/* debug code to avoid system hangs... */
 			if (--timeout == 0) {
-				jack_error("hung in loop copying position");
+				jack_error ("hung in loop copying position B");
 				abort();
 			}
 		}
@@ -219,19 +235,31 @@ jack_nframes_t
 jack_frame_time (const jack_client_t *client)
 {
 	jack_frame_timer_t current;
-	float usecs;
-	jack_nframes_t elapsed;
+	float elapsed_usecs;
+	jack_nframes_t elapsed_frames;
 	jack_control_t *ectl = client->engine;
+	jack_time_t now;
 
 	jack_read_frame_time (client, &current);
 	
-	usecs = jack_get_microseconds() - current.stamp;
+	now = jack_get_microseconds ();
 
-	elapsed = (jack_nframes_t)
-		floor ((((float) ectl->current_time.frame_rate)
-			/ 1000000.0f) * usecs);
+	elapsed_usecs = now - current.stamp;
 	
-	return current.frames + elapsed;
+	elapsed_frames = (jack_nframes_t)
+		floor ((((float) ectl->current_time.frame_rate)
+			/ 1000000.0f) * elapsed_usecs);
+
+	/* clamp to prevent race conditions when other threads
+	   call this in the window between the driver wakeup
+	   and the frame timer being updated.
+	*/
+
+	if (elapsed_frames > ectl->buffer_size) {
+		elapsed_frames = ectl->buffer_size;
+	} 
+
+	return current.frames + elapsed_frames;
 }
 
 jack_nframes_t

@@ -409,7 +409,14 @@ Please report bugs to
 .br
 .I http://jackit.sourceforge.net/mantis/main_page.php
 .SH "AUTHORS"
-Paul Davis and others.
+Architect and original implementor: Paul Davis
+.PP
+Original design Group: Paul Davis, David Olofson, Kai Vehmanen, Benno Sennoner,
+Richard Guenther, and other members of the Linux Audio Developers group.
+.PP
+Programming: Paul Davis, Jack O'Quin, Taybin Rutkin, Stephane Letz, Fernando
+Pablo Lopez-Lezcano, Steve Harris, Jeremy Hall, Andy Wingo, Kai
+Vehmanen, Melanie Thielker, Jussi Laako, Tilman Linneweh, Johnny Petrantoni.
 .PP
 Manpage written by Stefan Schwandter, Jack O'Quin and Alexandre
 Prokoudine.
