@@ -804,6 +804,171 @@
 			refType = 4;
 			sourceTree = "<group>";
 		};
+		4B776780072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = atomicity.h;
+			path = ../../../jack/atomicity.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776785072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = driver_interface.h;
+			path = ../../../jack/driver_interface.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776786072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = driver_parse.h;
+			path = ../../../jack/driver_parse.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776787072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = driver.h;
+			path = ../../../jack/driver.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776788072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = engine.h;
+			path = ../../../jack/engine.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776789072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = hardware.h;
+			path = ../../../jack/hardware.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B77678A072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = jslist.h;
+			path = ../../../jack/jslist.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B77678E072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = memops.h;
+			path = ../../../jack/memops.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B77678F072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = pool.h;
+			path = ../../../jack/pool.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776790072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = port.h;
+			path = ../../../jack/port.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776791072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = shm.h;
+			path = ../../../jack/shm.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776792072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = start.h;
+			path = ../../../jack/start.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776793072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = thread.h;
+			path = ../../../jack/thread.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776794072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = unlock.h;
+			path = ../../../jack/unlock.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776795072D2B5700F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = version.h;
+			path = ../../../jack/version.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B776799072D2B9500F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = transengine.h;
+			path = ../../../jackd/transengine.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B77679A072D2B9500F14709 = {
+			fileRef = 4B776799072D2B9500F14709;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B77679E072D2BAD00F14709 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = local.h;
+			path = ../../../libjack/local.h;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B77679F072D2BAD00F14709 = {
+			fileRef = 4B77679E072D2BAD00F14709;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
 		4B783E1B049F824D00053105 = {
 			fileRef = 4B099343041FB67A00053105;
 			isa = PBXBuildFile;
@@ -834,6 +999,8 @@
 				4B1A736007252DA3007105CE,
 				4B1A736607252DBE007105CE,
 				4B1A736A07252DDC007105CE,
+				4B77679A072D2B9500F14709,
+				4B77679F072D2BAD00F14709,
 			);
 			isa = PBXHeadersBuildPhase;
 			runOnlyForDeploymentPostprocessing = 0;
@@ -1056,25 +1223,25 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
-	<string></string>
+	<string>Jack</string>
 	<key>CFBundleGetInfoString</key>
-	<string></string>
+	<string>Jack Server 0.99.10, @03-04 Paul Davis, Grame</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
-	<string></string>
+	<string>com.grame.Jack</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string></string>
+	<string>Jack</string>
 	<key>CFBundlePackageType</key>
 	<string>FMWK</string>
 	<key>CFBundleShortVersionString</key>
-	<string></string>
+	<string>Jack</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>0.0.1d1</string>
+	<string>0.99.10</string>
 </dict>
 </plist>
 ";
@@ -1296,6 +1463,23 @@
 		};
 		4BA9D903040E0CC200053105 = {
 			children = (
+				4B77679E072D2BAD00F14709,
+				4B776799072D2B9500F14709,
+				4B776780072D2B5700F14709,
+				4B776785072D2B5700F14709,
+				4B776786072D2B5700F14709,
+				4B776787072D2B5700F14709,
+				4B776788072D2B5700F14709,
+				4B776789072D2B5700F14709,
+				4B77678A072D2B5700F14709,
+				4B77678E072D2B5700F14709,
+				4B77678F072D2B5700F14709,
+				4B776790072D2B5700F14709,
+				4B776791072D2B5700F14709,
+				4B776792072D2B5700F14709,
+				4B776793072D2B5700F14709,
+				4B776794072D2B5700F14709,
+				4B776795072D2B5700F14709,
 				4BA39A2205DD2CA5008919E8,
 				4BA39A1E05DD2C63008919E8,
 				4B4DCBA105DD234100DC3452,
@@ -1394,7 +1578,7 @@
 				LIBRARY_SEARCH_PATHS = "";
 				LIBRARY_STYLE = BUNDLE;
 				OPTIMIZATION_CFLAGS = "-O3";
-				OTHER_LDFLAGS = "-framework PortAudio  -framework CoreAudio ";
+				OTHER_LDFLAGS = "-framework CoreAudio -framework AudioToolbox PortAudioLib ";
 				OTHER_LIBTOOL_FLAGS = "";
 				OTHER_REZFLAGS = "";
 				PRODUCT_NAME = jack_portaudio.so;
