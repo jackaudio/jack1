@@ -56,7 +56,7 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
 
     if (new_pos || time_reset) {
 
-	pos->valid |= JackPositionBBT;
+	pos->valid = JackPositionBBT;
 	pos->beats_per_bar = time_beats_per_bar;
 	pos->beat_type = time_beat_type;
 	pos->ticks_per_beat = time_ticks_per_beat;
@@ -69,7 +69,7 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
 	 * or time signature changes at specific locations in the
 	 * transport timeline. */
 
-	min = (double) pos->frame / ((double) pos->frame_rate * 60.0);
+	min = pos->frame / ((double) pos->frame_rate * 60.0);
 	abs_tick = min * pos->beats_per_minute * pos->ticks_per_beat;
 	abs_beat = abs_tick / pos->ticks_per_beat;
 
@@ -79,6 +79,12 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
 	pos->bar_start_tick = pos->bar * pos->beats_per_bar *
 	    pos->ticks_per_beat;
 	pos->bar++;			/* adjust start to bar 1 */
+
+#if 0
+	/* some debug code... */
+	fprintf(stderr, "\nnew position: %lu\tBBT: %3d|%d|%04d\n",
+		pos->frame, pos->bar, pos->beat, pos->tick);
+#endif
 
     } else {
 

@@ -22,23 +22,26 @@ showtime ()
 
 	switch (transport_state) {
 	case JackTransportStopped:
-		printf ("state: Stopped\t");
+		printf ("state: Stopped");
 		break;
 	case JackTransportRolling:
-		printf ("state: Rolling\t");
+		printf ("state: Rolling");
 		break;
 	case JackTransportStarting:
-		printf ("state: Starting\t");
+		printf ("state: Starting");
 		break;
 	default:
-		printf ("state: [unknown]\t");
+		printf ("state: [unknown]");
 	}
 
 	if (current.valid & JackPositionBBT)
-		printf ("BBT: %3d|%d|%04d\n",
+		printf ("\tBBT: %3d|%d|%04d",
 			current.bar, current.beat, current.tick);
-	else
-		printf ("BBT: [-]\n");
+
+	if (current.valid & JackPositionTimecode)
+		printf ("\tTC: %.6f, %.6f",
+			current.frame_time, current.period_duration);
+	printf ("\n");
 }
 
 void

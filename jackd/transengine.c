@@ -176,6 +176,8 @@ jack_timebase_reset (jack_engine_t *engine, jack_client_id_t client_id)
 		client->control->is_timebase = 0;
 		engine->timebase_client = NULL;
 		ectl->pending_time.valid = 0;
+		VERBOSE (engine, "%s resigned as timebase master\n",
+			 client->control->name);
 		ret = 0;
 	}  else
 		ret = EINVAL;
@@ -197,22 +199,34 @@ jack_timebase_set (jack_engine_t *engine,
 
 	client = jack_client_internal_by_id (engine, client_id);
 
+	if (client == NULL) {
+		// JOQ: use PRIuLEAST32 here...
+		VERBOSE (engine, " %lu no longer exists!\n", client_id);
+		jack_unlock_graph (engine);
+		return EINVAL;
+	}
+
 	if (conditional && engine->timebase_client) {
 
 		/* see if timebase master is someone else */
-		if (client && (client != engine->timebase_client))
+		if (client != engine->timebase_client) {
+			VERBOSE (engine, "conditional timebase for %s failed\n"
+				 " %s is already the master\n",
+				 client->control->name,
+				 engine->timebase_client->control->name);
 			ret = EBUSY;
+		} else
+			VERBOSE (engine, " %s was already timebase master:\n",
+				 client->control->name);
 
 	} else {
 
-		if (client) {
-			if (engine->timebase_client)
-				engine->timebase_client->
-					control->is_timebase = 0;
-			engine->timebase_client = client;
-			client->control->is_timebase = 1;
-		}  else
-			ret = EINVAL;
+		if (engine->timebase_client)
+			engine->timebase_client->control->is_timebase = 0;
+		engine->timebase_client = client;
+		client->control->is_timebase = 1;
+		VERBOSE (engine, "new timebase master: %s\n",
+			 client->control->name);
 	}
 
 	jack_unlock_graph (engine);

@@ -122,8 +122,14 @@ jack_transport_request_new_pos (jack_client_t *client, jack_position_t *pos)
 {
 	jack_control_t *ectl = client->engine;
 
-	/* carefully copy requested postion into shared memory */
+	/* distinguish this request from all others */
 	pos->unique_1 = pos->unique_2 = jack_generate_unique_id(ectl);
+
+	/* clients may not set these fields */
+	pos->usecs = ectl->current_time.usecs;
+	pos->frame_rate = ectl->current_time.frame_rate;
+
+	/* carefully copy requested postion into shared memory */
 	jack_transport_copy_position (pos, &ectl->request_time);
 	
 	return 0;

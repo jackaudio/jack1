@@ -32,8 +32,6 @@ struct _jack_client {
 
 extern int jack_client_deliver_request (const jack_client_t *client, jack_request_t *req);
 extern jack_port_t *jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control_t *control);
-extern void jack_call_sync_client (jack_client_t *client);
-extern void jack_call_timebase_master (jack_client_t *client);
 
 
 extern void *jack_zero_filled_buffer;

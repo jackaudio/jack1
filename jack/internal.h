@@ -374,5 +374,9 @@ extern void jack_client_invalidate_port_buffers (jack_client_t *client);
 extern void jack_transport_copy_position (jack_position_t *from,
 					  jack_position_t *to);
 
+extern void jack_call_sync_client (jack_client_t *client);
+
+extern void jack_call_timebase_master (jack_client_t *client);
+
 #endif /* __jack_internal_h__ */
 

@@ -108,9 +108,12 @@ jack_unload_LDADD = ../libjack/libjack.la
 
 ip_clientdir = $(ADDON_DIR)
 
-ip_client_LTLIBRARIES = inprocess.la
+ip_client_LTLIBRARIES = inprocess.la intime.la
 
 inprocess_la_LDFLAGS = -module -avoid-version
 inprocess_la_SOURCES = inprocess.c
+
+intime_la_LDFLAGS = -module -avoid-version
+intime_la_SOURCES = intime.c
 
 dist-hook: dist-check-sndfile

@@ -390,34 +390,30 @@ jack_process_internal(jack_engine_t *engine, JSList *node, jack_nframes_t nframe
 	
 	/* internal client ("plugin") */
 
-       if (ctl->process) {
+	DEBUG ("invoking an internal client's callbacks");
+	ctl->state = Running;
+	engine->current_client = client;
 
-	       DEBUG ("calling process() on an internal client");
+	/* XXX how to time out an internal client? */
 
-	       ctl->state = Running;
+	if (ctl->sync_cb)
+		jack_call_sync_client (ctl->private_client);
 
-	       /* XXX how to time out an internal client? */
+	if (ctl->process)
+		if (ctl->process (nframes, ctl->process_arg)) {
+			jack_error ("internal client %s failed", ctl->name);
+			engine->process_errors++;
+		}
 
-	       engine->current_client = client;
+	if (ctl->timebase_cb)
+		jack_call_timebase_master (ctl->private_client);
+		
+	ctl->state = Finished;
 
-	       if (ctl->process (nframes, ctl->process_arg) == 0) {
-		       ctl->state = Finished;
-	       } else {
-		       jack_error ("internal client %s failed", client->control->name);
-		       engine->process_errors++;
-		       return NULL; /* will stop the loop */
-	       }
-
-	       //JOQ: can an internal client be slow sync?
-	       //JOQ: can an internal client have a timebase master?
-
-       } else {
-	       DEBUG ("internal client has no process() function");
-
-	       ctl->state = Finished;
-       }
-
-       return jack_slist_next (node);
+	if (engine->process_errors)
+		return NULL;		/* will stop the loop */
+	else
+		return jack_slist_next (node);
 }
 
 #if defined(__APPLE__) && defined(__POWERPC__) 

@@ -49,10 +49,12 @@ typedef unsigned long long jack_unique_t; /**< Unique ID (opaque) */
 typedef enum {
 
 	JackPositionBBT =	0x10,	/**< Bar, Beat, Tick */
+	JackPositionTimecode =	0x20,	/**< External timecode */
 
 } jack_position_bits_t;
 
-#define JACK_POSITION_MASK (JackPositionBBT) /**< all valid position bits */
+/** all valid position bits */
+#define JACK_POSITION_MASK (JackPositionBBT|JackPositionTimecode)
 #define EXTENDED_TIME_INFO
 
 /**
@@ -79,10 +81,14 @@ typedef struct {
     double	ticks_per_beat;
     double	beats_per_minute;
 
+    /* JackPositionTimecode fields: */
+    double	frame_time;		/**< current time in seconds */
+    double	period_duration;	/**< period duration (sec) */
+
     /* For binary compatibility, new fields should be allocated from
      * this padding area with new valid bits controlling access, so
      * the existing structure size and offsets are preserved. */
-    int		padding[14];
+    int		padding[10];
 
     /* When (unique_1 == unique_2) the contents are consistent. */
     jack_unique_t	unique_2;	/**< unique ID */
