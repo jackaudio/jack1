@@ -547,7 +547,7 @@ jack_client_thread (void *arg)
 			status = -1;
 			break;
 		}
-		
+
 		if (client->pollfd[0].revents & ~POLLIN) {
 			jack_error ("engine has shut down socket; thread exiting");
 			if (client->on_shutdown) {
@@ -626,9 +626,9 @@ jack_client_thread (void *arg)
 		}
 
 		if (client->pollfd[1].revents & POLLIN) {
-			DEBUG ("client told to process() (wakeup on graph_wait_fd==%d)", client->pollfd[1].fd);
-
 			control->signalled_at = get_cycles();
+
+			DEBUG ("client told to process() at %Lu (wakeup on graph_wait_fd==%d)", control->signalled_at, client->pollfd[1].fd);
 
 			control->state = Running;
 
@@ -644,7 +644,7 @@ jack_client_thread (void *arg)
 
 			/* pass the execution token along */
 
-			DEBUG ("client finished processing, writing on graph_next_fd==%d", client->graph_next_fd);
+			DEBUG ("client finished processing at %Lu, writing on graph_next_fd==%d", control->finished_at, client->graph_next_fd);
 
 			if (write (client->graph_next_fd, &c, sizeof (c)) != sizeof (c)) {
 				jack_error ("cannot continue execution of the processing graph (%s)", strerror(errno));
@@ -652,7 +652,7 @@ jack_client_thread (void *arg)
 				break;
 			}
 
-			DEBUG ("client reading on graph_wait_fd==%d", client->graph_wait_fd);
+			DEBUG ("client sent message to next stage by %Lu, client reading on graph_wait_fd==%d", get_cycles(), client->graph_wait_fd);
 
 			if ((read (client->graph_wait_fd, &c, sizeof (c)) != sizeof (c))) {
 				DEBUG ("WARNING: READ FAILED!");

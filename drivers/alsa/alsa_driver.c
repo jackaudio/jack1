@@ -42,6 +42,8 @@ extern void store_wait_time (int);
 extern void show_wait_times ();
 extern void show_work_times ();
 
+#undef DEBUG_WAKEUP
+
 static void
 alsa_driver_release_channel_dependent_memory (alsa_driver_t *driver)
 
@@ -242,7 +244,8 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 	int err;
 
 	if ((err = snd_pcm_hw_params_any (handle, hw_params)) < 0)  {
-		jack_error ("ALSA: no playback configurations available");
+		jack_error ("ALSA: no playback configurations available (%s)",
+			    snd_strerror (err));
 		return -1;
 	}
 
@@ -318,7 +321,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 
 	snd_pcm_sw_params_current (handle, sw_params);
 
-	if ((err = snd_pcm_sw_params_set_start_threshold (handle, sw_params, ~0U)) < 0) {
+	if ((err = snd_pcm_sw_params_set_start_threshold (handle, sw_params, 0U)) < 0) {
 		jack_error ("ALSA: cannot set start mode for %s", stream_name);
 		return -1;
 	}
@@ -827,7 +830,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 		/* ALSA doesn't set POLLERR in some versions of 0.9.X */
 		
 		for (i = 0; i < nfds; i++) {
-			driver->pfd[nfds].events |= POLLERR;
+			driver->pfd[i].events |= POLLERR;
 		}
 
 		if (extra_fd >= 0) {
@@ -876,7 +879,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 				/* we timed out on the extra fd */
 
 				*status = -4;
-#if 0
+#ifdef DEBUG_WAKEUP
 				printf ("checked %d fds, at %Lu %.9f usecs since poll entered\n", 
 					nfds,
 					poll_ret, 
@@ -901,11 +904,17 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 				
 				if (driver->pfd[i].revents == 0) {
 					p_timed_out++;
+#ifdef DEBUG_WAKEUP
+					fprintf (stderr, "%Lu playback stream timed out\n", poll_ret);
+#endif
 				}
 			}
-
+			
 			if (p_timed_out == 0) {
 				need_playback = 0;
+#ifdef DEBUG_WAKEUP
+				fprintf (stderr, "%Lu playback stream ready\n", poll_ret);
+#endif
 			}
 		}
 		
@@ -919,11 +928,17 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 				
 				if (driver->pfd[i].revents == 0) {
 					c_timed_out++;
+#ifdef DEBUG_WAKEUP
+					fprintf (stderr, "%Lu capture stream timed out\n", poll_ret);
+#endif
 				}
 			}
 			
 			if (c_timed_out == 0) {
 				need_capture = 0;
+#ifdef DEBUG_WAKEUP
+				fprintf (stderr, "%Lu capture stream ready\n", poll_ret);
+#endif
 			}
 		}
 		
@@ -968,7 +983,12 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 	*status = 0;
 
 	avail = capture_avail < playback_avail ? capture_avail : playback_avail;
-	
+
+#ifdef DEBUG_WAKEUP
+	fprintf (stderr, "wakup complete, avail = %lu, pavail = %lu cavail = %lu\n",
+		 avail, playback_avail, capture_avail);
+#endif
+
 	/* constrain the available count to the nearest (round down) number of
 	   periods.
 	*/
