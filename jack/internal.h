@@ -43,10 +43,10 @@
 #define DEBUG(format,args...) \
 	printf ("jack:%5d:%Lu %s:%s:%d: " format "\n", getpid(), jack_get_microseconds(), __FILE__, __FUNCTION__, __LINE__ , ## args)
 #else
-#if defined(linux) 
-    #define DEBUG(format,args...)
-#elif defined(__APPLE__) && defined(__POWERPC__) 
+#if defined(__APPLE__) && defined(__POWERPC__) 
     #define DEBUG(format...)
+#else
+    #define DEBUG(format,args...)
 #endif
 #endif
 

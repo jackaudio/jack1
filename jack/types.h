@@ -40,10 +40,10 @@ typedef unsigned long        jack_nframes_t;
  * monotonic clock with units of microseconds.
  */
 
-#if defined(linux)
-typedef unsigned long long jack_time_t;
-#elif defined(__APPLE__) && defined(__POWERPC__) 
+#if defined(__APPLE__) && defined(__POWERPC__) 
 typedef double jack_time_t;
+#else
+typedef unsigned long long jack_time_t;
 #endif
 
 /**
