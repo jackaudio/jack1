@@ -203,9 +203,14 @@ typedef struct {
     int status;
 }  jack_request_t;
 
+extern void jack_cleanup_shm ();
+extern void jack_cleanup_files ();
+
 extern int jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event);
 
 jack_client_t *jack_driver_become_client (const char *client_name);
+
+extern char *jack_temp_dir;
 
 #endif /* __jack_internal_h__ */
 

@@ -22,7 +22,7 @@
 #include <signal.h>
 #include <getopt.h>
 #include <sys/types.h>
-#include <dirent.h>
+#include <sys/shm.h>
 #include <string.h>
 #include <errno.h>
 #include <wait.h>
@@ -32,7 +32,7 @@
 #include <jack/driver.h>
 
 static sigset_t signals;
-static jack_engine_t *engine;
+static jack_engine_t *engine = 0;
 static int jackd_pid;
 static char *alsa_pcm_name = "default";
 static nframes_t frames_per_interrupt = 64;
@@ -40,111 +40,18 @@ static nframes_t srate = 48000;
 static int realtime = 0;
 static int realtime_priority = 10;
 static int with_fork = 1;
-static int need_cleanup = 1;
-
-#define JACK_TEMP_DIR "/tmp"
-
-static void
-cleanup ()
-{
-	DIR *dir;
-	struct dirent *dirent;
-
-	/* this doesn't have to truly atomic. in fact, its not even strictly
-	   necessary. it just potentially saves us from thrashing through
-	   the temp dir several times over.
-	*/
-
-	if (!need_cleanup) {
-		return;
-	}
-
-	need_cleanup = 0;
-
-	/* its important that we remove all files that jackd creates
-	   because otherwise subsequent attempts to start jackd will
-	   believe that an instance is already running.
-	*/
-
-	if ((dir = opendir (JACK_TEMP_DIR)) == NULL) {
-		fprintf (stderr, "jackd(%d): cleanup - cannot open scratch directory (%s)\n", getpid(), strerror (errno));
-		return;
-	}
-
-	while ((dirent = readdir (dir)) != NULL) {
-		if (strncmp (dirent->d_name, "jack-", 5) == 0 || strncmp (dirent->d_name, "jack_", 5) == 0) {
-			char fullpath[PATH_MAX+1];
-			sprintf (fullpath, JACK_TEMP_DIR "/%s", dirent->d_name);
-			unlink (fullpath);
-		}
-	}
-
-	closedir (dir);
-}
 
 static void
 signal_handler (int sig)
 {
-	fprintf (stderr, "parent (%d): killing jackd at %d\n", getpid(), jackd_pid);
+	fprintf (stderr, "jackd: signal %d received\n", sig);
 	kill (jackd_pid, SIGTERM);
-	cleanup ();
-	exit (1);
 }
 
 static void
-catch_signals (void)
-{
-	/* what's this for? 
-
-	   this just makes sure that if we are using the fork
-	   approach to cleanup (see main()), the waiting
-	   process will catch common "interrupt" signals
-	   and terminate the real server appropriately.
-	*/
-
-	signal (SIGHUP, signal_handler);
-	signal (SIGINT, signal_handler);
-	signal (SIGQUIT, signal_handler);
-	signal (SIGTERM, signal_handler);
-}
-
-static void *
-signal_thread (void *arg)
-
-{
-	int sig;
-	int err;
-
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-	
-	/* Note: normal operation has with_form == 1 */
-
-	if (with_fork) {
-		/* let the parent handle SIGINT */
-		sigdelset (&signals, SIGINT);
-	}
-
-	err = sigwait (&signals, &sig);
-	fprintf (stderr, "child (%d): exiting due to signal %d\n", getpid(), sig);
-	jack_engine_delete (engine);
-
-	if (!with_fork) {
-		/* no parent - take care of this ourselves */
-		cleanup ();
-	}
-
-	exit (err);
-
-	/*NOTREACHED*/
-	return 0;
-}
-
-static int
 posix_me_harder (void)
 
 {
-	pthread_t thread_id;
-
 	/* what's this for?
 
 	   POSIX says that signals are delivered like this:
@@ -156,11 +63,11 @@ posix_me_harder (void)
 
            this means that a simple-minded multi-threaded
 	   program can expect to get POSIX signals delivered
-	   to any of its threads.
+	   randomly to any one of its threads, 
 
 	   here, we block all signals that we think we
-	   might receive and want to catch. all later
-	   threads will inherit this setting. then we
+	   might receive and want to catch. all "child"
+	   threads will inherit this setting. if we
 	   create a thread that calls sigwait() on the
 	   same set of signals, implicitly unblocking
 	   all those signals. any of those signals that
@@ -187,7 +94,7 @@ posix_me_harder (void)
 	sigaddset(&signals, SIGTERM);
 
 	/* this can make debugging a pain, but it also makes
-	   segv-exits cleanup after themselves rather than
+	   segv-exits cleanup_files after themselves rather than
 	   leaving the audio thread active. i still
 	   find it truly wierd that _exit() or whatever is done
 	   by the default SIGSEGV handler does not
@@ -200,44 +107,92 @@ posix_me_harder (void)
 	/* all child threads will inherit this mask */
 
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
-
-	/* start a thread to wait for signals */
-
-	if (pthread_create (&thread_id, 0, signal_thread, 0)) {
-		fprintf (stderr, "cannot create signal catching thread");
-		return -1;
-	}
-
-	pthread_detach (thread_id);
-
-	return 0;
 }
 
-static void
-jack_main ()
+static void *
+jack_engine_waiter_thread (void *arg)
 {
+	pid_t signal_pid = (pid_t) arg;
 	jack_driver_t *driver;
 
-	posix_me_harder ();
+	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
 	if ((engine = jack_engine_new (realtime, realtime_priority)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
-		return;
+		kill (signal_pid, SIGTERM);
+		return 0;
 	}
 
 	if ((driver = jack_driver_load (ADDON_DIR "/jack_alsa.so", alsa_pcm_name, frames_per_interrupt, srate)) == 0) {
 		fprintf (stderr, "cannot load ALSA driver module\n");
-		return;
+		kill (signal_pid, SIGTERM);
+		return 0;
 	}
 
 	jack_use_driver (engine, driver);
 
 	if (jack_run (engine)) {
 		fprintf (stderr, "cannot start main JACK thread\n");
-		return;
+		kill (signal_pid, SIGTERM);
+		return 0;
 	}
 
 	jack_wait (engine);
+
+	fprintf (stderr, "telling signal thread that the engine is done\n");
+	kill (signal_pid, SIGHUP);
+
+	return 0; /* nobody cares what this returns */
+}
+
+static void
+jack_main ()
+{
+	int sig;
+	int err;
+	pthread_t waiter_thread;
+
+	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
+	posix_me_harder ();
+	
+	/* what we'd really like to do here is to be able to 
+	   wait for either the engine to stop or a POSIX signal,
+	   whichever arrives sooner. but there is no mechanism
+	   to do that, so instead we create a thread to wait
+	   for the engine to finish, and here we stop and wait
+	   for any (reasonably likely) POSIX signal.
+
+	   if the engine finishes first, the waiter thread will
+	   tell us about it via a signal.
+
+	   if a signal arrives, we'll stop the engine and then
+	   exit. 
+
+	   in normal operation, our parent process will be waiting
+	   for us and will cleanup.
+	*/
+
+	if (pthread_create (&waiter_thread, 0, jack_engine_waiter_thread, (void *) getpid())) {
+		fprintf (stderr, "jackd: cannot create engine waiting thread\n");
+		return;
+	}
+
+	/* Note: normal operation has with_fork == 1 */
+
+	if (with_fork) {
+		/* let the parent handle SIGINT */
+		sigdelset (&signals, SIGINT);
+	}
+
+	err = sigwait (&signals, &sig);
+
+	fprintf (stderr, "signal waiter: exiting due to signal %d\n", sig);
+
+	pthread_cancel (waiter_thread);
+	jack_engine_delete (engine);
+
+	return;
 }
 
 static void usage () 
@@ -256,9 +211,10 @@ int
 main (int argc, char *argv[])
 
 {
-	const char *options = "hd:r:p:RP:F";
+	const char *options = "hd:r:p:RP:FD:";
 	struct option long_options[] = 
 	{ 
+		{ "tmpdir", 1, 0, 'D' },
 		{ "device", 1, 0, 'd' },
 		{ "srate", 1, 0, 'r' },
 		{ "frames-per-interrupt", 1, 0, 'p' },
@@ -274,6 +230,10 @@ main (int argc, char *argv[])
 	opterr = 0;
 	while ((opt = getopt_long (argc, argv, options, long_options, &option_index)) != EOF) {
 		switch (opt) {
+		case 'D':
+			jack_set_temp_dir (optarg);
+			break;
+
 		case 'd':
 			alsa_pcm_name = optarg;
 			break;
@@ -307,25 +267,38 @@ main (int argc, char *argv[])
 	}
 
 	if (!with_fork) {
+
+		/* This is really here so that we can run gdb easily */
+
 		jack_main ();
-		cleanup ();
 
 	} else {
 
 		int pid = fork ();
 		
 		if (pid < 0) {
+
 			fprintf (stderr, "could not fork jack server (%s)", strerror (errno));
 			exit (1);
+
 		} else if (pid == 0) {
+
 			jack_main ();
+
 		} else {
 			jackd_pid = pid;
-			catch_signals ();
+
+			signal (SIGHUP, signal_handler);
+			signal (SIGINT, signal_handler);
+			signal (SIGQUIT, signal_handler);
+			signal (SIGTERM, signal_handler);
+
 			waitpid (pid, NULL, 0);
-			cleanup ();
 		}
 	}
+
+	jack_cleanup_shm ();
+	jack_cleanup_files ();
 
 	return 0;
 }

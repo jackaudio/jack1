@@ -28,6 +28,7 @@
 #include <sys/shm.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <dirent.h>
 #include <sys/ipc.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -40,6 +41,8 @@
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <jack/driver.h>
+
+#define MAX_SHM_ID 256 /* likely use is more like 16 */
 
 typedef struct {
 
@@ -94,6 +97,8 @@ static int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_
 
 static void jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes);
 
+static int *jack_shm_registry;
+static int  jack_shm_id_cnt;
 
 jack_port_type_info_t builtin_port_types[] = {
 	{ JACK_DEFAULT_AUDIO_TYPE, jack_audio_port_mixdown, 1 },
@@ -104,14 +109,6 @@ static inline int
 jack_client_is_inprocess (jack_client_internal_t *client)
 {
 	return (client->control->type == ClientDynamic) || (client->control->type == ClientDriver);
-}
-
-static
-void shm_destroy (int status, void *arg)
-
-{
-	int shm_id = (int) arg;
-	shmctl (shm_id, IPC_RMID, 0);
 }
 
 static int
@@ -129,7 +126,7 @@ make_sockets (int fd[2])
 
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
-		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "/tmp/jack_%d", i);
+		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d", jack_temp_dir, i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -163,7 +160,7 @@ make_sockets (int fd[2])
 
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
-		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "/tmp/jack_ack_%d", i);
+		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_%d", jack_temp_dir, i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -230,6 +227,88 @@ jack_cleanup_clients (jack_engine_t *engine)
 }	
 
 static int
+jack_initialize_shm ()
+{
+	int shmid_id;
+	void *addr;
+
+	if (jack_shm_registry != NULL) {
+		return 0;
+	}
+
+	/* grab a chunk of memory to store shm ids in. this is 
+	   to allow our parent to clean up all such ids when
+	   if we exit. otherwise, they can get lost in crash
+	   or debugger driven exits.
+	*/
+	
+	if ((shmid_id = shmget (random(), sizeof(int) * MAX_SHM_ID, IPC_CREAT|0600)) < 0) {
+		jack_error ("cannot create engine shm ID registry (%s)", strerror (errno));
+		return -1;
+	}
+	if ((addr = shmat (shmid_id, 0, 0)) == (void *) -1) {
+		jack_error ("cannot attach shm ID registry (%s)", strerror (errno));
+		shmctl (shmid_id, IPC_RMID, 0);
+		return -1;
+	}
+	if (shmctl (shmid_id, IPC_RMID, NULL)) {
+		jack_error ("cannot mark shm ID registry as destroyed (%s)", strerror (errno));
+		return -1;
+	}
+
+	jack_shm_registry = (int *) addr;
+	jack_shm_id_cnt = 0;
+
+	return 0;
+}
+
+static void
+jack_register_shm (int shmid)
+{
+	if (jack_shm_id_cnt < MAX_SHM_ID) {
+		jack_shm_registry[jack_shm_id_cnt++] = shmid;
+	}
+}
+
+void
+jack_cleanup_shm ()
+{
+	int i;
+
+	for (i = 0; i < jack_shm_id_cnt; i++) {
+		fprintf (stderr, "removing shm ID[%d] = %d\n", i, jack_shm_registry[i]);
+		shmctl (jack_shm_registry[i], IPC_RMID, NULL);
+	}
+}
+
+void
+jack_cleanup_files ()
+{
+	DIR *dir;
+	struct dirent *dirent;
+
+	/* its important that we remove all files that jackd creates
+	   because otherwise subsequent attempts to start jackd will
+	   believe that an instance is already running.
+	*/
+
+	if ((dir = opendir (jack_temp_dir)) == NULL) {
+		fprintf (stderr, "jack(%d): cannot open jack FIFO directory (%s)\n", getpid(), strerror (errno));
+		return;
+	}
+
+	while ((dirent = readdir (dir)) != NULL) {
+		if (strncmp (dirent->d_name, "jack-", 5) == 0 || strncmp (dirent->d_name, "jack_", 5) == 0) {
+			char fullpath[PATH_MAX+1];
+			sprintf (fullpath, "%s/%s", jack_temp_dir, dirent->d_name);
+			unlink (fullpath);
+		}
+	}
+
+	closedir (dir);
+}
+
+static int
 jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 
 {
@@ -249,13 +328,13 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 		return -1;
 	}
 	
+	jack_register_shm (id);
+
 	if ((addr = shmat (id, 0, 0)) == (char *) -1) {
 		jack_error ("cannot attach new port segment (%s)", strerror (errno));
 		shmctl (id, IPC_RMID, 0);
 		return -1;
 	}
-		
-	on_exit (shm_destroy, (void *) id);
 		
 	si = (jack_port_segment_info_t *) malloc (sizeof (jack_port_segment_info_t));
 	si->shm_key = key;
@@ -1026,7 +1105,6 @@ jack_engine_new (int realtime, int rtpriority)
 	engine->port_max = 128;
 	engine->rtpriority = rtpriority;
 	engine->silent_buffer = 0;
-	engine->getthehelloutathere = FALSE;
 
 	pthread_mutex_init (&engine->graph_lock, 0);
 	pthread_mutex_init (&engine->buffer_lock, 0);
@@ -1064,18 +1142,22 @@ jack_engine_new (int realtime, int rtpriority)
 	engine->control_key = random();
 	control_size = sizeof (jack_control_t) + (sizeof (jack_port_shared_t) * engine->port_max);
 
+	if (jack_initialize_shm (engine)) {
+		return 0;
+	}
+
 	if ((engine->control_shm_id = shmget (engine->control_key, control_size, IPC_CREAT|0644)) < 0) {
 		jack_error ("cannot create engine control shared memory segment (%s)", strerror (errno));
 		return 0;
 	}
+
+	jack_register_shm (engine->control_shm_id);
 	
 	if ((addr = shmat (engine->control_shm_id, 0, 0)) == (void *) -1) {
 		jack_error ("cannot attach control shared memory segment (%s)", strerror (errno));
 		shmctl (engine->control_shm_id, IPC_RMID, 0);
 		return 0;
 	}
-
-	on_exit (shm_destroy, (void *) engine->control_shm_id);
 
 	engine->control = (jack_control_t *) addr;
 
@@ -1109,7 +1191,7 @@ jack_engine_new (int realtime, int rtpriority)
 	engine->control->buffer_size = 0;
 	engine->control->frame_time = 0;
 
-	sprintf (engine->fifo_prefix, "/tmp/jack_fifo_%d", getpid());
+	sprintf (engine->fifo_prefix, "%s/ack_fifo_%d", jack_temp_dir, getpid());
 
 	(void) jack_get_fifo_fd (engine, 0);
 	jack_start_server (engine);
@@ -1227,7 +1309,9 @@ int
 jack_engine_delete (jack_engine_t *engine)
 
 {
-	pthread_cancel (engine->main_thread);
+	if (engine) {
+		return pthread_cancel (engine->main_thread);
+	}
 	return 0;
 }
 
@@ -1253,6 +1337,8 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 			jack_error ("cannot create client control block");
 			return 0;
 		}
+		
+		jack_register_shm (shm_id);
 
 		if ((addr = shmat (shm_id, 0, 0)) == (void *) -1) {
 			jack_error ("cannot attach new client control block");

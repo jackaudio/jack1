@@ -716,7 +716,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 	while (need_playback || need_capture) {
 
 		int p_timed_out, c_timed_out;
-		int ci;
+		int ci = 0;
 		int nfds;
 
 		nfds = 0;

@@ -73,15 +73,15 @@ struct _jack_engine {
     unsigned long fifo_size;
     unsigned long external_client_cnt;
     int rtpriority;
-    int getthehelloutathere;
 };
 
 /* public functions */
 
-jack_engine_t *jack_engine_new (int real_time, int real_time_priority);
+jack_engine_t  *jack_engine_new (int real_time, int real_time_priority);
 int             jack_engine_delete (jack_engine_t *);
 int             jack_run (jack_engine_t *engine);
 int             jack_wait (jack_engine_t *engine);
 int             jack_use_driver (jack_engine_t *, struct _jack_driver *);
+void            jack_set_temp_dir (const char *);
 
 #endif /* __jack_engine_h__ */

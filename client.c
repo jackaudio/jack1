@@ -37,6 +37,14 @@
 #include <jack/pool.h>
 #include <jack/error.h>
 
+char *jack_temp_dir = "/tmp";
+
+void
+jack_set_temp_dir (const char *path)
+{
+	jack_temp_dir = strdup (path);
+}
+
 static jack_port_t *jack_port_new (jack_client_t *client, jack_port_id_t port_id, jack_control_t *control);
 
 static pthread_mutex_t client_lock;
@@ -250,7 +258,7 @@ server_connect (int which)
 	}
 
 	addr.sun_family = AF_UNIX;
-	g_snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "/tmp/jack_%d", which);
+	g_snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d", jack_temp_dir, which);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server", strerror (errno));
@@ -276,7 +284,7 @@ server_event_connect (jack_client_t *client)
 	}
 
 	addr.sun_family = AF_UNIX;
-	g_snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "/tmp/jack_ack_0");
+	g_snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0", jack_temp_dir);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server for events", strerror (errno));
