@@ -866,8 +866,15 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 			} 
 			driver->poll_last = poll_ret;
 			driver->poll_next = poll_ret + (unsigned long long) floor ((driver->period_usecs * driver->cpu_mhz));
-			driver->engine->control->current_time.cycles = get_cycles();
+			driver->engine->control->current_time.cycles = poll_ret;
 		}
+
+#ifdef DEBUG_WAKEUP
+		printf ("%Lu: checked %d fds, %.9f usecs since poll entered\n", 
+			poll_ret, 
+			nfds,
+			(float) (poll_ret - poll_enter) / driver->cpu_mhz);
+#endif
 
 		/* check to see if it was the extra FD that caused us to return from poll
 		 */
@@ -878,12 +885,6 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 				/* we timed out on the extra fd */
 
 				*status = -4;
-#ifdef DEBUG_WAKEUP
-				printf ("checked %d fds, at %Lu %.9f usecs since poll entered\n", 
-					nfds,
-					poll_ret, 
-					(float) (poll_ret - poll_enter) / driver->cpu_mhz);
-#endif
 				return -1;
 			} 
 
@@ -1007,6 +1008,7 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 	JSList *node;
 	jack_engine_t *engine = driver->engine;
 	static int cnt = 0;
+	int engine_ran = 0;
 
 	cnt++;
 
@@ -1076,7 +1078,7 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 					
 					port = (jack_port_t *) node->data;
 					
-					if (!jack_port_connected (driver->client, port)) {
+					if (!jack_port_connected (port)) {
 						continue;
 					}
 
@@ -1086,17 +1088,19 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 			}
 
 			if (contiguous != driver->frames_per_cycle) {
-				printf ("wierd contig size %lu\n", contiguous);
+				jack_error ("wierd contiguous size %lu", contiguous);
 			}
 
 			if ((ret = engine->process (engine, contiguous)) != 0) {
-				engine->process_unlock (engine);
 				alsa_driver_audio_stop (driver);
 				if (ret > 0) {
 					engine->post_process (engine);
 				}
+				engine->process_unlock (engine);
 				return ret;
 			}
+
+			engine_ran = 1;
 
 			if (driver->playback_handle) {
 				/* now move data from ports to channels */
@@ -1106,7 +1110,7 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 
 					jack_port_t *port = (jack_port_t *) node->data;
 					
-					if (!jack_port_connected (driver->client, port)) {
+					if (!jack_port_connected (port)) {
 						continue;
 					}
 
@@ -1116,8 +1120,13 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 				}
 			}
 
-			engine->process_unlock (engine);
-		} 
+
+		} else {
+			/* oh well, the engine can't run, so we'll just throw away this 
+			   cycle's data ...
+			*/
+			snd_pcm_mmap_commit (driver->capture_handle, capture_offset, contiguous);
+		}
 
 		/* Now handle input monitoring */
 		
@@ -1161,8 +1170,12 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 
 		nframes -= contiguous;
 	}
-	
-	engine->post_process (engine);
+
+	if (engine_ran) {
+		engine->post_process (engine);
+		engine->process_unlock (engine);
+	}
+
 	return 0;
 }
 

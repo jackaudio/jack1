@@ -173,22 +173,20 @@ const char * jack_port_type (const jack_port_t *port);
 int          jack_port_is_mine (const jack_client_t *, const jack_port_t *port);
 
 /** 
- * This returns TRUE or FALSE to indicate if there are
- * any connections to/from the port argument.
+ * This returns a positive integer indicating the number
+ * of connections to or from @port. 
+ *
+ * The calling client must own @port.
  */
-int jack_port_connected (const jack_client_t *client, const jack_port_t *port);
+int jack_port_connected (const jack_port_t *port);
 
 /**
  * This returns TRUE or FALSE if the port argument is
  * DIRECTLY connected to the port with the name given in 'portname' 
+ *
+ * The calling client must own @port.
  */
-int jack_port_connected_to (const jack_client_t *client, const jack_port_t *port, const char *portname);
-
-/**
- * This returns TRUE or FALSE if the two ports are
- * directly connected to each other.
- */
-int jack_port_connected_to_port (const jack_client_t *client, const jack_port_t *port, const jack_port_t *other_port);
+int jack_port_connected_to (const jack_port_t *port, const char *portname);
 
 /**
  * This returns a null-terminated array of port names to which 
@@ -197,8 +195,32 @@ int jack_port_connected_to_port (const jack_client_t *client, const jack_port_t 
  *
  * The caller is responsible for calling free(3) on any
  * non-NULL returned value.
+ *
+ * The calling client must own @port.
+ *
+ * See jack_port_get_all_connections() for an alternative.
  */   
-const char ** jack_port_get_connections (const jack_client_t *client, const jack_port_t *port);
+const char ** jack_port_get_connections (const jack_port_t *port);
+
+/**
+ * This returns a null-terminated array of port names to which 
+ * the argument port is connected. if there are no connections, it 
+ * returns NULL.
+ *
+ * The caller is responsible for calling free(3) on any
+ * non-NULL returned value.
+ *
+ * It differs from jack_port_get_connections() in two important
+ * respects:
+ *
+ *     1) You may not call this function from code that is
+ *          executed in response to a JACK event. For example,
+ *          you cannot use it in a GraphReordered handler.
+ *
+ *     2) You need not be the owner of the port to get information
+ *          about its connections. 
+ */   
+const char ** jack_port_get_all_connections (const jack_client_t *client, const jack_port_t *port);
 
 /**
  * This modifies a port's name, and may be called at any time.
@@ -407,7 +429,7 @@ jack_port_t *jack_port_by_name (jack_client_t *, const char *portname);
 /**
  * Searchs for and returns the jack_port_t of id @id.
  */
-jack_port_t *jack_port_by_id (jack_client_t *client, jack_port_id_t id);
+jack_port_t *jack_port_by_id (const jack_client_t *client, jack_port_id_t id);
 
 /**
  * If a client is told (by the user) to become the timebase
@@ -446,6 +468,16 @@ jack_nframes_t jack_frame_time (const jack_client_t *);
  * represented by the data that was processed.
  */
 float jack_cpu_load (jack_client_t *client);
+
+/**
+ * Set the directory in which the server is expected
+ * to have put its communication FIFOs. A client
+ * will need to call this before calling
+ * jack_client_new() if the server was started
+ * with arguments telling it to use a non-standard
+ * directory.
+ */
+void jack_set_server_dir (const char *path);
 
 #ifdef __cplusplus
 }

@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
-SOURCE_FILES = client.c pool.c driver.c
+SOURCE_FILES = client.c pool.c driver.c timestamps.c
 
 lib_LTLIBRARIES	   = libjack.la
 

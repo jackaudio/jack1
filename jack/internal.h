@@ -37,7 +37,7 @@
 
 #ifdef DEBUG_ENABLED
 #define DEBUG(format,args...) \
-	printf ("jack:%5d %s:%s:%d: " format "\n", getpid(), __FILE__, __FUNCTION__, __LINE__ , ## args)
+	printf ("jack:%5d:%Lu %s:%s:%d: " format "\n", getpid(), get_cycles(), __FILE__, __FUNCTION__, __LINE__ , ## args)
 #else
 #define DEBUG(format,args...)
 #endif
@@ -166,6 +166,7 @@ typedef volatile struct {
     volatile char       timed_out : 1;    /* r/w: engine */
     volatile pid_t      pid;              /* w: client r: engine; pid of client */
     volatile unsigned long long signalled_at;
+    volatile unsigned long long awake_at;
     volatile unsigned long long finished_at;
 
     /* callbacks */
@@ -275,7 +276,7 @@ extern int jack_client_handle_port_connection (jack_client_t *client, jack_event
 
 jack_client_t *jack_driver_become_client (const char *client_name);
 
-extern char *jack_temp_dir;
+extern char *jack_server_dir;
 
 extern int jack_get_mhz (void);
 

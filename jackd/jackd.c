@@ -380,7 +380,7 @@ main (int argc, char *argv[])
 			break;
 
 		case 'D':
-			jack_set_temp_dir (optarg);
+			jack_set_server_dir (optarg);
 			break;
 
 		case 'd':

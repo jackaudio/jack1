@@ -43,15 +43,19 @@
 #include <jack/cycles.h>
 #include <jack/jslist.h>
 
-char *jack_temp_dir = "/tmp";
+#ifdef WITH_TIMESTAMPS
+#include <jack/timestamps.h>
+#endif /* WITH_TIMESTAMPS */
+
+char *jack_server_dir = "/tmp";
 
 void
-jack_set_temp_dir (const char *path)
+jack_set_server_dir (const char *path)
 {
-	jack_temp_dir = strdup (path);
+	jack_server_dir = strdup (path);
 }
 
-static jack_port_t *jack_port_new (jack_client_t *client, jack_port_id_t port_id, jack_control_t *control);
+static jack_port_t *jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control_t *control);
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
@@ -132,7 +136,7 @@ jack_client_alloc ()
 }
 
 jack_port_t *
-jack_port_by_id (jack_client_t *client, jack_port_id_t id)
+jack_port_by_id (const jack_client_t *client, jack_port_id_t id)
 {
 	JSList *node;
 
@@ -300,7 +304,7 @@ server_connect (int which)
 	}
 
 	addr.sun_family = AF_UNIX;
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d", jack_temp_dir, which);
+	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d", jack_server_dir, which);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server", strerror (errno));
@@ -326,7 +330,7 @@ server_event_connect (jack_client_t *client)
 	}
 
 	addr.sun_family = AF_UNIX;
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0", jack_temp_dir);
+	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0", jack_server_dir);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server for events", strerror (errno));
@@ -526,11 +530,13 @@ jack_client_thread (void *arg)
 	pthread_cond_signal (&client_ready);
 	pthread_mutex_unlock (&client_lock);
 
+	DEBUG ("client thread is now running");
+
 	while (err == 0) {
 	        if (client->engine->engine_ok == 0) {
 		     jack_error ("engine unexpectedly shutdown; thread exiting\n");
 		     if (client->on_shutdown) {
-		       client->on_shutdown (client->on_shutdown_arg);
+			     client->on_shutdown (client->on_shutdown_arg);
 		     }
 		     pthread_exit (0);
 
@@ -548,7 +554,15 @@ jack_client_thread (void *arg)
 			break;
 		}
 
-		if (client->pollfd[0].revents & ~POLLIN) {
+		/* get an accurate timestamp on waking from poll for a process()
+		   cycle.
+		*/
+
+		if (client->pollfd[1].revents & POLLIN) {
+			control->awake_at = get_cycles();
+		}
+
+		if (client->pollfd[0].revents & ~POLLIN || client->control->dead) {
 			jack_error ("engine has shut down socket; thread exiting");
 			if (client->on_shutdown) {
 				client->on_shutdown (client->on_shutdown_arg);
@@ -626,9 +640,17 @@ jack_client_thread (void *arg)
 		}
 
 		if (client->pollfd[1].revents & POLLIN) {
-			control->signalled_at = get_cycles();
 
-			DEBUG ("client told to process() at %Lu (wakeup on graph_wait_fd==%d)", control->signalled_at, client->pollfd[1].fd);
+#ifdef WITH_TIMESTAMPS
+			jack_reset_timestamps ();
+#endif
+
+			DEBUG ("client %d signalled at %Lu, awake for process at %Lu (delay = %f usecs) (wakeup on graph_wait_fd==%d)", 
+			       getpid(),
+			       control->signalled_at, 
+			       control->awake_at, 
+			       ((float) (control->awake_at - control->signalled_at))/client->cpu_mhz, 
+			       client->pollfd[1].fd);
 
 			control->state = Running;
 
@@ -642,9 +664,15 @@ jack_client_thread (void *arg)
 			
 			control->finished_at = get_cycles();
 
+#ifdef WITH_TIMESTAMPS
+			jack_timestamp ("finished");
+#endif
 			/* pass the execution token along */
 
-			DEBUG ("client finished processing at %Lu, writing on graph_next_fd==%d", control->finished_at, client->graph_next_fd);
+			DEBUG ("client finished processing at %Lu (elapsed = %f usecs), writing on graph_next_fd==%d", 
+			       control->finished_at, 
+			       ((float)(control->finished_at - control->awake_at)/client->cpu_mhz),
+			       client->graph_next_fd);
 
 			if (write (client->graph_next_fd, &c, sizeof (c)) != sizeof (c)) {
 				jack_error ("cannot continue execution of the processing graph (%s)", strerror(errno));
@@ -654,6 +682,11 @@ jack_client_thread (void *arg)
 
 			DEBUG ("client sent message to next stage by %Lu, client reading on graph_wait_fd==%d", get_cycles(), client->graph_wait_fd);
 
+#ifdef WITH_TIMESTAMPS
+			jack_timestamp ("read pending byte from wait");
+#endif
+			DEBUG("reading cleanup byte from pipe\n");
+
 			if ((read (client->graph_wait_fd, &c, sizeof (c)) != sizeof (c))) {
 				DEBUG ("WARNING: READ FAILED!");
 /*
@@ -662,6 +695,12 @@ jack_client_thread (void *arg)
 				break;
 */
 			}
+
+			DEBUG("process cycle fully complete\n");
+
+#ifdef WITH_TIMESTAMPS
+			jack_timestamp ("read done");
+#endif			
 
 		}
 	}
@@ -940,6 +979,8 @@ jack_client_close (jack_client_t *client)
 	JSList *node;
 	void *status;
 
+	jack_deactivate (client);
+
 	/* stop the thread that communicates with the jack server */
 
 	pthread_cancel (client->thread);
@@ -978,7 +1019,6 @@ jack_client_close (jack_client_t *client)
 
 int
 jack_load_client (const char *client_name, const char *path_to_so)
-
 {
 	int fd;
 	jack_client_connect_request_t req;
@@ -1104,8 +1144,7 @@ unsigned long jack_get_sample_rate (jack_client_t *client)
 }
 
 static jack_port_t *
-jack_port_new (jack_client_t *client, jack_port_id_t port_id, jack_control_t *control)
-
+jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control_t *control)
 {
 	jack_port_t *port;
 	jack_port_shared_t *shared;
@@ -1858,8 +1897,75 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 	}
 }
 
+/* LOCAL (in-client) connection querying only */
+
+int
+jack_port_connected (const jack_port_t *port)
+{
+	return jack_slist_length (port->connections);
+}
+
+int
+jack_port_connected_to (const jack_port_t *port, const char *portname)
+{
+	JSList *node;
+	int ret = FALSE;
+
+	/* XXX this really requires a cross-process lock
+	   so that ports/connections cannot go away
+	   while we are checking for them. that's hard,
+	   and has a non-trivial performance impact
+	   for jackd.
+	*/  
+
+	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
+
+	for (node = port->connections; node; node = jack_slist_next (node)) {
+		jack_port_t *other_port = (jack_port_t *) node->data;
+		
+		if (strcmp (other_port->shared->name, portname) == 0) {
+			ret = TRUE;
+			break;
+		}
+	}
+
+	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
+	return ret;
+}
+
 const char **
-jack_port_get_connections (const jack_client_t *client, const jack_port_t *port)
+jack_port_get_connections (const jack_port_t *port)
+{
+	const char **ret = NULL;
+	JSList *node;
+	unsigned int n;
+
+	/* XXX this really requires a cross-process lock
+	   so that ports/connections cannot go away
+	   while we are checking for them. that's hard,
+	   and has a non-trivial performance impact
+	   for jackd.
+	*/  
+
+	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
+
+	if (port->connections != NULL) {
+
+		ret = (const char **) malloc (sizeof (char *) * (jack_slist_length (port->connections) + 1));
+		for (n = 0, node = port->connections; node; node = jack_slist_next (node), ++n) {
+			ret[n] = ((jack_port_t *) node->data)->shared->name;
+		}
+		ret[n] = NULL;
+	}
+
+	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
+	return ret;
+}
+
+/* SERVER-SIDE (all) connection querying */
+
+const char **
+jack_port_get_all_connections (const jack_client_t *client, const jack_port_t *port)
 {
 	const char **ret;
 	jack_request_t req;
@@ -1884,6 +1990,10 @@ jack_port_get_connections (const jack_client_t *client, const jack_port_t *port)
 		return 0;
 	}
 	
+	if (req.x.nports == 0) {
+		return NULL;
+	}
+
 	ret = (const char **) malloc (sizeof (char *) * (req.x.nports + 1));
 
 	for ( i=0; i<req.x.nports; i++ ) {
@@ -1900,95 +2010,6 @@ jack_port_get_connections (const jack_client_t *client, const jack_port_t *port)
 	ret[i] = NULL;
 
 	return ret;
-}
-
-int
-jack_port_connected (const jack_client_t *client, const jack_port_t *port)
-{
-	jack_request_t req;
-
-	if( port->shared->client_id == client->control->id )
-	{
-		return port->connections != NULL;
-	}
-
-	req.type = GetPortNConnections;
-
-	req.x.nports = 0;
-	req.x.port_info.name[0] = '\0';
-	req.x.port_info.type[0] = '\0';
-	req.x.port_info.flags = 0;
-	req.x.port_info.buffer_size = 0;
-	req.x.port_info.client_id = 0;
-	req.x.port_info.port_id = port->shared->id;
-
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send port connections request to server");
-		return 0;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read port connections result from server");
-		return 0;
-	}
-	
-	return req.x.nports > 0;
-}
-
-int
-jack_port_connected_to (const jack_client_t *client,
-						const jack_port_t *port,
-						const char *portname)
-{
-	int ret = FALSE;
-
-	jack_request_t req;
-	int i;
-
-	req.type = GetPortConnections;
-
-	req.x.port_info.name[0] = '\0';
-	req.x.port_info.type[0] = '\0';
-	req.x.port_info.flags = 0;
-	req.x.port_info.buffer_size = 0;
-	req.x.port_info.client_id = 0;
-	req.x.port_info.port_id = port->shared->id;
-
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send port connections request to server");
-		return 0;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read port connections result from server");
-		return 0;
-	}
-	
-	for ( i=0; i<req.x.nports; i++ ) {
-		jack_port_id_t port_id;
-		
-		if (read (client->request_fd, &port_id, sizeof (port_id)) != sizeof (port_id)) {
-			jack_error ("cannot read port id from server");
-			return 0;
-		}
-		
-		if( strcmp( jack_port_by_id (client, port_id)->shared->name, portname ) == 0 )
-		{
-			ret = TRUE;
-			// don't break here because we must read all the data from
-			// the pipe or bad things will happen
-		}
-	}
-	
-	return ret;
-}
-
-int
-jack_port_connected_to_port (const jack_client_t *client,
-							 const jack_port_t *port,
-							 const jack_port_t *other_port)
-{
-	return jack_port_connected_to (client, port, other_port->shared->name);
 }
 
 /* TRANSPORT CONTROL */

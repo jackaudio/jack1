@@ -31,12 +31,19 @@ struct _jack_port_internal;
 struct _jack_engine {
     jack_control_t        *control;
     struct _jack_driver   *driver;
+
+    /* these are all "callbacks" made by the driver */
+
     int  (*process)(struct _jack_engine *, jack_nframes_t frames);
     int  (*set_buffer_size)(struct _jack_engine *, jack_nframes_t frames);
     int  (*set_sample_rate)(struct _jack_engine *, jack_nframes_t frames);
     int  (*process_lock)(struct _jack_engine *);
     void (*process_unlock)(struct _jack_engine *);
     int  (*post_process)(struct _jack_engine *);
+
+    /* "private" sections starts here */
+
+
     pthread_mutex_t client_lock;
     pthread_mutex_t buffer_lock;
     pthread_mutex_t port_lock;
@@ -101,9 +108,7 @@ int             jack_engine_delete (jack_engine_t *);
 int             jack_run (jack_engine_t *engine);
 int             jack_wait (jack_engine_t *engine);
 int             jack_use_driver (jack_engine_t *, struct _jack_driver *);
-void            jack_set_temp_dir (const char *);
 void            jack_set_asio_mode (jack_engine_t *, int yn);
-
 void            jack_dump_configuration(jack_engine_t *engine, int take_lock);
 
 #endif /* __jack_engine_h__ */

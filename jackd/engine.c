@@ -178,7 +178,7 @@ make_sockets (int fd[2])
 
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
-		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d", jack_temp_dir, i);
+		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d", jack_server_dir, i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -212,7 +212,7 @@ make_sockets (int fd[2])
 
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
-		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_%d", jack_temp_dir, i);
+		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_%d", jack_server_dir, i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -307,7 +307,7 @@ jack_cleanup_files ()
 	   believe that an instance is already running.
 	*/
 
-	if ((dir = opendir (jack_temp_dir)) == NULL) {
+	if ((dir = opendir (jack_server_dir)) == NULL) {
 		fprintf (stderr, "jack(%d): cannot open jack FIFO directory (%s)\n", getpid(), strerror (errno));
 		return;
 	}
@@ -315,7 +315,7 @@ jack_cleanup_files ()
 	while ((dirent = readdir (dir)) != NULL) {
 		if (strncmp (dirent->d_name, "jack-", 5) == 0 || strncmp (dirent->d_name, "jack_", 5) == 0) {
 			char fullpath[PATH_MAX+1];
-			sprintf (fullpath, "%s/%s", jack_temp_dir, dirent->d_name);
+			sprintf (fullpath, "%s/%s", jack_server_dir, dirent->d_name);
 			unlink (fullpath);
 		} 
 	}
@@ -421,15 +421,12 @@ jack_set_sample_rate (jack_engine_t *engine, jack_nframes_t nframes)
 int
 jack_engine_process_lock (jack_engine_t *engine)
 {
-	int ret = pthread_mutex_trylock (&engine->client_lock);
-	if (ret == 0) DEBUG ("success"); else DEBUG ("FAILURE");
-	return ret;
+	return pthread_mutex_trylock (&engine->client_lock);
 }
 
 void
 jack_engine_process_unlock (jack_engine_t *engine)
 {
-	DEBUG ("success");
 	pthread_mutex_unlock (&engine->client_lock);
 }
 
@@ -443,6 +440,8 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 	int status;
 	float delayed_usecs;
 	unsigned long long now, then;
+
+	c = get_cycles();
 
 	engine->process_errors = 0;
 
@@ -499,7 +498,8 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 			/* out of process subgraph */
 
 			ctl->state = Triggered; // a race exists if we do this after the write(2) 
-			ctl->signalled_at = 0;
+			ctl->signalled_at = get_cycles();
+			ctl->awake_at = 0;
 			ctl->finished_at = 0;
 
 			DEBUG ("calling process() on an OOP subgraph, fd==%d", client->subgraph_start_fd);
@@ -547,22 +547,32 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 
 			if (status != 0) {
 				if (engine->verbose) {
-					fprintf (stderr, "at %Lu client waiting on %d took %.9f usecs, status = %d sig = %Lu fin = %Lu dur=%.6f\n",
+					fprintf (stderr, "at %Lu client waiting on %d took %.9f usecs, status = %d sig = %Lu awa = %Lu fin = %Lu dur=%.6f\n",
 						now,
 						client->subgraph_wait_fd,
 						(float) (now - then) / engine->cpu_mhz,
 						status,
 						ctl->signalled_at,
+						ctl->awake_at,
 						ctl->finished_at,
 						((float) (ctl->finished_at - ctl->signalled_at)) / engine->cpu_mhz);
 				}
-				ctl->timed_out++;
+
+				/* we can only consider the timeout a client error if it actually woke up.
+				   its possible that the kernel scheduler screwed us up and 
+				   never woke up the client in time. sigh.
+				*/
+
+				if (ctl->awake_at > 0) {
+					ctl->timed_out++;
+				}
+
 				engine->process_errors++;
 				break;
 			} else {
 				DEBUG ("reading byte from subgraph_wait_fd==%d", client->subgraph_wait_fd);
 
-				if (read (client->subgraph_wait_fd, &c, sizeof (c)) != sizeof (c)) {
+				if (read (client->subgraph_wait_fd, &c, sizeof(c)) != sizeof (c)) {
 					jack_error ("pp: cannot clean up byte from graph wait fd (%s)", strerror (errno));
 					client->error++;
 					break;
@@ -592,10 +602,6 @@ jack_engine_post_process (jack_engine_t *engine)
 	JSList *node;
 	int need_remove = FALSE;
 	
-	jack_lock_graph (engine);
-	
-	/* update timebase */
-
 	engine->control->pending_time.cycles = engine->control->current_time.cycles;
 	engine->control->current_time = engine->control->pending_time;
 
@@ -606,7 +612,7 @@ jack_engine_post_process (jack_engine_t *engine)
 		client = (jack_client_internal_t *) node->data;
 		ctl = client->control;
 		
-		if (ctl->state > NotTriggered && ctl->state != Finished && ctl->timed_out++) {
+		if (ctl->awake_at != 0 && ctl->state > NotTriggered && ctl->state != Finished && ctl->timed_out++) {
 			client->error = TRUE;
 		}
 
@@ -650,8 +656,6 @@ jack_engine_post_process (jack_engine_t *engine)
 		jack_engine_reset_rolling_usecs (engine);
 
 	}
-
-	jack_unlock_graph (engine);
 
 	return 0;
 }
@@ -1465,7 +1469,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	}
 #endif
 	engine->control->engine_ok = 1;
-	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix), "%s/jack-ack-fifo-%d", jack_temp_dir, getpid());
+	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix), "%s/jack-ack-fifo-%d", jack_server_dir, getpid());
 
 	(void) jack_get_fifo_fd (engine, 0);
 	jack_start_server (engine);
@@ -1528,7 +1532,7 @@ watchdog_thread (void *arg)
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
 	int watchdog_priority = (engine->rtpriority) > 89 ? 99 : engine->rtpriority + 10;
-	
+
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
 	if (jack_become_real_time (pthread_self(), watchdog_priority)) {
@@ -1639,7 +1643,10 @@ jack_main_thread (void *arg)
 		int status;
 		float delayed_usecs;
 
-		nframes = driver->wait (driver, -1, &status, &delayed_usecs);
+		if ((nframes = driver->wait (driver, -1, &status, &delayed_usecs)) == 0) {
+			/* the driver detected an xrun, and restarted */
+			continue;
+		}
 
 		jack_inc_frame_time (engine, nframes);
 
@@ -2094,7 +2101,7 @@ jack_rechain_graph (jack_engine_t *engine)
 	subgraph_client = 0;
 
 	if (engine->verbose) {
-		fprintf(stderr, "-- jack_rechain_graph():\n");
+		fprintf(stderr, "++ jack_rechain_graph():\n");
 	}
 
 	event.type = GraphReordered;
@@ -2180,11 +2187,11 @@ jack_rechain_graph (jack_engine_t *engine)
 				 */
 				
 				(void) jack_get_fifo_fd(engine, client->execution_order + 1);
-				
+
 				event.x.n = client->execution_order;
 				
 				jack_deliver_event (engine, client, &event);
-                                
+
 				n++;
 			}
 		}
@@ -2196,6 +2203,10 @@ jack_rechain_graph (jack_engine_t *engine)
 			fprintf(stderr, "client %s: wait_fd=%d, execution_order=%lu (last client).\n", 
 				subgraph_client->control->name, subgraph_client->subgraph_wait_fd, n);
 		}
+	}
+
+	if (engine->verbose) {
+		fprintf(stderr, "-- jack_rechain_graph()\n");
 	}
 
 	return err;
@@ -2577,6 +2588,7 @@ jack_port_do_connect (jack_engine_t *engine,
 	if (dstport->connections && dstport->shared->type_info.mixdown == NULL) {
 		jack_error ("cannot make multiple connections to a port of type [%s]", dstport->shared->type_info.type_name);
 		free (connection);
+		jack_unlock_graph (engine);
 		return -1;
 	} else {
 		if (engine->verbose) {
@@ -2963,18 +2975,22 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 
 int
 jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int reply_fd)
-	
 {
-	jack_port_internal_t *port = &engine->internal_ports[req->x.port_info.port_id];
+	jack_port_internal_t *port;
 	JSList *node;
+	int ret = -1;
+
+	jack_lock_graph (engine);
+
+	port = &engine->internal_ports[req->x.port_info.port_id];
 
 	DEBUG ("Getting connections for port '%s'.", port->shared->name);
-	
+
 	req->x.nports = jack_slist_length (port->connections);
 
 	if (write (reply_fd, req, sizeof (*req)) < sizeof (req)) {
 		jack_error ("cannot write GetPortConnections result to client");
-		return -1;
+		goto out;
 	}
 
 	if (req->type == GetPortConnections)
@@ -2993,12 +3009,16 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int re
 			
 			if (write (reply_fd, &port_id, sizeof (port_id)) < sizeof (port_id)) {
 				jack_error ("cannot write port id to client");
-				return -1;
+				goto out;
 			}
 		}
 	}
-	
-	return 0;
+
+	ret = 0;
+
+  out:
+	jack_unlock_graph (engine);
+	return ret;
 }
 
 void

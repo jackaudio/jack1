@@ -1,0 +1,79 @@
+/*
+    Copyright (C) 2002 Paul Davis
+    
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
+    (at your option) any later version.
+    
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Lesser General Public License for more details.
+    
+    You should have received a copy of the GNU Lesser General Public License
+    along with this program; if not, write to the Free Software 
+    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+    $Id$
+*/
+
+#include <stdlib.h>
+#include <jack/timestamps.h>
+#include <jack/internal.h>
+#include <jack/cycles.h>
+
+typedef struct {
+    cycles_t when;
+    const char *what;
+} jack_timestamp_t;
+
+static jack_timestamp_t *timestamps = 0;
+static unsigned long timestamp_cnt = 0;
+static unsigned long timestamp_index;
+
+void
+jack_init_timestamps (unsigned long howmany)
+{
+	if (timestamps) {
+		free (timestamps);
+	}
+	timestamps = (jack_timestamp_t *) malloc (howmany * sizeof(jack_timestamp_t));
+	timestamp_cnt = howmany;
+	memset (timestamps, 0, sizeof (jack_timestamp_t) * howmany);
+	timestamp_index = 0;
+}
+
+void
+jack_timestamp (const char *what)
+{
+	if (timestamp_index < timestamp_cnt) {
+		timestamps[timestamp_index].when = get_cycles();
+		timestamps[timestamp_index].what = what;
+		++timestamp_index;
+	}
+}
+
+void
+jack_dump_timestamps (FILE *out)
+{
+	unsigned long i;
+	float mhz = (float) jack_get_mhz();
+
+	for (i = 0; i < timestamp_index; ++i) {
+		fprintf (out, "%-.32s %Lu %f", 
+			 timestamps[i].what, timestamps[i].when,
+			 ((float) (timestamps[i].when - timestamps[0].when)) / mhz);
+		if (i > 0) {
+			fprintf (out, " %f", ((float) (timestamps[i].when - timestamps[i-1].when)) / mhz);
+		}
+		fputc ('\n', out);
+	}
+}
+
+void
+jack_reset_timestamps ()
+{
+	timestamp_index = 0;
+}
+

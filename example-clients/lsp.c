@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -30,10 +31,11 @@ main (int argc, char *argv[])
 	for (i = 0; ports[i]; ++i) {
 		printf ("%s\n", ports[i]);
 		if (show_con) {
-			connections = jack_port_get_connections (client,
-					jack_port_by_name(client, ports[i]));
-			for (j = 0; connections[j]; j++) {
-				printf("   %s\n", connections[j]);
+			if ((connections = jack_port_get_all_connections (client, jack_port_by_name(client, ports[i]))) != 0) {
+				for (j = 0; connections[j]; j++) {
+					printf ("   %s\n", connections[j]);
+				}
+				free (connections);
 			}
 		}
 	}
