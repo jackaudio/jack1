@@ -35,12 +35,14 @@ static sigset_t signals;
 static jack_engine_t *engine = 0;
 static int jackd_pid;
 static char *alsa_pcm_name = "default";
-static nframes_t frames_per_interrupt = 64;
+static nframes_t frames_per_interrupt = 1024;
 static nframes_t srate = 48000;
+static unsigned long user_nperiods = 2;
 static int realtime = 0;
 static int realtime_priority = 10;
 static int with_fork = 1;
 static int hw_monitoring = 0;
+static int verbose = 0;
 
 static void
 signal_handler (int sig)
@@ -118,7 +120,7 @@ jack_engine_waiter_thread (void *arg)
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
-	if ((engine = jack_engine_new (realtime, realtime_priority)) == 0) {
+	if ((engine = jack_engine_new (realtime, realtime_priority, verbose)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
 		kill (signal_pid, SIGTERM);
 		return 0;
@@ -126,7 +128,8 @@ jack_engine_waiter_thread (void *arg)
 
 	if ((driver = jack_driver_load (ADDON_DIR "/jack_alsa.so", 
 					alsa_pcm_name, 
-					frames_per_interrupt, 
+					frames_per_interrupt,
+					user_nperiods,
 					srate, 
 					hw_monitoring)) == 0) {
 		fprintf (stderr, "cannot load ALSA driver module\n");
@@ -206,10 +209,12 @@ static void usage ()
 	fprintf (stderr, 
 "usage: jackd [ --device OR -d ALSA-PCM-device ]
               [ --srate OR -r sample-rate ] 
-              [ --frames-per-interrupt OR -p frames_per_interrupt ] 
+              [ --frames-per-period OR -p frames_per_period ]
+              [ --periods OR -n nr_of_periods ]
               [ --realtime OR -R [ --realtime-priority OR -P priority ] ]
-              [ --hw-monitor OR -h ]
+              [ --hw-monitor OR -H ]
               [ --spoon OR -F ]  (don't fork)
+              [ --verbose OR -v ]
 ");
 }	
 
@@ -217,13 +222,15 @@ int
 main (int argc, char *argv[])
 
 {
-	const char *options = "hd:r:p:RP:FD:H";
+	const char *options = "hd:n:r:p:RP:FD:Hv";
 	struct option long_options[] = 
 	{ 
 		{ "tmpdir", 1, 0, 'D' },
 		{ "device", 1, 0, 'd' },
 		{ "srate", 1, 0, 'r' },
 		{ "frames-per-interrupt", 1, 0, 'p' },
+		{ "number-of-fragments", 1, 0, 'n' },
+		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
@@ -244,13 +251,21 @@ main (int argc, char *argv[])
 		case 'd':
 			alsa_pcm_name = optarg;
 			break;
-			
+
+		case 'n':
+			user_nperiods = atoi (optarg);
+			break;
+
 		case 'r':
 			srate = atoi (optarg);
 			break;
 
 		case 'p':
 			frames_per_interrupt = atoi (optarg);
+			break;
+
+		case 'v':
+			verbose = 1;
 			break;
 
 		case 'F':
@@ -278,10 +293,10 @@ main (int argc, char *argv[])
 	}
 
 	printf ( "jackd " VERSION "\n"
-		 "Copyright 2001-2002 Paul Davis and others.\n\n"
+		 "Copyright 2001-2002 Paul Davis and others.\n"
 		 "jackd comes with ABSOLUTELY NO WARRANTY\n"
 		 "This is free software, and you are welcome to redistribute it\n"
-		 "under certain conditions; see the file COPYING for details\n");
+		 "under certain conditions; see the file COPYING for details\n\n");
 
 	if (!with_fork) {
 

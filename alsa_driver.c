@@ -240,13 +240,13 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 		return -1;
 	}
 
-	if ((err = snd_pcm_hw_params_set_periods (handle, hw_params, 2, 0)) < 0) {
-		jack_error ("ALSA: cannot set number of periods to 2 for %s", stream_name);
+	if ((err = snd_pcm_hw_params_set_periods (handle, hw_params, driver->user_nperiods, 0)) < 0) {
+		jack_error ("ALSA: cannot set number of periods to %u for %s", driver->user_nperiods, stream_name);
 		return -1;
 	}
 	
-	if ((err = snd_pcm_hw_params_set_buffer_size (handle, hw_params, 2 * driver->frames_per_cycle)) < 0) {
-		jack_error ("ALSA: cannot set buffer length to %u for %s", 2 * driver->frames_per_cycle, stream_name);
+	if ((err = snd_pcm_hw_params_set_buffer_size (handle, hw_params, driver->user_nperiods * driver->frames_per_cycle)) < 0) {
+		jack_error ("ALSA: cannot set buffer length to %u for %s", driver->user_nperiods * driver->frames_per_cycle, stream_name);
 		return -1;
 	}
 
@@ -291,7 +291,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 }
 
 static int 
-alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, nframes_t rate)
+alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, nframes_t user_nperiods, nframes_t rate)
 
 {
 	int p_noninterleaved;
@@ -304,6 +304,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 
 	driver->frame_rate = rate;
 	driver->frames_per_cycle = frames_per_cycle;
+	driver->user_nperiods = user_nperiods;
 	
 	if (alsa_driver_configure_stream (driver, "capture",
 					  driver->capture_handle,
@@ -476,11 +477,11 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 }	
 
 static int
-alsa_driver_reset_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, nframes_t rate)
+alsa_driver_reset_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, nframes_t user_nperiods, nframes_t rate)
 {
 	/* XXX unregister old ports ? */
 	alsa_driver_release_channel_dependent_memory (driver);
-	return alsa_driver_set_parameters (driver, frames_per_cycle, rate);
+	return alsa_driver_set_parameters (driver, frames_per_cycle, user_nperiods, rate);
 }
 
 static int
@@ -674,7 +675,7 @@ alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn, ClockSy
 
 {
 	driver->clock_sync_data[chn] = status;
-	jack_driver_clock_sync_notify ((jack_driver_t *) driver, chn, status);
+	alsa_driver_clock_sync_notify (driver, chn, status);
 }
 
 static int under_gdb = FALSE;
@@ -855,8 +856,9 @@ alsa_driver_wait (alsa_driver_t *driver)
 			jack_error ("alsa_pcm: engine processing error - stopping.");
 			return -1;
 		}
-		/* now move data from ports to channels */
 
+		/* now move data from ports to channels */
+		
 		for (chn = 0, node = driver->playback_ports; node; node = g_slist_next (node), chn++) {
 
 			jack_port_t *port = (jack_port_t *) node->data;
@@ -1088,6 +1090,13 @@ static void
 alsa_driver_delete (alsa_driver_t *driver)
 
 {
+	GSList *node;
+
+	for (node = driver->clock_sync_listeners; node; node = g_slist_next (node)) {
+		free (node->data);
+	}
+	g_slist_free (driver->clock_sync_listeners);
+
 	if (driver->capture_handle) {
 		snd_pcm_close (driver->capture_handle);
 		driver->capture_handle = 0;
@@ -1130,13 +1139,13 @@ alsa_driver_delete (alsa_driver_t *driver)
 	free(driver->alsa_driver);
 
 	alsa_driver_release_channel_dependent_memory (driver);
-	jack_driver_release ((jack_driver_t *) driver);
 	free (driver);
 }
 
 static jack_driver_t *
 alsa_driver_new (char *name, char *alsa_device,
 		 nframes_t frames_per_cycle,
+		 nframes_t user_nperiods,
 		 nframes_t rate,
 		 int hw_monitoring)
 {
@@ -1144,8 +1153,8 @@ alsa_driver_new (char *name, char *alsa_device,
 
 	alsa_driver_t *driver;
 
-	printf ("creating alsa driver ... %s|%lu|%lu|%s\n", 
-		alsa_device, frames_per_cycle, rate,
+	printf ("creating alsa driver ... %s|%lu|%lu|%lu|%s\n", 
+		alsa_device, frames_per_cycle, user_nperiods, rate,
 		hw_monitoring ? "hwmon":"swmon");
 
 	driver = (alsa_driver_t *) calloc (1, sizeof (alsa_driver_t));
@@ -1155,15 +1164,8 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->attach = (JackDriverAttachFunction) alsa_driver_attach;
         driver->detach = (JackDriverDetachFunction) alsa_driver_detach;
 	driver->wait = (JackDriverWaitFunction) alsa_driver_wait;
-
-	driver->audio_stop = (JackDriverAudioStopFunction) alsa_driver_audio_stop;
-	driver->audio_start = (JackDriverAudioStartFunction) alsa_driver_audio_start;
-	driver->set_hw_monitoring  = (JackDriverSetHwMonitoringFunction) alsa_driver_set_hw_monitoring ;
-	driver->reset_parameters  = (JackDriverResetParametersFunction) alsa_driver_reset_parameters;
-	driver->mark_channel_silent  = (JackDriverMarkChannelSilentFunction) alsa_driver_mark_channel_silent;
-	driver->request_all_monitor_input = (JackDriverRequestAllMonitorInputFunction) alsa_driver_request_all_monitor_input;
-	driver->clock_sync_status = (JackDriverClockSyncStatusFunction) alsa_driver_clock_sync_status;
-	driver->change_sample_clock  = (JackDriverChangeSampleClockFunction) alsa_driver_change_sample_clock;
+	driver->start = (JackDriverStartFunction) alsa_driver_audio_start;
+	driver->stop = (JackDriverStopFunction) alsa_driver_audio_stop;
 
 	driver->ctl_handle = 0;
 	driver->hw = 0;
@@ -1181,13 +1183,16 @@ alsa_driver_new (char *name, char *alsa_device,
 
 	driver->clock_mode = ClockMaster; /* XXX is it? */
 	driver->input_monitor_mask = 0;   /* XXX is it? */
-	
+
 	driver->capture_ports = 0;
 	driver->playback_ports = 0;
 
 	driver->pfd = 0;
 	driver->playback_nfds = 0;
 	driver->capture_nfds = 0;
+
+	pthread_mutex_init (&driver->clock_sync_lock, 0);
+	driver->clock_sync_listeners = 0;
 	
 	if ((err = snd_pcm_open (&driver->playback_handle, alsa_device, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
 		jack_error ("ALSA: Cannot open PCM device %s/%s", name, alsa_device);
@@ -1237,7 +1242,7 @@ alsa_driver_new (char *name, char *alsa_device,
 		return 0;
 	}
 
-	if (alsa_driver_set_parameters (driver, frames_per_cycle, rate)) {
+	if (alsa_driver_set_parameters (driver, frames_per_cycle, user_nperiods, rate)) {
 		alsa_driver_delete (driver);
 		return 0;
 	}
@@ -1253,6 +1258,58 @@ alsa_driver_new (char *name, char *alsa_device,
 	return (jack_driver_t *) driver;
 }
 
+int
+alsa_driver_listen_for_clock_sync_status (alsa_driver_t *driver, 
+					  ClockSyncListenerFunction func,
+					  void *arg)
+{
+	ClockSyncListener *csl;
+
+	csl = (ClockSyncListener *) malloc (sizeof (ClockSyncListener));
+	csl->function = func;
+	csl->arg = arg;
+	csl->id = driver->next_clock_sync_listener_id++;
+	
+	pthread_mutex_lock (&driver->clock_sync_lock);
+	driver->clock_sync_listeners = g_slist_prepend (driver->clock_sync_listeners, csl);
+	pthread_mutex_unlock (&driver->clock_sync_lock);
+	return csl->id;
+}
+
+int
+alsa_driver_stop_listening_to_clock_sync_status (alsa_driver_t *driver, int which)
+
+{
+	GSList *node;
+	int ret = -1;
+	pthread_mutex_lock (&driver->clock_sync_lock);
+	for (node = driver->clock_sync_listeners; node; node = g_slist_next (node)) {
+		if (((ClockSyncListener *) node->data)->id == which) {
+			driver->clock_sync_listeners = g_slist_remove_link (driver->clock_sync_listeners, node);
+			free (node->data);
+			g_slist_free_1 (node);
+			ret = 0;
+			break;
+		}
+	}
+	pthread_mutex_unlock (&driver->clock_sync_lock);
+	return ret;
+}
+
+void 
+alsa_driver_clock_sync_notify (alsa_driver_t *driver, channel_t chn, ClockSyncStatus status)
+{
+	GSList *node;
+
+	pthread_mutex_lock (&driver->clock_sync_lock);
+	for (node = driver->clock_sync_listeners; node; node = g_slist_next (node)) {
+		ClockSyncListener *csl = (ClockSyncListener *) node->data;
+		csl->function (chn, status, csl->arg);
+	}
+	pthread_mutex_unlock (&driver->clock_sync_lock);
+
+}
+
 /* PLUGIN INTERFACE */
 
 jack_driver_t *
@@ -1260,15 +1317,18 @@ driver_initialize (va_list ap)
 {
 	nframes_t srate;
 	nframes_t frames_per_interrupt;
+	unsigned long user_nperiods;
 	char *pcm_name;
 	int hw_monitoring;
 
 	pcm_name = va_arg (ap, char *);
 	frames_per_interrupt = va_arg (ap, nframes_t);
+	user_nperiods = va_arg(ap, unsigned long);
 	srate = va_arg (ap, nframes_t);
 	hw_monitoring = va_arg (ap, int);
 
-	return alsa_driver_new ("alsa_pcm", pcm_name, frames_per_interrupt, srate, hw_monitoring);
+	return alsa_driver_new ("alsa_pcm", pcm_name, frames_per_interrupt, 
+				user_nperiods, srate, hw_monitoring);
 }
 
 void

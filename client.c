@@ -52,7 +52,7 @@ static jack_port_t *jack_port_new (jack_client_t *client, jack_port_id_t port_id
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
-static void *jack_zero_filled_buffer = 0;
+void *jack_zero_filled_buffer = 0;
 
 static void jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes);
 
@@ -176,7 +176,7 @@ jack_client_invalidate_port_buffers (jack_client_t *client)
 		port = (jack_port_t *) node->data;
 
 		if (port->shared->flags & JackPortIsInput) {
-			if (port->client_segment_base != 0 && port->shared->offset == 0) {
+			if (port->client_segment_base == 0) {
 				jack_pool_release ((void *) port->shared->offset);
 				port->client_segment_base = 0;
 				port->shared->offset = 0;
@@ -582,8 +582,12 @@ jack_client_thread (void *arg)
 
 			control->state = Running;
 
-                        status = control->process (control->nframes, control->process_arg);
-			
+			if (control->process) {
+				status = control->process (control->nframes, control->process_arg);
+			} else {
+				status = 0;
+			}
+					
 			if (!status) {
 				control->state = Finished;
 			}
@@ -1201,10 +1205,18 @@ jack_port_get_buffer (jack_port_t *port, nframes_t nframes)
 	   the incoming data to that buffer. we have already
 	   established the existence of a mixdown function
 	   during the connection process.
+
+	   no port can have an offset of 0 - that offset refers
+	   to the zero-filled area at the start of a shared port
+	   segment area. so, use the offset to store the location
+	   of a locally allocated buffer, and reset the client_segment_base 
+	   so that the jack_port_buffer() computation works correctly.
 	*/
 
-	if (port->client_segment_base == 0 && port->shared->offset == 0) {
-		port->shared->offset = (size_t) jack_pool_alloc (port->shared->type_info.buffer_scale_factor * sizeof (sample_t) * nframes);
+	if (port->shared->offset == 0) {
+		port->shared->offset = (size_t) jack_pool_alloc (port->shared->type_info.buffer_scale_factor * 
+								 sizeof (sample_t) * nframes);
+		port->client_segment_base = 0;
 	}
 
 	port->shared->type_info.mixdown (port, nframes);
@@ -1563,7 +1575,7 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 	buffer = jack_port_buffer (port);
 
 	memcpy (buffer, jack_port_buffer (input), sizeof (sample_t) * nframes);
-	
+
 	for (node = g_slist_next (node); node; node = g_slist_next (node)) {
 
 		input = (jack_port_t *) node->data;

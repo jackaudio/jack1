@@ -73,11 +73,12 @@ struct _jack_engine {
     unsigned long fifo_size;
     unsigned long external_client_cnt;
     int rtpriority;
+    char verbose;
 };
 
 /* public functions */
 
-jack_engine_t  *jack_engine_new (int real_time, int real_time_priority);
+jack_engine_t  *jack_engine_new (int real_time, int real_time_priority, int verbose);
 int             jack_engine_delete (jack_engine_t *);
 int             jack_run (jack_engine_t *engine);
 int             jack_wait (jack_engine_t *engine);

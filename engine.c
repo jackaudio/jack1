@@ -205,11 +205,15 @@ jack_cleanup_clients (jack_engine_t *engine)
 		client = (jack_client_internal_t *) node->data;
 		ctl = client->control;
 		
-		printf ("client %s state = %d\n", ctl->name, ctl->state);
-		
+		if (engine->verbose) {
+			fprintf (stderr, "client %s state = %d\n", ctl->name, ctl->state);
+		}
+
 		if (ctl->state > NotTriggered) {
 			remove = g_slist_prepend (remove, node->data);
-			printf ("%d: removing failed client %s\n", x, ctl->name);
+			if (engine->verbose) {
+				fprintf (stderr, "%d: removing failed client %s\n", x, ctl->name);
+			}
 		}
 	}
 	pthread_mutex_unlock (&engine->graph_lock);
@@ -272,7 +276,6 @@ jack_cleanup_shm ()
 	int i;
 
 	for (i = 0; i < jack_shm_id_cnt; i++) {
-		fprintf (stderr, "removing shm ID[%d] = %d\n", i, jack_shm_registry[i]);
 		shmctl (jack_shm_registry[i], IPC_RMID, NULL);
 	}
 }
@@ -382,7 +385,8 @@ static int
 jack_set_buffer_size (jack_engine_t *engine, nframes_t nframes)
 {
 	/* XXX this is not really right, since it only works for
-	   audio ports.
+	   audio ports. it also doesn't resize the zero filled
+	   area.
 	*/
 
 	engine->control->buffer_size = nframes;
@@ -469,6 +473,9 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 			pollfd[0].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
 
 			if (poll (pollfd, 1, engine->driver->period_interval) < 0) {
+				if (errno == EINTR) {
+					continue;
+				}
 				jack_error ("engine cannot poll for graph completion (%s)", strerror (errno));
 				err++;
 				break;
@@ -498,8 +505,11 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 				}
 				node = g_slist_next (node);
 			}
+
 		}
 	}
+		
+
 	pthread_mutex_unlock (&engine->graph_lock);
 	
 	if (err) {
@@ -592,7 +602,9 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 			return -1;
 		}
 
-		printf ("new client: %s, type %d @ %p\n", client->control->name, req.type, client->control);
+		if (engine->verbose) {
+			fprintf (stderr, "new client: %s, type %d @ %p\n", client->control->name, req.type, client->control);
+		}
 
 		res.client_key = client->shm_key;
 		res.control_key = engine->control_key;
@@ -658,8 +670,6 @@ handle_client_ack_connection (jack_engine_t *engine, int client_fd)
 		jack_error ("unknown client ID in ACK connection request");
 		return -1;
 	}
-
-	fprintf (stderr, "client %s is on event fd %d\n", client->control->name, client_fd);
 
 	client->event_fd = client_fd;
 
@@ -1043,7 +1053,7 @@ jack_start_server (jack_engine_t *engine)
 }
 
 jack_engine_t *
-jack_engine_new (int realtime, int rtpriority)
+jack_engine_new (int realtime, int rtpriority, int verbose)
 {
 	jack_engine_t *engine;
 	size_t control_size;
@@ -1062,6 +1072,7 @@ jack_engine_new (int realtime, int rtpriority)
 	engine->port_max = 128;
 	engine->rtpriority = rtpriority;
 	engine->silent_buffer = 0;
+	engine->verbose = verbose;
 
 	pthread_mutex_init (&engine->graph_lock, 0);
 	pthread_mutex_init (&engine->buffer_lock, 0);
@@ -1174,8 +1185,10 @@ cancel_cleanup1 (void *arg)
 
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
-	printf ("audio thread cancelled or finished\n");
-	engine->driver->audio_stop (engine->driver);
+	if (engine->verbose) {
+		fprintf (stderr, "audio thread cancelled or finished\n");
+	}
+	engine->driver->stop (engine->driver);
 }
 
 void
@@ -1183,7 +1196,7 @@ cancel_cleanup2 (int status, void *arg)
 
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
-	engine->driver->audio_stop (engine->driver);
+	engine->driver->stop (engine->driver);
 	engine->driver->finish (engine->driver);
 }
 
@@ -1203,7 +1216,7 @@ jack_main_thread (void *arg)
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 	on_exit (cancel_cleanup2, engine);
 
-	if (driver->audio_start (driver)) {
+	if (driver->start (driver)) {
 		jack_error ("cannot start driver");
 		pthread_exit (0);
 	}
@@ -1367,7 +1380,9 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	GSList *node;
 	int i;
 
-	printf ("removing client %s\n", client->control->name);
+	if (engine->verbose) {
+		fprintf (stderr, "removing client %s\n", client->control->name);
+	}
 
 	pthread_mutex_lock (&engine->graph_lock);
 	
@@ -1852,9 +1867,11 @@ jack_port_do_connect (jack_engine_t *engine,
 		free (connection);
 		return -1;
 	} else {
-		fprintf (stderr, "connect %s and %s\n",
-			 srcport->shared->name,
-			 dstport->shared->name);
+		if (engine->verbose) {
+			fprintf (stderr, "connect %s and %s\n",
+				 srcport->shared->name,
+				 dstport->shared->name);
+		}
 
 		dstport->connections = g_slist_prepend (dstport->connections, connection);
 		srcport->connections = g_slist_prepend (srcport->connections, connection);
@@ -1890,9 +1907,11 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 
 		if (connect->source == srcport && connect->destination == dstport) {
 
-			fprintf (stderr, "DIS-connect %s and %s\n",
-				 srcport->shared->name,
-				 dstport->shared->name);
+			if (engine->verbose) {
+				fprintf (stderr, "DIS-connect %s and %s\n",
+					 srcport->shared->name,
+					 dstport->shared->name);
+			}
 			
 			srcport->connections = g_slist_remove (srcport->connections, connect);
 			dstport->connections = g_slist_remove (dstport->connections, connect);
@@ -1935,8 +1954,10 @@ jack_port_do_disconnect_all (jack_engine_t *engine,
 		return -1;
 	}
 
-	fprintf (stderr, "clear connections for %s\n", engine->internal_ports[port_id].shared->name);
-	
+	if (engine->verbose) {
+		fprintf (stderr, "clear connections for %s\n", engine->internal_ports[port_id].shared->name);
+	}
+
 	pthread_mutex_lock (&engine->graph_lock);
 	jack_port_clear_connections (engine, &engine->internal_ports[port_id]);
 	jack_sort_graph (engine, FALSE);
@@ -2188,7 +2209,9 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	jack_port_registration_notify (engine, port_id, TRUE);
 	pthread_mutex_unlock (&engine->graph_lock);
 
-	fprintf (stderr, "registered port %s\n", shared->name);
+	if (engine->verbose) {
+		fprintf (stderr, "registered port %s\n", shared->name);
+	}
 
 	req->x.port_info.port_id = port_id;
 
@@ -2290,6 +2313,7 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 			port->shared->offset = bi->offset;
 			break;
 		}
+
 	}
 	
 	if (port->shared->shm_key >= 0) {

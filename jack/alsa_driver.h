@@ -60,6 +60,12 @@ typedef struct {
     unsigned long                 playback_nchannels;
     unsigned long                 capture_nchannels;
     unsigned long                 sample_bytes;
+
+    nframes_t                     frame_rate;
+    nframes_t                     frames_per_cycle;
+    nframes_t                     capture_frame_latency;
+    nframes_t                     playback_frame_latency;
+
     unsigned long                *silent;
     char                         *alsa_name;
     char                         *alsa_driver;
@@ -69,6 +75,7 @@ typedef struct {
     unsigned long                 channel_done_bits;
     snd_pcm_format_t              sample_format;
     float                         max_sample_val;
+    unsigned long                 user_nperiods;
     unsigned long                 nfragments;
     int                           max_level;
     int                           min_level;
@@ -81,18 +88,30 @@ typedef struct {
     snd_pcm_sw_params_t          *playback_sw_params;
     snd_pcm_hw_params_t          *capture_hw_params;
     snd_pcm_sw_params_t          *capture_sw_params;
-    jack_hardware_t       *hw;  
+    jack_hardware_t              *hw;  
     ClockSyncStatus              *clock_sync_data;
-    jack_client_t         *client;
+    struct _jack_engine          *engine;
+    jack_client_t                *client;
     GSList                       *capture_ports;
     GSList                       *playback_ports;
 
+    unsigned long input_monitor_mask;
+
+    char   hw_monitoring : 1;
+    char   all_monitor_in : 1;
     char   capture_and_playback_not_synced : 1;
     char   interleaved : 1;
 
     ReadCopyFunction read_via_copy;
     WriteCopyFunction write_via_copy;
     CopyCopyFunction channel_copy;
+
+    SampleClockMode clock_mode;
+    GSList *clock_sync_listeners;
+    pthread_mutex_t clock_sync_lock;
+    unsigned long next_clock_sync_listener_id;
+    char has_clock_sync_reporting : 1;
+    char has_hw_monitoring : 1;
 
 } alsa_driver_t;
 
@@ -166,6 +185,9 @@ static __inline__ void alsa_driver_copy_channel (alsa_driver_t *driver,
 }
 
 void  alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn, ClockSyncStatus status);
+int   alsa_driver_listen_for_clock_sync_status (alsa_driver_t *, ClockSyncListenerFunction, void *arg);
+int   alsa_driver_stop_listen_for_clock_sync_status (alsa_driver_t *, int);
+void  alsa_driver_clock_sync_notify (alsa_driver_t *, channel_t chn, ClockSyncStatus);
 
 
 #endif /* __jack_alsa_driver_h__ */
