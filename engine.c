@@ -1518,6 +1518,8 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 	char status;
 	int client_err = 0;
 
+	/* caller must hold the graph_lock */
+
 	if (client->control->dead) {
 		return 0;
 	}
@@ -1559,9 +1561,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 		}
 
 		if (client_err || status != 0) {
-			pthread_mutex_lock (&engine->graph_lock);
 			jack_remove_client (engine, client);
-			pthread_mutex_unlock (&engine->graph_lock);
 		}
 	}
 
