@@ -33,7 +33,8 @@ typedef uint32_t	     jack_nframes_t;
 /**
  * Maximum value that can be stored in jack_nframes_t
  */
-#define JACK_MAX_FRAMES UINT32_MAX;
+#define JACK_MAX_FRAMES (4294967295U)	/* This should be UINT32_MAX, but
+					   C++ has a problem with that. */
 
 /**
  * Type used to represent the value of free running
