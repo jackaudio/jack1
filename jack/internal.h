@@ -271,7 +271,6 @@ struct _jack_request {
     int status;
 };
 
-extern void jack_cleanup_shm ();
 extern void jack_cleanup_files ();
 
 extern int  jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event);
@@ -287,8 +286,6 @@ void handle_internal_client_request (jack_control_t*, jack_request_t*);
 extern char *jack_server_dir;
 
 extern void jack_error (const char *fmt, ...);
-
-extern char *jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot);
 
 extern jack_port_type_info_t jack_builtin_port_types[];
 

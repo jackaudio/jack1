@@ -32,6 +32,7 @@
 #include <jack/engine.h>
 #include <jack/internal.h>
 #include <jack/driver.h>
+#include <jack/shm.h>
 
 #ifdef USE_CAPABILITIES
 

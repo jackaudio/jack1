@@ -23,7 +23,6 @@
 #include <sys/socket.h>
 #include <sys/poll.h>
 #include <sys/un.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -33,6 +32,7 @@
 #include <sys/ipc.h>
 #include <signal.h>
 #include <sys/types.h>
+#include <sys/mman.h>
 #include <string.h>
 #include <limits.h>
 
@@ -43,14 +43,13 @@
 #include <jack/driver.h>
 #include <jack/time.h>
 #include <jack/version.h>
+#include <jack/shm.h>
 
 #ifdef USE_CAPABILITIES
 /* capgetp and capsetp are linux only extensions, not posix */
 #undef _POSIX_SOURCE
 #include <sys/capability.h>
 #endif
-
-#define MAX_SHM_ID 256 /* likely use is more like 16 */
 
 /**
  * Time to wait for clients in msecs. Used when jackd is 
@@ -126,19 +125,11 @@ static void jack_port_registration_notify (jack_engine_t *, jack_port_id_t, int)
 static int  jack_send_connection_notification (jack_engine_t *, jack_client_id_t, jack_port_id_t, jack_port_id_t, int);
 static int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_event_t *);
 static void jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event);
-static int  jack_engine_post_process (jack_engine_t *);
+static void jack_engine_post_process (jack_engine_t *);
 
 static int  internal_client_request (void*, jack_request_t *);
 
 static int  jack_use_driver (jack_engine_t *engine, jack_driver_t *driver);
-
-typedef struct {
-    shm_name_t name;
-    char* address;
-} jack_shm_registry_entry_t;
-
-static jack_shm_registry_entry_t *jack_shm_registry;
-static int                        jack_shm_id_cnt;
 
 static char *client_state_names[] = {
 	"Not triggered",
@@ -279,99 +270,6 @@ make_sockets (int fd[2])
 	return 0;
 }
 
-static void
-jack_register_shm (char *shm_name, char *addr)
-{
-	if (jack_shm_id_cnt < MAX_SHM_ID) {
-		snprintf (jack_shm_registry[jack_shm_id_cnt++].name, sizeof (shm_name_t), "%s", shm_name);
-		jack_shm_registry[jack_shm_id_cnt].address = addr;
-	}
-}
-
-static int
-jack_initialize_shm ()
-{
-	void *addr;
-
-	if (jack_shm_registry != NULL) {
-		return 0;
-	}
-
-	/* grab a chunk of memory to store shm ids in. this is 
-	   to allow our parent to clean up all such ids when
-	   if we exit. otherwise, they can get lost in crash
-	   or debugger driven exits.
-	*/
-	
-	if ((addr = jack_get_shm ("/jack-shm-registry", sizeof (jack_shm_registry_entry_t) * MAX_SHM_ID, 
-				  O_RDWR|O_CREAT|O_TRUNC, 0600, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
-		return -1;
-	}
-
-	jack_shm_registry = (jack_shm_registry_entry_t *) addr;
-	jack_shm_id_cnt = 0;
-	
-	jack_register_shm("/jack-shm-registry", addr);
-
-	return 0;
-}
-
-void
-jack_cleanup_shm ()
-{
-	int i;
-
-	for (i = 0; i < jack_shm_id_cnt; i++) {
-		shm_unlink (jack_shm_registry[i].name);
-	}
-}
-
-static char *
-jack_resize_shm (const char *shm_name, size_t size, int perm, int mode, int prot)
-{
-	int i;
-	int shm_fd;
-	char *addr;
-	struct stat statbuf;
-
-	for (i = 0; i < jack_shm_id_cnt; ++i) {
-		if (strcmp (jack_shm_registry[i].name, shm_name) == 0) {
-			break;
-		}
-	}
-
-	if (i == jack_shm_id_cnt) {
-		jack_error ("attempt to resize unknown shm segment \"%s\"", shm_name);
-		return MAP_FAILED;
-	}
-
-	if ((shm_fd = shm_open (shm_name, perm, mode)) < 0) {
-		jack_error ("cannot create shm segment %s (%s)", shm_name, strerror (errno));
-		return MAP_FAILED;
-	}
-
-	fstat (shm_fd, &statbuf);
-	
-	munmap (jack_shm_registry[i].address, statbuf.st_size);
-
-	if (perm & O_CREAT) {
-		if (ftruncate (shm_fd, size) < 0) {
-			jack_error ("cannot set size of engine shm registry (%s)", strerror (errno));
-			return MAP_FAILED;
-		}
-	}
-		
-	if ((addr = mmap (0, size, prot, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
-		jack_error ("cannot mmap shm segment %s (%s)", shm_name, strerror (errno));
-		shm_unlink (shm_name);
-		close (shm_fd);
-		return MAP_FAILED;
-	}
-
-	close (shm_fd);
-	return addr;
-}
-
 void
 jack_cleanup_files ()
 {
@@ -408,6 +306,7 @@ jack_resize_port_segment (jack_engine_t *engine, jack_port_type_info_t *port_typ
 	size_t offset;
 	size_t one_buffer;
 	size_t size;
+	int shmid;
 
 	if (port_type->buffer_scale_factor < 0) {
 		one_buffer = port_type->buffer_size;
@@ -422,13 +321,13 @@ jack_resize_port_segment (jack_engine_t *engine, jack_port_type_info_t *port_typ
 		snprintf (port_type->shm_info.shm_name, sizeof(port_type->shm_info.shm_name), "/jck-[%s]", port_type->type_name);
 
 		if ((addr = jack_get_shm (port_type->shm_info.shm_name, size, 
-					  (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
+					  (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE, &shmid)) == MAP_FAILED) {
 			jack_error ("cannot create new port segment of %d bytes, shm_name = %s (%s)", 
 				    size, port_type->shm_info.shm_name, strerror (errno));
 			return -1;
 		}
 		
-		jack_register_shm (port_type->shm_info.shm_name, addr);
+		jack_register_shm (port_type->shm_info.shm_name, addr, shmid);
 		port_type->shm_info.address = addr;
 
 	} else {
@@ -743,15 +642,12 @@ jack_calc_cpu_load(jack_engine_t *engine)
 
 }
 
-static void*
-jack_removal_thread (void *arg)
+static void
+jack_remove_clients (jack_engine_t* engine)
 {
 	JSList *tmp, *node;
 	int need_sort = FALSE;
-	jack_engine_t* engine = (jack_engine_t*) arg;
 	jack_client_internal_t *client;
-	
-	fprintf (stderr, "@_@_@_@_@ REMOVAL THREAD\n");
 	
 	/* remove all dead clients */
 
@@ -765,7 +661,7 @@ jack_removal_thread (void *arg)
 			
 			/* if we have a communication problem with the client,
 			   remove it. otherwise, turn it into a zombie. the client
-			   will/should realize this and will close it sockets.
+			   will/should realize this and will close its sockets.
 			   then we'll end up back here again and will finally
 			   remove the client.
 			*/
@@ -798,19 +694,15 @@ jack_removal_thread (void *arg)
 	}
 	
 	jack_engine_reset_rolling_usecs (engine);
-	jack_unlock_graph (engine);
-
-	return 0;
 }
 
-static int
+static void
 jack_engine_post_process (jack_engine_t *engine)
 {
 	jack_client_control_t *ctl;
 	jack_client_internal_t *client;
 	JSList *node;
 	int need_remove = FALSE;
-	int ret;
 
 	/* maintain the current_time.usecs and frame_rate values, since clients
 	   are not permitted to set these.
@@ -848,17 +740,10 @@ jack_engine_post_process (jack_engine_t *engine)
 	}
 	
 	if (need_remove) {
-		pthread_t removal_thread;
-		pthread_create (&removal_thread, NULL, jack_removal_thread, engine);
-		pthread_detach (removal_thread);
-		ret = 1;
-	} else {
-		ret = 0;
+		jack_remove_clients (engine);
 	}
 
 	jack_calc_cpu_load (engine);
-
-	return ret;
 }
 
 static int
@@ -1061,8 +946,6 @@ jack_load_driver (jack_engine_t *engine, char *so_name)
 
 	info->client_name = (char *) dlsym (info->handle, "driver_client_name");
 
-	fprintf (stderr, "driver client name = [%s]\n", info->client_name);
-
 	if ((errstr = dlerror ()) != 0) {
 		jack_error ("no client name in in shared driver object %s", path_to_so);
 		goto fail;
@@ -1130,7 +1013,9 @@ handle_unload_client (jack_engine_t *engine, int client_fd, jack_client_connect_
 
 	res.status = -1;
 
-	fprintf (stderr, "unloading client \"%s\"\n", req->name);
+	if (engine->verbose) {
+		fprintf (stderr, "unloading client \"%s\"\n", req->name);
+	}
 
 	jack_lock_graph (engine);
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
@@ -1749,6 +1634,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	jack_engine_t *engine;
 	void *addr;
 	unsigned int i;
+	int shmid;
 #ifdef USE_CAPABILITIES
 	uid_t uid = getuid ();
 	uid_t euid = geteuid ();
@@ -1799,12 +1685,12 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	}
 
 	if ((addr = jack_get_shm (engine->control_shm_name, engine->control_size, 
-				  O_RDWR|O_CREAT|O_TRUNC, 0644, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
+				  O_RDWR|O_CREAT|O_TRUNC, 0644, PROT_READ|PROT_WRITE, &shmid)) == MAP_FAILED) {
 		jack_error ("cannot create engine control shared memory segment (%s)", strerror (errno));
 		return 0;
 	}
 
-	jack_register_shm (engine->control_shm_name, addr);
+	jack_register_shm (engine->control_shm_name, addr, shmid);
 	
 	engine->control = (jack_control_t *) addr;
 	engine->control->engine = engine;
@@ -2007,12 +1893,6 @@ jack_engine_notify_clients_about_delay (jack_engine_t *engine)
 	jack_unlock_graph (engine);
 }
 
-#if defined(linux)
-static inline jack_time_t jack_get_wait_timestamp (jack_engine_t *engine) {
-	return engine->driver->last_wait_ust;
-}
-#endif
-
 static inline void
 jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
 {
@@ -2023,7 +1903,7 @@ jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
 
 	time->guard1++;
 	time->frames += amount;
-	time->stamp = jack_get_wait_timestamp (engine);
+	time->stamp = engine->driver->last_wait_ust;
 
 	// atomic_inc (&time->guard2, 1);
 	// might need a memory barrier here
@@ -2074,7 +1954,6 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes, float delayed_use
 
 	if (jack_try_lock_graph (engine)) {
 		/* engine can't run. just throw away an entire cycle */
-		fprintf (stderr, "#*#*#*#*# NULL CYCLE\n");
 		driver->null_cycle (driver, nframes);
 		return 0;
 	}
@@ -2086,24 +1965,18 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes, float delayed_use
 	if (jack_engine_process (engine, nframes)) {
 		driver->stop (driver);
 		restart = 1;
-		fprintf (stderr, "restart\n");
 	} else {
 		if (driver->write (driver, nframes)) {
 			goto unlock;
 		}
 	}
 
-	if ((ret = jack_engine_post_process (engine)) > 0) {
-		ret = 0; 
-		goto maybe_restart;  /* leave engine locked */
-	}
-
+	jack_engine_post_process (engine);
 	ret = 0;
 
   unlock:
 	jack_unlock_graph (engine);
 	
-  maybe_restart:
 	if (restart) {
 		driver->start (driver);
 	}
@@ -2225,6 +2098,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 {
 	jack_client_internal_t *client;
 	shm_name_t shm_name;
+	int shmid;
 	int shm_fd = 0;
 	void *addr = 0;
 
@@ -2237,11 +2111,11 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 
 		snprintf (shm_name, sizeof (shm_name), "/jack-c-%s", req->name);
 		if ((addr = jack_get_shm (shm_name, sizeof (jack_client_control_t), 
-					  (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
+					  (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE, &shmid)) == MAP_FAILED) {
 			jack_error ("cannot create client control block for %s", req->name);
 			return 0;
 		}
-		jack_register_shm (shm_name, addr);
+		jack_register_shm (shm_name, addr, shmid);
 		break;
 	}
 
@@ -2321,7 +2195,7 @@ static void
 jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
 	if (engine->verbose) {
-		fprintf (stderr, "senor %s - you are a zombie\n", client->control->name);
+		fprintf (stderr, "*&*&*&*&** senor %s - you are a ZOMBIE\n", client->control->name);
 	}
 
 	/* caller must hold the client_lock */
@@ -2403,8 +2277,8 @@ jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 		jack_client_unload (client);
 		free ((char *) client->control);
 	} else {
-		munmap ((void*) client->control, sizeof (*client->control));
-		shm_unlink (client->shm_name);
+		jack_destroy_shm (client->shm_name);
+		jack_release_shm ((char*)client->control, sizeof (jack_client_control_t));
 		close (client->shm_fd);
 	}
 
@@ -2470,7 +2344,6 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 	/* caller must hold the graph lock */
 
 	DEBUG ("delivering event (type %d)", event->type);
-	fprintf (stderr, "delivering event %d to client %s\n", event->type, client->control->name);
 
 	if (client->control->dead) {
 		return 0;

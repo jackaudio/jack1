@@ -1,6 +1,7 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
 SOURCE_FILES = \
+	     shm.c \
 	     client.c \
 	     driver.c \
 	     pool.c \

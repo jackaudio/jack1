@@ -13,8 +13,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=67
-JACK_MICRO_VERSION=3
+JACK_MINOR_VERSION=68
+JACK_MICRO_VERSION=0
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -77,14 +77,28 @@ AC_C_BIGENDIAN
 AC_CHECK_HEADERS(string.h strings.h)
 
 AC_CHECK_FUNC(getopt_long, , AC_MSG_ERROR([GNU getopt is required to build jack]))
-
 AC_CHECK_FUNC(gethostent, , AC_CHECK_LIB(nsl, gethostent))
 AC_CHECK_FUNC(setsockopt, , AC_CHECK_LIB(socket, setsockopt))
 AC_CHECK_FUNC(connect, , AC_CHECK_LIB(inet, connect))
-
 AC_CHECK_FUNCS(on_exit atexit)
 
-JACK_CORE_CFLAGS='-I$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall'
+dnl
+dnl look for system support for POSIX shm API
+dnl XXX this could probably be improved
+dnl
+
+AC_MSG_CHECKING([POSIX shm support (compile time)])
+df | grep -s /dev/shm >/dev/null 2>&1
+if test $? = 0 ; then
+   SHM_FLAGS=-DUSE_POSIX_SHM
+   AC_MSG_RESULT([found.
+	JACK will use shm_open() and friends])
+else
+   AC_MSG_RESULT([not found. 
+	JACK will use System V shm API (shmget() and friends])
+fi
+
+JACK_CORE_CFLAGS="-I\$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall $SHM_FLAGS"
 
 JACK_CFLAGS="$JACK_CORE_CFLAGS -g"
 JACK_OPT_CFLAGS="$JACK_CORE_CFLAGS -O3 -fomit-frame-pointer -ffast-math -fstrength-reduce -funroll-loops -fmove-all-movables"

@@ -42,6 +42,7 @@
 #include <jack/time.h>
 #include <jack/jslist.h>
 #include <jack/version.h>
+#include <jack/shm.h>
 
 #include "local.h"
 
@@ -73,40 +74,6 @@ typedef struct {
     const char *client_name;
 } client_info;
 
-void
-jack_unlink_shm (const char *shm_name)
-{
-	shm_unlink (shm_name);
-}
-
-char *
-jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot)
-{
-	int shm_fd;
-	char *addr;
-
-	if ((shm_fd = shm_open (shm_name, perm, mode)) < 0) {
-		jack_error ("cannot create shm segment %s (%s)", shm_name, strerror (errno));
-		return MAP_FAILED;
-	}
-
-	if (perm & O_CREAT) {
-		if (ftruncate (shm_fd, size) < 0) {
-			jack_error ("cannot set size of engine shm registry (%s)", strerror (errno));
-			return MAP_FAILED;
-		}
-	}
-
-	if ((addr = mmap (0, size, prot, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
-		jack_error ("cannot mmap shm segment %s (%s)", shm_name, strerror (errno));
-		shm_unlink (shm_name);
-		close (shm_fd);
-		return MAP_FAILED;
-	}
-
-	close (shm_fd);
-	return addr;
-}
 
 void 
 jack_error (const char *fmt, ...)
@@ -484,6 +451,7 @@ jack_client_new (const char *client_name)
 	jack_client_t *client;
 	void *addr;
 	int i;
+	int shmid;
 	jack_port_type_info_t* type_info;
 
 	/* external clients need this initialized; internal clients
@@ -507,7 +475,7 @@ jack_client_new (const char *client_name)
 	/* attach the engine control/info block */
 
 	if ((addr = jack_get_shm (res.control_shm_name, res.control_size, O_RDWR, 
-				  0, (PROT_READ|PROT_WRITE))) == MAP_FAILED) {
+				  0, (PROT_READ|PROT_WRITE), &shmid)) == MAP_FAILED) {
 		jack_error ("cannot attached engine control shared memory segment");
 		goto fail;
 	}
@@ -518,7 +486,7 @@ jack_client_new (const char *client_name)
 	/* now attach the client control block */
 
 	if ((addr = jack_get_shm (res.client_shm_name, sizeof (jack_client_control_t), O_RDWR, 
-				  0, (PROT_READ|PROT_WRITE))) == MAP_FAILED) {
+				  0, (PROT_READ|PROT_WRITE), &shmid)) == MAP_FAILED) {
 		jack_error ("cannot attached client control shared memory segment");
 		goto fail;
 	}
@@ -526,10 +494,11 @@ jack_client_new (const char *client_name)
 	client->control = (jack_client_control_t *) addr;
 
 	/* nobody else needs to access this shared memory any more, so 
-	   unlink it.
+	   destroy it. because we have our own link to it, it won't vanish
+	   till we exit.
 	*/
 
-	jack_unlink_shm (res.client_shm_name);
+	jack_destroy_shm (res.client_shm_name);
 
 	/* read incoming port type information so that we can get shared memory
 	   information for each one.
@@ -618,6 +587,7 @@ void
 jack_client_handle_new_port_type (jack_client_t *client, shm_name_t shm_name, size_t size, void* addr)
 {
 	jack_port_segment_info_t *si;
+	int shmid;
 
 	/* Lookup, attach and register the port/buffer segments in use
 	   right now.
@@ -625,7 +595,7 @@ jack_client_handle_new_port_type (jack_client_t *client, shm_name_t shm_name, si
 
 	if (client->control->type == ClientExternal) {
 		
-		if ((addr = jack_get_shm(shm_name, size, O_RDWR, 0, (PROT_READ|PROT_WRITE))) == MAP_FAILED) {
+		if ((addr = jack_get_shm(shm_name, size, O_RDWR, 0, (PROT_READ|PROT_WRITE), &shmid)) == MAP_FAILED) {
 			jack_error ("cannot attached port segment shared memory (%s)", strerror (errno));
 			return;
 		}
