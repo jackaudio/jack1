@@ -27,7 +27,6 @@ TODO for merging Mac OS X support
 - clean up other header files
   -- <sysdeps/poll.h>, fakepoll.h, etc.
   -- <sysdeps/ipc.h>, <sys/ipc.h> in shm.c
-  -- need config/os/generic/time.h implementation
 
 TODO before-1.0
 
