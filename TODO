@@ -22,8 +22,6 @@ send a change request to Kai Vehmanen (mailto:k_at_eca.cx).
 
 TODO for merging Mac OS X support
 
-- <sysdeps/atomicity.h>
-  -- fix cpu/generic/atomicity.h:36:#include <bits/gthr.h>
 - clean up other header files
   -- <sysdeps/poll.h>, fakepoll.h, etc.
   -- <sysdeps/ipc.h>, <sys/ipc.h> in shm.c
