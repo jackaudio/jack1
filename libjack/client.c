@@ -969,11 +969,7 @@ jack_client_thread (void *arg)
 	    if (pthread_getschedparam(pthread_self(), &policy, &self_param)
 		== 0) {
 		if (policy != SCHED_FIFO) {
-		    /*
-		    jack_error ("Client thread was not created with SCHED_FIFO "
-				"scheduling, exiting thread\n");
-		    */
-		    pthread_exit(1);
+		    pthread_exit (0);
 		}
 	    }
 	}

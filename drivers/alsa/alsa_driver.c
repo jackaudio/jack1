@@ -2196,7 +2196,7 @@ driver_get_descriptor ()
 	params[i].type       = JackDriverParamString;
 	strcpy (params[i].value.str, "none");
 	strcpy (params[i].short_desc,
-		"Provide only capture ports.  Optionally set device");
+		"Provide capture ports.  Optionally set device");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
 	i++;
@@ -2205,7 +2205,7 @@ driver_get_descriptor ()
 	params[i].type       = JackDriverParamString;
 	strcpy (params[i].value.str, "none");
 	strcpy (params[i].short_desc,
-		"Provide only playback ports.  Optionally set device");
+		"Provide playback ports.  Optionally set device");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
 	i++;

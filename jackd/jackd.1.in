@@ -1,4 +1,4 @@
-.TH JACKD "1" @VERSION@ "April 2004"
+.TH JACKD "1" @VERSION@ "July 2004"
 .SH NAME
 jackd, jackstart \- JACK Audio Connection Kit sound server
 .SH SYNOPSYS
@@ -84,7 +84,8 @@ Print the current JACK version number and exit.
 .SS ALSA DRIVER OPTIONS
 .TP
 \fB\-C, \-\-capture\fR [ \fIname\fR ]
-Provide only capture ports.  Optionally set device name.
+Provide only capture ports, unless combined with \-D or \-P.  Optionally set 
+capture device name.
 .TP
 \fB\-d, \-\-device \fIname\fR
 .br
@@ -96,7 +97,8 @@ Set dithering mode.  If \fBnone\fR or unspecified, dithering is off.
 Only the first letter of the mode name is required.
 .TP
 \fB\-D, \-\-duplex\fR
-Provide both capture and playback ports (the default).
+Provide both capture and playback ports.  Defaults to on unless only one 
+of \-P or \-C is specified.
 .TP
 \fB\-h, \-\-help\fR Print a brief usage message describing only the
 \fBalsa\fR driver options.
@@ -143,7 +145,8 @@ the JACK buffer size in bytes.  The JACK output latency in seconds is
 Number of playback channels.  Default is maximum supported by hardware.
 .TP
 \fB\-P, \-\-playback\fR [ \fIname\fR ]
-Provide only playback ports.  Optionally set device name.
+Provide only playback ports, unless combined with \-D or \-C.  Optionally set 
+playback device name.
 .TP
 \fB\-p, \-\-period \fIint\fR
 .br
@@ -207,6 +210,15 @@ by the ALSA driver will be ignored.  The larger buffer helps reduce
 data loss.  Rectangular dithering will be used for playback.
 .IP 
 \fBjackd \-d alsa \-d hw:1 \-p2048 \-n3 \-\-softmode \-zr\fR
+.PP
+Run \fBjackd\fR in full-duplex mode using the ALSA hw:0,0 device for 
+playback and the hw:0,2 device for capture.
+.IP 
+\fBjackd \-d alsa \-P hw:0,0 \-C hw:0,2\fR
+.PP
+Run \fBjackd\fR in playback-only mode using the ALSA hw:0,0 device. 
+.IP 
+\fBjackd \-d alsa \-P hw:0,0\fR
 .SH ENVIRONMENT
 .br
 JACK is evolving a mechanism for automatically starting the server
