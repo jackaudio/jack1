@@ -81,8 +81,22 @@ static OSStatus get_device_id_from_num(int i, AudioDeviceID * id)
 int coreaudio_runCycle(void *driver, long bufferSize)
 {
     coreaudio_driver_t *ca_driver = (coreaudio_driver_t *) driver;
-    ca_driver->last_wait_ust = jack_get_microseconds();
-    return ca_driver->engine->run_cycle(ca_driver->engine, bufferSize, 0);
+	if (ca_driver->xrun_detected > 0) { /* XRun was detected */
+		jack_time_t current_time = jack_get_microseconds();
+		ca_driver->engine->delay(ca_driver->engine, current_time - (ca_driver->last_wait_ust + ca_driver->period_usecs));
+		ca_driver->last_wait_ust = current_time;
+		ca_driver->xrun_detected = 0;
+		return 0;
+    }else{
+		ca_driver->last_wait_ust = jack_get_microseconds();
+		return ca_driver->engine->run_cycle(ca_driver->engine, bufferSize, 0);
+	}
+}
+
+void coreaudio_XRun(void *driver, float delayed_usecs)
+{
+    coreaudio_driver_t *ca_driver = (coreaudio_driver_t *) driver;
+	ca_driver->xrun_detected = 1;
 }
 
 static int
@@ -375,6 +389,7 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     driver->frame_rate = rate;
     driver->capturing = capturing;
     driver->playing = playing;
+	driver->xrun_detected = 0;
 
     driver->attach = (JackDriverAttachFunction) coreaudio_driver_attach;
     driver->detach = (JackDriverDetachFunction) coreaudio_driver_detach;
@@ -412,6 +427,7 @@ static jack_driver_t *coreaudio_driver_new(char *name,
 
     setHostData(driver->stream, driver);
     setCycleFun(driver->stream, coreaudio_runCycle);
+	setXRunFun(driver->stream, coreaudio_XRun);
     setParameter(driver->stream, 'inte', &driver->isInterleaved);
     setParameter(driver->stream, 'nstr', &driver->numberOfInputStreams);
     setParameter(driver->stream, 'nstO', &driver->numberOfOuputStreams);

@@ -111,6 +111,14 @@ void setCycleFun(void *instance, JackRunCyclePtr fun)
     }
 }
 
+void setXRunFun(void *instance, JackXRunPtr fun)
+{
+    if (instance) {
+		AudioRender *inst = (AudioRender *) instance;
+		inst->f_JackXRun = fun;
+    }
+}
+
 void setParameter(void *instance, int id, void *data)
 {
     if (instance) {

@@ -25,7 +25,8 @@
  */
 
 typedef int (*JackRunCyclePtr) (void *driver, long bufferSize);
-
+typedef void (*JackXRunPtr) (void* driver, float delayed_usecs);
+ 
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -41,6 +42,7 @@ extern "C" {
     void *getHostData(void *instance);
     void setHostData(void *instance, void *hostData);
     void setCycleFun(void *instance, JackRunCyclePtr fun);
+	void setXRunFun(void *instance, JackXRunPtr fun);
     void setParameter(void *instance, int id, void *data);
 
 #ifdef __cplusplus

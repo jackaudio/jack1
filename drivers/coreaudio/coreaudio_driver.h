@@ -59,6 +59,8 @@ typedef struct {
     int *channelsPerInputStream, *channelsPerOuputStream;
     char driver_name[256];
     void *stream;
+	
+	int xrun_detected;
 
 } coreaudio_driver_t;
 
