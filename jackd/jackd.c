@@ -220,9 +220,13 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 	char * filename;
 	const char * dlerr;
 	int err;
+	char* driver_dir;
 
-	filename = malloc (strlen (ADDON_DIR) + 1 + strlen (sofile) + 1);
-	sprintf (filename, "%s/%s", ADDON_DIR, sofile);
+	if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
+		driver_dir = ADDON_DIR;
+	}
+	filename = malloc (strlen (driver_dir) + 1 + strlen (sofile) + 1);
+	sprintf (filename, "%s/%s", driver_dir, sofile);
 
 
 	if (verbose) {
@@ -285,12 +289,17 @@ jack_drivers_load ()
 	int err;
 	JSList * driver_list = NULL;
 	jack_driver_desc_t * desc;
+	char* driver_dir;
 
-	/* search through the ADDON_DIR and add get descriptors
+	if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
+		driver_dir = ADDON_DIR;
+	}
+
+	/* search through the driver_dir and add get descriptors
 	   from the .so files in it */
-	dir_stream = opendir (ADDON_DIR);
+	dir_stream = opendir (driver_dir);
 	if (!dir_stream) {
-		jack_error ("could not open driver directory %s: %s\n", ADDON_DIR, strerror (errno));
+		jack_error ("could not open driver directory %s: %s\n", driver_dir, strerror (errno));
 		return NULL;
 	}
   
@@ -318,11 +327,11 @@ jack_drivers_load ()
 
 	err = closedir (dir_stream);
 	if (err) {
-		jack_error ("error closing driver directory %s: %s\n", ADDON_DIR, strerror (errno));
+		jack_error ("error closing driver directory %s: %s\n", driver_dir, strerror (errno));
 	}
 
 	if (!driver_list) {
-		jack_error ("could not find any drivers in %s!\n", ADDON_DIR);
+		jack_error ("could not find any drivers in %s!\n", driver_dir);
 		return NULL;
 	}
 
