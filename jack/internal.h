@@ -160,10 +160,10 @@ typedef enum  {
   XRun,
   StartFreewheel,
   StopFreewheel
-} EventType;
+} JackEventType;
 
 typedef struct {
-    EventType type;
+    JackEventType type;
     union {
 	uint32_t n;
 	jack_port_id_t port_id;
