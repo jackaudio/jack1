@@ -512,6 +512,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	unsigned int p_nfragments = 0;
 	unsigned int c_nfragments = 0;
 	channel_t chn;
+	unsigned int pr = 0;
+	unsigned int cr = 0;
 
 	driver->frame_rate = rate;
 	driver->frames_per_cycle = frames_per_cycle;
@@ -551,6 +553,30 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 		}
 	}
 	
+	/* check the rate, since thats rather important */
+
+	if (driver->playback_handle) {
+		int dir;
+		pr = snd_pcm_hw_params_get_rate (driver->playback_hw_params, &dir);
+	}
+
+	if (driver->capture_handle) {
+		int dir;
+		cr = snd_pcm_hw_params_get_rate (driver->capture_hw_params, &dir);
+	}
+
+	if (cr != pr) {
+		jack_error ("playback and capture sample rates do not match (%d vs. %d)",
+			    pr, cr);
+		return -1;
+	}
+	
+	if (cr != driver->frame_rate) {
+		jack_error ("sample rate in use (%d Hz) does not match requested rate (%d Hz)",
+			    cr, driver->frame_rate);
+		driver->frame_rate = cr;
+	}
+
 	/* check the fragment size, since thats non-negotiable */
 	
 	if (driver->playback_handle) {
@@ -2383,6 +2409,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 
 		case 'r':
 		        srate = param->value.ui;
+			fprintf (stderr, "apparent rate = %d\n", srate);
 		        break;
 			
 		case 'p':
