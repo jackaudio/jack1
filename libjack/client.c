@@ -705,15 +705,7 @@ jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 	} else {
 
 		/* release any previous segment */
-		
-#if JACK_USE_MACH_THREADS 
-		/* Stephane Letz : letz@grame.fr
-		Need a fix : this crash on MacOSX : temporary removed 
 		jack_release_shm (&client->port_segment[ptid]);
-		*/
-#else
-		jack_release_shm (&client->port_segment[ptid]);
-#endif
 	}
 
 	/* get the index into the shm registry */
