@@ -1,3 +1,7 @@
+2003-05-09  Jack O'Quin  <joq@io.com>
+
+	* Added new jack_is_realtime() function.
+
 2003-02-23  Paul Davis  <paul>
 
 	* client.c: 
