@@ -15,7 +15,7 @@ AM_CFLAGS = $(JACK_CFLAGS) -DJACKD_LOCATION=\"$(bindir)/jackd\" $(GLIB_CFLAGS)
 jackd_SOURCES = jackd.c engine.c
 jackd_LDADD = ../libjack/libjack.la -lm -ldl -lpthread $(GLIB_LIBS) $(CAP_LIBS)
 
-noinst_HEADERS = jack_md5.h md5.h
+noinst_HEADERS = jack_md5.h md5.h md5_loc.h
 
 BUILT_SOURCES = jack_md5.h
 
