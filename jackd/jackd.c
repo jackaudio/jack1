@@ -405,6 +405,8 @@ main (int argc, char *argv[])
 	int status;
 #endif
 
+	setvbuf (stdout, NULL, _IOLBF, 120);
+
 #ifdef USE_CAPABILITIES
 
 	/* check to see if there is a pipe in the right descriptor */
