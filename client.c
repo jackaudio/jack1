@@ -1672,3 +1672,49 @@ jack_port_connected_to_port (const jack_port_t *port, const jack_port_t *other_p
 	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
 	return ret;
 }
+
+/* TRANSPORT CONTROL */
+
+int
+jack_get_transport_info (jack_client_t *client,
+			 jack_transport_info_t *info)
+{
+	jack_time_info_t *time_info = &client->engine->time;
+	
+	if (info->valid & JackTransportState) {
+		info->state = time_info->transport_state;
+	}
+	
+	if (info->valid & JackTransportPosition) {
+		info->position = time_info->frame;
+	}
+
+	if (info->valid & JackTransportLoop) {
+		info->loop_start = time_info->loop_start;
+		info->loop_end = time_info->loop_end;
+	}
+
+	return 0;
+}
+
+int
+jack_set_transport_info (jack_client_t *client,
+			 jack_transport_info_t *info)
+{
+	jack_time_info_t *time_info = &client->engine->time;
+	
+	if (info->valid & JackTransportState) {
+		time_info->transport_state = info->state;
+	}
+
+	if (info->valid & JackTransportPosition) {
+		time_info->frame = info->position;
+	}
+
+	if (info->valid & JackTransportLoop) {
+		time_info->loop_start = info->loop_start;
+		time_info->loop_end = info->loop_end;
+	}
+
+	return 0;
+}	

@@ -33,6 +33,7 @@
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/port.h>
+#include <jack/transport.h>
 
 typedef void * dlhandle;
 
@@ -51,7 +52,11 @@ typedef struct _time_info
     nframes_t frame;
     nframes_t frame_rate;
     unsigned long microseconds;
+    jack_transport_state_t transport_state;
+    nframes_t loop_start;
+    nframes_t loop_end;
 
+#if 0
     double ppqPos;        // 1 ppq
     double tempo;         // in bpm
     double barStartPos;   // last bar start, in 1 ppq
@@ -64,11 +69,13 @@ typedef struct _time_info
     long smpteFrameRate;  // 0:24, 1:25, 2:29.97, 3:30, 4:29.97 df, 5:30 df
     long samplesToNextClock; // midi clock resolution (24 ppq), can be negative
     long flags;     // see below
-} time_info;
+#endif
+    
+} jack_time_info_t;
 
 typedef struct {
 
-    time_info           time;
+    jack_time_info_t    time;
     pid_t               engine_pid;
     unsigned long       buffer_size;
     char                real_time;

@@ -9,7 +9,7 @@ SUBDIRS = jack
 EXTRA_PROGRAMS = jack_fltk_client jackrec
 
 bin_PROGRAMS = jackd jack_simple_client jack_monitor_client \
-	jack_impulse_grabber @XTRA@
+	jack_impulse_grabber jack_connect jack_disconnect @XTRA@
 
 AM_CFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" @GLIB_CFLAGS@
 
@@ -22,6 +22,14 @@ jackd_LDADD = libjack.la
 jack_simple_client_SOURCES = simple_client.c
 jack_simple_client_LDFLAGS = -ldl -lpthread
 jack_simple_client_LDADD = libjack.la
+
+jack_connect_SOURCES = connect.c
+jack_connect_LDFLAGS = -ldl -lpthread
+jack_connect_LDADD = libjack.la
+
+jack_disconnect_SOURCES = connect.c
+jack_disconnect_LDFLAGS = -ldl -lpthread
+jack_disconnect_LDADD = libjack.la
 
 jack_monitor_client_SOURCES = monitor_client.c
 jack_monitor_client_LDFLAGS = -ldl -lpthread

@@ -1878,9 +1878,11 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 	        client = (jack_client_internal_t *) clientnode->data;
 		ctl = client->control;
 
-		fprintf (stderr, "client #%d: %s\n",
+		fprintf (stderr, "client #%d: %s (type: %d, process? %s)\n",
 			 ++n,
-			 ctl->name);
+			 ctl->name,
+			 ctl->type,
+			 ctl->process ? "yes" : "no");
 		
 		for(m = 0, portnode = client->ports; portnode; portnode = g_slist_next (portnode)) {
 		        port = (jack_port_internal_t *) portnode->data;

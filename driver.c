@@ -18,6 +18,7 @@
     $Id$
 */
 
+#include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -51,7 +52,6 @@ jack_driver_t *
 jack_driver_load (int argc, char **argv)
 
 {
-	va_list ap;
 	const char *errstr;
 	dlhandle handle;
 	jack_driver_t *driver;
@@ -69,7 +69,6 @@ jack_driver_load (int argc, char **argv)
 		} else {
 			jack_error ("bizarre error loading driver shared object %s", path_to_so);
 		}
-		va_end (ap);
 		return 0;
 	}
 
@@ -78,7 +77,6 @@ jack_driver_load (int argc, char **argv)
 	if ((errstr = dlerror ()) != 0) {
 		jack_error ("no initialize function in shared object %s\n", path_to_so);
 		dlclose (handle);
-		va_end (ap);
 		return 0;
 	}
 
