@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=98
-JACK_MICRO_VERSION=1
+JACK_MICRO_VERSION=1beta2
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -112,12 +112,16 @@ AC_CHECK_HEADER(/usr/include/nptl/pthread.h,
 
 # functions and libraries
 AC_CHECK_FUNC(getopt_long, [],
-	AC_MSG_ERROR([GNU getopt is required to build jack]))
+    AC_MSG_ERROR([*** JACK requires GNU getopt_long]))
 AC_CHECK_FUNC(gethostent, [], AC_CHECK_LIB(nsl, gethostent))
 AC_CHECK_FUNC(setsockopt, [], AC_CHECK_LIB(socket, setsockopt))
 AC_CHECK_FUNC(connect, [], AC_CHECK_LIB(inet, connect))
-AC_CHECK_FUNC(dlopen, [], AC_CHECK_LIB(dl, dlopen))
-AC_CHECK_FUNC(pthread_create, [], AC_CHECK_LIB(pthread, pthread_create))
+AC_CHECK_FUNC(dlopen, [], 
+    AC_CHECK_LIB(dl, dlopen, [],
+	AC_MSG_ERROR([*** JACK requires dynamic load support])))
+AC_CHECK_FUNC(pthread_create, [],
+    AC_CHECK_LIB(pthread, pthread_create, [],
+	AC_MSG_ERROR([*** JACK requires POSIX threads support])))
 AC_CHECK_FUNCS(on_exit atexit)
 AC_CHECK_FUNCS(posix_memalign)
 AC_CHECK_LIB(m, sin)
