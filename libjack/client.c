@@ -875,10 +875,11 @@ jack_internal_client_new (const char *client_name, const char *so_name, const ch
 {
 	jack_client_connect_result_t res;
 	int req_fd;
+	jack_status_t status;
 	
 	return jack_request_client (ClientInternal, client_name, so_name,
 				    so_data, &res, &req_fd,
-				    0, NULL, NULL, NULL);
+				    0, &status, NULL, NULL);
 }
 
 void

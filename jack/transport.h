@@ -76,8 +76,8 @@ typedef struct {
     int32_t		tick;		/**< current tick-within-beat */
     double		bar_start_tick;            
 
-    float		beats_per_bar;
-    float		beat_type;
+    float		beats_per_bar;	/**< time signature "numerator" */
+    float		beat_type;	/**< time signature "denominator" */
     double		ticks_per_beat;
     double		beats_per_minute;
 

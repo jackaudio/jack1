@@ -30,7 +30,7 @@
  * signature is "march time": 4/4, 120bpm
  */
 float time_beats_per_bar = 4.0;
-float time_beat_type = 1.0 / 4.0;
+float time_beat_type = 4.0;
 double time_ticks_per_beat = 1920.0;
 double time_beats_per_minute = 120.0;
 
@@ -133,7 +133,6 @@ jack_initialize (jack_client_t *client, const char *arg)
 		fprintf (stderr, "counting %.1f/%.1f at %.2f bpm\n",
 			 time_beats_per_bar, time_beat_type,
 			 time_beats_per_minute);
-		time_beat_type = 1.0 / time_beat_type;
 	} else {
 		int len = strlen(arg);
 		if ((len > 0) && (strncmp(arg, "timecode", len) == 0))

@@ -38,7 +38,7 @@ jack_client_t *client;
  * The default time signature is: "march time", 4/4, 120bpm
  */
 float time_beats_per_bar = 4.0;
-float time_beat_type = 0.25;
+float time_beat_type = 4.0;
 double time_ticks_per_beat = 1920.0;
 double time_beats_per_minute = 120.0;
 volatile int time_reset = 1;		/* true when time values change */
