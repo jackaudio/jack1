@@ -54,6 +54,7 @@ typedef long                 jack_port_id_t;
  * by the engine anytime there is work to be done.
  *
  * @pre nframes == jack_get_buffer_size()
+ * @pre nframes == pow(2,x)
  *
  * @param nframes number of frames to process
  * @param arg pointer to a client supplied structure
