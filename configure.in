@@ -14,7 +14,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=79
-JACK_MICRO_VERSION=1
+JACK_MICRO_VERSION=2
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -294,7 +294,6 @@ jackd/jackd.1
 libjack/Makefile
 drivers/Makefile
 drivers/alsa/Makefile
-drivers/solaris/Makefile
 drivers/dummy/Makefile
 example-clients/Makefile
 doc/Makefile
