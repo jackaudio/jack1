@@ -1580,7 +1580,7 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 	node = port->connections;
 	input = (jack_port_t *) node->data;
 	buffer = jack_port_buffer (port);
-
+	
 	memcpy (buffer, jack_port_buffer (input), sizeof (sample_t) * nframes);
 
 	for (node = g_slist_next (node); node; node = g_slist_next (node)) {

@@ -1894,10 +1894,12 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 			    connectionnode = g_slist_next (connectionnode)) {
 			        connection = (jack_connection_internal_t *) connectionnode->data;
 	
-				fprintf(stderr, "\t\t connection #%d: %s -> %s\n",
+				fprintf(stderr, "\t\t connection #%d: %s %s\n",
 					++o,
-					connection->source->shared->name,
-					connection->destination->shared->name);
+					(port->shared->flags & JackPortIsInput) ? "<-" : "->",
+					(port->shared->flags & JackPortIsInput) ?
+					  connection->source->shared->name :
+					  connection->destination->shared->name);
 			}
 		}
 	}
@@ -2361,11 +2363,16 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 	jack_port_internal_t *port;
 
 	if (req->x.port_info.port_id < 0 || req->x.port_info.port_id > engine->port_max) {
-		jack_error ("invalid port ID %d in unregister request\n", req->x.port_info.port_id);
+		jack_error ("invalid port ID %d in unregister request", req->x.port_info.port_id);
 		return -1;
 	}
 
 	shared = &engine->control->ports[req->x.port_info.port_id];
+
+	if (shared->client_id != req->x.port_info.client_id) {
+		jack_error ("Client %d is not allowed to remove port %s", req->x.port_info.client_id, shared->name);
+		return -1;
+	}
 
 	pthread_mutex_lock (&engine->graph_lock);
 	if ((client = jack_client_internal_by_id (engine, shared->client_id)) == NULL) {
