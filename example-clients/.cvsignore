@@ -18,3 +18,5 @@ jack_load
 jack_transport
 inprocess.la
 inprocess.lo
+intime.la
+intime.lo
