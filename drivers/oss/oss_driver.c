@@ -879,12 +879,20 @@ static void *io_thread (void *param)
 
 	if (pthread_getschedparam(pthread_self(), &schedpol, &schedp) == 0)
 	{
-		schedpol = SCHED_FIFO;
-		schedp.sched_priority = sched_get_priority_max(SCHED_FIFO) - 1;
-		if (pthread_setschedparam(pthread_self(), schedpol, 
-			&schedp) != 0)
+		if (schedpol != SCHED_FIFO)
 		{
-			puts("oss_driver: pthread_setschedparam() failed\n");
+			schedpol = SCHED_FIFO;
+			schedp.sched_priority = 
+				sched_get_priority_max(SCHED_FIFO) - 1;
+			if (pthread_setschedparam(pthread_self(), schedpol, 
+				&schedp) != 0)
+			{
+				puts("oss_driver: pthread_setschedparam() failed\n");
+			}
+		}
+		else
+		{
+			puts("oss_driver: already running SCHED_FIFO; no changes\n");
 		}
 	}
 	else
