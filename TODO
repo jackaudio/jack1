@@ -1,0 +1,20 @@
+TODO
+
+fix graph sorting to use same approach as in ARDOUR::Session for
+    routes
+
+figure out how to have pools of buffers for ports by type
+figure out how to use the same buffer over and over when possible
+
+passing args to drivers and clients?
+getting callbacks and args from dynamically loaded clients?
+how do dynamically loaded clients (un)register ports, activate, etc.
+pool based malloc for rt client-local mem allocation
+
+TO THINK ABOUT:
+
+multiple port buffer shm segments (i.e. dynamically
+         increase the total number of ports in the system)
+
+
+

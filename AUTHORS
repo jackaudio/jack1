@@ -1,0 +1,14 @@
+JACK was inspired by and partially designed during discussions on the
+Linux Audio Developers mailing list. Particularly significant
+contributions to those discussions came from (in alphabetical order):
+
+    Paul Davis
+    David Olofson
+    Benno Sennoner
+    Kai Vehamen
+
+Many other members of LAD contributed ideas to JACK.
+
+Paul Davis was the principal author of the JACK API and of the sample
+implementation contained here.
+

@@ -1,0 +1,64 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(client.c)
+
+AC_CONFIG_AUX_DIR(.)
+
+JACK_MAJOR_VERSION=0
+JACK_MINOR_VERSION=2
+JACK_MICRO_VERSION=4
+
+BETA=
+
+AC_SUBST(JACK_MAJOR_VERSION)
+AC_SUBST(JACK_MINOR_VERSION)
+AC_SUBST(JACK_MICRO_VERSION)
+
+JACK_SO_VERSION=${JACK_MAJOR_VERSION}:${JACK_MINOR_VERSION}:${JACK_MICRO_VERSION}${BETA}
+JACK_VERSION=$JACK_MAJOR_VERSION.$JACK_MINOR_VERSION.${JACK_MICRO_VERSION}${BETA}
+JACK_RELEASE=$JACK_MAJOR_VERSION-$JACK_MINOR_VERSION-${JACK_MICRO_VERSION}${BETA}
+
+AC_SUBST(JACK_SO_VERSION)
+AC_SUBST(JACK_VERSION)
+AC_SUBST(JACK_RELEASE)
+
+AM_INIT_AUTOMAKE(jack,${JACK_VERSION})
+
+CFLAGS="-g -Wall -I.. -D_REENTRANT"
+OPT_CFLAGS="-D_REENTRANT -O6 -Wall -fomit-frame-pointer -ffast-math -fstrength-reduce -funroll-loops -fmove-all-movables"
+
+AM_PATH_GLIB(1.0.0,,[AC_MSG_ERROR([*** JACK requires glib, but it doesn't appear to be installed])])
+
+CFLAGS="$CFLAGS $GLIB_CFLAGS"
+CXXFLAGS="$CFLAGS"
+LIBS="$LIBS $GLIB_LIBS"
+
+AC_ARG_ENABLE(optimize,
+     [  --enable-optimize       ask the compiler for its best optimizations.],
+     [ if test "x$enable_optimize" != "xno" ; then CFLAGS="$CFLAGS $OPT_CFLAGS" ; fi ])
+
+XTRA=""
+
+AC_ARG_ENABLE(fltk-client,
+     [  --enable-fltk-client    build the FLTK test client.])
+
+if test "x$enable_fltk_client" != "no" ; then
+     AC_CHECK_LIB(fltk,main,
+         [ XTRA="$XTRA jack_fltk_client" ],
+         [ AC_MSG_ERROR([*** you can't build the FLTK client without the FLTK library])],
+         [ -L/usr/X11R6/lib -lX11 -lXext ])
+fi	    
+
+AC_SUBST(XTRA)
+
+AC_PROG_CXX
+AC_PROG_LD
+AM_PROG_LIBTOOL
+
+dnl check for the libraries we need
+
+AC_OUTPUT(Makefile
+          jack.pc
+	  jack/Makefile)
+
+
+
