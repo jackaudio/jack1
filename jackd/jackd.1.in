@@ -29,12 +29,6 @@ For the latest JACK information, please consult the web site,
 <\fBhttp://jackit.sourceforge.net\fR>.
 .SH OPTIONS
 .TP
-\fB\-h, \-\-help\fR
-.br
-Print a brief usage message describing the main \fBjackd\fR options.
-These do not include driver options, which are obtained using the
-\fB\-\-help\fR option for that specific driver, instead.
-.TP
 \fB\-a, \-\-asio\fR
 .br
 Force absolute realtime behaviour on the system.  Rather than allowing
@@ -46,10 +40,16 @@ configuration where there are 2 periods per buffer (see
 need to enforce strict realtime limits.  It can be useful for testing
 the realtime behavior of a new JACK clients.
 .TP
-\fB\-t, \-\-timeout \fIint\fR
+\fB\-d, \-\-driver \fI driver \fR [ \fI driver-options \fR ] 
 .br
-Set client timeout limit in microseconds.  The default is 500 msec
-when not in realtime mode (see: \-R).
+Select the output driver.  The only \fIdriver\fR currently documented
+is \fBalsa\fR (see below).
+.TP
+\fB\-h, \-\-help\fR
+.br
+Print a brief usage message describing the main \fBjackd\fR options.
+These do not include driver options, which are obtained using the
+\fB\-\-help\fR option for that specific driver, instead.
 .TP
 \fB\-R, \-\-realtime\fR 
 .br
@@ -67,54 +67,42 @@ without running as root.
 When running \fB\-\-realtime\fR, set the scheduler priority to
 \fIint\fR.
 .TP
-\fB\-D, \-\-tmpdir \fIdirectory\fR
-Set the \fIdirectory\fR to use for temporary files.
+\fB\-\-silent\fR
+Stops any output during operation.
+.TP
+\fB\-t, \-\-timeout \fIint\fR
+.br
+Set client timeout limit in microseconds.  The default is 500 msec
+when not in realtime mode (see: \-R).
 .TP
 \fB\-v, \-\-verbose\fR
 Give verbose output.
 .TP
 \fB\-V, \-\-version\fR
 Print the current JACK version number and exit.
-.TP
-\fB\-d, \-\-driver \fI driver \fR [ \fI driver-options \fR ] 
-.br
-Select the output driver.  The only \fIdriver\fR currently documented
-is \fBalsa\fR (see below).
 .SS ALSA DRIVER OPTIONS
 .TP
-\fB\-h, \-\-help\fR Print a brief usage message describing only the
-\fBalsa\fR driver options.
+\fB\-C, \-\-capture\fR [ \fIname\fR ]
+Provide only capture ports.  Optionally set device name.
 .TP
 \fB\-d, \-\-device \fIname\fR
 .br
 The ALSA pcm device \fIname\fR to use ("hw:0" if none specified).
 .TP
-\fB\-r, \-\-rate \fIint\fR
-Specify the sample rate.  The default is 48000.
-.TP
-\fB\-p, \-\-period \fIint\fR
-.br
-Specify the number of frames between JACK \fBprocess()\fR calls.  The
-default is 1024.  If you need low latency, set \fB\-p\fR as low as you
-can go without seeing xruns.  A larger period size yields higher
-latency, but makes xruns less likely.  The JACK input latency in
-seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
-.TP
-\fB\-n, \-\-nperiods \fIint\fR
-.br
-Specify the number of periods in the hardware buffer.  The default is
-2.  The period size (\fB\-p\fR) times \fB\-\-nperiods\fR times four is
-the JACK buffer size in bytes.  The JACK output latency in seconds is
-\fB\-\-nperiods\fR times \fB\-\-period\fR divided by \fB\-\-rate\fR.
+\fB\-z, --dither [rectangular,triangular,shaped,none]
+Set dithering mode.  If \fBnone\fR or unspecified, dithering is off.
+Only the first letter of the mode name is required.
 .TP
 \fB\-D, \-\-duplex\fR
 Provide both capture and playback ports (the default).
 .TP
-\fB\-C, \-\-capture\fR [ \fIname\fR ]
-Provide only capture ports.  Optionally set device name.
+\fB\-h, \-\-help\fR Print a brief usage message describing only the
+\fBalsa\fR driver options.
 .TP
-\fB\-P, \-\-playback\fR [ \fIname\fR ]
-Provide only playback ports.  Optionally set device name.
+\fB\-M, \-\-hwmeter\fR
+.br
+Enable hardware metering for devices that support it.  Otherwise, use
+software metering.
 .TP
 \fB\-H, \-\-hwmon\fR
 .br
@@ -137,33 +125,45 @@ into system memory, then copy it back out to the hardware again,
 imposing the basic JACK system latency determined by the
 \fB\-\-period\fR and \fB\-\-nperiods\fR options.
 .TP
-\fB\-M, \-\-hwmeter\fR
+\fB\-i, \-\-inchannels \fIint\fR
 .br
-Enable hardware metering for devices that support it.  Otherwise, use
-software metering.
+Number of capture channels.  Default is maximum supported by hardware.
+.TP
+\fB\-n, \-\-nperiods \fIint\fR
+.br
+Specify the number of periods in the hardware buffer.  The default is
+2.  The period size (\fB\-p\fR) times \fB\-\-nperiods\fR times four is
+the JACK buffer size in bytes.  The JACK output latency in seconds is
+\fB\-\-nperiods\fR times \fB\-\-period\fR divided by \fB\-\-rate\fR.
+.TP
+\fB\-o, \-\-outchannels \fIint\fR
+.br
+Number of playback channels.  Default is maximum supported by hardware.
+.TP
+\fB\-P, \-\-playback\fR [ \fIname\fR ]
+Provide only playback ports.  Optionally set device name.
+.TP
+\fB\-p, \-\-period \fIint\fR
+.br
+Specify the number of frames between JACK \fBprocess()\fR calls.  The
+default is 1024.  If you need low latency, set \fB\-p\fR as low as you
+can go without seeing xruns.  A larger period size yields higher
+latency, but makes xruns less likely.  The JACK input latency in
+seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
+.TP
+\fB\-r, \-\-rate \fIint\fR
+Specify the sample rate.  The default is 48000.
+.TP
+\fB\-S, \-\-shorts
+.br
+Try to configure card for 16-bit samples first, only trying 32-bits if
+unsuccessful.  Default is to prefer 32-bit samples.
 .TP
 \fB\-s, \-\-softmode\fR 
 .br
 Ignore xruns reported by the ALSA driver.  This makes JACK less likely
 to disconnect unresponsive ports when running without
 \fB\-\-realtime\fR.
-.TP
-\fB\-z, --dither [rectangular,triangular,shaped,none]
-Set dithering mode.  If \fBnone\fR or unspecified, dithering is off.
-Only the first letter of the mode name is required.
-.TP
-\fB\-i, \-\-inchannels \fIint\fR
-.br
-Number of capture channels.  Default is maximum supported by hardware.
-.TP
-\fB\-o, \-\-outchannels \fIint\fR
-.br
-Number of playback channels.  Default is maximum supported by hardware.
-.TP
-\fB\-S, \-\-shorts
-.br
-Try to configure card for 16-bit samples first, only trying 32-bits if
-unsuccessful.  Default is to prefer 32-bit samples.
 .SH EXAMPLES
 .PP
 Print usage message for options specific to the \fBalsa\fR driver.
