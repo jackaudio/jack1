@@ -138,8 +138,8 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 
 	if ((engine = jack_engine_new (realtime, realtime_priority, 
 				       do_mlock, do_unlock,
-				       temporary, verbose, client_timeout, port_max,
-				       getpid(), drivers)) == 0) {
+				       temporary, verbose, client_timeout,
+				       port_max, getpid(), drivers)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
 		return -1;
 	}

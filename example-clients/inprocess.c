@@ -48,16 +48,16 @@ inprocess (jack_nframes_t nframes, void *arg)
 
 /**
  * This required entry point is called after the client is loaded by
- * jack_internal_client_new().
+ * jack_internal_client_load().
  *
  * @param client pointer to JACK client structure.
- * @param so_data character string passed from jack_internal_client_new().
+ * @param load_init character string passed to the load operation.
  *
  * @return 0 if successful; otherwise jack_finish() will be called and
  * the client terminated immediately.
  */
 int
-jack_initialize (jack_client_t *client, const char *so_data)
+jack_initialize (jack_client_t *client, const char *load_init)
 {
 	port_pair_t *pp = malloc (sizeof (port_pair_t));
 
@@ -96,7 +96,7 @@ jack_initialize (jack_client_t *client, const char *so_data)
 /**
  * This required entry point is called immediately before the client
  * is unloaded, which could happen due to a call to
- * jack_internal_client_close(), or a nonzero return from either
+ * jack_internal_client_unload(), or a nonzero return from either
  * jack_initialize() or inprocess().
  *
  * @param arg the same parameter provided to inprocess().

@@ -45,6 +45,7 @@
 #include <jack/shm.h>
 #include <jack/unlock.h>
 #include <jack/thread.h>
+#include <jack/varargs.h>
 
 #include <sysdeps/time.h>
 JACK_TIME_GLOBAL_DECL;			/* One instance per process. */
@@ -146,12 +147,13 @@ oop_client_deliver_request (void *ptr, jack_request_t *req)
 int
 jack_client_deliver_request (const jack_client_t *client, jack_request_t *req)
 {
-	/* indirect through the function pointer that was set 
-	   either by jack_client_new() (external) or handle_new_client()
-	   in the server.
-	*/
+	/* indirect through the function pointer that was set either
+	 * by jack_client_open() or by jack_new_client_request() in
+	 * the server.
+	 */
 
-	return client->control->deliver_request (client->control->deliver_arg, req);
+	return client->control->deliver_request (client->control->deliver_arg,
+						 req);
 }
 
 jack_client_t *
@@ -344,7 +346,7 @@ server_connect (const char *server_name)
 	}
 
 	//JOQ: temporary debug code
-	// fprintf (stderr, "connecting to %s server\n", server_name);
+	//fprintf (stderr, "DEBUG: connecting to `%s' server\n", server_name);
 
 	//JOQ: use server_name as part of socket path
 	addr.sun_family = AF_UNIX;
@@ -412,7 +414,7 @@ server_event_connect (jack_client_t *client)
 
 /* Exec the JACK server in this process.  Does not return. */
 static void
-_start_server (const char *server_cmd)
+_start_server (void)
 {
 	FILE* fp = 0;
 	char filename[255];
@@ -425,11 +427,6 @@ _start_server (const char *server_cmd)
 	int i = 0;
 	int good = 0;
 	int ret;
-
-	//JOQ:
-	// if (start_command) {
-	//	parse user-supplied command
-	// } else {
 
 	snprintf(filename, 255, "%s/.jackdrc", getenv("HOME"));
 	fp = fopen(filename, "r");
@@ -501,7 +498,7 @@ _start_server (const char *server_cmd)
 }
 
 int
-start_server (jack_options_t options, const char *server_cmd)
+start_server (jack_options_t options)
 {
 	if ((options & JackNoStartServer)
 	    || (getenv("JACK_NO_START_SERVER") != NULL)) {
@@ -521,7 +518,7 @@ start_server (jack_options_t options, const char *server_cmd)
 	case 0:				/* child process */
 		switch (fork()) {
 		case 0:			/* grandchild process */
-			_start_server(server_cmd);
+			_start_server();
 			_exit (99);	/* exec failed */
 		case -1:
 			_exit (98);
@@ -537,18 +534,15 @@ start_server (jack_options_t options, const char *server_cmd)
 }
 
 static int
-jack_request_client (ClientType type, const char* client_name,
-		     const char* so_name, const char* so_data,
-		     jack_client_connect_result_t *res, int *req_fd,
-		     jack_options_t options, jack_status_t *status,
-		     const char *server_name, const char *server_cmd)
+jack_request_client (ClientType type,
+		     const char* client_name, jack_options_t options,
+		     jack_status_t *status, jack_varargs_t *va,
+		     jack_client_connect_result_t *res, int *req_fd)
 {
 	jack_client_connect_request_t req;
 
 	*req_fd = -1;
-
 	memset (&req, 0, sizeof (req));
-
 	req.options = options;
 
 	if (strlen (client_name) >= sizeof (req.name)) {
@@ -559,48 +553,54 @@ jack_request_client (ClientType type, const char* client_name,
 		return -1;
 	}
 
-	if (strlen (so_name) > sizeof (req.object_path) - 1) {
+	if (va->load_name
+	    && (strlen (va->load_name) > sizeof (req.object_path) - 1)) {
 		jack_error ("\"%s\" is too long to be used as a JACK shared"
 			    " object name.\n"
 			     "Please use %lu characters or less.",
-			    so_name, sizeof (req.object_path) - 1);
+			    va->load_name, sizeof (req.object_path) - 1);
 		return -1;
 	}
 
-	if (strlen (so_data) > sizeof (req.object_data) - 1) {
+	if (va->load_init
+	    && (strlen (va->load_init) > sizeof (req.object_data) - 1)) {
 		jack_error ("\"%s\" is too long to be used as a JACK shared"
 			    " object data string.\n"
 			     "Please use %lu characters or less.",
-			    so_data, sizeof (req.object_data) - 1);
+			    va->load_init, sizeof (req.object_data) - 1);
 		return -1;
 	}
 
-	if ((*req_fd = server_connect (server_name)) < 0) {
+	if ((*req_fd = server_connect (va->server_name)) < 0) {
 		int trys;
-		if (start_server(options, server_cmd)) {
-			*status |= JackServerFailed;
+		if (start_server(options)) {
+			*status |= (JackFailure|JackServerFailed);
 			goto fail;
 		}
 		trys = 5;
 		do {
 			sleep(1);
 			if (--trys < 0) {
-				*status |= JackServerFailed;
+				*status |= (JackFailure|JackServerFailed);
 				goto fail;
 			}
-		} while ((*req_fd = server_connect (server_name)) < 0);
+		} while ((*req_fd = server_connect (va->server_name)) < 0);
 		*status |= JackServerStarted;
 	}
 
 	req.load = TRUE;
 	req.type = type;
-	snprintf (req.name, sizeof (req.name), "%s", client_name);
-	snprintf (req.object_path, sizeof (req.object_path), "%s", so_name);
-	snprintf (req.object_data, sizeof (req.object_data), "%s", so_data);
+	snprintf (req.name, sizeof (req.name),
+		  "%s", client_name);
+	snprintf (req.object_path, sizeof (req.object_path),
+		  "%s", va->load_name);
+	snprintf (req.object_data, sizeof (req.object_data),
+		  "%s", va->load_init);
 
 	if (write (*req_fd, &req, sizeof (req)) != sizeof (req)) {
 		jack_error ("cannot send request to jack server (%s)",
 			    strerror (errno));
+		*status |= (JackFailure|JackServerError);
 		goto fail;
 	}
 
@@ -608,33 +608,36 @@ jack_request_client (ClientType type, const char* client_name,
 
 		if (errno == 0) {
 			/* server shut the socket */
-			jack_error ("could not attach as client "
-				    "(duplicate client name?)");
+			jack_error ("could not attach as client");
+			*status |= (JackFailure|JackServerError);
 			goto fail;
 		}
 		
 		if (errno == ECONNRESET) {
-			jack_error ("could not attach as jack client (server has exited)");
+			jack_error ("could not attach as JACK client "
+				    "(server has exited)");
+			*status |= (JackFailure|JackServerError);
 			goto fail;
 		}
 		
-		jack_error ("cannot read regsponse from jack server (%s)",
+		jack_error ("cannot read response from jack server (%s)",
 			    strerror (errno));
+		*status |= (JackFailure|JackServerError);
 		goto fail;
 	}
 
-	*status |= res->open_status;	/* return server status bits */
+	*status |= res->status;		/* return server status bits */
 
-	//JOQ: fixme overloading confusion
-	if (res->status) {
-		jack_error ("could not attach as client "
-			    "(duplicate client name?)");
+	if (*status & JackFailure) {
+		jack_error ("could not attach as client");
+		*status |= JackServerError;
 		goto fail;
 	}
 
 	if (res->protocol_v != jack_protocol_version){
 		jack_error ("application linked against incompatible libjack"
 			    " version.");
+		*status |= (JackFailure|JackServerError);
 		goto fail;
 	}
 
@@ -735,9 +738,8 @@ jack_client_open (const char *client_name,
 		  jack_status_t *status, ...)
 {
 	/* optional arguments: */
-	char *server_name = "default";	/* server name */
-	char *server_cmd = NULL;	/* server command (not implemented) */
 	va_list ap;			/* variable argument pointer */
+	jack_varargs_t va;		/* variable arguments */
 
 	int req_fd = -1;
 	int ev_fd = -1;
@@ -748,21 +750,17 @@ jack_client_open (const char *client_name,
 
 	if (status == NULL)		/* no status from caller? */
 		status = &my_status;	/* use local status word */
-
 	*status = 0;
 
 	/* validate parameters */
-	if ((options & ~JackValidOptions)) {
-		*status |= JackInvalidOption;
+	if ((options & ~JackOpenOptions)) {
+		*status |= (JackFailure|JackInvalidOption);
 		return NULL;
 	}
 
-	/* parse optional arguments */
+	/* parse variable arguments */
 	va_start (ap, status);
-	if ((options & JackServerName))
-		server_name = va_arg(ap, char *);
-	//if ((options & JackServerCmd))	/* not implemented */
-	//	server_cmd = va_arg(ap, char *);
+	jack_varargs_parse (options, ap, &va);
 	va_end (ap);
 
 	/* External clients need this initialized.  It is already set
@@ -775,9 +773,8 @@ jack_client_open (const char *client_name,
 		return NULL;
 	}
 
-	if (jack_request_client (ClientExternal, client_name, "", "",
-				 &res, &req_fd, options, status,
-				 server_name, server_cmd)) {
+	if (jack_request_client (ClientExternal, client_name, options, status,
+				 &va, &res, &req_fd)) {
 		return NULL;
 	}
 
@@ -893,19 +890,24 @@ jack_get_client_name (jack_client_t *client)
 }
 
 int
-jack_internal_client_new (const char *client_name, const char *so_name, const char *so_data)
+jack_internal_client_new (const char *client_name,
+			  const char *so_name, const char *so_data)
 {
 	jack_client_connect_result_t res;
 	int req_fd;
+	jack_varargs_t va;
 	jack_status_t status;
 	jack_options_t options = JackUseExactName;
 
 	if (getenv("JACK_START_SERVER") == NULL)
 		options |= JackNoStartServer;
 
-	return jack_request_client (ClientInternal, client_name, so_name,
-				    so_data, &res, &req_fd,
-				    options, &status, NULL, NULL);
+	jack_varargs_init (&va);
+	va.load_name = (char *) so_name;
+	va.load_init = (char *) so_data;
+
+	return jack_request_client (ClientInternal, client_name,
+				    options, &status, &va, &res, &req_fd);
 }
 
 void
@@ -913,16 +915,21 @@ jack_internal_client_close (const char *client_name)
 {
 	jack_client_connect_request_t req;
 	int fd;
+	char *server_name;
+
+	if ((server_name = getenv("JACK_DEFAULT_SERVER")) == NULL)
+		server_name = "default";
 
 	req.load = FALSE;
 	snprintf (req.name, sizeof (req.name), "%s", client_name);
 	
-	if ((fd = server_connect (NULL)) < 0) {
+	if ((fd = server_connect (server_name)) < 0) {
 		return;
 	}
 
 	if (write (fd, &req, sizeof (req)) != sizeof(req)) {
-		jack_error ("cannot deliver ClientUnload request to JACK server.");
+		jack_error ("cannot deliver ClientUnload request to JACK "
+			    "server.");
 	}
 	
 	/* no response to this request */
@@ -930,7 +937,6 @@ jack_internal_client_close (const char *client_name)
 	close (fd);
 	return;
 }
-
 
 int
 jack_set_freewheel (jack_client_t* client, int onoff)
@@ -1489,7 +1495,7 @@ jack_activate (jack_client_t *client)
 
 		req.type = SetClientCapabilities;
 		req.x.client_id = client->control->id;
-		
+
 		jack_client_deliver_request (client, &req);
 
 		if (req.status) {

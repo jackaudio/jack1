@@ -37,6 +37,7 @@ int
 main (int argc, char *argv[])
 {
 	jack_client_t *client;
+	jack_status_t status;
 	const char **ports, **connections;
 	unsigned int i, j;
 	int show_con = 0;
@@ -87,10 +88,19 @@ main (int argc, char *argv[])
 		}
 	}
 
-	/* try to become a client of the JACK server */
+	/* Open a client connection to the JACK server.  Starting a
+	 * new server only to list its ports seems pointless, so we
+	 * specify JackNoStartServer. */
+	//JOQ: need a new server name option
 
-	if ((client = jack_client_new ("lsp")) == 0) {
-		fprintf (stderr, "jack server not running?\n");
+	client = jack_client_open ("lsp", JackNoStartServer, &status);
+	if (client == NULL) {
+		if (status & JackServerFailed) {
+			fprintf (stderr, "JACK server not running\n");
+		} else {
+			fprintf (stderr, "jack_client_open() failed, "
+				 "status = 0x%x\n", status);
+		}
 		return 1;
 	}
 

@@ -122,11 +122,11 @@ timecode (jack_transport_state_t state, jack_nframes_t nframes,
 
 /* after internal client loaded */
 int
-jack_initialize (jack_client_t *client, const char *arg)
+jack_initialize (jack_client_t *client, const char *load_init)
 {
 	JackTimebaseCallback callback = timebbt;
 
-	int rc = sscanf(arg, " %f/%f, %lf bpm ", &time_beats_per_bar,
+	int rc = sscanf(load_init, " %f/%f, %lf bpm ", &time_beats_per_bar,
 			&time_beat_type, &time_beats_per_minute);
 
 	if (rc > 0) {
@@ -134,8 +134,8 @@ jack_initialize (jack_client_t *client, const char *arg)
 			 time_beats_per_bar, time_beat_type,
 			 time_beats_per_minute);
 	} else {
-		int len = strlen(arg);
-		if ((len > 0) && (strncmp(arg, "timecode", len) == 0))
+		int len = strlen(load_init);
+		if ((len > 0) && (strncmp(load_init, "timecode", len) == 0))
 			callback = timecode;
 	}
 

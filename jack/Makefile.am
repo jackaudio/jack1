@@ -3,6 +3,7 @@ MAINTAINERCLEANFILES = Makefile.in version.h
 libjackincludedir = $(includedir)/jack
 
 libjackinclude_HEADERS = 	\
+	intclient.h		\
 	jack.h			\
 	ringbuffer.h		\
 	thread.h                \
@@ -26,4 +27,5 @@ noinst_HEADERS =		\
 	shm.h			\
 	start.h			\
 	unlock.h		\
+	varargs.h		\
 	version.h

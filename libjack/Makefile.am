@@ -1,16 +1,17 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
 SOURCE_FILES = \
-	     shm.c \
 	     client.c \
 	     driver.c \
-	     unlock.c  \
+	     intclient.c \
 	     pool.c \
 	     port.c \
 	     ringbuffer.c \
+	     shm.c \
 	     thread.c \
 	     timestamps.c \
-	     transclient.c
+	     transclient.c \
+	     unlock.c
 
 lib_LTLIBRARIES	= libjack.la
 

@@ -162,6 +162,12 @@ int		jack_engine_load_driver (jack_engine_t *engine,
 					 JSList * driver_params);
 void		jack_dump_configuration(jack_engine_t *engine, int take_lock);
 
+/* private engine functions */
+void		jack_engine_reset_rolling_usecs (jack_engine_t *engine);
+int		internal_client_request (void* ptr, jack_request_t *request);
+int		jack_get_fifo_fd (jack_engine_t *engine,
+				  unsigned int which_fifo);
+
 extern jack_client_internal_t *
 jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
 
@@ -186,5 +192,12 @@ static inline unsigned int jack_power_of_two (unsigned int n)
 {
 	return !(n & (n - 1));
 }
+
+/* Internal port handling interfaces for JACK engine. */
+void	jack_port_clear_connections (jack_engine_t *engine,
+				     jack_port_internal_t *port);
+void	jack_port_registration_notify (jack_engine_t *, jack_port_id_t, int);
+void	jack_port_release (jack_engine_t *engine, jack_port_internal_t *);
+void	jack_sort_graph (jack_engine_t *engine);
 
 #endif /* __jack_engine_h__ */

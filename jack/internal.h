@@ -217,7 +217,7 @@ typedef volatile struct {
 	
     /* external clients: set by libjack
      * internal clients: set by engine */
-    int (*deliver_request)(void*, jack_request_t*);
+    int (*deliver_request)(void*, jack_request_t*); /* JOQ: 64/32 bug! */
     void *deliver_arg;
 
     /* for engine use only */
@@ -239,10 +239,9 @@ typedef struct {
 
 typedef struct {
 
-    int32_t	status;			/* messy name overloading */
     uint32_t	protocol_v;
+    jack_status_t status;
 
-    jack_status_t open_status;		/* used for open() */
     jack_shm_info_t client_shm;
     jack_shm_info_t engine_shm;
 
@@ -253,12 +252,9 @@ typedef struct {
 
     char name[JACK_CLIENT_NAME_SIZE];	/* unique name, if assigned */
 
-    /* these two are valid only if the connect request
-       was for type == ClientDriver. 
-    */
-
-    jack_client_control_t *client_control; /* JOQ: 64/32 problem */
-    jack_control_t        *engine_control; /* JOQ: 64/32 problem */
+    /* these two are valid only for internal clients */
+    jack_client_control_t *client_control;
+    jack_control_t        *engine_control;
 
 #ifdef JACK_USE_MACH_THREADS
     /* specific resources for server/client real-time thread communication */
@@ -294,6 +290,10 @@ typedef enum {
 	SetBufferSize = 16,
 	FreeWheel = 17,
 	StopFreeWheel = 18,
+	IntClientHandle = 19,
+	IntClientLoad = 20,
+	IntClientName = 21,
+	IntClientUnload = 22
 } RequestType;
 
 struct _jack_request {
@@ -320,6 +320,13 @@ struct _jack_request {
 	    jack_client_id_t client_id;
 	    int32_t conditional;
 	} timebase;
+	struct {
+	    jack_options_t options;
+	    jack_client_id_t id;
+	    char name[JACK_CLIENT_NAME_SIZE];
+	    char path[PATH_MAX+1];
+	    char init[JACK_LOAD_INIT_LIMIT];
+	} intclient;
 	jack_client_id_t client_id;
 	jack_nframes_t nframes;
 	jack_time_t timeout;

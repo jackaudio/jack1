@@ -47,22 +47,25 @@ extern "C" {
  * @ref JackUseExactName option, the server will modify this name to
  * create a unique variant, if needed.
  *
- * @param options formed by OR-ing together @ref JackOpenOptions bits.
+ * @param options formed by OR-ing together @ref JackOptions bits.
+ * Only the @ref JackOpenOptions bits are allowed.
  *
  * @param status (if non-NULL) an address for JACK to return
  * information from the open operation.  This status word is formed by
- * OR-ing together the relevant @ref JackOpenStatus bits.
+ * OR-ing together the relevant @ref JackStatus bits.
  *
- * <b>Optional parameters:</b>
  *
- * @arg @a server_name <tt>(char *)</tt> selects from among several
- * possible concurrent server instances.  This parameter must follow
- * @a status if the @ref JackServerName option is specified.
- * Otherwise, "default" is assumed.  Server names are unique to each
- * user.
+ * <b>Optional parameters:</b> depending on corresponding [@a options
+ * bits] additional parameters may follow @a status (in this order).
+ *
+ * @arg [@ref JackServerName] <em>(char *) server_name</em> selects
+ * from among several possible concurrent server instances.  Server
+ * names are unique to each user.  If unspecified, use "default"
+ * unless \$JACK_DEFAULT_SERVER is defined in the process environment.
  *
  * @return Opaque client handle if successful.  If this is NULL, the
- * open operation failed, and the caller is not a JACK client.
+ * open operation failed, @a *status includes @ref JackFailure and the
+ * caller is not a JACK client.
  */
 jack_client_t *jack_client_open (const char *client_name,
 				 jack_options_t options,
@@ -110,30 +113,37 @@ int jack_client_name_size (void);
  * JackNameNotUnique status was returned.  In that case, the actual
  * name will differ from the @a client_name requested.
  */
-char *jack_get_client_name (jack_client_t* client);
+char *jack_get_client_name (jack_client_t *client);
 
 /**
- * Attempt to load an internal client into the Jack server.
+ * Load an internal client into the Jack server.
  *
- * Internal clients run within the JACK server process.  They can use
- * of the same functions as external clients.  Each internal client
- * must declare jack_initialize() and jack_finish() entry points,
- * called at load and unload times.  See inprocess.c for an example of
- * how to write an internal client.
+ * Internal clients run inside the JACK server process.  They can use
+ * most of the same functions as external clients.  Each internal
+ * client must declare jack_initialize() and jack_finish() entry
+ * points, called at load and unload times.  See inprocess.c for an
+ * example of how to write an internal client.
+ *
+ * @deprecated Please use jack_internal_client_load().
  *
  * @param client_name of at most jack_client_name_size() characters.
- * @param so_name A path to a shared object file containing the code
- * for the new client.
- * @param so_data An arbitary string containing information to be
- * passed to the jack_initialize() routine of the new client.
+ *
+ * @param load_name of a shared object file containing the code for
+ * the new client.
+ *
+ * @param load_init an arbitary string passed to the jack_initialize()
+ * routine of the new client (may be NULL).
+ *
+ * @return 0 if successful.
  */
-int jack_internal_client_new (const char *client_name, const char *so_name,
-			      const char *so_data);
+int jack_internal_client_new (const char *client_name,
+			      const char *load_name,
+			      const char *load_init);
 
 /**
- * Removes an internal client from a JACK server.
+ * Remove an internal client from a JACK server.
  *
- * @return 0 on success, otherwise a non-zero error code
+ * @deprecated Please use jack_internal_client_load().
  */
 void jack_internal_client_close (const char *client_name);
 

@@ -63,7 +63,7 @@ programs are not all running synchronously.
 Using JACK within your program is very simple, and typically consists
 of just:
 
-   - calling @ref jack_client_open to connect to the JACK server.
+   - calling @ref jack_client_open() to connect to the JACK server.
    - registering "ports" to enable data to be moved to and from
        your application.
    - registering a "process callback" which will be called at the
@@ -83,6 +83,8 @@ internal client "plugin" that runs within the JACK server process.
 The JACK programming interfaces are described in several header files:
 
   - @ref jack.h "<jack/jack.h>" defines most of the JACK interfaces.
+  - @ref intclient.h "<jack/intclient.h>" defines interfaces for
+  loading and unloading JACK internal clients.
   - @ref ringbuffer.h "<jack/ringbuffer.h>" defines a simple API for
   using lock-free ringbuffers.  These are a good way to pass data
   between threads, when streaming realtime data to slower media, like

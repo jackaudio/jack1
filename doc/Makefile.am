@@ -5,9 +5,15 @@ CLEANFILES=doxygen-build.stamp
 
 DOX=reference.doxygen
 DOXSOURCES=mainpage.dox transport.dox porting.dox fsm.png fsm.eps \
-	../jack/jack.h ../jack/types.h ../jack/transport.h \
-	../jack/ringbuffer.h ../jack/thread.h ../jack/port.h \
-	../example-clients/simple_client.c ../example-clients/inprocess.c
+	../example-clients/inprocess.c \
+	../example-clients/simple_client.c \
+	../jack/intclient.h \
+	../jack/jack.h \
+	../jack/port.h \
+	../jack/ringbuffer.h \
+	../jack/thread.h \
+	../jack/transport.h \
+	../jack/types.h
 
 EXTRA_DIST=mainpage.dox transport.dox fsm.png fsm.eps porting.dox
 

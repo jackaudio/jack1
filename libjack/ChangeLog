@@ -1,3 +1,9 @@
+2004-11-27  Jack O'Quin  <joq@io.com>
+
+	* new API functions: jack_internal_client_handle(),
+	jack_internal_client_load(), jack_get_internal_client_name(),
+	jack_internal_client_unload().  See: <jack/intclient.h>.
+
 2004-10-14  Jack O'Quin  <joq@io.com>
 
 	* new API function: jack_get_xrun_delayed_usecs()

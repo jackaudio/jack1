@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2001 Paul Davis
+    Copyright (C) 2004 Jack O'Quin
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -42,6 +43,19 @@ typedef uint32_t	     jack_nframes_t;
  * monotonic clock with units of microseconds.
  */
 typedef uint64_t jack_time_t;
+
+/**
+ *  Maximum size of @a load_init string passed to an internal client
+ *  jack_initialize() function via jack_internal_client_load().
+ */
+#define JACK_LOAD_INIT_LIMIT 1024
+
+/**
+ *  jack_intclient_t is an opaque type representing a loaded internal
+ *  client.  You may only access it using the API provided in @ref
+ *  intclient.h "<jack/intclient.h>".
+ */
+typedef uint64_t jack_intclient_t;
 
 /**
  *  jack_port_t is an opaque type.  You may only access it using the
@@ -227,9 +241,9 @@ enum JackPortFlags {
 };	    
 
 /**
- *  jack_client_open() option bits
+ *  @ref jack_options_t bits
  */
-enum JackOpenOptions {
+enum JackOptions {
 
      /**
       * Null value to use when no option bits are needed.
@@ -251,32 +265,50 @@ enum JackOpenOptions {
      JackUseExactName = 0x02,
 
      /**
-      * Open with optional @a char @a *server_name parameter.
-      *
-      * @warning This option has not yet been implemented.
+      * Open with optional <em>(char *) server_name</em> parameter.
+      * <b>Warning: this option is not yet implemented.</b>
       */
-     JackServerName = 0x04
-};
-
-/* options mask does not include unimplemented features */
-#define JackValidOptions (JackNoStartServer|JackUseExactName)
-
-/**
- *  jack_client_open() request options are formed by AND-ing together
- *  @ref JackOpenOptions bits.
- */
-typedef enum JackOpenOptions jack_options_t;
-
-/**
- *  jack_client_open() status bits
- */
-enum JackOpenStatus {
+     JackServerName = 0x04,
 
      /**
-      * The open request failed because it contained an invalid or
-      * unsupported option.
+      * Load internal client from optional <em>(char *)
+      * load_name</em>.  Otherwise use the @a client_name.
       */
-     JackInvalidOption = 0x01,
+     JackLoadName = 0x08,
+
+     /**
+      * Pass optional <em>(char *) load_init</em> string to the
+      * jack_initialize() entry point of an internal client.
+      */
+     JackLoadInit = 0x10
+};
+
+/** Valid options for opening an external client. */
+#define JackOpenOptions (JackServerName|JackNoStartServer|JackUseExactName)
+
+/** Valid options for loading an internal client. */
+#define JackLoadOptions (JackLoadInit|JackLoadName|JackUseExactName)
+
+/**
+ *  Options for several JACK operations, formed by OR-ing together the
+ *  relevant @ref JackOptions bits.
+ */
+typedef enum JackOptions jack_options_t;
+
+/**
+ *  @ref jack_status_t bits
+ */
+enum JackStatus {
+
+     /**
+      * Overall operation failed.
+      */
+     JackFailure = 0x01,
+
+     /**
+      * The operation contained an invalid or unsupported option.
+      */
+     JackInvalidOption = 0x02,
 
      /**
       * The desired client name was not unique.  With the @ref
@@ -287,26 +319,36 @@ enum JackOpenStatus {
       * that was used.  If the specified @a client_name plus these
       * extra characters would be too long, the open fails instead.
       */
-     JackNameNotUnique = 0x02,
+     JackNameNotUnique = 0x04,
 
      /**
-      * The JACK server was started as a result of this open.
+      * The JACK server was started as a result of this operation.
       * Otherwise, it was running already.  In either case the caller
       * is now connected to jackd, so there is no race condition.
       * When the server shuts down, the client will find out.
       */
-     JackServerStarted = 0x04,
+     JackServerStarted = 0x08,
 
      /**
-      * Unable to connect to the JACK server, open failed.
+      * Unable to connect to the JACK server.
       */
-     JackServerFailed = 0x08
+     JackServerFailed = 0x10,
+
+     /**
+      * Communication error with the JACK server.
+      */
+     JackServerError = 0x20,
+
+     /**
+      * Requested client does not exist.
+      */
+     JackNoSuchClient = 0x40
 };
 
 /**
- *  The status word returned from jack_client_open() is formed by
- *  AND-ing together the relevant @ref JackOpenStatus bits.
+ *  Status word returned from several JACK operations, formed by
+ *  OR-ing together the relevant @ref JackStatus bits.
  */
-typedef enum JackOpenStatus jack_status_t;
+typedef enum JackStatus jack_status_t;
 
 #endif /* __jack_types_h__ */
