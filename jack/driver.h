@@ -65,6 +65,7 @@ typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, 
      3) engine starts driver
      4) while (1) {
            engine->wait ();
+	   engine->audio_cycle ();
         }
      5) engine stops driver
      6) engine detaches from driver
@@ -135,9 +136,29 @@ typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, 
 
     JackDriverWaitFunction wait;
 
+/* the JACK engine will call this to ask the driver to move
+   data from its inputs to its output port buffers. it should
+   return 0 to indicate successful completion, negative otherwise. 
+ 
+   this function will always be called after the wait function (above).
+*/
+
     JackDriverReadFunction read;
 
+/* the JACK engine will call this to ask the driver to move
+   data from its input port buffers to its outputs. it should
+   return 0 to indicate successful completion, negative otherwise. 
+ 
+   this function will always be called after the read function (above).
+*/
     JackDriverWriteFunction write;
+
+/* the JACK engine will call this after the wait function (above) has
+   been called, but for some reason the engine is unable to execute
+   a full "cycle". the driver should do whatever is necessary to
+   keep itself running correctly, but cannot reference ports
+   or other JACK data structures in any way.
+*/
 
     JackDriverNullCycleFunction null_cycle;
     

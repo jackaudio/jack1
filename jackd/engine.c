@@ -2069,7 +2069,7 @@ jack_engine_wait (jack_engine_t *engine, jack_nframes_t* nframes)
 }
 
 static int
-jack_audio_cycle (jack_engine_t *engine, jack_nframes_t nframes)
+jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes)
 {
 	int ret;
 	jack_driver_t* driver = engine->driver;
@@ -2137,8 +2137,8 @@ jack_main_thread (void *arg)
 			
 		} else if (wait_status == 0) {
 			
-			if (jack_audio_cycle (engine, nframes)) {
-				jack_error ("audio cycle failure, exiting");
+			if (jack_run_cycle (engine, nframes)) {
+				jack_error ("cycle execution failure, exiting");
 				break;
 			}
 
