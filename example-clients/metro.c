@@ -45,17 +45,17 @@ void
 usage ()
 
 {
-	fprintf (stderr, "\
-usage: jack_metro 
-              [ --frequency OR -f frequency (in Hz) ]
-              [ --amplitude OR -A maximum amplitude (between 0 and 1) ]
-              [ --duration OR -D duration (in ms) ]
-              [ --attack OR -a attack (in percent of duration) ]
-              [ --decay OR -d decay (in percent of duration) ]
-              [ --name OR -n jack name for metronome client ]
-              [ --transport OR -t transport aware ]
-              --bpm OR -b beats per minute
-");
+	fprintf (stderr, "\n"
+"usage: jack_metro \n"
+"              [ --frequency OR -f frequency (in Hz) ]\n"
+"              [ --amplitude OR -A maximum amplitude (between 0 and 1) ]\n"
+"              [ --duration OR -D duration (in ms) ]\n"
+"              [ --attack OR -a attack (in percent of duration) ]\n"
+"              [ --decay OR -d decay (in percent of duration) ]\n"
+"              [ --name OR -n jack name for metronome client ]\n"
+"              [ --transport OR -t transport aware ]\n"
+"              --bpm OR -b beats per minute\n"
+);
 }
 
 void

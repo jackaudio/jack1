@@ -159,7 +159,7 @@ disk_thread (void *arg)
 					}
 				}
 				
-				if (sf_writef_double (info->sf, fbuf, buf->nframes) != buf->nframes) {
+				if (sf_writef_double (info->sf, fbuf, buf->nframes) != (sf_count_t)buf->nframes) {
 					char errstr[256];
 					sf_error_str (0, errstr, sizeof (errstr) - 1);
 					fprintf (stderr, "cannot write data to sndfile (%s)\n", errstr);

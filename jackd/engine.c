@@ -1808,7 +1808,7 @@ jack_wait (jack_engine_t *engine)
 			jack_error ("cannot join with audio thread (%s)", strerror (errno));
 		}
 	}
-	return (int) ret;
+	return (int) ((intptr_t)ret);
 }
 
 int 
@@ -2982,7 +2982,7 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	jack_unlock_graph (engine);
 
 	if (engine->verbose) {
-		fprintf (stderr, "registered port %s, offset = %u\n", shared->name, shared->offset);
+		fprintf (stderr, "registered port %s, offset = %u\n", shared->name, (unsigned int)shared->offset);
 	}
 
 	req->x.port_info.port_id = port_id;
@@ -3144,7 +3144,7 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 		fprintf (stderr, "port %s buf shm key 0x%x at offset %d bi = %p\n", 
 			 port->shared->name,
 			 port->shared->shm_key,
-			 port->shared->offset,
+			 (int)port->shared->offset,
 			 port->buffer_info);
 	}
 

@@ -117,7 +117,7 @@ solaris_driver_delete (solaris_driver_t *driver)
 static void
 solaris_usage ()
 {
-	fprintf (stderr, 
+	fprintf (stderr, "\n"
 
 "solaris PCM driver args:\n"
 "    -r sample-rate (default: 48kHz)\n"

@@ -1592,7 +1592,7 @@ alsa_driver_clock_sync_notify (alsa_driver_t *driver, channel_t chn, ClockSyncSt
 static void
 alsa_usage ()
 {
-	fprintf (stderr, 
+	fprintf (stderr, "\n"
 
 "alsa PCM driver args:\n"
 "    -d alsa-pcm-name (default: default)\n"

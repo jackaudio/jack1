@@ -714,7 +714,7 @@ jack_client_thread (void *arg)
 		}
 	}
 	
-	return (void *) err;
+	return (void *) ((intptr_t)err);
 }
 
 static int
