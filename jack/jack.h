@@ -352,10 +352,8 @@ jack_port_t *jack_port_by_name (jack_client_t *, const char *portname);
 /* If a client is told (by the user) to become the timebase
    for the entire system, it calls this function. If it
    returns zero, then the client has the responsibility to
-   call jack_update_time() at the end of its process()
-   callback. Whatever time it provides (in frames since its
-   reference zero time) becomes the current timebase for the
-   entire system.  
+   call jack_set_transport_info()) at the end of its process()
+   callback. 
 */
 
 int  jack_engine_takeover_timebase (jack_client_t *);
