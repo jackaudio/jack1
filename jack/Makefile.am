@@ -6,7 +6,8 @@ libjackinclude_HEADERS = 	\
 	jack.h			\
 	error.h			\
 	transport.h 		\
-	types.h
+	types.h			\
+	timestamps.h
 
 noinst_HEADERS = 		\
 	alsa_driver.h 		\
@@ -22,5 +23,6 @@ noinst_HEADERS = 		\
 	pool.h			\
 	port.h			\
 	start.h			\
-	jslist.h
+	jslist.h		\
+	hdsp.h
 
