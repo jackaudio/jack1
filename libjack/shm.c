@@ -84,7 +84,7 @@ jack_release_shm_info (jack_shm_registry_index_t index)
 }
 
 void
-jack_cleanup_shm ()
+jack_cleanup_shm (void)
 {
 	int i;
 	int destroy;
@@ -136,7 +136,7 @@ jack_cleanup_shm ()
 #if USE_POSIX_SHM
 
 int
-jack_initialize_shm ()
+jack_initialize_shm (void)
 {
 	int shm_fd;
 	jack_shmsize_t size;
@@ -323,7 +323,7 @@ jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 #define JACK_SHM_REGISTRY_KEY 0x282929
 
 int
-jack_initialize_shm ()
+jack_initialize_shm (void)
 {
 	int shmflags;
 	int shmid;

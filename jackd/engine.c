@@ -1974,7 +1974,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose,
 
 	srandom (time ((time_t *) 0));
 
-	if (jack_initialize_shm (engine)) {
+	if (jack_initialize_shm ()) {
 		return 0;
 	}
         

@@ -55,8 +55,8 @@ static inline char* jack_shm_addr (jack_shm_info_t* si) {
 
 /* here beginneth the API */
 
-extern int  jack_initialize_shm ();
-extern void jack_cleanup_shm ();
+extern int  jack_initialize_shm (void);
+extern void jack_cleanup_shm (void);
 
 extern int  jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* result);
 extern void jack_release_shm (jack_shm_info_t*);
