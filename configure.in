@@ -502,12 +502,21 @@ if test x$HAVE_SNDFILE = xfalse; then
              AC_MSG_WARN([*** the jackrec example client will not be built])
 fi
 
-# on some systems, readline depends on termcap or ncurses, respectively
+# On some systems, readline depends on termcap or ncurses.  But, the
+# MacOSX linker complains bitterly if these libraries are explicitly
+# referenced.  
+#
+# AC_CHECK_LIB() foolishly assumes that checking a library for an entry
+# point always returns the same result regardless of any dependent
+# libraries specified.  The `unset ac_cv_lib_readline_readline' erases
+# the cached result to work around this problem.
 READLINE_DEPS=""
 HAVE_READLINE=true
 AC_CHECK_LIB(readline, readline, [],
-    [AC_CHECK_LIB(readline, readline, [READLINE_DEPS="-ltermcap"],
-	[AC_CHECK_LIB(readline, readline,
+    [unset ac_cv_lib_readline_readline
+     AC_CHECK_LIB(readline, readline, [READLINE_DEPS="-ltermcap"],
+        [unset ac_cv_lib_readline_readline
+	 AC_CHECK_LIB(readline, readline,
 	    [READLINE_DEPS="-lncurses"], [HAVE_READLINE=false], "-lncurses")],
 	"-ltermcap")])
 if test x$HAVE_READLINE = xfalse; then
