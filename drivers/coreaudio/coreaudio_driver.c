@@ -104,7 +104,6 @@ static void printError1(OSStatus err)
 static OSStatus get_device_name_from_id(AudioDeviceID id, char name[60])
 {
     UInt32 size = sizeof(char) * 60;
-	JCALog("get_device_name_from_id %ld\n",id);
     OSStatus res = AudioDeviceGetProperty(id, 0, false,
 					   kAudioDevicePropertyDeviceName,
 					   &size,
@@ -237,16 +236,12 @@ coreaudio_driver_attach(coreaudio_driver_t * driver,
        if (driver->has_hw_monitoring) {
 			port_flags |= JackPortCanMonitor;
        }
-     */
+	*/
 
     for (chn = 0; chn < driver->capture_nchannels; chn++) {
 		//snprintf (buf, sizeof(buf) - 1, "capture_%lu", chn+1);
 		
 		err = AudioDeviceGetPropertyInfo(driver->device_id, chn + 1, true, kAudioDevicePropertyChannelName, &size, &isWritable);
-		if (err != noErr) {
-			JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyChannelName error \n");
-			printError1(err);
-		}
 		if (err == noErr && size > 0)  {
 			err = AudioDeviceGetProperty(driver->device_id, chn + 1, true, kAudioDevicePropertyChannelName, &size, channel_name);	
 			if (err != noErr) 
@@ -277,8 +272,6 @@ coreaudio_driver_attach(coreaudio_driver_t * driver,
 		//snprintf (buf, sizeof(buf) - 1, "playback_%lu", chn+1);
 		
 		err = AudioDeviceGetPropertyInfo(driver->device_id, chn + 1, false, kAudioDevicePropertyChannelName, &size, &isWritable);
-		if (err != noErr) 
-			JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyChannelName error \n");
 		if (err == noErr && size > 0)  {
 			err = AudioDeviceGetProperty(driver->device_id, chn + 1, false, kAudioDevicePropertyChannelName, &size, channel_name);	
 			if (err != noErr) 
@@ -406,8 +399,6 @@ static jack_driver_t *coreaudio_driver_new(char *name,
 	AudioStreamBasicDescription srcFormat, dstFormat, sampleRate;
 	int in_nChannels, out_nChannels, i;
 
-    JCALog("coreaudio beta %d driver\n", CAVersion);
-
     driver = (coreaudio_driver_t *) calloc(1, sizeof(coreaudio_driver_t));
     jack_driver_init((jack_driver_t *) driver);
 
@@ -437,7 +428,6 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     bzero(&deviceName[0], sizeof(char) * 64);
 	
     if (!driver_name) {
-		JCALog("Get driver name from deviceID\n");
 		if (get_device_name_from_id(deviceID, deviceName) != noErr)
 			goto error;
     } else {
