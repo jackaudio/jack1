@@ -52,7 +52,15 @@ dummy_driver_audio_stop (dummy_driver_t *driver)
 static jack_nframes_t 
 dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status, float *delayed_usecs)
 {
-  usleep (driver->wait_time);
+  jack_time_t processing_time;
+
+  processing_time = driver->last_wait_ust
+    ? jack_get_microseconds() - driver->last_wait_ust
+    : 0;
+
+  if (processing_time < driver->wait_time)
+    usleep (driver->wait_time - processing_time);
+
 
   driver->last_wait_ust = jack_get_microseconds ();
 
@@ -195,6 +203,7 @@ dummy_driver_new (jack_client_t * client,
   driver->sample_rate = sample_rate;
   driver->period_size = period_size;
   driver->wait_time   = wait_time;
+  driver->last_wait_ust = 0;
 
   driver->capture_channels  = capture_ports;
   driver->capture_ports     = NULL;
