@@ -222,6 +222,7 @@ fi
 %{_includedir}/jack/types.h
 %{_includedir}/jack/thread.h
 %{_includedir}/jack/intclient.h
+%{_includedir}/jack/statistics.h
 %{_libdir}/pkgconfig/jack.pc
 
 
@@ -240,13 +241,16 @@ fi
 
 %changelog
 
+* Thu Jan  3 2005 Rui Nuno Capela <rncbc@rncbc.org> - 0.99.44-1
+- add jack/statistics.h to devel package
+
 * Thu Dec 28 2004 Rui Nuno Capela <rncbc@rncbc.org> - 0.99.41-1
 - merge integration of usx2y (rawusb) driver into alsa backend
 - enable preemption check feature of 2.6 RT kernels
 - add jack/intclient.h to devel package
 - add jack/thread.h to devel package
 - moved doc/reference to devel package
-- set default tmpdir to /var/tmp/jack/tmp
+- set default tmpdir to /var/lib/jack/tmp
 - include oss backend driver if available
 
 * Sat May 22 2004 Pete Bessman <ninjadroid@gazuga.net> - 0.98.1-1
