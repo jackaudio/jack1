@@ -5,7 +5,7 @@ dnl will set SYSCONFDIR to /usr/local/etc
 
 dnl written by thomas vander stichele
 
-AC_DEFUN(AS_AC_EXPAND,
+AC_DEFUN([AS_AC_EXPAND],
 [
   EXP_VAR=[$1]
   FROM_VAR=[$2]
