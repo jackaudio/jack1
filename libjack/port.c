@@ -61,11 +61,13 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	       jack_control_t *control)
 {
 	jack_port_shared_t *shared = &control->ports[port_id];
-	jack_port_type_id_t ptid = shared->type_info.type_id;
+	jack_port_type_id_t ptid = shared->ptype_id;
 	jack_port_t *port = (jack_port_t *) malloc (sizeof (jack_port_t));
 
-	port->client_segment_base = 0;
+	port->mix_buffer = NULL;
+	port->client_segment_base = NULL;
 	port->shared = shared;
+	port->type_info = &client->engine->port_types[ptid];
 	pthread_mutex_init (&port->connection_lock, NULL);
 	port->connections = 0;
 	port->tied = NULL;
@@ -76,7 +78,7 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 		 * functions within this address space.  These builtin
 		 * definitions can be overridden by the client. */
 
-		if (port->shared->type_info.type_id == JACK_AUDIO_PORT_TYPE) {
+		if (ptid == JACK_AUDIO_PORT_TYPE) {
 
 			port->fptr = jack_builtin_audio_functions;
 			port->shared->has_mixdown = TRUE;
@@ -94,7 +96,8 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	   port->offset can change if the buffer size or port counts
 	   are changed.
 	*/
-	port->client_segment_base = client->port_segment[ptid].address;
+	port->client_segment_base =
+		(void *) &client->port_segment[ptid].address;
 	
 	return port;
 }
@@ -371,7 +374,7 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 		if (port->tied) {
 			return jack_port_get_buffer (port->tied, nframes);
 		}
-		return jack_port_buffer (port);
+		return jack_output_port_buffer (port);
 	}
 
 	/* Input port.  Since this can only be called from the
@@ -394,28 +397,20 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 					     nframes);
 	}
 
-	/* Multiple connections.  Use a local buffer and mixdown the
-	   incoming data to that buffer. we have already established
-	   the existence of a mixdown function during the connection
-	   process.
-
-	   No port can have an offset of 0, that offset refers to the
-	   zero-filled area at the start of a shared port segment
-	   area.  So, use the offset to store the location of a
-	   locally allocated buffer, and reset the client_segment_base
-	   so that the jack_port_buffer() computation works correctly.
+	/* Multiple connections.  Use a local buffer and mix the
+	   incoming data into that buffer.  We have already
+	   established the existence of a mixdown function during the
+	   connection process.
 	*/
-
-	if (port->shared->offset == 0) {
-		port->shared->offset = (size_t)
+	if (port->mix_buffer == NULL) {
+		port->mix_buffer =
 			jack_pool_alloc (
-				port->shared->type_info.buffer_scale_factor
+				port->type_info->buffer_scale_factor
 				* sizeof (jack_default_audio_sample_t)
 				* nframes);
-		port->client_segment_base = 0;
 	}
 	port->fptr.mixdown (port, nframes);
-	return (jack_default_audio_sample_t *) port->shared->offset;
+	return (jack_default_audio_sample_t *) port->mix_buffer;
 }
 
 int
@@ -565,7 +560,7 @@ jack_port_flags (const jack_port_t *port)
 const char *
 jack_port_type (const jack_port_t *port)
 {
-	return port->shared->type_info.type_name;
+	return port->type_info->type_name;
 }
 
 int
@@ -604,7 +599,8 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 	jack_default_audio_sample_t *dst, *src;
 
 	/* by the time we've called this, we've already established
-	   the existence of more than 1 connection to this input port.
+	   the existence of more than one connection to this input
+	   port and allocated a mix_buffer.
 	*/
 
 	/* no need to take connection lock, since this is called
@@ -615,9 +611,9 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 
 	node = port->connections;
 	input = (jack_port_t *) node->data;
-	buffer = jack_port_buffer (port);
+	buffer = port->mix_buffer;
 
-	memcpy (buffer, jack_port_buffer (input),
+	memcpy (buffer, jack_output_port_buffer (input),
 		sizeof (jack_default_audio_sample_t) * nframes);
 
 	for (node = jack_slist_next (node); node;
@@ -627,7 +623,7 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 
 		n = nframes;
 		dst = buffer;
-		src = jack_port_buffer (input);
+		src = jack_output_port_buffer (input);
 
 		while (n--) {
 			*dst++ += *src++;

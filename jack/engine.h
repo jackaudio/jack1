@@ -38,6 +38,7 @@ typedef struct {
     jack_shmsize_t offset;
 } jack_port_buffer_info_t;
 
+/* The engine keeps an array of these in its local memory. */
 typedef struct _jack_port_internal {
     struct _jack_port_shared *shared;
     JSList                   *connections;

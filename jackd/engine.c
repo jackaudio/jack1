@@ -171,14 +171,14 @@ jack_global_port_type_info (jack_engine_t *engine, jack_port_internal_t *port)
 {
 	/* Returns a pointer to the port type information in the
 	   engine's shared control structure. */
-	return &engine->control->port_types[port->shared->type_info.type_id];
+	return &engine->control->port_types[port->shared->ptype_id];
 }
 
 static inline jack_port_type_internal_t *
 jack_local_port_type_info (jack_engine_t *engine, jack_port_internal_t *port)
 {
 	/* Points to the engine's private port type struct. */
-	return &engine->port_type[port->shared->type_info.type_id];
+	return &engine->port_type[port->shared->ptype_id];
 }
 
 static int
@@ -311,8 +311,9 @@ jack_resize_port_segment (jack_engine_t *engine,
 	int shmid;
 	int perm;
 	jack_port_buffer_info_t *bi;
-	jack_port_type_id_t ptid = port_type->type_id;
+	jack_port_type_id_t ptid = port_type->ptype_id;
 	jack_port_type_internal_t *pti = &engine->port_type[ptid];
+	jack_port_id_t i;
 
 	if (port_type->buffer_scale_factor < 0) {
 		one_buffer = port_type->buffer_size;
@@ -369,8 +370,8 @@ jack_resize_port_segment (jack_engine_t *engine,
 		pthread_mutex_unlock (&pti->buffer_lock);
 
 	} else {
-
 		/* resize existing buffer segment */
+
 		if ((addr = jack_resize_shm (port_type->shm_info.shm_name,
 					     size, perm, 0666,
 					     PROT_READ|PROT_WRITE))
@@ -391,6 +392,15 @@ jack_resize_port_segment (jack_engine_t *engine,
 			offset += one_buffer;
 			++bi;
 		}
+
+		/* update any existing output port offsets */
+		for (i = 0; i < engine->port_max; i++) {
+			if (engine->control->ports[i].flags|JackPortIsOutput &&
+			    engine->control->ports[i].ptype_id == ptid) {
+				bi = engine->internal_ports[i].buffer_info;
+				engine->control->ports[i].offset = bi->offset;
+			}
+		}
 		pthread_mutex_unlock (&pti->buffer_lock);
 	}
 
@@ -401,7 +411,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 	event.type = AttachPortSegment;
 	strcpy (event.x.shm_name, port_type->shm_info.shm_name);
 	event.y.ptid = ptid;
-	event.z.size = size;		/* JOQ: why wasn't this set before? */
+	event.z.size = size;
 	jack_deliver_event_to_all (engine, &event);
 }
 
@@ -2025,8 +2035,8 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 			&jack_builtin_port_types[i],
 			sizeof (jack_port_type_info_t));
 
-		/* set offset into port_types array */
-		engine->control->port_types[i].type_id = i;
+		/* the port type id is index into port_types array */
+		engine->control->port_types[i].ptype_id = i;
 
 		/* be sure to initialize mutex correctly */
 		pthread_mutex_init (&engine->port_type[i].buffer_lock, NULL);
@@ -3388,7 +3398,7 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 			 jack_slist_length(client->fed_by),
 			 client->subgraph_start_fd,
 			 client->subgraph_wait_fd);
-		
+
 		for(m = 0, portnode = client->ports; portnode;
 		    portnode = jack_slist_next (portnode)) {
 		        port = (jack_port_internal_t *) portnode->data;
@@ -3472,8 +3482,7 @@ jack_port_do_connect (jack_engine_t *engine,
 		return -1;
 	}
 
-	if (srcport->shared->type_info.type_id
-	    != dstport->shared->type_info.type_id) {
+	if (srcport->shared->ptype_id != dstport->shared->ptype_id) {
 		jack_error ("ports used in attemped connection are not of "
 			    "the same data type");
 		return -1;
@@ -3508,7 +3517,8 @@ jack_port_do_connect (jack_engine_t *engine,
 	}
 
 	for (it = srcport->connections; it; it = it->next) {
-		if (((jack_connection_internal_t *)it->data)->destination == dstport) {
+		if (((jack_connection_internal_t *)it->data)->destination
+		    == dstport) {
 			return EEXIST;
 		}
 	}
@@ -3524,11 +3534,11 @@ jack_port_do_connect (jack_engine_t *engine,
 
 	jack_lock_graph (engine);
 
-	if (dstport->connections &&
-	    !dstport->shared->has_mixdown) {
+	if (dstport->connections && !dstport->shared->has_mixdown) {
+		jack_port_type_info_t *port_type =
+			jack_global_port_type_info (engine, dstport);
 		jack_error ("cannot make multiple connections to a port of"
-			    " type [%s]", 
-			    dstport->shared->type_info.type_name);
+			    " type [%s]", port_type->type_name);
 		free (connection);
 		jack_unlock_graph (engine);
 		return -1;
@@ -3900,8 +3910,7 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	shared = &engine->control->ports[port_id];
 
 	strcpy (shared->name, req->x.port_info.name);
-	memcpy (&shared->type_info, &engine->control->port_types[i],
-		sizeof (jack_port_type_info_t));
+	shared->ptype_id = engine->control->port_types[i].ptype_id;
 	shared->client_id = req->x.port_info.client_id;
 	shared->flags = req->x.port_info.flags;
 	shared->latency = 0;

@@ -10,9 +10,15 @@ struct _jack_client {
     int pollmax;
     int graph_next_fd;
     int request_fd;
+
     jack_port_type_id_t n_port_types;
-    jack_port_segment_info_t port_segment[JACK_MAX_PORT_TYPES];
+    struct {
+	shm_name_t     shm_name;
+	void	       *address;
+	jack_shmsize_t	size;
+    } port_segment[JACK_MAX_PORT_TYPES];
     JSList *ports;
+
     pthread_t thread;
     char fifo_prefix[PATH_MAX+1];
     void (*on_shutdown)(void *arg);

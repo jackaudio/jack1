@@ -202,11 +202,9 @@ jack_client_invalidate_port_buffers (jack_client_t *client)
 		port = (jack_port_t *) node->data;
 
 		if (port->shared->flags & JackPortIsInput) {
-			if (port->client_segment_base == 0) {
-				jack_pool_release (
-					(void *) port->shared->offset);
-				port->client_segment_base = 0;
-				port->shared->offset = 0;
+			if (port->mix_buffer) {
+				jack_pool_release (port->mix_buffer);
+				port->mix_buffer = NULL;
 			}
 		}
 	}
@@ -1527,16 +1525,19 @@ jack_get_ports (jack_client_t *client,
 	engine = client->engine;
 
 	if (port_name_pattern && port_name_pattern[0]) {
-		regcomp (&port_regex, port_name_pattern, REG_EXTENDED|REG_NOSUB);
+		regcomp (&port_regex, port_name_pattern,
+			 REG_EXTENDED|REG_NOSUB);
 	}
 	if (type_name_pattern && type_name_pattern[0]) {
-		regcomp (&type_regex, type_name_pattern, REG_EXTENDED|REG_NOSUB);
+		regcomp (&type_regex, type_name_pattern,
+			 REG_EXTENDED|REG_NOSUB);
 	}
 
 	psp = engine->ports;
 	match_cnt = 0;
 
-	matching_ports = (const char **) malloc (sizeof (char *) * engine->port_max);
+	matching_ports = (const char **)
+		malloc (sizeof (char *) * engine->port_max);
 
 	for (i = 0; i < engine->port_max; i++) {
 		matching = 1;
@@ -1558,7 +1559,10 @@ jack_get_ports (jack_client_t *client,
 		} 
 
 		if (matching && type_name_pattern && type_name_pattern[0]) {
-			if (regexec (&type_regex, psp[i].type_info.type_name, 0, NULL, 0)) {
+			jack_port_type_id_t ptid = psp[i].ptype_id;
+			if (regexec (&type_regex,
+				     engine->port_types[ptid].type_name,
+				     0, NULL, 0)) {
 				matching = 0;
 			}
 		} 

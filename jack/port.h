@@ -46,24 +46,22 @@ typedef int32_t jack_port_type_id_t;
 
 typedef struct {
     shm_name_t     shm_name;
-    char          *address;		/* JOQ: no longer set globally */
     jack_shmsize_t size;
 } jack_port_segment_info_t;
 
-/* Port type structure.  Has several uses:
+/* Port type structure.  
  *
  *  (1) One for each port type is part of the engine's jack_control_t
  *  shared memory structure.
  *
  *  (2) One for each port type is appended to the engine's
- *  jack_client_connect_result_t response.
- *
- *  (3) The client reads these into its local memory, and uses them to
- *  attach the corresponding shared memory segments.
+ *  jack_client_connect_result_t response.  The client reads them into
+ *  its local memory, using them to attach the corresponding shared
+ *  memory segments.
  */
 typedef struct _jack_port_type_info {
 
-    jack_port_type_id_t type_id;
+    jack_port_type_id_t ptype_id;
     const char     type_name[JACK_PORT_TYPE_SIZE];      
 
     /* If == 1, then a buffer to handle nframes worth of data has
@@ -82,17 +80,12 @@ typedef struct _jack_port_type_info {
 
 } jack_port_type_info_t;
 
-/* This is the data structure allocated in shared memory
- * by the engine.
- */
+/* Allocated by the engine in shared memory. */
 typedef struct _jack_port_shared {
-    jack_port_type_info_t    type_info;
-    /* location of buffer as an offset from the start of the port's
-     * type-specific shared memory region. */
-    jack_shmsize_t           offset;
-    /* index into engine port array for this port */
-    jack_port_id_t           id;
-    int8_t		     has_mixdown; /* port has a mixdown function */
+
+    jack_port_type_id_t      ptype_id;	/* index into port type array */
+    jack_shmsize_t           offset;	/* buffer offset in shm segment */
+    jack_port_id_t           id;	/* index into engine port array */
     enum JackPortFlags	     flags;    
     char                     name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
     jack_client_id_t         client_id;	/* who owns me */
@@ -101,6 +94,7 @@ typedef struct _jack_port_shared {
     volatile jack_nframes_t  total_latency;
     volatile uint8_t	     monitor_requests;
 
+    int8_t		     has_mixdown; /* port has a mixdown function */
     char                     in_use     : 1;
     char                     locked     : 1;
 
@@ -115,20 +109,27 @@ typedef struct _jack_port_functions {
 
 } jack_port_functions_t;
 
-/* This port structure is allocated by the client in local memory. */
+/* Allocated by the client in local memory. */
 struct _jack_port {
-    char                     *client_segment_base;
+    void                     **client_segment_base;
+    void                     *mix_buffer;
+    jack_port_type_info_t    *type_info; /* shared memory type info */
     struct _jack_port_shared *shared;	/* corresponding shm struct */
     struct _jack_port        *tied;	/* locally tied source port */
-    jack_port_functions_t    fptr;	/* local port functions */
-    pthread_mutex_t           connection_lock;
+    jack_port_functions_t    fptr;
+    pthread_mutex_t          connection_lock;
     JSList                   *connections;
 };
 
-/* Inline would be cleaner, but it needs to be fast even in
- * non-optimized code. */
+/*  Inline would be cleaner, but it needs to be fast even in
+ *  non-optimized code.  jack_output_port_buffer() only handles output
+ *  ports.  jack_port_buffer() works for both input and output ports.
+ */
 #define jack_port_buffer(p) \
-  ((void *) ((p)->client_segment_base + (p)->shared->offset))
+  ((void *) ((p)->mix_buffer? (p)->mix_buffer: \
+   *(p)->client_segment_base + (p)->shared->offset))
+#define jack_output_port_buffer(p) \
+  ((void *) (*(p)->client_segment_base + (p)->shared->offset))
 
 #endif /* __jack_port_h__ */
 
