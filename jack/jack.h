@@ -176,10 +176,14 @@ int jack_deactivate (jack_client_t *client);
  * the data may be of any type. Ports may be connected to each other
  * in various ways.
  *
- * A port has a short name, which may be any non-NULL and non-zero
- * length string, and is passed as the first argument. A port's full
- * name is the name of the client concatenated with a colon (:) and
- * then its short name.
+ * A port has a short name, a non-NULL and non-zero length string, and
+ * is passed as the first argument. A port's full name is the name of
+ * the client concatenated with a colon (:) and then its short
+ * name. There are limits to the length of the name, and exceeding
+ * them will cause registration of the port to fail and the function
+ * to return NULL. The limit is derived from the size of a full port
+ * name, which also has to include the client name and a separator
+ * character.
  *
  * A port has a type, which may be any non-NULL and non-zero length
  * string, and is passed as the second argument. For types that are
@@ -189,6 +193,9 @@ int jack_deactivate (jack_client_t *client);
  * 'buffer_size' is ignored.
  *
  * The 'flags' argument is formed from a bitmask of JackPortFlags values.
+ *
+ * @return a valid jack_port_t* on success, NULL otherwise.
+ * returns NULL.
  */
 jack_port_t *jack_port_register (jack_client_t *,
                                  const char *port_name,

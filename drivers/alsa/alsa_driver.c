@@ -85,13 +85,14 @@ alsa_driver_check_card_type (alsa_driver_t *driver)
 
 	snd_ctl_card_info_alloca (&card_info);
 
-	if ((err = snd_ctl_open (&driver->ctl_handle, driver->alsa_name, 0)) < 0) {
-		jack_error ("control open \"%s\" (%s)", driver->alsa_name, snd_strerror(err));
+	// XXX: I don't know the "right" way to do this. Which to use driver->alsa_name_playback or driver->alsa_name_capture.
+	if ((err = snd_ctl_open (&driver->ctl_handle, driver->alsa_name_playback, 0)) < 0) {
+		jack_error ("control open \"%s\" (%s)", driver->alsa_name_playback, snd_strerror(err));
 		return -1;
 	}
 	
 	if ((err = snd_ctl_card_info(driver->ctl_handle, card_info)) < 0) {
-		jack_error ("control hardware info \"%s\" (%s)", driver->alsa_name, snd_strerror (err));
+		jack_error ("control hardware info \"%s\" (%s)", driver->alsa_name_playback, snd_strerror (err));
 		snd_ctl_close (driver->ctl_handle);
 		return -1;
 	}
@@ -254,7 +255,7 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 }
 
 static int
-alsa_driver_configure_stream (alsa_driver_t *driver, 
+alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			      const char *stream_name,
 			      snd_pcm_t *handle, 
 			      snd_pcm_hw_params_t *hw_params, 
@@ -286,7 +287,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 		if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S16)) < 0) {
 			jack_error ("Sorry. The audio interface \"%s\""
 				    "doesn't support either of the two hardware sample formats that jack can use.",
-				    driver->alsa_name);
+				    device_name);
 			return -1;
 		}
 	}
@@ -401,7 +402,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	driver->user_nperiods = user_nperiods;
 	
 	if (driver->capture_handle) {
-		if (alsa_driver_configure_stream (driver, "capture",
+		if (alsa_driver_configure_stream (driver, driver->alsa_name_capture, "capture", 
 						  driver->capture_handle,
 						  driver->capture_hw_params,
 						  driver->capture_sw_params,
@@ -412,7 +413,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	}
 
 	if (driver->playback_handle) {
-		if (alsa_driver_configure_stream (driver, "playback",
+		if (alsa_driver_configure_stream (driver, driver->alsa_name_playback, "playback",
 						  driver->playback_handle,
 						  driver->playback_hw_params,
 						  driver->playback_sw_params,
@@ -459,9 +460,9 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 		/* Check that we are using the same sample format on both streams */
 		
 		if (p_format != c_format) {
-			jack_error ("Sorry. The PCM device \"%s\""
-				    "doesn't support the same sample format for capture and playback."
-				    "We cannot use this PCM device.", driver->alsa_name);
+			jack_error ("Sorry. The PCM device \"%s\" and \"%s\""
+				    "don't support the same sample format for capture and playback."
+				    "We cannot use this PCM device.", driver->alsa_name_playback, driver->alsa_name_capture );
 			return -1;
 		}
 
@@ -506,9 +507,19 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	}
 
 	if (driver->interleaved) {
+		const snd_pcm_channel_area_t *my_areas;
+		snd_pcm_uframes_t offset, frames;
+		if (snd_pcm_mmap_begin(driver->playback_handle, &my_areas, &offset, &frames) < 0) {
+			jack_error ("ALSA: %s: mmap areas info error", driver->alsa_name_playback);
+			return -1;
+		}
+		driver->playback_interleave_skip = my_areas[0].step / 8;
+		if (snd_pcm_mmap_begin(driver->capture_handle, &my_areas, &offset, &frames) < 0) {
+			jack_error ("ALSA: %s: mmap areas info error", driver->alsa_name_playback);
+			return -1;
+		}
+		driver->capture_interleave_skip = my_areas[0].step / 8;
 		driver->interleave_unit = snd_pcm_format_physical_width (driver->sample_format) / 8;
-		driver->playback_interleave_skip = driver->interleave_unit * driver->playback_nchannels;
-		driver->capture_interleave_skip = driver->interleave_unit * driver->capture_nchannels;
 	} else {
 		driver->interleave_unit = 0;  /* NOT USED */
 		driver->playback_interleave_skip = snd_pcm_format_physical_width (driver->sample_format) / 8;
@@ -599,7 +610,7 @@ alsa_driver_get_channel_addresses (alsa_driver_t *driver,
 		if ((err = snd_pcm_mmap_begin (driver->capture_handle, &driver->capture_areas,
 					       (snd_pcm_uframes_t *) capture_offset, 
 					       (snd_pcm_uframes_t *) capture_avail)) < 0) {
-			jack_error ("ALSA-HW: %s: mmap areas info error", driver->alsa_name);
+			jack_error ("ALSA: %s: mmap areas info error", driver->alsa_name_capture);
 			return -1;
 		}
 		
@@ -613,7 +624,7 @@ alsa_driver_get_channel_addresses (alsa_driver_t *driver,
 		if ((err = snd_pcm_mmap_begin (driver->playback_handle, &driver->playback_areas, 
 					       (snd_pcm_uframes_t *) playback_offset, 
 					       (snd_pcm_uframes_t *) playback_avail)) < 0) {
-			jack_error ("ALSA-HW: %s: mmap areas info error ", driver->alsa_name);
+			jack_error ("ALSA: %s: mmap areas info error ", driver->alsa_name_playback);
 			return -1;
 		}
 		
@@ -639,14 +650,14 @@ alsa_driver_audio_start (alsa_driver_t *driver)
 
 	if (driver->playback_handle) {
 		if ((err = snd_pcm_prepare (driver->playback_handle)) < 0) {
-			jack_error ("ALSA-HW: prepare error for playback on \"%s\" (%s)", driver->alsa_name, snd_strerror(err));
+			jack_error ("ALSA: prepare error for playback on \"%s\" (%s)", driver->alsa_name_playback, snd_strerror(err));
 			return -1;
 		}
 	}
 
 	if (driver->capture_handle && driver->capture_and_playback_not_synced) {
 		if ((err = snd_pcm_prepare (driver->capture_handle)) < 0) {
-			jack_error ("ALSA-HW: prepare error for capture on \"%s\" (%s)", driver->alsa_name, snd_strerror(err));
+			jack_error ("ALSA: prepare error for capture on \"%s\" (%s)", driver->alsa_name_capture, snd_strerror(err));
 			return -1;
 		}
 	}
@@ -663,7 +674,7 @@ alsa_driver_audio_start (alsa_driver_t *driver)
 		pavail = snd_pcm_avail_update (driver->playback_handle);
 
 		if (pavail != driver->buffer_frames) {
-			jack_error ("ALSA-HW: full buffer not available at start");
+			jack_error ("ALSA: full buffer not available at start");
 			return -1;
 		}
 	
@@ -822,7 +833,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 	int need_capture;
 	int need_playback;
 	unsigned int i;
-	jack_time_t poll_enter, poll_ret;
+	jack_time_t poll_enter;
+	jack_time_t poll_ret = 0;
 
 	*status = -1;
 	*delayed_usecs = 0;
@@ -1432,7 +1444,8 @@ alsa_driver_delete (alsa_driver_t *driver)
 		driver->hw->release (driver->hw);
 		driver->hw = 0;
 	}
-	free(driver->alsa_name);
+	free(driver->alsa_name_playback);
+	free(driver->alsa_name_capture);
 	free(driver->alsa_driver);
 
 	alsa_driver_release_channel_dependent_memory (driver);
@@ -1440,7 +1453,7 @@ alsa_driver_delete (alsa_driver_t *driver)
 }
 
 static jack_driver_t *
-alsa_driver_new (char *name, char *alsa_device,
+alsa_driver_new (char *name, char *playback_alsa_device, char *capture_alsa_device,
 		 jack_client_t *client, 
 		 jack_nframes_t frames_per_cycle,
 		 jack_nframes_t user_nperiods,
@@ -1457,8 +1470,8 @@ alsa_driver_new (char *name, char *alsa_device,
 
 	alsa_driver_t *driver;
 
-	printf ("creating alsa driver ... %s|%lu|%lu|%lu|%s|%s|%s\n", 
-		alsa_device, frames_per_cycle, user_nperiods, rate,
+	printf ("creating alsa driver ... %s|%s|%lu|%lu|%lu|%s|%s|%s\n", 
+		playback_alsa_device, capture_alsa_device, frames_per_cycle, user_nperiods, rate,
 		hw_monitoring ? "hwmon":"swmon", hw_metering ? "hwmeter":"swmeter", soft_mode ? "soft-mode":"rt");
 
 	driver = (alsa_driver_t *) calloc (1, sizeof (alsa_driver_t));
@@ -1507,15 +1520,27 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->clock_sync_listeners = 0;
 
 	if (playing) {
-		if (snd_pcm_open (&driver->playback_handle, alsa_device, SND_PCM_STREAM_PLAYBACK, 0) < 0) {
+		if (snd_pcm_open (&driver->playback_handle, playback_alsa_device, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK) < 0) {
+			if (errno == -EBUSY) {
+				jack_error ("the playback device \"%s\" is already in use. Please stop the application using it and "
+					    "run JACK again", playback_alsa_device);
+				return NULL;
+			}
 			driver->playback_handle = NULL;
 		}
+		snd_pcm_nonblock (driver->playback_handle, 0);
 	} 
 
 	if (capturing) {
-		if (snd_pcm_open (&driver->capture_handle, alsa_device, SND_PCM_STREAM_CAPTURE, 0) < 0) {
+		if (snd_pcm_open (&driver->capture_handle, capture_alsa_device, SND_PCM_STREAM_CAPTURE, SND_PCM_NONBLOCK) < 0) {
+			if (errno == -EBUSY) {
+				jack_error ("the capture device \"%s\" is already in use. Please stop the application using it and "
+					    "run JACK again", capture_alsa_device);
+				return NULL;
+			}
 			driver->capture_handle = NULL;
 		}
+		snd_pcm_nonblock (driver->capture_handle, 0);
 	}
 
 	fprintf (stderr, "open\n");
@@ -1556,7 +1581,8 @@ alsa_driver_new (char *name, char *alsa_device,
 		}
 	}
 
-	driver->alsa_name = strdup (alsa_device);
+	driver->alsa_name_playback = strdup (playback_alsa_device);
+	driver->alsa_name_capture = strdup (capture_alsa_device);
 
 	if (alsa_driver_check_card_type (driver)) {
 		if (driver->capture_handle) {
@@ -1687,8 +1713,8 @@ alsa_usage ()
 "    -H,--hwmon   \tuse hardware monitoring, if available (default: no)\n"
 "    -M,--hwmeter \tuse hardware metering, if available (default: no)\n"
 "    -D,--duplex  \tduplex I/O (default: yes)\n"
-"    -C,--capture \tcapture input (default: duplex)\n"
-"    -P,--playback\tplayback output (default: duplex)\n"
+"    -C,--capture [name] \tcapture input and optionally set the capture device (default: duplex)\n"
+"    -P,--playback [name] \tplayback output and optionally set the playback device (default: duplex)\n"
 "    -s,--softmode\tsoft-mode, no xrun handling (default: off)\n"
 "    -m,--monitor \tprovide monitor ports for the output (default: off)\n"
 "    -z,--dither  \tdithering mode:\n"
@@ -1744,7 +1770,8 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 	jack_nframes_t srate = 48000;
 	jack_nframes_t frames_per_interrupt = 1024;
 	unsigned long user_nperiods = 2;
-	char *pcm_name = "default";
+	char *playback_pcm_name = "default";
+	char *capture_pcm_name = "default";
 	int hw_monitoring = FALSE;
 	int hw_metering = FALSE;
 	int capture = FALSE;
@@ -1757,13 +1784,13 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 	char optstring[2];		/* string made from opt char */
 	struct option long_options[] = 
 	{ 
-		{ "capture",	0, NULL, 'C' },
+		{ "capture",	2, NULL, 'C' },
 		{ "duplex",	0, NULL, 'D' },
 		{ "device",	1, NULL, 'd' },
 		{ "hwmon",	0, NULL, 'H' },
 		{ "hwmeter",	0, NULL, 'M' },
 		{ "help",	0, NULL, 'h' },
-		{ "playback",	0, NULL, 'P' },
+		{ "playback",	2, NULL, 'P' },
 		{ "period",	1, NULL, 'p' },
 		{ "rate",	1, NULL, 'r' },
 		{ "nperiods",	1, NULL, 'n' },
@@ -1778,7 +1805,8 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 	*/
 	
 	if ((envvar = getenv ("JACK_ALSA_DEVICE")) != NULL) {
-		pcm_name = envvar;
+		playback_pcm_name = envvar;
+		capture_pcm_name = envvar;
 	}
 
 	if ((envvar = getenv ("JACK_ALSA_HWMON")) != NULL) {
@@ -1827,13 +1855,16 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 	optind = 0;
 	opterr = 0;
 
-	while ((opt = getopt_long(argc, argv, "-CDd:HMPp:r:n:msz::",
+	while ((opt = getopt_long(argc, argv, "-C::Dd:HMP::p:r:n:msz::",
 				  long_options, NULL))
 	       != EOF) {
 		switch (opt) {
 
 		case 'C':
 			capture = TRUE;
+			if (optarg != NULL) {
+				capture_pcm_name = optarg;
+			}
 			break;
 
 		case 'D':
@@ -1842,7 +1873,8 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 			break;
 
 		case 'd':
-			pcm_name = optarg;
+			playback_pcm_name = optarg;
+			capture_pcm_name = optarg;
 			break;
 
 		case 'H':
@@ -1863,6 +1895,9 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 			
 		case 'P':
 			playback = TRUE;
+			if (optarg != NULL) {
+				playback_pcm_name = optarg;
+			}
 			break;
 
 		case 'p':
@@ -1910,7 +1945,7 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 		playback = TRUE;
 	}
 
-	return alsa_driver_new ("alsa_pcm", pcm_name, client, frames_per_interrupt, 
+	return alsa_driver_new ("alsa_pcm", playback_pcm_name, capture_pcm_name, client, frames_per_interrupt, 
 				user_nperiods, srate, hw_monitoring, hw_metering, capture,
 			        playback, dither, soft_mode, monitor);
 }
@@ -1920,4 +1955,3 @@ driver_finish (jack_driver_t *driver)
 {
 	alsa_driver_delete ((alsa_driver_t *) driver);
 }
-

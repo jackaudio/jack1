@@ -70,7 +70,8 @@ typedef struct {
     jack_nframes_t                playback_frame_latency;
 
     unsigned long                *silent;
-    char                         *alsa_name;
+    char                         *alsa_name_playback;
+    char                         *alsa_name_capture;
     char                         *alsa_driver;
     snd_pcm_uframes_t             buffer_frames;
     unsigned long                 channels_not_done;
