@@ -69,8 +69,9 @@ static void
 signal_handler (int sig)
 {
 	fprintf (stderr, "killing jackd at %d\n", jackd_pid);
-	kill (jackd_pid, SIGTERM);
-	exit (-sig);
+	kill (jackd_pid, SIGKILL);
+	cleanup ();
+	exit (-1);
 }
 
 static void

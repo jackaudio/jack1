@@ -722,13 +722,20 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id, int to_wait)
 		jack_client_internal_t *client = (jack_client_internal_t *) node->data;
 
 		if (client->control->id == id) {
-			
+		        
+	        	GSList *portnode;
+			jack_port_internal_t *port;
+
 			if (client == engine->timebase_client) {
 				engine->timebase_client = 0;
 				engine->control->frame_time = 0;
 			}
 			
-			jack_client_disconnect (engine, client);
+			for (portnode = client->ports; portnode; portnode = g_slist_next (portnode)) {
+				port = (jack_port_internal_t *) portnode->data;
+				jack_port_clear_connections (engine, port);
+ 			}
+
 			ret = jack_client_do_deactivate (engine, node->data);
 			break;
 		}
