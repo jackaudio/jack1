@@ -294,7 +294,8 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			      unsigned long *nchns,unsigned long sample_width)
 {
 	int err;
-
+	snd_pcm_uframes_t stop_th;
+	
 	if ((err = snd_pcm_hw_params_any (handle, hw_params)) < 0)  {
 		jack_error ("ALSA: no playback configurations available (%s)",
 			    snd_strerror (err));
@@ -328,7 +329,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		if ((err = snd_pcm_hw_params_set_format (
 			     handle, hw_params, SND_PCM_FORMAT_S32)) < 0) {
 			jack_error("Couldn't open %s for 32bit samples "
-				   "trying 16bit instead",device_name);
+				   "trying 16bit instead", device_name);
 			if ((err = snd_pcm_hw_params_set_format (
 				     handle, hw_params, SND_PCM_FORMAT_S16))
 			    < 0) {
@@ -450,21 +451,18 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		return -1;
 	}
 
-	{
-		snd_pcm_uframes_t stop_th =
-			driver->user_nperiods * driver->frames_per_cycle;
-		if (driver->soft_mode) {
-			stop_th = (snd_pcm_uframes_t)-1;
-		}
-
-		if ((err = snd_pcm_sw_params_set_stop_threshold (
-			     handle, sw_params, stop_th)) < 0) {
-			jack_error ("ALSA: cannot set stop mode for %s",
-				    stream_name);
-			return -1;
-		}
+	stop_th = driver->user_nperiods * driver->frames_per_cycle;
+	if (driver->soft_mode) {
+		stop_th = (snd_pcm_uframes_t)-1;
 	}
 	
+	if ((err = snd_pcm_sw_params_set_stop_threshold (
+		     handle, sw_params, stop_th)) < 0) {
+		jack_error ("ALSA: cannot set stop mode for %s",
+			    stream_name);
+		return -1;
+	}
+
 	if ((err = snd_pcm_sw_params_set_silence_threshold (
 		     handle, sw_params, 0)) < 0) {
 		jack_error ("ALSA: cannot set silence threshold for %s",
@@ -472,13 +470,19 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		return -1;
 	}
 
+#if 0
+	fprintf (stderr, "set silence size to %lu * %lu = %lu\n",
+		 driver->frames_per_cycle, driver->user_nperiods,
+		 driver->frames_per_cycle * driver->user_nperiods);
+
 	if ((err = snd_pcm_sw_params_set_silence_size (
 		     handle, sw_params,
-		     driver->frames_per_cycle * driver->nfragments)) < 0) {
+		     driver->frames_per_cycle * driver->user_nperiods)) < 0) {
 		jack_error ("ALSA: cannot set silence size for %s",
 			    stream_name);
 		return -1;
 	}
+#endif
 
 	if ((err = snd_pcm_sw_params_set_avail_min (
 		     handle, sw_params, driver->frames_per_cycle)) < 0) {
@@ -487,7 +491,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 	}
 
 	if ((err = snd_pcm_sw_params (handle, sw_params)) < 0) {
-		jack_error ("ALSA: cannot set software parameters for %s",
+		jack_error ("ALSA: cannot set software parameters for %s\n",
 			    stream_name);
 		return -1;
 	}
@@ -511,6 +515,10 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	driver->frame_rate = rate;
 	driver->frames_per_cycle = frames_per_cycle;
 	driver->user_nperiods = user_nperiods;
+
+	fprintf (stderr, 
+		 "configuring for %luHz, period = %lu frames, buffer = %lu periods\n",
+		 rate, frames_per_cycle, user_nperiods);
 	
 	if (driver->capture_handle) {
 		if (alsa_driver_configure_stream (
@@ -1512,7 +1520,7 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 			jack_error ("could not complete playback of %"
 				    PRIu32 " frames: error = %d",
 				    contiguous, err);
-			if (err != -EPIPE && err != -ESTRPIPE)
+			if (err != EPIPE && err != ESTRPIPE)
 				return -1;
 		}
 
@@ -1860,7 +1868,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 				  playback_alsa_device,
 				  SND_PCM_STREAM_PLAYBACK,
 				  SND_PCM_NONBLOCK) < 0) {
-			if (errno == -EBUSY) {
+			if (errno == EBUSY) {
 				jack_error ("the playback device \"%s\" is "
 					    "already in use. Please stop the"
 					    " application using it and "
@@ -1869,7 +1877,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 				return NULL;
 			}
 			driver->playback_handle = NULL;
-		}
+		} 
 		snd_pcm_nonblock (driver->playback_handle, 0);
 	} 
 
@@ -1878,7 +1886,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 				  capture_alsa_device,
 				  SND_PCM_STREAM_CAPTURE,
 				  SND_PCM_NONBLOCK) < 0) {
-			if (errno == -EBUSY) {
+			if (errno == EBUSY) {
 				jack_error ("the capture device \"%s\" is "
 					    "already in use. Please stop the"
 					    " application using it and "

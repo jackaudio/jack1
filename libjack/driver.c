@@ -147,9 +147,9 @@ jack_driver_nt_thread (void * arg)
 	pthread_mutex_unlock (&driver->nt_run_lock);
 
  out:
-	if (rc || run == DRIVER_NT_EXIT)
-  	  driver->engine->driver_exit (driver->engine);
-
+	if (rc) {
+		driver->engine->driver_exit (driver->engine);
+	}
 	pthread_exit (NULL);
 }
 

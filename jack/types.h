@@ -139,7 +139,17 @@ typedef int  (*JackSampleRateCallback)(jack_nframes_t nframes, void *arg);
 typedef void (*JackPortRegistrationCallback)(jack_port_id_t port, int, void *arg);
 
 /**
- * Used for the type argument of jack_port_register().
+ * Prototype for the client supplied function that is called 
+ * whenever jackd starts or stops freewheeling.
+ *
+ * @param starting non-zero if we start starting to freewheel, zero otherwise
+ * @param arg pointer to a client supplied structure
+ */ 
+typedef void (*JackFreewheelCallback)(int starting, void *arg);
+
+/**
+ * Used for the type argument of jack_port_register() for default
+ * audio ports.
  */
 #define JACK_DEFAULT_AUDIO_TYPE "32 bit float mono audio"
 

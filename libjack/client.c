@@ -713,19 +713,34 @@ jack_set_freewheel (jack_client_t* client, int onoff)
 void
 jack_start_freewheel (jack_client_t* client)
 {
-	jack_drop_real_time_scheduling (client->thread);
+	jack_client_control_t *control = client->control;
+
+	if (client->engine->real_time) {
+		jack_drop_real_time_scheduling (client->thread);
+	}
+
+	if (control->freewheel_cb) {
+		control->freewheel_cb (1, control->freewheel_arg);
+	}
 }
 
 void
 jack_stop_freewheel (jack_client_t* client)
 {
-	jack_acquire_real_time_scheduling (client->thread,
-					   client->engine->client_priority);
+	jack_client_control_t *control = client->control;
+
+	if (control->freewheel_cb) {
+		control->freewheel_cb (0, control->freewheel_arg);
+	}
+
+	if (client->engine->real_time) {
+		jack_acquire_real_time_scheduling (client->thread,
+						   client->engine->client_priority);
+	}
 }
 
 static void *
 jack_client_thread (void *arg)
-
 {
 	jack_client_t *client = (jack_client_t *) arg;
 	jack_client_control_t *control = client->control;
@@ -1541,6 +1556,19 @@ jack_set_process_callback (jack_client_t *client,
 }
 
 int
+jack_set_freewheel_callback (jack_client_t *client,
+			     JackFreewheelCallback callback, void *arg)
+{
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+	client->control->freewheel_arg = arg;
+	client->control->freewheel_cb = callback;
+	return 0;
+}
+
+int
 jack_set_buffer_size_callback (jack_client_t *client,
 			       JackBufferSizeCallback callback, void *arg)
 {
@@ -1553,7 +1581,6 @@ int
 jack_set_port_registration_callback(jack_client_t *client,
 				    JackPortRegistrationCallback callback,
 				    void *arg)
-
 {
 	if (client->control->active) {
 		jack_error ("You cannot set callbacks on an active client.");

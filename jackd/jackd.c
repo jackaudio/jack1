@@ -354,7 +354,7 @@ static void usage (FILE *file)
 static jack_driver_desc_t *
 jack_find_driver_descriptor (const char * name)
 {
-	jack_driver_desc_t * desc;
+	jack_driver_desc_t * desc = 0;
 	JSList * node;
 
 	for (node = drivers; node; node = jack_slist_next (node)) {

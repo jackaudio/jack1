@@ -111,6 +111,19 @@ int jack_set_process_callback (jack_client_t *client,
 			       void *arg);
 
 /**
+ * Tell the Jack server to call @a freewheel_callback
+ * whenever we enter or leave "freewheel" mode, passing @a
+ * arg as the second argument. The first argument to the
+ * callback will be non-zero if JACK is entering freewheel
+ * mode, and zero otherwise.
+ *
+ * @return 0 on success, otherwise a non-zero error code.
+ */
+int jack_set_freewheel_callback (jack_client_t *client,
+				 JackFreewheelCallback freewheel_callback,
+				 void *arg);
+
+/**
  * Start/Stop JACK's "freewheel" mode.
  *
  * When in "freewheel" mode, JACK no longer waits for

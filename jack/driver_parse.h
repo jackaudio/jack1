@@ -28,7 +28,7 @@ static void
 jack_print_driver_options (jack_driver_desc_t * desc, FILE *file)
 {
 	unsigned long i;
-	const char * arg_string;
+	const char * arg_string = "";
 	char arg_default[JACK_DRIVER_PARAM_STRING_MAX + 1];
 
 	for (i = 0; i < desc->nparams; i++) {

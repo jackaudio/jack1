@@ -603,7 +603,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 static JSList * 
 jack_process_external(jack_engine_t *engine, JSList *node)
 {
-	int status;
+	int status = 0;
 	char c;
 	struct pollfd pfd[1];
 	int poll_timeout;
@@ -638,9 +638,13 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 
 	then = jack_get_microseconds ();
 
-	poll_timeout = (engine->control->real_time == 0 ?
-			engine->client_timeout_msecs :
-			engine->driver->period_usecs/1000);
+	if (engine->freewheeling) {
+		poll_timeout = 10000; /* 10 seconds */
+	} else {
+		poll_timeout = (engine->control->real_time == 0 ?
+				engine->client_timeout_msecs :
+				engine->driver->period_usecs/1000);
+	}
 
 	pfd[0].fd = client->subgraph_wait_fd;
 	pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
@@ -851,7 +855,7 @@ jack_remove_clients (jack_engine_t* engine)
 						    (jack_client_internal_t *)
 						    node->data);
 			} else {
-				VERBOSE (engine, "zombifying failed "
+				VERBOSE (engine, "client failure: "
 					 "client %s state = %s errors"
 					 " = %d\n", 
 					 client->control->name,
@@ -2252,13 +2256,18 @@ jack_start_freewheeling (jack_engine_t* engine)
 {
 	jack_event_t event;
 
+	if (engine->freewheeling) {
+		return 0;
+	}
+
 	if (engine->driver == NULL) {
 		jack_error ("cannot start freewheeling without a driver!");
 		return -1;
 	}
 
-	event.type = StartFreewheel;
-	jack_deliver_event_to_all (engine, &event);
+	/* stop driver before telling anyone about it so 
+	   there are no more process() calls being handled.
+	*/
 
 	if (engine->driver->stop (engine->driver)) {
 		jack_error ("could not stop driver for freewheeling");
@@ -2267,6 +2276,9 @@ jack_start_freewheeling (jack_engine_t* engine)
 
 	engine->freewheeling = 1;
 
+	event.type = StartFreewheel;
+	jack_deliver_event_to_all (engine, &event);
+	
 	if (pthread_create (&engine->freewheel_thread, NULL,
 			    jack_engine_freewheel, engine)) {
 		jack_error ("could not start create freewheel thread");
@@ -2281,6 +2293,10 @@ jack_stop_freewheeling (jack_engine_t* engine)
 {
 	jack_event_t event;
 	void *ftstatus;
+
+	if (!engine->freewheeling) {
+		return 0;
+	}
 
 	if (engine->driver == NULL) {
 		jack_error ("cannot start freewheeling without a driver!");

@@ -8,7 +8,7 @@
 
 	No compatibility issues: this introduces new functionality to 
 	JACK and doesn't alter any existing functionality.
-	
+
 2003-09-18  Jack O'Quin  <joq@io.com>
 
 	* new function jack_set_buffer_size().  

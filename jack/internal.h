@@ -180,9 +180,11 @@ typedef volatile struct {
     volatile uint64_t	finished_at;
 
     /* JOQ: all these pointers are trouble for 32/64 compatibility,
-     * they should move to non-shared memory. */
+     * they should move to non-shared memory. 
+     */
 
-    /* callbacks */
+    /* callbacks 
+     */
     JackProcessCallback process;
     void *process_arg;
     JackBufferSizeCallback bufsize;
@@ -199,7 +201,9 @@ typedef volatile struct {
     void *sync_arg;
     JackTimebaseCallback timebase_cb;
     void *timebase_arg;
-
+    JackFreewheelCallback freewheel_cb;
+    void *freewheel_arg;
+	
     /* external clients: set by libjack
      * internal clients: set by engine */
     int (*deliver_request)(void*, jack_request_t*);

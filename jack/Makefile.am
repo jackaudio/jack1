@@ -18,6 +18,7 @@ noinst_HEADERS =		\
 	jslist.h		\
 	pool.h			\
 	port.h			\
+	ringbuffer.h		\
 	shm.h			\
 	start.h			\
 	time.h			\
