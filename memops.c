@@ -34,23 +34,15 @@
    floating-point => int conversion the compiler provides.  
 */
 
-void sample_move_d32u24_sS (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, gain_t gain)
+void sample_move_d32u24_sS (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip)
 
 {
 	/* ALERT: signed sign-extension portability !!! */
 
-	if (gain == 1.0) {
-		while (nsamples--) {
-			*((int *) dst) = ((int) (*src * SAMPLE_MAX_24BIT)) << 8;
-			dst += dst_skip;
-			src++;
-		}
-	} else {
-		while (nsamples--) {
-			*((int *) dst) = ((int) ((*src * gain) * SAMPLE_MAX_24BIT)) << 8;
-			dst += dst_skip;
-			src++;
-		}
+	while (nsamples--) {
+		*((int *) dst) = ((int) (*src * SAMPLE_MAX_24BIT)) << 8;
+		dst += dst_skip;
+		src++;
 	}
 }	
 
@@ -65,7 +57,7 @@ void sample_move_dS_s32u24 (sample_t *dst, char *src, unsigned long nsamples, un
 	}
 }	
 
-void sample_move_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, gain_t gain)
+void sample_move_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip)
 	
 {
 	sample_t val;
@@ -76,33 +68,17 @@ void sample_move_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsi
 	   sucks that h/w.
 	*/
 	
-	
-	if (gain == 1.0) {
-		while (nsamples--) {
-			val = *src;
-			if (val > 1.0f) {
-				*((short *)dst) = SHRT_MAX;
-			} else if (val < -1.0f) {
-				*((short *)dst) = SHRT_MIN;
-			} else {
-				*((short *) dst) = (short) (val * SAMPLE_MAX_16BIT);
-			}
-			dst += dst_skip;
-			src++;
+	while (nsamples--) {
+		val = *src;
+		if (val > 1.0f) {
+			*((short *)dst) = SHRT_MAX;
+		} else if (val < -1.0f) {
+			*((short *)dst) = SHRT_MIN;
+		} else {
+			*((short *) dst) = (short) (val * SAMPLE_MAX_16BIT);
 		}
-	} else {
-		while (nsamples--) {
-			val = *src * gain;
-			if (val > 1.0f) {
-				*((short *)dst) = SHRT_MAX;
-			} else if (val < -1.0f) {
-				*((short *)dst) = SHRT_MIN;
-			} else {
-				*((short *) dst) = (short) (val * SAMPLE_MAX_16BIT);
-			}
-			dst += dst_skip;
-			src++;
-		}
+		dst += dst_skip;
+		src++;
 	}
 }	
 
@@ -117,60 +93,36 @@ void sample_move_dS_s16 (sample_t *dst, char *src, unsigned long nsamples, unsig
 	}
 }	
 
-void sample_merge_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, gain_t gain)
+void sample_merge_d16_sS (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip)
 {
 	short val;
 
 	/* ALERT: signed sign-extension portability !!! */
 	
-	if (gain == 1.0) {
-		while (nsamples--) {
-			val = (short) (*src * SAMPLE_MAX_16BIT);
-
-			if (val > SHRT_MAX - *((short *) dst)) {
-				*((short *)dst) = SHRT_MAX;
-			} else if (val < SHRT_MIN - *((short *) dst)) {
-				*((short *)dst) = SHRT_MIN;
-			} else {
-				*((short *) dst) += val;
-			}
-			dst += dst_skip;
-			src++;
+	while (nsamples--) {
+		val = (short) (*src * SAMPLE_MAX_16BIT);
+		
+		if (val > SHRT_MAX - *((short *) dst)) {
+			*((short *)dst) = SHRT_MAX;
+		} else if (val < SHRT_MIN - *((short *) dst)) {
+			*((short *)dst) = SHRT_MIN;
+		} else {
+			*((short *) dst) += val;
 		}
-	} else {
-		while (nsamples--) {
-			val = (short) (*src * gain * SAMPLE_MAX_16BIT);
-
-			if (val > SHRT_MAX - *((short *) dst)) {
-				*((short *)dst) = SHRT_MAX;
-			} else if (val < SHRT_MIN - *((short *) dst)) {
-				*((short *)dst) = SHRT_MIN;
-			} else {
-				*((short *) dst) += val;
-			}
-			dst += dst_skip;
-			src++;
-		}
+		dst += dst_skip;
+		src++;
 	}
 }	
 
-void sample_merge_d32u24_sS (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, gain_t gain)
+void sample_merge_d32u24_sS (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip)
 
 {
 	/* ALERT: signed sign-extension portability !!! */
 
-	if (gain == 1.0) {
-		while (nsamples--) {
-			*((int *) dst) += (((int) (*src * SAMPLE_MAX_24BIT)) << 8);
-			dst += dst_skip;
-			src++;
-		}
-	} else {
-		while (nsamples--) {
-			*((int *) dst) += (((int) ((*src * gain) * SAMPLE_MAX_24BIT)) << 8);
-			dst += dst_skip;
-			src++;
-		}
+	while (nsamples--) {
+		*((int *) dst) += (((int) (*src * SAMPLE_MAX_24BIT)) << 8);
+		dst += dst_skip;
+		src++;
 	}
 }	
 

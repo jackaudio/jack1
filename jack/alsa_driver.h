@@ -34,8 +34,7 @@ typedef void (*ReadCopyFunction)  (sample_t *dst, char *src,
 				   unsigned long src_skip_bytes);
 typedef void (*WriteCopyFunction) (char *dst, sample_t *src,
 				   unsigned long src_bytes,
-				   unsigned long dst_skip_bytes,
-				   gain_t gain);
+				   unsigned long dst_skip_bytes);
 typedef void (*CopyCopyFunction)  (char *dst, char *src,
 				   unsigned long src_bytes,
 				   unsigned long dst_skip_bytes,
@@ -155,14 +154,12 @@ static __inline__ void alsa_driver_read_from_channel (alsa_driver_t *driver,
 static __inline__ void alsa_driver_write_to_channel (alsa_driver_t *driver,
 				   channel_t channel, 
 				   sample_t *buf, 
-				   nframes_t nsamples, 
-				   gain_t gain) 
+				   nframes_t nsamples)
 {
 	driver->write_via_copy (driver->playback_addr[channel],
 				buf, 
 				nsamples, 
-				driver->playback_interleave_skip, 
-				gain);
+				driver->playback_interleave_skip);
 	alsa_driver_mark_channel_done (driver, channel);
 }
 

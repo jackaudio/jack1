@@ -23,47 +23,31 @@
 
 #include <jack/types.h>
 
-void sample_move_d32u24_sS           (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, gain_t);
-void sample_move_d16_sS              (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, gain_t);
+void sample_move_d32u24_sS           (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip);
+void sample_move_d16_sS              (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip);
 
 void sample_move_dS_s32u24           (sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
 void sample_move_dS_s16              (sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
 
-void sample_merge_d16_sS             (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, gain_t);
-void sample_merge_d32u24_sS          (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, gain_t);
+void sample_merge_d16_sS             (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip);
+void sample_merge_d32u24_sS          (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip);
 
 static __inline__ void
-sample_merge (sample_t *dst, sample_t *src, unsigned long cnt, gain_t gain)
+sample_merge (sample_t *dst, sample_t *src, unsigned long cnt)
 
 {
-	if (gain == 1.0) {
-		while (cnt--) {
-			*dst += *src;
-			dst++;
-			src++;
-		}
-	} else {
-		while (cnt--) {
-			*dst += (*src * gain);
-			dst++;
-			src++;
-		}
+	while (cnt--) {
+		*dst += *src;
+		dst++;
+		src++;
 	}
 }
 
 static __inline__ void
-sample_memcpy (sample_t *dst, sample_t *src, unsigned long cnt, gain_t gain)
+sample_memcpy (sample_t *dst, sample_t *src, unsigned long cnt)
 
 {
-	if (gain == 1.0) {
-		memcpy (dst, src, cnt * sizeof (sample_t));
-	} else {
-		while (cnt--) {
-			*dst = (*src * gain);
-			dst++;
-			src++;
-		}
-	}
+	memcpy (dst, src, cnt * sizeof (sample_t));
 }
 
 void memset_interleave               (char *dst, char val, unsigned long bytes, unsigned long unit_bytes, unsigned long skip_bytes);

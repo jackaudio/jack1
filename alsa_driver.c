@@ -839,7 +839,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 					continue;
 				}
 
-				alsa_driver_write_to_channel (driver, 1, jack_port_get_buffer (port, contiguous), contiguous, 1.0);
+				alsa_driver_write_to_channel (driver, 1, jack_port_get_buffer (port, contiguous), contiguous);
 			}
 			
 			engine->process_unlock (engine);
