@@ -18,6 +18,12 @@
     $Id$
 */
 
+#define _ISOC9X_SOURCE  1
+#define _ISOC99_SOURCE  1
+
+#define __USE_ISOC9X    1
+#define __USE_ISOC99    1
+
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -30,11 +36,17 @@
 #define SAMPLE_MAX_24BIT  8388607.0f
 #define SAMPLE_MAX_16BIT  32767.0f
 
-/* Round float to int (can't go in memops.h otherwise it gets multiply
-   defined) */
-inline int f_round(float f) {
-        f += (3<<22);
-        return *((int*)&f) - 0x4b400000;
+#define f_round(f) lrintf(f)
+
+/* Linear Congruential noise generator. From the music-dsp list
+ * less random than rand(), but good enough and 10x faster */
+inline unsigned int fast_rand();
+
+inline unsigned int fast_rand() {
+	static unsigned int seed = 22222;
+	seed = (seed * 96314165) + 907633515;
+
+	return seed;
 }
 
 /* XXX we could use rint(), but for now we'll accept whatever default
@@ -80,7 +92,7 @@ void sample_move_dither_rect_d32u24_sS (char *dst, jack_default_audio_sample_t *
 
 	while (nsamples--) {
 		x = *src * SAMPLE_MAX_16BIT;
-		x -= (float)rand() / (float)RAND_MAX;
+		x -= (float)fast_rand() / (float)INT_MAX;
 		y = (long long)f_round(x);
 		y <<= 16;
 		if (y > INT_MAX) {
@@ -105,7 +117,7 @@ void sample_move_dither_tri_d32u24_sS (char *dst,  jack_default_audio_sample_t *
 
 	while (nsamples--) {
 		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)rand() / (float)RAND_MAX - 1.0f;
+		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		x += r - rm1;
 		rm1 = r;
 		/* swh: This could be some inline asm on x86 */
@@ -139,7 +151,7 @@ void sample_move_dither_shaped_d32u24_sS (char *dst,  jack_default_audio_sample_
 
 	while (nsamples--) {
 		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)rand() / (float)RAND_MAX - 1.0f;
+		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		/* Filter the error with Lipshitz's minimally audible FIR:
 		   [2.033 -2.165 1.959 -1.590 0.6149] */
 		xe = x
@@ -207,7 +219,7 @@ void sample_move_dither_rect_d16_sS (char *dst,  jack_default_audio_sample_t *sr
 
 	while (nsamples--) {
 		val = *src * (float)SAMPLE_MAX_16BIT;
-		val -= (float)rand() / (float)RAND_MAX;
+		val -= (float)fast_rand() / (float)INT_MAX;
 		/* swh: This could be some inline asm on x86 */
 		tmp = f_round(val);
 		if (tmp > SHRT_MAX) {
@@ -232,7 +244,7 @@ void sample_move_dither_tri_d16_sS (char *dst,  jack_default_audio_sample_t *src
 
 	while (nsamples--) {
 		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)rand() / (float)RAND_MAX - 1.0f;
+		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		x += r - rm1;
 		rm1 = r;
 		/* swh: This could be some inline asm on x86 */
@@ -265,7 +277,7 @@ void sample_move_dither_shaped_d16_sS (char *dst,  jack_default_audio_sample_t *
 
 	while (nsamples--) {
 		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)rand() / (float)RAND_MAX - 1.0f;
+		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		/* Filter the error with Lipshitz's minimally audible FIR:
 		   [2.033 -2.165 1.959 -1.590 0.6149] */
 		xe = x
