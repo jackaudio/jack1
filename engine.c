@@ -83,6 +83,7 @@ static int  jack_rechain_graph (jack_engine_t *engine, int take_lock);
 static int  jack_get_fifo_fd (jack_engine_t *engine, int which_fifo);
 static int  jack_port_do_connect (jack_engine_t *engine, const char *source_port, const char *destination_port);
 static int  jack_port_do_disconnect (jack_engine_t *engine, const char *source_port, const char *destination_port);
+static int  jack_port_do_disconnect_all (jack_engine_t *engine, jack_port_id_t);
 
 static int  jack_port_do_unregister (jack_engine_t *engine, jack_request_t *);
 static int  jack_port_do_register (jack_engine_t *engine, jack_request_t *);
@@ -886,6 +887,10 @@ handle_client_io (jack_engine_t *engine, int fd)
 		req.status = jack_port_do_connect (engine, req.x.connect.source_port, req.x.connect.destination_port);
 		break;
 
+	case DisconnectPort:
+		req.status = jack_port_do_disconnect_all (engine, req.x.port_info.port_id);
+		break;
+
 	case DisconnectPorts:
 		req.status = jack_port_do_disconnect (engine, req.x.connect.source_port, req.x.connect.destination_port);
 		break;
@@ -1356,7 +1361,6 @@ jack_port_clear_connections (jack_engine_t *engine, jack_port_internal_t *port)
 	port->connections = 0;
 }
 
-
 static void
 jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
@@ -1477,10 +1481,6 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 		case PortConnected:
 		case PortDisconnected:
 			jack_client_handle_port_connection (client->control->private_internal_client, event);
-			break;
-
-		case GraphReordered:
-			jack_error ("reorder event delivered to internal client!");
 			break;
 
 		case BufferSizeChange:
@@ -1850,6 +1850,10 @@ jack_port_do_connect (jack_engine_t *engine,
 		free (connection);
 		return -1;
 	} else {
+		fprintf (stderr, "connect %s and %s\n",
+			 srcport->shared->name,
+			 dstport->shared->name);
+
 		dstport->connections = g_slist_prepend (dstport->connections, connection);
 		srcport->connections = g_slist_prepend (srcport->connections, connection);
 
@@ -1866,9 +1870,9 @@ jack_port_do_connect (jack_engine_t *engine,
 
 int
 jack_port_disconnect_internal (jack_engine_t *engine, 
-				jack_port_internal_t *srcport, 
-				jack_port_internal_t *dstport, 
-				int sort_graph)
+			       jack_port_internal_t *srcport, 
+			       jack_port_internal_t *dstport, 
+			       int sort_graph)
 
 {
 	GSList *node;
@@ -1884,6 +1888,10 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 
 		if (connect->source == srcport && connect->destination == dstport) {
 
+			fprintf (stderr, "DIS-connect %s and %s\n",
+				 srcport->shared->name,
+				 dstport->shared->name);
+			
 			srcport->connections = g_slist_remove (srcport->connections, connect);
 			dstport->connections = g_slist_remove (dstport->connections, connect);
 
@@ -1913,11 +1921,26 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 		jack_sort_graph (engine, FALSE);
 	}
 
-	if (ret == -1) {
-		printf ("disconnect failed\n");
+	return ret;
+}
+
+static int
+jack_port_do_disconnect_all (jack_engine_t *engine,
+			     jack_port_id_t port_id)
+{
+	if (port_id >= engine->control->port_max) {
+		jack_error ("illegal port ID in attempted disconnection [%u]", port_id);
+		return -1;
 	}
 
-	return ret;
+	fprintf (stderr, "clear connections for %s\n", engine->internal_ports[port_id].shared->name);
+	
+	pthread_mutex_lock (&engine->graph_lock);
+	jack_port_clear_connections (engine, &engine->internal_ports[port_id]);
+	jack_sort_graph (engine, FALSE);
+	pthread_mutex_unlock (&engine->graph_lock);
+
+	return 0;
 }
 
 static int 
@@ -1929,7 +1952,7 @@ jack_port_do_disconnect (jack_engine_t *engine,
 	int ret = -1;
 
 	if ((srcport = jack_get_port_by_name (engine, source_port)) == 0) {
-		jack_error ("unknown source port in attempted connection [%s]", source_port);
+		jack_error ("unknown source port in attempted disconnection [%s]", source_port);
 		return -1;
 	}
 
@@ -2163,6 +2186,8 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	jack_port_registration_notify (engine, port_id, TRUE);
 	pthread_mutex_unlock (&engine->graph_lock);
 
+	fprintf (stderr, "registered port %s\n", shared->name);
+
 	req->x.port_info.port_id = port_id;
 
 	return 0;
@@ -2187,15 +2212,15 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 	pthread_mutex_lock (&engine->graph_lock);
 	if ((client = jack_client_internal_by_id (engine, shared->client_id)) == NULL) {
 		jack_error ("unknown client id in port registration request");
+		pthread_mutex_unlock (&engine->graph_lock);
 		return -1;
 	}
-	pthread_mutex_unlock (&engine->graph_lock);
 
 	port = &engine->internal_ports[req->x.port_info.port_id];
 
+	jack_port_clear_connections (engine, port);
 	jack_port_release (engine, &engine->internal_ports[req->x.port_info.port_id]);
 	
-	pthread_mutex_lock (&engine->graph_lock);
 	client->ports = g_slist_remove (client->ports, port);
 	jack_port_registration_notify (engine, req->x.port_info.port_id, FALSE);
 	pthread_mutex_unlock (&engine->graph_lock);

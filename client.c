@@ -1065,6 +1065,31 @@ jack_connect (jack_client_t *client, const char *source_port, const char *destin
 	return req.status;
 }
 
+int
+jack_port_disconnect (jack_client_t *client, jack_port_t *port)
+{
+	jack_request_t req;
+
+	if (port->connections == NULL) {
+		return 0;
+	}
+
+	req.type = DisconnectPort;
+	req.x.port_info.port_id = port->shared->id;
+
+	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot send port disconnect request to server");
+		return -1;
+	}
+
+	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot read port disconnect result from server");
+		return -1;
+	}
+	
+	return req.status;
+}
+
 int 
 jack_disconnect (jack_client_t *client, const char *source_port, const char *destination_port)
 {
