@@ -64,6 +64,13 @@ const static jack_driver_param_desc_t oss_params[OSS_DRIVER_N_PARAMS] = {
 	  "period size",
 	  "period size"
 	},
+	{ "nperiods",
+	  'n',
+	  JackDriverParamUInt,
+	  { .ui = OSS_DRIVER_DEF_NPERIODS },
+	  "number of periods in buffer",
+	  "number of periods in buffer"
+	},
 	{ "wordlength",
 	  'w',
 	  JackDriverParamInt,
@@ -105,13 +112,6 @@ const static jack_driver_param_desc_t oss_params[OSS_DRIVER_N_PARAMS] = {
 	  { },
 	  "ignore hardware period size",
 	  "ignore hardware period size"
-	},
-	{ "help",
-	  'h',
-	  JackDriverParamBool,
-	  { },
-	  "help",
-	  "help"
 	}
 };
 
@@ -250,15 +250,11 @@ static void copy_and_convert_out (void *dst, jack_sample_t *src,
 }
 
 
-static void set_fragment (int fd, int fragsize)
+static void set_fragment (int fd, size_t fragsize, unsigned int fragcount)
 {
-	int fragcount;
 	int fragsize_2p;
 	int fragments;
 
-	fragcount = 2;
-	//fragcount = 3;
-	//fragcount = 0xffff / fragsize;
 	fragsize_2p = (int) (log(fragsize) / log(2.0) + 0.5);
 	fragments = ((fragcount << 16) | (fragsize_2p & 0xffff));
 	if (ioctl(fd, SNDCTL_DSP_SETFRAGMENT, &fragments) < 0)
@@ -414,7 +410,7 @@ static int oss_driver_start (oss_driver_t *driver)
 			}
 			fragsize = driver->period_size * 
 				driver->capture_channels * samplesize;
-			set_fragment(infd, fragsize);
+			set_fragment(infd, fragsize, driver->nperiods);
 		}
 		else infd = -1;
 
@@ -429,7 +425,7 @@ static int oss_driver_start (oss_driver_t *driver)
 			}
 			fragsize = driver->period_size * 
 				driver->playback_channels * samplesize;
-			set_fragment(outfd, fragsize);
+			set_fragment(outfd, fragsize, driver->nperiods);
 		}
 		else outfd = -1;
 	}
@@ -485,13 +481,13 @@ static int oss_driver_start (oss_driver_t *driver)
 		{
 			fragsize = driver->period_size * 
 				driver->capture_channels * samplesize;
-			set_fragment(infd, fragsize);
+			set_fragment(infd, fragsize, driver->nperiods);
 		}
 		if (outfd >= 0 && infd < 0)
 		{
 			fragsize = driver->period_size * 
 				driver->playback_channels * samplesize;
-			set_fragment(outfd, fragsize);
+			set_fragment(outfd, fragsize, driver->nperiods);
 		}
 	}
 	driver->infd = infd;
@@ -1026,6 +1022,7 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	int bits = OSS_DRIVER_DEF_BITS;
 	jack_nframes_t sample_rate = OSS_DRIVER_DEF_FS;
 	jack_nframes_t period_size = OSS_DRIVER_DEF_BLKSIZE;
+	unsigned int nperiods = OSS_DRIVER_DEF_NPERIODS;
 	unsigned int capture_channels = OSS_DRIVER_DEF_INS;
 	unsigned int playback_channels = OSS_DRIVER_DEF_OUTS;
 	const JSList *pnode;
@@ -1067,6 +1064,9 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 			case 'p':
 				period_size = param->value.ui;
 				break;
+			case 'n':
+				nperiods = param->value.ui;
+				break;
 			case 'w':
 				bits = param->value.i;
 				break;
@@ -1085,23 +1085,13 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 			case 'b':
 				driver->ignorehwbuf = 1;
 				break;
-			case 'h':
-				puts("-r <fs>\tsample rate");
-				puts("-p <size>\tperiod size");
-				puts("-w <bits>\tword length");
-				puts("-i <chs>\tcapture channels");
-				puts("-o <chs>\tplayback channels");
-				puts("-C <dev>\tcapture device");
-				puts("-P <dev>\tplayback device");
-				puts("-b\tignore hardware buffer size");
-				puts("-h\tthis help");
-				break;
 		}
 		pnode = jack_slist_next(pnode);
 	}
 	
 	driver->sample_rate = sample_rate;
 	driver->period_size = period_size;
+	driver->nperiods = nperiods;
 	driver->bits = bits;
 	driver->capture_channels = capture_channels;
 	driver->playback_channels = playback_channels;

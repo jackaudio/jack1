@@ -36,6 +36,7 @@
 #define OSS_DRIVER_DEF_DEV	"/dev/dsp"
 #define OSS_DRIVER_DEF_FS	48000
 #define OSS_DRIVER_DEF_BLKSIZE	1024
+#define OSS_DRIVER_DEF_NPERIODS	2
 #define OSS_DRIVER_DEF_BITS	16
 #define OSS_DRIVER_DEF_INS	2
 #define OSS_DRIVER_DEF_OUTS	2
@@ -49,6 +50,7 @@ typedef struct _oss_driver
 
 	jack_nframes_t sample_rate;
 	jack_nframes_t period_size;
+	unsigned int nperiods;
 	int bits;
 	unsigned int capture_channels;
 	unsigned int playback_channels;
