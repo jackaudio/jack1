@@ -2340,7 +2340,7 @@ jack_client_feeds (jack_client_internal_t *might, jack_client_internal_t *target
 }
 
 static jack_nframes_t
-jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port, int hop_count)
+jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port, int hop_count, int toward_port)
 {
 	JSList *node;
 	jack_nframes_t latency;
@@ -2365,6 +2365,13 @@ jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port, 
 
 		connection = (jack_connection_internal_t *) node->data;
 
+		
+		if ((toward_port && (connection->source->shared == port->shared)) ||
+		    /* !toward_port is implicit */
+		    (connection->destination->shared == port->shared)) {
+			continue;
+		}
+
 		/* if we're a destination in the connection, recurse on the source to
 		   get its total latency
 		*/
@@ -2374,7 +2381,8 @@ jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port, 
 			if (connection->source->shared->flags & JackPortIsTerminal) {
 				this_latency = connection->source->shared->latency;
 			} else {
-				this_latency = jack_get_port_total_latency (engine, connection->source, hop_count + 1);
+				this_latency = jack_get_port_total_latency (engine, connection->source, hop_count + 1, 
+									    toward_port);
 			}
 
 		} else {
@@ -2384,7 +2392,8 @@ jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port, 
 			if (connection->destination->shared->flags & JackPortIsTerminal) {
 				this_latency = connection->destination->shared->latency;
 			} else {
-				this_latency = jack_get_port_total_latency (engine, connection->destination, hop_count + 1);
+				this_latency = jack_get_port_total_latency (engine, connection->destination, hop_count + 1, 
+									    toward_port);
 			}
 		}
 
@@ -2401,10 +2410,16 @@ jack_compute_all_port_total_latencies (jack_engine_t *engine)
 {
 	jack_port_shared_t *shared = engine->control->ports;
 	int i;
+	int toward_port;
 
 	for (i = 0; i < engine->control->port_max; i++) {
 		if (shared[i].in_use) {
-			shared[i].total_latency = jack_get_port_total_latency (engine, &engine->internal_ports[i], 0);
+			if (shared->flags & JackPortIsOutput) {
+				toward_port = TRUE;
+			} else {
+				toward_port = FALSE;
+			}
+			shared[i].total_latency = jack_get_port_total_latency (engine, &engine->internal_ports[i], 0, toward_port);
 		}
 	}
 }
@@ -2537,6 +2552,8 @@ jack_port_do_connect (jack_engine_t *engine,
 	jack_port_internal_t *srcport, *dstport;
 	jack_port_id_t src_id, dst_id;
 
+	fprintf (stderr, "got connect request\n");
+
 	if ((srcport = jack_get_port_by_name (engine, source_port)) == NULL) {
 		jack_error ("unknown source port in attempted connection [%s]", source_port);
 		return -1;
@@ -2606,6 +2623,7 @@ jack_port_do_connect (jack_engine_t *engine,
 
 		jack_send_connection_notification (engine, srcport->shared->client_id, src_id, dst_id, TRUE);
 		jack_send_connection_notification (engine, dstport->shared->client_id, dst_id, src_id, TRUE);
+
 	}
 
 	jack_unlock_graph (engine);
