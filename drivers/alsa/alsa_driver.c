@@ -2467,6 +2467,8 @@ driver_initialize (jack_client_t *client, const JSList * params)
 				
 		case 'n':
 			user_nperiods = param->value.ui;
+			if (user_nperiods < 2)	/* enforce minimum value */
+				user_nperiods = 2;
 			break;
 				
 		case 's':
