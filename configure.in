@@ -14,8 +14,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=98
-JACK_MICRO_VERSION=0
+JACK_MINOR_VERSION=97
+JACK_MICRO_VERSION=3
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -121,11 +121,10 @@ AC_CHECK_FUNCS(on_exit atexit)
 AC_CHECK_FUNCS(posix_memalign)
 AC_CHECK_LIB(m, sin)
 
-# should we use mlock() on this platform?
+# should we use mlockall() on this platform?
 if test "x$JACK_DO_NOT_MLOCK" = "x"; then
-    AC_CHECK_HEADER(sys/mman.h,
-	AC_CHECK_FUNC(mlockall,
-	    [AC_DEFINE(USE_MLOCK, 1, [Use POSIX memory locking])]))
+    AC_CHECK_FUNC(mlockall,
+	    [AC_DEFINE(USE_MLOCK, 1, [Use POSIX memory locking])])
 fi
 
 # look for system support for POSIX shm API
