@@ -22,7 +22,6 @@
 #include <jack/hardware.h>
 #include <jack/alsa_driver.h>
 #include <jack/hdsp.h>
-#include <jack/error.h>
 #include <jack/internal.h>
 
 /* Constants to make working with the hdsp matrix mixer easier */

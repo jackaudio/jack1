@@ -21,7 +21,6 @@
 #include <jack/hardware.h>
 #include <jack/alsa_driver.h>
 #include <jack/hammerfall.h>
-#include <jack/error.h>
 #include <jack/internal.h>
 
 static void 
