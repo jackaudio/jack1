@@ -30,14 +30,23 @@
 
 /* timebase callback
  *
+ * It would probably be faster to compute frame_time without the
+ * conditional expression.  But, it demonstrates the invariant:
+ * next_time[i] == frame_time[i+1], unless a reposition occurs.
+ *
  * Runs in the process thread.  Realtime, must not wait.
  */
 void timebase(jack_transport_state_t state, jack_nframes_t nframes, 
 	      jack_position_t *pos, int new_pos, void *arg)
 {
+	/* nominal transport speed */
+	double seconds_per_frame = 1.0 / (double) pos->frame_rate;
+
 	pos->valid = JackPositionTimecode;
-	pos->frame_time = pos->frame / (double) pos->frame_rate;
-	pos->period_duration = nframes / (double) pos->frame_rate;
+	pos->frame_time = (new_pos?
+			   pos->frame * seconds_per_frame:
+			   pos->next_time);
+	pos->next_time = (pos->frame + nframes) * seconds_per_frame;
 }
 
 /* after internal client loaded */

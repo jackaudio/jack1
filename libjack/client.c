@@ -267,7 +267,7 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 		client->graph_next_fd = -1;
 	}
 
-	sprintf (path, "%s-%lu", client->fifo_prefix, event->x.n);
+	sprintf (path, "%s-%" PRIu32, client->fifo_prefix, event->x.n);
 
 	if ((client->graph_wait_fd = open (path, O_RDONLY|O_NONBLOCK)) < 0) {
 		jack_error ("cannot open specified fifo [%s] for reading (%s)", path, strerror (errno));
@@ -277,7 +277,7 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 
 	DEBUG ("opened new graph_wait_fd %d (%s)", client->graph_wait_fd, path);
 
-	sprintf (path, "%s-%lu", client->fifo_prefix, event->x.n+1);
+	sprintf (path, "%s-%" PRIu32, client->fifo_prefix, event->x.n+1);
 	
 	if ((client->graph_next_fd = open (path, O_WRONLY|O_NONBLOCK)) < 0) {
 		jack_error ("cannot open specified fifo [%s] for writing (%s)", path, strerror (errno));
@@ -782,7 +782,10 @@ jack_client_thread (void *arg)
 			jack_reset_timestamps ();
 #endif
 
-			DEBUG ("client %d signalled at %Lu, awake for process at %Lu (delay = %Lu usecs) (wakeup on graph_wait_fd==%d)", 
+			DEBUG ("client %d signalled at %" PRIu64
+			       ", awake for process at %" PRIu64
+			       " (delay = %" PRIu64
+			       " usecs) (wakeup on graph_wait_fd==%d)", 
 			       getpid(),
 			       control->signalled_at, 
 			       control->awake_at, 
@@ -1278,7 +1281,7 @@ int jack_is_realtime (jack_client_t *client)
 	return client->engine->real_time;
 }
 
-unsigned long jack_get_buffer_size (jack_client_t *client)
+jack_nframes_t jack_get_buffer_size (jack_client_t *client)
 
 {
 	return client->engine->buffer_size;
@@ -1538,15 +1541,15 @@ jack_get_mhz (void)
 		}
 
 #ifdef __powerpc__
-		ret = sscanf(buf, "clock\t: %LuMHz", &mhz);
+		ret = sscanf(buf, "clock\t: %" SCNu64 "MHz", &mhz);
 #else
-		ret = sscanf(buf, "cpu MHz         : %Lu", &mhz);
+		ret = sscanf(buf, "cpu MHz         : %" SCNu64, &mhz);
 #endif /* __powerpc__ */
 
 		if (ret == 1)
 		{
 			fclose(f);
-			return mhz;
+			return (jack_time_t)mhz;
 		}
 	}
 }

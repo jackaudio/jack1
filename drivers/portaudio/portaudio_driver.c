@@ -231,7 +231,8 @@ portaudio_driver_new (char *name,
         int      numDevices;
         int      i,j;
         
-	printf ("creating portaudio driver ... %lu|%lu|%lu\n", frames_per_cycle, rate);
+	printf ("creating portaudio driver ... %" PRIu32 "|%"
+		PRIu32 "\n", frames_per_cycle, rate);
     
 	driver = (portaudio_driver_t *) calloc (1, sizeof (portaudio_driver_t));
 

@@ -41,7 +41,7 @@ typedef enum {
 
 } jack_transport_state_t;
 
-typedef unsigned long long jack_unique_t; /**< Unique ID (opaque) */
+typedef uint64_t jack_unique_t;		/**< Unique ID (opaque) */
 
 /**
  * Optional struct jack_position_t fields.
@@ -71,24 +71,25 @@ typedef struct {
     jack_position_bits_t valid;		/**< which other fields are valid */
 
     /* JackPositionBBT fields: */
-    int		bar;			/**< current bar */
-    int		beat;			/**< current beat-within-bar */
-    int		tick;			/**< current tick-within-beat */
-    double	bar_start_tick;            
+    int32_t		bar;		/**< current bar */
+    int32_t		beat;		/**< current beat-within-bar */
+    int32_t		tick;		/**< current tick-within-beat */
+    double		bar_start_tick;            
 
-    float	beats_per_bar;
-    float	beat_type;
-    double	ticks_per_beat;
-    double	beats_per_minute;
+    float		beats_per_bar;
+    float		beat_type;
+    double		ticks_per_beat;
+    double		beats_per_minute;
 
-    /* JackPositionTimecode fields: */
-    double	frame_time;		/**< current time in seconds */
-    double	period_duration;	/**< period duration (sec) */
+    /* JackPositionTimecode fields:	(EXPERIMENTAL: could change) */
+    double		frame_time;	/**< current time in seconds */
+    double		next_time;	/**< next sequential frame_time
+					     (unless repositioned) */
 
     /* For binary compatibility, new fields should be allocated from
      * this padding area with new valid bits controlling access, so
      * the existing structure size and offsets are preserved. */
-    int		padding[10];
+    int32_t		padding[10];
 
     /* When (unique_1 == unique_2) the contents are consistent. */
     jack_unique_t	unique_2;	/**< unique ID */

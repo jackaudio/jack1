@@ -506,8 +506,11 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 
 	if (status != 0) {
 		if (engine->verbose) {
-			fprintf (stderr, "at %Lu client waiting on %d took %Lu usecs, status = %d sig = %Lu "
-				 "awa = %Lu fin = %Lu dur=%Lu\n",
+			fprintf (stderr, "at %" PRIu64
+				 " client waiting on %d took %" PRIu64
+				 " usecs, status = %d sig = %" PRIu64
+				 " awa = %" PRIu64 " fin = %" PRIu64
+				 " dur=%" PRIu64 "\n",
 				 now,
 				 client->subgraph_wait_fd,
 				 now - then,
@@ -710,7 +713,9 @@ jack_engine_post_process (jack_engine_t *engine)
 
 		if (!jack_client_is_internal (client) && ctl->process) {
 			if (ctl->awake_at != 0 && ctl->state > NotTriggered && ctl->state != Finished && ctl->timed_out++) {
-				fprintf (stderr, "client %s error: awake_at = %Lu state = %d timed_out = %d\n",
+				fprintf (stderr, "client %s error: awake_at = %"
+					 PRIu64
+					 " state = %d timed_out = %d\n",
 					 ctl->name,
 					 ctl->awake_at,
 					 ctl->state,
@@ -802,7 +807,8 @@ setup_client (jack_engine_t *engine, int client_fd, jack_client_connect_request_
 	}
 	
 	if (engine->verbose) {
-		fprintf (stderr, "new client: %s, id = %ld type %d @ %p fd = %d\n", 
+		fprintf (stderr, "new client: %s, id = %" PRIu32
+			 " type %d @ %p fd = %d\n", 
 			 client->control->name, client->control->id, 
 			 req->type, client->control, client_fd);
 	}
@@ -3130,7 +3136,8 @@ jack_port_do_disconnect_all (jack_engine_t *engine,
 			     jack_port_id_t port_id)
 {
 	if (port_id >= engine->control->port_max) {
-		jack_error ("illegal port ID in attempted disconnection [%u]", port_id);
+		jack_error ("illegal port ID in attempted disconnection [%"
+			    PRIu32 "]", port_id);
 		return -1;
 	}
 
@@ -3413,14 +3420,17 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 	jack_port_internal_t *port;
 
 	if (req->x.port_info.port_id < 0 || req->x.port_info.port_id > engine->port_max) {
-		jack_error ("invalid port ID %d in unregister request", req->x.port_info.port_id);
+		jack_error ("invalid port ID %" PRIu32
+			    " in unregister request", req->x.port_info.port_id);
 		return -1;
 	}
 
 	shared = &engine->control->ports[req->x.port_info.port_id];
 
 	if (shared->client_id != req->x.port_info.client_id) {
-		jack_error ("Client %d is not allowed to remove port %s", req->x.port_info.client_id, shared->name);
+		jack_error ("Client %" PRIu32
+			    " is not allowed to remove port %s",
+			    req->x.port_info.client_id, shared->name);
 		return -1;
 	}
 
@@ -3606,7 +3616,8 @@ jack_send_connection_notification (jack_engine_t *engine, jack_client_id_t clien
 	jack_event_t event;
 
 	if ((client = jack_client_internal_by_id (engine, client_id)) == NULL) {
-		jack_error ("no such client %d during connection notification", client_id);
+		jack_error ("no such client %" PRIu32
+			    " during connection notification", client_id);
 		return -1;
 	}
 

@@ -63,8 +63,9 @@ jack_generate_unique_id (jack_control_t *ectl)
 	// forcing JACK to either depend on that pesky header file, or
 	// maintain its own like ardour does.
 
-	// fprintf (stderr, "unique ID 0x%llx, process %d, cycle 0x%lx\n",
-	//	 id.unique, id.field.pid, id.field.cycle);
+	// fprintf (stderr, "unique ID 0x%" PRIx64
+	//          ", process %d, cycle 0x%" PRIx32 "\n",
+	//	    id.unique, id.field.pid, id.field.cycle);
 
 	return id.unique;
 }
@@ -229,7 +230,7 @@ jack_frame_time (const jack_client_t *client)
 	return current.frames + elapsed;
 }
 
-unsigned long 
+jack_nframes_t
 jack_get_sample_rate (jack_client_t *client)
 {
 	return client->engine->current_time.frame_rate;

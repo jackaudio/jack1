@@ -21,38 +21,43 @@
 #ifndef __jack_types_h__
 #define __jack_types_h__
 
-#include <limits.h> /* ULONG_MAX */
+#include <inttypes.h>
 
 typedef char shm_name_t[32];
 
 /**
  * Type used to represent sample frame counts.
  */
-typedef unsigned long        jack_nframes_t;
+typedef uint32_t	     jack_nframes_t;
 
 /**
  * Maximum value that can be stored in jack_nframes_t
  */
-#define JACK_MAX_FRAMES ULONG_MAX;
+#define JACK_MAX_FRAMES UINT32_MAX;
 
 /**
  * Type used to represent the value of free running
  * monotonic clock with units of microseconds.
  */
 
+/* JOQ: this is trouble.  APPLE POWERPC should use a compatible
+ * typedef, explicitly converting from double, if necessary.
+ * Otherwise applications cannot safely print a jack_time_t. */
 #if defined(__APPLE__) && defined(__POWERPC__) 
 typedef double jack_time_t;
 #else
-typedef unsigned long long jack_time_t;
+typedef uint64_t jack_time_t;
 #endif
 
 /**
- *  jack_port_t is an opaque type. You may only access it using the API provided.
+ *  jack_port_t is an opaque type.  You may only access it using the
+ *  API provided.
  */
 typedef struct _jack_port    jack_port_t;
 
 /**
- *  jack_client_t is an opaque type. You may only access it using the API provided.
+ *  jack_client_t is an opaque type.  You may only access it using the
+ *  API provided.
  */
 typedef struct _jack_client  jack_client_t;
 
@@ -60,7 +65,7 @@ typedef struct _jack_client  jack_client_t;
  *  Ports have unique ids. A port registration callback is the only
  *  place you ever need to know their value.
  */
-typedef unsigned long        jack_port_id_t;
+typedef uint32_t	     jack_port_id_t;
 
 /**
  * Prototype for the client supplied function that is called 

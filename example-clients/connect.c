@@ -74,7 +74,8 @@ main (int argc, char *argv[])
 	   callback (see above) for this value.
 	*/
 
-	printf ("engine sample rate: %lu\n", jack_get_sample_rate (client));
+	printf ("engine sample rate: %" PRIu32 "\n",
+		jack_get_sample_rate (client));
 
 	/* find the two ports */
 

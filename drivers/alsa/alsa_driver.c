@@ -299,8 +299,12 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		}
 	}
 
-	if ((err = snd_pcm_hw_params_set_rate_near (handle, hw_params, driver->frame_rate, 0)) < 0) {
-		jack_error ("ALSA: cannot set sample/frame rate to %u for %s", driver->frame_rate, stream_name);
+	if ((err = snd_pcm_hw_params_set_rate_near (handle, hw_params,
+						    driver->frame_rate, 0))
+	    < 0) {
+		jack_error ("ALSA: cannot set sample/frame rate to %"
+			    PRIu32 " for %s", driver->frame_rate,
+			    stream_name);
 		return -1;
 	}
 
@@ -327,8 +331,13 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		return -1;
 	}
 	
-	if ((err = snd_pcm_hw_params_set_period_size (handle, hw_params, driver->frames_per_cycle, 0)) < 0) {
-		jack_error ("ALSA: cannot set period size to %u frames for %s", driver->frames_per_cycle, stream_name);
+	if ((err = snd_pcm_hw_params_set_period_size (handle, hw_params,
+						      driver->frames_per_cycle,
+						      0))
+	    < 0) {
+		jack_error ("ALSA: cannot set period size to %" PRIu32
+			    " frames for %s", driver->frames_per_cycle,
+			    stream_name);
 		return -1;
 	}
 
@@ -338,7 +347,10 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 	}
 	
 	if ((err = snd_pcm_hw_params_set_buffer_size (handle, hw_params, driver->user_nperiods * driver->frames_per_cycle)) < 0) {
-		jack_error ("ALSA: cannot set buffer length to %u for %s", driver->user_nperiods * driver->frames_per_cycle, stream_name);
+		jack_error ("ALSA: cannot set buffer length to %" PRIu32
+			    " for %s",
+			    driver->user_nperiods * driver->frames_per_cycle,
+			    stream_name);
 		return -1;
 	}
 
@@ -435,8 +447,10 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 		driver->playback_interleaved = (snd_pcm_hw_params_get_access (driver->playback_hw_params) == SND_PCM_ACCESS_MMAP_INTERLEAVED);
 
 		if (p_period_size != driver->frames_per_cycle) {
-			jack_error ("alsa_pcm: requested an interrupt every %u frames but got %uc frames for playback",
-				    driver->frames_per_cycle,p_period_size);
+			jack_error ("alsa_pcm: requested an interrupt every %"
+				    PRIu32
+				    " frames but got %u frames for playback",
+				    driver->frames_per_cycle, p_period_size);
 			return -1;
 		}
 	}
@@ -448,8 +462,10 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 		driver->capture_interleaved = (snd_pcm_hw_params_get_access (driver->capture_hw_params) == SND_PCM_ACCESS_MMAP_INTERLEAVED);
 	
 		if (c_period_size != driver->frames_per_cycle) {
-			jack_error ("alsa_pcm: requested an interrupt every %u frames but got %uc frames for capture",
-				    driver->frames_per_cycle,p_period_size);
+			jack_error ("alsa_pcm: requested an interrupt every %"
+				    PRIu32
+				    " frames but got %uc frames for capture",
+				    driver->frames_per_cycle, p_period_size);
 			return -1;
 		}
 	}
@@ -1150,7 +1166,8 @@ alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 		}
 		
 		if (snd_pcm_mmap_commit (driver->capture_handle, offset, contiguous) < 0) {
-			jack_error ("alsa_pcm: could not complete read of %lu frames\n", contiguous);
+			jack_error ("alsa_pcm: could not complete read of %"
+				    PRIu32 " frames\n", contiguous);
 			return -1;
 		}
 
@@ -1225,8 +1242,12 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 			alsa_driver_silence_untouched_channels (driver, contiguous);
 		}
 		
-		if ((err = snd_pcm_mmap_commit (driver->playback_handle, offset, contiguous)) < 0) {
-			jack_error ("could not complete playback of %lu frames: error = %d", contiguous, err);
+		if ((err = snd_pcm_mmap_commit (driver->playback_handle,
+						offset, contiguous))
+		    < 0) {
+			jack_error ("could not complete playback of %"
+				    PRIu32 " frames: error = %d",
+				    contiguous, err);
 			if (err != -EPIPE && err != -ESTRPIPE)
 				return -1;
 		}
@@ -1469,9 +1490,12 @@ alsa_driver_new (char *name, char *playback_alsa_device, char *capture_alsa_devi
 
 	alsa_driver_t *driver;
 
-	printf ("creating alsa driver ... %s|%s|%lu|%lu|%lu|%s|%s|%s\n", 
-		playback_alsa_device, capture_alsa_device, frames_per_cycle, user_nperiods, rate,
-		hw_monitoring ? "hwmon":"nomon", hw_metering ? "hwmeter":"swmeter", soft_mode ? "soft-mode":"rt");
+	printf ("creating alsa driver ... %s|%s|%" PRIu32 "|%" PRIu32
+		"|%" PRIu32 "|%s|%s|%s\n", playback_alsa_device,
+		capture_alsa_device, frames_per_cycle, user_nperiods, rate,
+		hw_monitoring ? "hwmon": "nomon",
+		hw_metering ? "hwmeter":"swmeter",
+		soft_mode ? "soft-mode":"rt");
 
 	driver = (alsa_driver_t *) calloc (1, sizeof (alsa_driver_t));
 

@@ -18,7 +18,7 @@ showtime ()
 
 	transport_state = jack_transport_query (client, &current);
 
-	printf ("frame: %7lu\t", current.frame);
+	printf ("frame: %7" PRIu32 "\t", current.frame);
 
 	switch (transport_state) {
 	case JackTransportStopped:
@@ -35,12 +35,12 @@ showtime ()
 	}
 
 	if (current.valid & JackPositionBBT)
-		printf ("\tBBT: %3d|%d|%04d",
-			current.bar, current.beat, current.tick);
+		printf ("\tBBT: %3" PRIi32 "|%" PRIi32 "|%04"
+			PRIi32, current.bar, current.beat, current.tick);
 
 	if (current.valid & JackPositionTimecode)
-		printf ("\tTC: %.6f, %.6f",
-			current.frame_time, current.period_duration);
+		printf ("\tTC: (%.6f, %.6f)",
+			current.frame_time, current.next_time);
 	printf ("\n");
 }
 

@@ -23,6 +23,10 @@
 #include <jack/hammerfall.h>
 #include <jack/internal.h>
 
+/* Set this to 1 if you want this compile error:
+ *   warning: `hammerfall_monitor_controls' defined but not used */
+#define HAMMERFALL_MONITOR_CONTROLS 0
+
 static void 
 set_control_id (snd_ctl_elem_id_t *ctl, const char *name)
 {
@@ -34,6 +38,7 @@ set_control_id (snd_ctl_elem_id_t *ctl, const char *name)
 	snd_ctl_elem_id_set_index (ctl, 0);
 }
 
+#if HAMMERFALL_MONITOR_CONTROLS
 static void
 hammerfall_broadcast_channel_status_change (hammerfall_t *h, int lock, int sync, channel_t lowchn, channel_t highchn)
 
@@ -125,6 +130,7 @@ hammerfall_check_sync (hammerfall_t *h, snd_ctl_elem_value_t *ctl)
 		jack_error ("Hammerfall: unknown control \"%s\"", name);
 	}
 }
+#endif /* HAMMERFALL_MONITOR_CONTROLS */
 
 static int 
 hammerfall_set_input_monitor_mask (jack_hardware_t *hw, unsigned long mask)
@@ -203,6 +209,7 @@ hammerfall_release (jack_hardware_t *hw)
 	free (h);
 }
 
+#if HAMMERFALL_MONITOR_CONTROLS
 static void *
 hammerfall_monitor_controls (void *arg)
 {
@@ -252,6 +259,7 @@ hammerfall_monitor_controls (void *arg)
 
 	pthread_exit (0);
 }
+#endif /* HAMMERFALL_MONITOR_CONTROLS */
 
 jack_hardware_t *
 jack_alsa_hammerfall_hw_new (alsa_driver_t *driver)

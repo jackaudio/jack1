@@ -181,8 +181,8 @@ dummy_driver_new (jack_client_t * client,
 {
   dummy_driver_t * driver;
 
-  printf ("creating dummy driver ... %s|%lu|%lu|%lu|%u|%u\n",
-	  name, sample_rate, period_size, wait_time,
+  printf ("creating dummy driver ... %s|%" PRIu32 "|%" PRIu32
+	  "|%lu|%u|%u\n", name, sample_rate, period_size, wait_time,
 	  capture_ports, playback_ports);
 
   driver = (dummy_driver_t *) calloc (1, sizeof (dummy_driver_t));

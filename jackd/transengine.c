@@ -50,7 +50,7 @@ jack_sync_poll_new (jack_engine_t *engine, jack_client_internal_t *client)
 		engine->control->transport_state = JackTransportStarting;
 		VERBOSE (engine, "force transport state to Starting\n");
 	}
-	VERBOSE (engine, "polling sync client %lu\n", client->control->id);
+	VERBOSE (engine, "polling sync client %" PRIu32 "\n", client->control->id);
 }
 
 /* stop polling a specific slow-sync client
@@ -63,7 +63,7 @@ jack_sync_poll_exit (jack_engine_t *engine, jack_client_internal_t *client)
 		client->control->sync_poll = 0;
 		client->control->sync_new = 0;
 		engine->control->sync_remain--;
-		VERBOSE (engine, "sync poll interrupted for client %lu\n",
+		VERBOSE (engine, "sync poll interrupted for client %" PRIu32 "\n",
 			 client->control->id);
 	}
 	client->control->is_slowsync = 0;
@@ -92,7 +92,8 @@ jack_sync_poll_stop (jack_engine_t *engine)
 	//JOQ: check invariant for debugging...
 	assert (poll_count == engine->control->sync_remain);
 	VERBOSE (engine,
-		 "sync poll halted with %ld clients and %8.6f secs remaining\n",
+		 "sync poll halted with %" PRIu32
+		 " clients and %8.6f secs remaining\n",
 		 engine->control->sync_remain,
 		 (double) (engine->control->sync_time_left / 1000000.0));
 	engine->control->sync_remain = 0;
@@ -121,8 +122,8 @@ jack_sync_poll_start (jack_engine_t *engine)
 	assert (sync_count == engine->control->sync_clients);
 	engine->control->sync_remain = engine->control->sync_clients;
 	engine->control->sync_time_left = engine->control->sync_timeout;
-	VERBOSE (engine, "transport Starting, sync poll of %ld clients "
-		 "for %8.6f secs\n", engine->control->sync_remain,
+	VERBOSE (engine, "transport Starting, sync poll of %" PRIu32
+		 " clients for %8.6f secs\n", engine->control->sync_remain,
 		 (double) (engine->control->sync_time_left / 1000000.0));
 }
 
@@ -200,8 +201,7 @@ jack_timebase_set (jack_engine_t *engine,
 	client = jack_client_internal_by_id (engine, client_id);
 
 	if (client == NULL) {
-		// JOQ: use PRIuLEAST32 here...
-		VERBOSE (engine, " %lu no longer exists!\n", client_id);
+ 		VERBOSE (engine, " %" PRIu32 " no longer exists\n", client_id);
 		jack_unlock_graph (engine);
 		return EINVAL;
 	}
@@ -446,8 +446,9 @@ jack_transport_cycle_end (jack_engine_t *engine)
 	if (ectl->request_time.unique_1 != ectl->prev_request) {
 		jack_transport_copy_position(&ectl->request_time,
 					     &ectl->pending_time);
-		VERBOSE (engine, "new transport position: %lu, id=0x%llx\n",
-		       ectl->pending_time.frame, ectl->pending_time.unique_1);
+		VERBOSE (engine, "new transport position: %" PRIu32
+			 ", id=0x%" PRIx64 "\n", ectl->pending_time.frame,
+			 ectl->pending_time.unique_1);
 		ectl->prev_request = ectl->pending_time.unique_1;
 		ectl->pending_pos = 1;
 	}

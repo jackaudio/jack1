@@ -39,7 +39,8 @@ jack_init_timestamps (unsigned long howmany)
 	if (timestamps) {
 		free (timestamps);
 	}
-	timestamps = (jack_timestamp_t *) malloc (howmany * sizeof(jack_timestamp_t));
+	timestamps = (jack_timestamp_t *)
+		malloc (howmany * sizeof(jack_timestamp_t));
 	timestamp_cnt = howmany;
 	memset (timestamps, 0, sizeof (jack_timestamp_t) * howmany);
 	timestamp_index = 0;
@@ -61,11 +62,12 @@ jack_dump_timestamps (FILE *out)
 	unsigned long i;
 
 	for (i = 0; i < timestamp_index; ++i) {
-		fprintf (out, "%-.32s %Lu %Lu", 
+		fprintf (out, "%-.32s %" PRIu64 " %" PRIu64, 
 			 timestamps[i].what, timestamps[i].when,
 			 timestamps[i].when - timestamps[0].when);
 		if (i > 0) {
-			fprintf (out, " %Lu", timestamps[i].when - timestamps[i-1].when);
+			fprintf (out, " %" PRIu64,
+				 timestamps[i].when - timestamps[i-1].when);
 		}
 		fputc ('\n', out);
 	}

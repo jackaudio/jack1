@@ -25,7 +25,7 @@ int
 srate (jack_nframes_t nframes, void *arg)
 
 {
-	printf ("the sample rate is now %lu/sec\n", nframes);
+	printf ("the sample rate is now %" PRIu32 "/sec\n", nframes);
 	return 0;
 }
 
@@ -93,7 +93,8 @@ main (int argc, char *argv[])
 	   callback (see above) for this value.
 	*/
 
-	printf ("engine sample rate: %lu\n", jack_get_sample_rate (client));
+	printf ("engine sample rate: %" PRIu32 "\n",
+		jack_get_sample_rate (client));
 
 	/* create two ports */
 

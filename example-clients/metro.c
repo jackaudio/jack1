@@ -228,7 +228,9 @@ main (int argc, char *argv[])
 	scale = 2 * PI * freq / sr;
 
 	if (tone_length >= wave_length) {
-		fprintf (stderr, "invalid duration (tone length = %lu, wave length = %lu\n", tone_length, wave_length);
+		fprintf (stderr, "invalid duration (tone length = %" PRIu32
+			 ", wave length = %" PRIu32 "\n", tone_length,
+			 wave_length);
 		return -1;
 	}
 	if (attack_length + decay_length > (int)tone_length) {

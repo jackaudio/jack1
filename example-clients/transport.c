@@ -82,7 +82,8 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
 
 #if 0
 	/* some debug code... */
-	fprintf(stderr, "\nnew position: %lu\tBBT: %3d|%d|%04d\n",
+	fprintf(stderr, "\nnew position: %" PRIu32 "\tBBT: %3"
+		PRIi32 "|%" PRIi32 "|%04" PRIi32 "\n",
 		pos->frame, pos->bar, pos->beat, pos->tick);
 #endif
 

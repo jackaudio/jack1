@@ -46,7 +46,7 @@
 
 #ifdef DEBUG_ENABLED
 #define DEBUG(format,args...) \
-	printf ("jack:%5d:%Lu %s:%s:%d: " format "\n", getpid(), jack_get_microseconds(), __FILE__, __FUNCTION__, __LINE__ , ## args)
+	printf ("jack:%5d:%" PRIu64 " %s:%s:%d: " format "\n", getpid(), jack_get_microseconds(), __FILE__, __FUNCTION__, __LINE__ , ## args)
 #else
 #if defined(__APPLE__) && defined(__POWERPC__) 
     #define DEBUG(format...)
@@ -70,7 +70,7 @@ typedef void * dlhandle;
 
 typedef struct {
     const char *shm_name;
-    size_t offset;
+    size_t offset;			/* JOQ: 32/64 problem? */
 } jack_port_buffer_info_t;
 
 typedef enum {
@@ -103,26 +103,26 @@ typedef struct {
     jack_position_t	  pending_time;	/* position for next cycle */
     jack_position_t	  request_time;	/* latest requested position */
     jack_unique_t	  prev_request; /* previous request unique ID */
-    volatile long	  seq_number;	/* unique ID sequence number */
-    char		  new_pos;	/* new position this cycle */
-    char		  pending_pos;	/* new position request pending */
+    volatile uint32_t	  seq_number;	/* unique ID sequence number */
+    int8_t		  new_pos;	/* new position this cycle */
+    int8_t		  pending_pos;	/* new position request pending */
     jack_nframes_t	  pending_frame; /* pending frame number */
-    unsigned long	  sync_clients;	/* number of is_slowsync clients */
-    unsigned long	  sync_remain;	/* number of them with sync_poll */
+    uint32_t		  sync_clients;	/* number of is_slowsync clients */
+    uint32_t		  sync_remain;	/* number of them with sync_poll */
     jack_time_t           sync_timeout;
     jack_time_t           sync_time_left;
     jack_frame_timer_t    frame_timer;
-    int                   internal;
+    int32_t		  internal;
     jack_nframes_t        frames_at_cycle_start;
     pid_t                 engine_pid;
-    unsigned long         buffer_size;
-    char                  real_time;
-    int                   client_priority;
-    int                   has_capabilities;
+    uint32_t		  buffer_size;
+    int8_t		  real_time;
+    int32_t		  client_priority;
+    int32_t		  has_capabilities;
     float                 cpu_load;
-    unsigned long         port_max;
-    int                   engine_ok;
-    unsigned long         n_port_types;
+    uint32_t		  port_max;
+    int32_t		  engine_ok;
+    uint32_t		  n_port_types;
     jack_port_type_info_t port_types[JACK_MAX_PORT_TYPES];
     jack_port_shared_t    ports[0];
 
@@ -143,18 +143,18 @@ typedef enum  {
 typedef struct {
     EventType type;
     union {
-	unsigned long n;
+	uint32_t n;
 	jack_port_id_t port_id;
 	jack_port_id_t self_id;
 	shm_name_t shm_name;
     } x;
     union {
-	unsigned long n;
+	uint32_t n;
 	jack_port_id_t other_id;
-	void* addr;
+	void* addr;			/* JOQ: 32/64 problem? */
     } y;
     union { 
-	size_t size;
+	size_t size;			/* JOQ: 32/64 problem? */
     } z;
 } jack_event_t;
 
@@ -177,22 +177,24 @@ typedef volatile struct {
     volatile jack_client_id_t id;         /* w: engine r: engine and client */
     volatile jack_nframes_t  nframes;     /* w: engine r: client */
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
-    volatile char       name[JACK_CLIENT_NAME_SIZE+1];
+    volatile int8_t     name[JACK_CLIENT_NAME_SIZE+1];
     volatile ClientType type;             /* w: engine r: engine and client */
-    volatile char       active : 1;       /* w: engine r: engine and client */
-    volatile char       dead : 1;         /* r/w: engine */
-    volatile char       timed_out : 1;    /* r/w: engine */
-    volatile char       is_timebase : 1;  /* w: engine, r: engine and client */
-    volatile char       is_slowsync : 1;  /* w: engine, r: engine and client */
-    volatile char       sync_poll : 1;    /* w: engine and client, r: engine */
-    volatile char       sync_new : 1;     /* w: engine and client, r: engine */
+    volatile int8_t     active : 1;       /* w: engine r: engine and client */
+    volatile int8_t     dead : 1;         /* r/w: engine */
+    volatile int8_t	timed_out : 1;    /* r/w: engine */
+    volatile int8_t     is_timebase : 1;  /* w: engine, r: engine and client */
+    volatile int8_t     is_slowsync : 1;  /* w: engine, r: engine and client */
+    volatile int8_t     sync_poll : 1;    /* w: engine and client, r: engine */
+    volatile int8_t     sync_new : 1;     /* w: engine and client, r: engine */
     volatile pid_t      pid;              /* w: client r: engine; client pid */
-    volatile unsigned long long signalled_at;
-    volatile unsigned long long awake_at;
-    volatile unsigned long long finished_at;
+    volatile uint64_t	signalled_at;
+    volatile uint64_t	awake_at;
+    volatile uint64_t	finished_at;
+
+    /* JOQ: all these pointers are trouble for 32/64 compatibility,
+     * they should move to non-shared memory. */
 
     /* callbacks */
-    
     JackProcessCallback process;
     void *process_arg;
     JackBufferSizeCallback bufsize;
@@ -222,7 +224,7 @@ typedef volatile struct {
 
 typedef struct {
     
-    int        load;
+    int32_t    load;
     ClientType type;
 
     char name[JACK_CLIENT_NAME_SIZE+1];
@@ -233,17 +235,17 @@ typedef struct {
 
 typedef struct {
 
-    int status;
+    int32_t	status;
 
-    unsigned int protocol_v;
+    uint32_t	protocol_v;
 
-    shm_name_t client_shm_name;
-    shm_name_t control_shm_name;
+    shm_name_t	client_shm_name;
+    shm_name_t	control_shm_name;
 
-    char fifo_prefix[PATH_MAX+1];
+    int8_t	fifo_prefix[PATH_MAX+1];
 
-    int realtime;
-    int realtime_priority;
+    int32_t	realtime;
+    int32_t	realtime_priority;
 
     /* these two are valid only if the connect request
        was for type == ClientDriver.
@@ -251,17 +253,17 @@ typedef struct {
 
     jack_client_control_t *client_control;
     jack_control_t        *engine_control;
-    size_t                 control_size;
+    size_t                 control_size; /* JOQ: 32/64 problem? */
 
     /* when we write this response, we deliver n_port_types
        of jack_port_type_info_t after it.
     */
 
-    unsigned long n_port_types;
+    uint32_t	n_port_types;
     
 #if defined(__APPLE__) && defined(__POWERPC__) 
-    /* specific ressources for server/client real-time thread communication */
-    int portnum;
+    /* specific resources for server/client real-time thread communication */
+    int32_t	portnum;
 #endif
 
 } jack_client_connect_result_t;
@@ -271,7 +273,7 @@ typedef struct {
 } jack_client_connect_ack_request_t;
 
 typedef struct {
-    char status;
+    int8_t status;
 } jack_client_connect_ack_result_t;
 
 typedef enum {
@@ -299,8 +301,8 @@ struct _jack_request {
 	struct {
 	    char name[JACK_PORT_NAME_SIZE+1];
 	    char type[JACK_PORT_TYPE_SIZE+1];
-	    unsigned long flags;
-	    unsigned long buffer_size;
+	    uint32_t flags;
+	    uint32_t buffer_size;
 	    jack_port_id_t port_id;
 	    jack_client_id_t client_id;
 	} port_info;
@@ -309,20 +311,22 @@ struct _jack_request {
 	    char destination_port[JACK_PORT_NAME_SIZE+1];
 	} connect;
 	struct {
-	    unsigned int nports;
-	    const char **ports;  
+	    int32_t nports;
+	    const char **ports;		/* JOQ: 32/64 problem? */
 	} port_connections;
 	struct {
 	    jack_client_id_t client_id;
-	    int conditional;
+	    int32_t conditional;
 	} timebase;
 	jack_client_id_t client_id;
 	jack_nframes_t nframes;
 	jack_time_t timeout;
     } x;
-    int status;
+    int32_t status;
 };
 
+/* per-client structure allocated in the server's address space
+ * JOQ: then why isn't this in engine.h? */
 typedef struct _jack_client_internal {
 
     jack_client_control_t *control;
@@ -337,12 +341,12 @@ typedef struct _jack_client_internal {
     unsigned long execution_order;
     struct  _jack_client_internal *next_client; /* not a linked list! */
     dlhandle handle;
-    int     (*initialize)(jack_client_t*, const char*);  /* for internal clients only */
-    void    (*finish)(void *);  /* for internal clients only */
+    int     (*initialize)(jack_client_t*, const char*); /* int. clients only */
+    void    (*finish)(void *);		/* internal clients only */
     int      error;
     
 #if defined(__APPLE__) && defined(__POWERPC__) 
-    /* specific ressources for server/client real-time thread communication */
+    /* specific resources for server/client real-time thread communication */
     mach_port_t serverport;
     trivial_message message;
     int running;
@@ -353,14 +357,17 @@ typedef struct _jack_client_internal {
 
 extern void jack_cleanup_files ();
 
-extern int  jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event);
-extern void jack_client_handle_new_port_type (jack_client_t *client, shm_name_t, size_t, void* addr);
+extern int  jack_client_handle_port_connection (jack_client_t *client,
+						jack_event_t *event);
+extern void jack_client_handle_new_port_type (jack_client_t *client,
+					      shm_name_t, size_t, void* addr);
 
-extern jack_client_t *jack_driver_client_new (jack_engine_t *, const char *client_name);
-jack_client_t *jack_client_alloc_internal (jack_client_control_t*, jack_control_t*);
+extern jack_client_t *jack_driver_client_new (jack_engine_t *,
+					      const char *client_name);
+jack_client_t *jack_client_alloc_internal (jack_client_control_t*,
+					   jack_control_t*);
 
-/* internal clients call this. its defined in jack/engine.c */
-
+/* internal clients call this. it's defined in jack/engine.c */
 void handle_internal_client_request (jack_control_t*, jack_request_t*);
 
 extern char *jack_server_dir;
@@ -373,7 +380,6 @@ extern void jack_client_invalidate_port_buffers (jack_client_t *client);
 
 extern void jack_transport_copy_position (jack_position_t *from,
 					  jack_position_t *to);
-
 extern void jack_call_sync_client (jack_client_t *client);
 
 extern void jack_call_timebase_master (jack_client_t *client);

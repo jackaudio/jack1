@@ -109,7 +109,8 @@ main (int argc, char *argv[])
 		if (show_latency) {
 			jack_port_t *port = jack_port_by_name (client, ports[i]);
 			if (port) {
-				printf ("	latency = %lu frames\n", jack_port_get_total_latency (client, port));
+				printf ("	latency = %" PRIu32 " frames\n",
+					jack_port_get_total_latency (client, port));
 				free (port);
 			}
 		}

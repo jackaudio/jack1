@@ -30,7 +30,7 @@
 
 /* these should probably go somewhere else */
 #define JACK_CLIENT_NAME_SIZE 32
-typedef unsigned long jack_client_id_t;
+typedef uint32_t jack_client_id_t;
 
 typedef struct {
     shm_name_t    shm_name;
@@ -40,7 +40,7 @@ typedef struct {
 
 typedef struct _jack_port_type_info {
 
-    unsigned long type_id;
+    uint32_t	  type_id;
     const char    type_name[JACK_PORT_TYPE_SIZE];      
 
     void (*mixdown)(jack_port_t *, jack_nframes_t); /* function to mixdown multiple inputs to a buffer. can be
@@ -60,7 +60,7 @@ typedef struct _jack_port_type_info {
 							the return value is normalized to a [0..1] range.
 						     */
     
-    long buffer_scale_factor;                       /* If == 1, then a buffer to handle nframes worth of
+    int32_t buffer_scale_factor;                       /* If == 1, then a buffer to handle nframes worth of
 						       data is sizeof(jack_default_audio_sample_t) * nframes bytes large.
 						       
 						       If anything other than 1, the buffer allocated
@@ -94,13 +94,13 @@ typedef struct _jack_port_shared {
                                         // start of the port's type-specific shared
                                         // memory region.
     jack_port_id_t           id;        // index into engine port array for this port
-    unsigned long            flags;    
+    uint32_t		     flags;    
     char                     name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
     jack_client_id_t         client_id; // who owns me
 
     volatile jack_nframes_t  latency;
     volatile jack_nframes_t  total_latency;
-    volatile unsigned char   monitor_requests;
+    volatile uint8_t	     monitor_requests;
 
     char                     in_use     : 1;
     char                     locked     : 1;

@@ -203,8 +203,8 @@ run_disk_thread (thread_info_t *info)
 	if (overruns > 0) {
 		fprintf (stderr,
 			 "jackrec failed with %ld overruns.\n", overruns);
-		fprintf (stderr, " try a bigger buffer than -B %ld.\n",
-			 info->rb_size);
+		fprintf (stderr, " try a bigger buffer than -B %"
+			 PRIu32 ".\n", info->rb_size);
 		info->status = EPIPE;
 	}
 	if (info->status) {

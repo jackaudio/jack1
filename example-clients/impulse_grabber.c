@@ -149,9 +149,11 @@ main (int argc, char *argv[])
 	*/
 
 	fs = jack_get_sample_rate(client);
-	response_duration = (int)(fs * duration);
+	response_duration = (unsigned long) (fs * duration);
 	response = malloc(response_duration * sizeof(float));
-	fprintf(stderr, "Grabbing %f seconds (%lu samples) of impulse response\n", duration, response_duration);
+	fprintf(stderr,
+		"Grabbing %f seconds (%lu samples) of impulse response\n",
+		duration, response_duration);
 
 	/* create two ports */
 

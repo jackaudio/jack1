@@ -494,7 +494,7 @@ int jack_port_disconnect (jack_client_t *, jack_port_t *);
  * This returns the sample rate of the jack system, as set by the user when
  * jackd was started.
  */
-unsigned long jack_get_sample_rate (jack_client_t *);
+jack_nframes_t jack_get_sample_rate (jack_client_t *);
 
 /**
  * This returns the current maximum size that will

@@ -1,3 +1,31 @@
+2003-08-26  Jack O'Quin  <joq@io.com>
+
+	* <jack/types.h> typedefs are now defined using the C99 standard
+	fixed-size integer typedefs.  These new typedefs are binary
+	compatible with 32-bit platforms, but not 64-bit machines.  
+
+	Programs using printf on these values will get GCC compiler
+	warnings.  To suppress the warnings, use the corresponding C99
+	printf specifications defined in <inttypes.h>.  That header is
+	already implicitly included by <jack/types.h>, but can also be
+	included explicitly to maintain compatibility with older versions
+	of JACK without messy #ifdef's.  Adding explicit casts will also
+	work, but may suppress future warnings you might want to see.
+
+	* jack_get_sample_rate() now returns jack_nframes_t rather than
+	unsigned long.  These are the same on 32-bit machines, but not on
+	64-bit platforms.
+
+2003-08-13  Jack O'Quin  <joq@io.com>
+
+	* Many new transport interfaces.  It would be silly to list them
+	all here.  Please see the new transport control section in the
+	JACK reference manual.
+
+	* jack_set_transport_info() and jack_engine_takeover_timebase(),
+	(the old timebase master interfaces) now do nothing.  Instead, use
+	jack_set_timebase_callback().
+
 2003-05-09  Jack O'Quin  <joq@io.com>
 
 	* Added new jack_is_realtime() function.
