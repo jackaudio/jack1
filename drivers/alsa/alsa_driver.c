@@ -565,17 +565,34 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 		cr = snd_pcm_hw_params_get_rate (driver->capture_hw_params, &dir);
 	}
 
-	if (cr != pr) {
-		jack_error ("playback and capture sample rates do not match (%d vs. %d)",
-			    pr, cr);
-		return -1;
+	if (driver->capture_handle && driver->playback_handle) {
+		if (cr != pr) {
+			jack_error ("playback and capture sample rates do not match (%d vs. %d)",
+				    pr, cr);
+		}
+
+		/* only change if *both* capture and playback rates don't match requested
+		 * certain hardware actually still works properly in full-duplex with
+		 * slightly different rate values between adc and dac
+		 */
+		if (cr != driver->frame_rate && pr != driver->frame_rate) {
+			jack_error ("sample rate in use (%d Hz) does not match requested rate (%d Hz)",
+				    cr, driver->frame_rate);
+			driver->frame_rate = cr;
+		}
+		
 	}
-	
-	if (cr != driver->frame_rate) {
-		jack_error ("sample rate in use (%d Hz) does not match requested rate (%d Hz)",
+	else if (driver->capture_handle && cr != driver->frame_rate) {
+		jack_error ("capture sample rate in use (%d Hz) does not match requested rate (%d Hz)",
 			    cr, driver->frame_rate);
 		driver->frame_rate = cr;
 	}
+	else if (driver->playback_handle && pr != driver->frame_rate) {
+		jack_error ("playback sample rate in use (%d Hz) does not match requested rate (%d Hz)",
+			    pr, driver->frame_rate);
+		driver->frame_rate = pr;
+	}
+
 
 	/* check the fragment size, since thats non-negotiable */
 	
