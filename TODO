@@ -4,16 +4,25 @@
 
 Version: $Id$
 
-Note to developers! You can update this list directly or alternatively
+Note to developers! A web-based bug tracker for JACK was put online in 
+Oct 2003. It is now the preferred way to report and track bugs and 
+feature requests. This TODO file is now used only for tracking release 
+issues (mapping features and other todo-items to release roadmap, etc).
+
+The new bug tracker can be found at:
+
+    http://jackit.sourceforge.net/mantis/
+
+-----------------------------------------------------------------------
+
+You can update this list directly via CVS or alternatively
 send a change request to Kai Vehmanen (mailto:k_at_eca.cx).
 
 -----------------------------------------------------------------------
 
-TO BE DECIDED (owner)
+TODO before-1.0
 
-- dropping the use of CAP_RESOURCE (nando)
-- support for on-the-fly sampling rate change
-- whether to default to triangular dithering for 16bit output. (swh)
+- add explanation of protocol versioning to README.developers (kaiv)
 
 TODO post-1.0
 
@@ -21,14 +30,19 @@ TODO post-1.0
 - handle mixed-mode 64bit and 32bit clients (joq)
 - TBD
 
-TODO general (owner)
+TODO general - no agreed timeline
 
 - better scheme for handling machine and system dependencies (joq)
-- add explanation of protocol versioning to README.developers (kaiv)
 - proper handling of client return values in libjack (kaiv)
 - pool based malloc for rt client-local mem allocation (paul, moved back here)
 
-TO THINK ABOUT
+TO BE DECIDED - no agreed timeline
+
+- dropping the use of CAP_RESOURCE (nando)
+- support for on-the-fly sampling rate change
+- whether to default to triangular dithering for 16bit output. (swh)
+
+TO THINK ABOUT - no agreed timeline
 
 - ensure that UST/MSC pairs work for transport API
 - whether we want to support varispeed (resampling and/or changing
