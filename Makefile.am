@@ -15,19 +15,19 @@ AM_CFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" @GLIB_CFLAGS@
 AM_CXXFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\"
 
 jackd_SOURCES = jackd.c engine.c
-jackd_LDFLAGS = -L. -ljack -lltdl -lpthread $(GLIB_LIBS)
+jackd_LDFLAGS = -L. -ljack -ldl -lpthread $(GLIB_LIBS)
 
 jack_simple_client_SOURCES = simple_client.c
-jack_simple_client_LDFLAGS = -L. -ljack -lltdl -lpthread
+jack_simple_client_LDFLAGS = -L. -ljack -ldl -lpthread
 
 jack_monitor_client_SOURCES = monitor_client.c
-jack_monitor_client_LDFLAGS = -L. -ljack -lltdl -lpthread
+jack_monitor_client_LDFLAGS = -L. -ljack -ldl -lpthread
 
 jack_fltk_client_SOURCES = fltk_client.cc
-jack_fltk_client_LDFLAGS = -L. -L/usr/X11R6/lib -lfltk -lX11 -lXext -ljack -lltdl -lpthread
+jack_fltk_client_LDFLAGS = -L. -L/usr/X11R6/lib -lfltk -lX11 -lXext -ljack -ldl -lpthread
 
 jackrec_SOURCES = capture_client.c
-jackrec_LDFLAGS = -L. -lsndfile -ljack -lltdl -lpthread
+jackrec_LDFLAGS = -L. -lsndfile -ljack -ldl -lpthread
 
 lib_LTLIBRARIES    = libjack.la jack_alsa.la
 

@@ -22,7 +22,6 @@
 #define __jack_driver_h__
 
 #include <glib.h>
-#include <ltdl.h>
 #include <pthread.h>
 #include <jack/types.h>
 
@@ -79,7 +78,7 @@ typedef int             (*JackDriverMonitoringInputFunction)(struct _jack_driver
     char all_monitor_in : 1; \
     char has_clock_sync_reporting : 1; \
     char has_hw_monitoring : 1; \
-    lt_dlhandle handle; \
+    void *handle; \
     void (*finish)(struct _jack_driver *);\
 \
     /* These are the "core" driver functions */ \
