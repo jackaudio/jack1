@@ -217,7 +217,6 @@ int main(int argc, char **argv)
 			fprintf (stderr, "jackstart: not running suid root, can't use capabilities\n");
 			fprintf (stderr, "    (currently running with uid=%d and euid=%d),\n", uid, euid);
 			fprintf (stderr, "    make jackstart suid root or start jackd directly\n\n");
-			exit (1);
 		}
 	}
 	/* see if we can get the required capabilities */
@@ -229,7 +228,6 @@ int main(int argc, char **argv)
 		fprintf (stderr, "           %s\n", cap_to_text(cap, &size));
 		fprintf (stderr, "    probably running under a kernel with capabilities disabled,\n");
 		fprintf (stderr, "    a suitable kernel would have printed something like \"=eip\"\n\n");
-		exit (1);
 	}
 
 	/* check the executable, owner, permissions, md5 checksum */
@@ -251,8 +249,9 @@ int main(int argc, char **argv)
 		exit (1);
 	}
 
-	/* make sure the file descriptors are the right ones, otherwise dup them,
-	   this is to make sure that both jackstart and jackd use the same fds
+	/* make sure the file descriptors are the right ones,
+	   otherwise dup them, this is to make sure that both
+	   jackstart and jackd use the same fds
 	*/
 	if (pipe_fds[0] != PIPE_READ_FD) {
 		if (dup2 (pipe_fds[0], PIPE_READ_FD) != PIPE_READ_FD) {
@@ -318,9 +317,7 @@ int main(int argc, char **argv)
 		}
 
 		/* set privileges on jackd process */
-		if (give_capabilities (parent_pid) != 0) {
-			exit (2);
-		}
+		give_capabilities (parent_pid);
 	}
 	exit (0);
 }

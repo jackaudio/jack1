@@ -2171,15 +2171,10 @@ jack_watchdog_thread (void *arg)
 					      control->pgrp, SIGKILL);
 			}
 
-			/* kill our process group, trying to get a dump */
+			/* kill our process group, try to get a dump */
 			kill (-getpgrp(), SIGABRT);
 			/*NOTREACHED*/
 			exit (1);
-
-#if 0  /* suppress watchdog message */
-		} else {
-			VERBOSE(engine, "jackd watchdog: all is well.\n");
-#endif
 		}
 		engine->watchdog_check = 0;
 	}
