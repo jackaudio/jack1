@@ -743,6 +743,13 @@ jack_client_open (const char *client_name,
 
 	*status = 0;
 
+	/* validate parameters */
+	if ((options & (~JackValidOptions))
+	    || server_name || server_command) {
+		*status |= JackInvalidOpen;
+		return NULL;
+	}
+
 	/* External clients need this initialized.  It is already set
 	 * up in the server's address space for internal clients.
 	 */

@@ -246,6 +246,8 @@ enum JackOpenOptions {
      JackUseExactName = 0x02
 };
 
+#define JackValidOptions (JackNoStartServer|JackUseExactName)
+
 /**
  *  jack_client_open() request options are formed by AND-ing together
  *  @ref JackOpenOptions bits.
@@ -274,7 +276,13 @@ enum JackOpenStatus {
       * that was used.  If the specified @a client_name plus these
       * extra characters would be too long, the open fails instead.
       */
-     JackNameNotUnique = 0x02
+     JackNameNotUnique = 0x02,
+
+     /**
+      * The open request contained an invalid or unsupported option or
+      * parameter.
+      */
+     JackInvalidOpen = 0x04
 };
 
 /**
