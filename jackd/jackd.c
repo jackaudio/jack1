@@ -647,10 +647,6 @@ main (int argc, char *argv[])
 
 	copyright (stdout);
 
-	if (jack_initialize_shm ()) {
-		fprintf (stderr, "no access to shm registry\n");
-		exit (1);
-	}
 	rc = jack_register_server (server_name);
 	switch (rc) {
 	case EEXIST:
@@ -659,6 +655,9 @@ main (int argc, char *argv[])
 	case ENOSPC:
 		fprintf (stderr, "too many servers already active\n");
 		exit (2);
+	case ENOMEM:
+		fprintf (stderr, "no access to shm registry\n");
+		exit (3);
 	default:
 		if (verbose)
 			fprintf (stderr, "server `%s' registered\n",
