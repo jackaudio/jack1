@@ -1,3 +1,4 @@
+/* -*- mode: c; c-file-style: "linux"; -*- */
 /*
     Copyright (C) 2001 Paul Davis 
 
@@ -1800,7 +1801,8 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 
 	printf ("creating alsa driver ... %s|%s|%" PRIu32 "|%" PRIu32
 		"|%" PRIu32"|%" PRIu32"|%" PRIu32 "|%s|%s|%s|%s\n",
-		playback_alsa_device,capture_alsa_device, 
+		playing ? playback_alsa_device : "-",
+		capturing ? capture_alsa_device : "-", 
 		frames_per_cycle, user_nperiods, rate,
 		user_capture_nchnls,user_playback_nchnls,
 		hw_monitoring ? "hwmon": "nomon",
@@ -2116,15 +2118,15 @@ driver_get_descriptor ()
 	desc = calloc (1, sizeof (jack_driver_desc_t));
 
 	strcpy (desc->name,"alsa");
-	desc->nparams = 15;
+	desc->nparams = 14;
   
 	params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
 	i = 0;
 	strcpy (params[i].name, "capture");
 	params[i].character  = 'C';
-	params[i].has_arg    = optional_argument;
 	params[i].type       = JackDriverParamString;
+	strcpy (params[i].value.str, "none");
 	strcpy (params[i].short_desc,
 		"Provide only capture ports.  Optionally set device");
 	strcpy (params[i].long_desc, params[i].short_desc);
@@ -2132,8 +2134,8 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "playback");
 	params[i].character  = 'P';
-	params[i].has_arg    = optional_argument;
 	params[i].type       = JackDriverParamString;
+	strcpy (params[i].value.str, "none");
 	strcpy (params[i].short_desc,
 		"Provide only playback ports.  Optionally set device");
 	strcpy (params[i].long_desc, params[i].short_desc);
@@ -2141,7 +2143,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "device");
 	params[i].character  = 'd';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamString;
 	strcpy (params[i].value.str,  "hw:0");
 	strcpy (params[i].short_desc, "ALSA device name");
@@ -2150,7 +2151,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "rate");
 	params[i].character  = 'r';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 48000U;
 	strcpy (params[i].short_desc, "Sample rate");
@@ -2159,7 +2159,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "period");
 	params[i].character  = 'p';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 1024U;
 	strcpy (params[i].short_desc, "Frames per period");
@@ -2168,7 +2167,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "nperiods");
 	params[i].character  = 'n';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 2U;
 	strcpy (params[i].short_desc, "Number of periods in hardware buffer");
@@ -2177,7 +2175,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "hwmon");
 	params[i].character  = 'H';
-	params[i].has_arg    = no_argument;
 	params[i].type       = JackDriverParamBool;
 	params[i].value.i    = 0;
 	strcpy (params[i].short_desc,"Hardware monitoring, if available");
@@ -2186,27 +2183,15 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "hwmeter");
 	params[i].character  = 'M';
-	params[i].has_arg    = no_argument;
 	params[i].type       = JackDriverParamBool;
 	params[i].value.i    = 0;
 	strcpy (params[i].short_desc, "Hardware metering, if available");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
 	i++;
-	strcpy (params[i].name, "duplex");
-	params[i].character  = 'D';
-	params[i].has_arg    = no_argument;
-	params[i].type       = JackDriverParamBool;
-	params[i].value.i    = 1;
-	strcpy (params[i].short_desc,
-		"Provide both capture and playback ports");
-	strcpy (params[i].long_desc, params[i].short_desc);
-
-	i++;
 	strcpy (params[i].name, "softmode");
 	params[i].character  = 's';
-	params[i].has_arg    = no_argument;
-	params[i].type       = JackDriverParamBool;
+ 	params[i].type       = JackDriverParamBool;
 	params[i].value.i    = 0;
 	strcpy (params[i].short_desc, "Soft-mode, no xrun handling");
 	strcpy (params[i].long_desc,  params[i].short_desc);
@@ -2214,7 +2199,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "monitor");
 	params[i].character  = 'm';
-	params[i].has_arg    = no_argument;
 	params[i].type       = JackDriverParamBool;
 	params[i].value.i    = 0;
 	strcpy (params[i].short_desc, "Provide monitor ports for the output");
@@ -2223,7 +2207,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "dither");
 	params[i].character  = 'z';
-	params[i].has_arg    = optional_argument;
 	params[i].type       = JackDriverParamChar;
 	params[i].value.c    = 'n';
 	strcpy (params[i].short_desc, "Dithering mode");
@@ -2237,7 +2220,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "inchannels");
 	params[i].character  = 'i';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.i    = 0;
 	strcpy (params[i].short_desc,
@@ -2247,7 +2229,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "outchannels");
 	params[i].character  = 'o';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.i    = 0;
 	strcpy (params[i].short_desc,
@@ -2257,7 +2238,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "shorts");
 	params[i].character  = 'S';
-	params[i].has_arg    = no_argument;
 	params[i].type       = JackDriverParamBool;
 	params[i].value.i    = 0;
 	strcpy (params[i].short_desc, "Try 16-bit samples before 32-bit");
@@ -2358,21 +2338,16 @@ driver_initialize (jack_client_t *client, const JSList * params)
 
 		case 'C':
 			capture = TRUE;
-			if (strcmp (param->value.str, "") != 0) {
+			if (strcmp (param->value.str, "none") != 0) {
 				capture_pcm_name = strdup (param->value.str);
 			}
 			break;
 
 		case 'P':
 			playback = TRUE;
-			if (strcmp (param->value.str, "") != 0) {
+			if (strcmp (param->value.str, "none") != 0) {
 				playback_pcm_name = strdup (param->value.str);
 			}
-			break;
-
-		case 'D':
-			capture = TRUE;
-			playback = TRUE;
 			break;
 
 		case 'd':
@@ -2381,15 +2356,15 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			break;
 
 		case 'H':
-			hw_monitoring = TRUE;
+			hw_monitoring = param->value.i;
 			break;
 
 		case 'm':
-			monitor = TRUE;
+			monitor = param->value.i;
 			break;
 
 		case 'M':
-			hw_metering = TRUE;
+			hw_metering = param->value.i;
 			break;
 
 		case 'r':
@@ -2405,7 +2380,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			break;
 				
 		case 's':
-			soft_mode = TRUE;
+			soft_mode = param->value.i;
 			break;
 
 		case 'z':
@@ -2422,7 +2397,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			break;
 
 		case 'S':
-			shorts_first = TRUE;
+			shorts_first = param->value.i;
 			break;
 
 		}

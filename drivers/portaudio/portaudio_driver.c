@@ -468,7 +468,6 @@ driver_get_descriptor ()
 	i = 0;
 	strcpy (desc->params[i].name, "channel");
 	desc->params[i].character  = 'c';
-	desc->params[i].has_arg    = required_argument;
 	desc->params[i].type       = JackDriverParamInt;
 	desc->params[i].value.ui   = 0;
 	strcpy (desc->params[i].short_desc, "Maximium number of channels");
@@ -477,7 +476,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (desc->params[i].name, "capture");
 	desc->params[i].character  = 'C';
-	desc->params[i].has_arg    = no_argument;
 	desc->params[i].type       = JackDriverParamBool;
 	desc->params[i].value.i    = TRUE;
 	strcpy (desc->params[i].short_desc, "Whether or not to capture");
@@ -486,7 +484,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (desc->params[i].name, "playback");
 	desc->params[i].character  = 'P';
-	desc->params[i].has_arg    = no_argument;
 	desc->params[i].type       = JackDriverParamBool;
 	desc->params[i].value.i    = TRUE;
 	strcpy (desc->params[i].short_desc, "Whether or not to playback");
@@ -495,7 +492,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (desc->params[i].name, "duplex");
 	desc->params[i].character  = 'D';
-	desc->params[i].has_arg    = no_argument;
 	desc->params[i].type       = JackDriverParamBool;
 	desc->params[i].value.i    = TRUE;
 	strcpy (desc->params[i].short_desc, "Capture and playback");
@@ -504,7 +500,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (desc->params[i].name, "rate");
 	desc->params[i].character  = 'r';
-	desc->params[i].has_arg    = required_argument;
 	desc->params[i].type       = JackDriverParamUInt;
 	desc->params[i].value.ui   = 48000U;
 	strcpy (desc->params[i].short_desc, "Sample rate");
@@ -513,7 +508,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (desc->params[i].name, "period");
 	desc->params[i].character  = 'p';
-	desc->params[i].has_arg    = required_argument;
 	desc->params[i].type       = JackDriverParamUInt;
 	desc->params[i].value.ui   = 128U;
 	strcpy (desc->params[i].short_desc, "Frames per period");
@@ -522,7 +516,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (desc->params[i].name, "dither");
 	desc->params[i].character  = 'z';
-	desc->params[i].has_arg    = optional_argument;
 	desc->params[i].type       = JackDriverParamChar;
 	desc->params[i].value.c    = '-';
 	strcpy (desc->params[i].short_desc, "Dithering mode");

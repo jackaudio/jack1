@@ -276,7 +276,6 @@ driver_get_descriptor ()
 	i = 0;
 	strcpy (params[i].name, "capture");
 	params[i].character  = 'C';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 2U;
 	strcpy (params[i].short_desc, "Number of capture ports");
@@ -285,7 +284,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "playback");
 	params[i].character  = 'P';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[1].value.ui   = 2U;
 	strcpy (params[i].short_desc, "Number of playback ports");
@@ -294,7 +292,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "rate");
 	params[i].character  = 'r';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 48000U;
 	strcpy (params[i].short_desc, "Sample rate");
@@ -303,7 +300,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "period");
 	params[i].character  = 'p';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 1024U;
 	strcpy (params[i].short_desc, "Frames per period");
@@ -312,7 +308,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "wait");
 	params[i].character  = 'w';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 21333U;
 	strcpy (params[i].short_desc,

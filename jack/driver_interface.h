@@ -59,7 +59,6 @@ typedef struct
 {
   char name[JACK_DRIVER_NAME_MAX+1]; /**< The parameter's name */
   char character;                    /**< The parameter's character (for getopt, etc) */
-  int32_t has_arg;                   /**< as with getopt's struct option */
   jack_driver_param_type_t type;     /**< The parameter's type */
   jack_driver_param_value_t value;   /**< The parameter's (default) value */
   char short_desc[64];               /**< A short (~30 chars) description for the user */

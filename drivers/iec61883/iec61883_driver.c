@@ -238,7 +238,6 @@ driver_get_descriptor ()
 	i = 0;
 	strcpy (params[i].name, "capture");
 	params[i].character  = 'C';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamString;
 	strcpy (params[i].value.str, "");
 	strcpy (params[i].short_desc,
@@ -254,7 +253,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "playback");
 	params[i].character  = 'P';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamString;
 	strcpy (params[i].value.str, "");
 	strcpy (params[i].short_desc,
@@ -264,7 +262,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "port");
 	params[i].character  = 'd';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 0U;
 	strcpy (params[i].short_desc, "The firewire port (ie, device) to use");
@@ -273,7 +270,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "buffer-size");
 	params[i].character  = 'b';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 1024U;
 	strcpy (params[i].short_desc, "The buffer size to use (in frames)");
@@ -282,7 +278,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "irq-interval");
 	params[i].character  = 'i';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 0U;
 	strcpy (params[i].short_desc, "The interrupt interval to use (in packets)");
@@ -291,7 +286,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "sample-rate");
 	params[i].character  = 'r';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 48000U;
 	strcpy (params[i].short_desc, "Sample rate to use");
@@ -300,7 +294,6 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "speed");
 	params[i].character  = 's';
-	params[i].has_arg    = required_argument;
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 400U;
 	strcpy (params[i].short_desc, "Set the transmit speed to 400, 200 or 100 MB/s");
