@@ -2126,7 +2126,6 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
 	(void) jack_get_fifo_fd (engine, 0);
 
 	pthread_create (&engine->server_thread, 0, &jack_server_thread, engine);
-	pthread_detach (engine->server_thread);
 
 	return engine;
 }
@@ -2216,7 +2215,6 @@ jack_start_watchdog (jack_engine_t *engine)
 		jack_error ("cannot start watchdog thread");
 		return -1;
 	}
-	pthread_detach (engine->watchdog_thread);
 	return 0;
 }
 
@@ -2457,14 +2455,17 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	return 0;
 }
 
-int 
+void 
 jack_engine_delete (jack_engine_t *engine)
 {
 	int i;
 
+	if (engine == NULL)
+		return;
+
 	engine->control->engine_ok = 0;	/* tell clients we're going away */
 
-	if (engine && engine->driver) {
+	if (engine->driver) {
 		jack_driver_t* driver = engine->driver;
 
 		VERBOSE (engine, "stopping driver\n");
@@ -2487,19 +2488,17 @@ jack_engine_delete (jack_engine_t *engine)
 	pthread_cancel (engine->server_thread);
 	pthread_join (engine->server_thread, NULL);
 
-	/* JOQ: We need to cancel the watchdog thread and wait for it
-	 * to terminate.  For some reason, with the 2.6 kernel this
-	 * causes a segfault in pthread_cancel().  I don't know why,
-	 * but 2.4 works OK.
-	 */
-	VERBOSE (engine, "stopping watchdog thread\n");
-
-	/* Stephane Letz : letz@grame.fr
-	Watch dog thread is not needed on MacOSX since CoreAudio drivers already contains a similar mechanism.
-	*/	
 #ifndef JACK_USE_MACH_THREADS 
-	pthread_cancel (engine->watchdog_thread);
-	pthread_join (engine->watchdog_thread, NULL);
+	/* Cancel the watchdog thread and wait for it to terminate.
+	 *
+	 * The watchdog thread is not used on MacOSX since CoreAudio
+	 * drivers already contain a similar mechanism.
+	 */	
+	if (engine->control->real_time) {
+		VERBOSE (engine, "stopping watchdog thread\n");
+		pthread_cancel (engine->watchdog_thread);
+		pthread_join (engine->watchdog_thread, NULL);
+	}
 #endif
 
 	/* free engine control shm segment */
@@ -2512,7 +2511,6 @@ jack_engine_delete (jack_engine_t *engine)
 
 	VERBOSE (engine, "engine deleted\n");
 	free (engine);
-	return 0;
 }
 
 /* Set up the engine's client internal and control structures for both

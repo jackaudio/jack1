@@ -153,13 +153,13 @@ jack_engine_t  *jack_engine_new (int real_time, int real_time_priority,
 				 int verbose, int client_timeout,
 				 unsigned int port_max,
                                  pid_t waitpid, JSList *drivers);
-int             jack_engine_delete (jack_engine_t *);
-int             jack_run (jack_engine_t *engine);
-int             jack_wait (jack_engine_t *engine);
-int             jack_engine_load_driver (jack_engine_t *engine,
+void		jack_engine_delete (jack_engine_t *);
+int		jack_run (jack_engine_t *engine);
+int		jack_wait (jack_engine_t *engine);
+int		jack_engine_load_driver (jack_engine_t *engine,
 					 jack_driver_desc_t * driver_desc,
 					 JSList * driver_params);
-void            jack_dump_configuration(jack_engine_t *engine, int take_lock);
+void		jack_dump_configuration(jack_engine_t *engine, int take_lock);
 
 extern jack_client_internal_t *
 jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
