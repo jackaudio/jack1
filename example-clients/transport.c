@@ -169,6 +169,17 @@ void com_tempo(char *arg)
     time_reset = 1;
 }
 
+/* Set sync timeout in seconds. */
+void com_timeout(char *arg)
+{
+    double timeout = 2.0;
+
+    if (*arg != '\0')
+	timeout = atof(arg);
+
+    jack_set_sync_timeout(client, (jack_time_t) (timeout*1000000));
+}
+
 
 /* Command parsing based on GNU readline info examples. */
 
@@ -192,6 +203,7 @@ command_t commands[] = {
     { "release", com_release,	"Release timebase" },
     { "stop",	com_stop,	"Stop transport" },
     { "tempo",	com_tempo,	"Set beat tempo <beats_per_min>" },
+    { "timeout", com_timeout,	"Set sync timeout in <seconds>" },
     { "?",	com_help,	"Synonym for `help'" },
     { (char *)NULL, (cmd_function_t *)NULL, (char *)NULL }
 };

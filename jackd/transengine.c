@@ -29,11 +29,30 @@
 
 /********************** internal functions **********************/
 
+/* initiate polling a new slow-sync client
+ *
+ *   precondition: caller holds the graph lock. */
+static inline void
+jack_sync_poll_new (jack_engine_t *engine, jack_client_internal_t *client)
+{
+	/* force sync_cb callback to run in its first cycle */
+	engine->control->sync_time_left = engine->control->sync_timeout;
+	client->control->sync_new = 1;
+	if (!client->control->sync_poll) {
+		client->control->sync_poll = 1;
+		engine->control->sync_remain++;
+	}
+
+	// JOQ: I don't like doing this here...
+	if (engine->control->transport_state == JackTransportRolling)
+		engine->control->transport_state = JackTransportStarting;
+}
+
 /* stop polling a specific slow-sync client
  *
  *   precondition: caller holds the graph lock. */
 static inline void
-jack_sync_poll_exit(jack_engine_t *engine, jack_client_internal_t *client)
+jack_sync_poll_exit (jack_engine_t *engine, jack_client_internal_t *client)
 {
 	if (client->control->sync_poll) {
 		client->control->sync_poll = 0;
@@ -48,7 +67,7 @@ jack_sync_poll_exit(jack_engine_t *engine, jack_client_internal_t *client)
  *
  *   precondition: caller holds the graph lock. */
 static void
-jack_sync_poll_stop(jack_engine_t *engine)
+jack_sync_poll_stop (jack_engine_t *engine)
 {
 	JSList *node;
 	long poll_count = 0;		/* count sync_poll clients */
@@ -73,7 +92,7 @@ jack_sync_poll_stop(jack_engine_t *engine)
  *
  *   precondition: caller holds the graph lock. */
 static void
-jack_sync_poll_start(jack_engine_t *engine)
+jack_sync_poll_start (jack_engine_t *engine)
 {
 	JSList *node;
 	long sync_count = 0;		/* count slow-sync clients */
@@ -95,21 +114,22 @@ jack_sync_poll_start(jack_engine_t *engine)
 
 /* check for sync timeout */
 static inline int
-jack_sync_timeout(jack_engine_t *engine)
+jack_sync_timeout (jack_engine_t *engine)
 {
 	jack_control_t *ectl = engine->control;
 	jack_time_t buf_usecs =
-		((ectl->buffer_size * (jack_time_t) 1000000000) /
+		((ectl->buffer_size * (jack_time_t) 1000000) /
 		 ectl->current_time.frame_rate);
 
 	/* compare carefully, jack_time_t is unsigned */
-	if (ectl->sync_time_left <= buf_usecs) {
-		ectl->sync_time_left = 0;
-		return 1;		/* timed out */
-	} else {
+	if (ectl->sync_time_left > buf_usecs) {
 		ectl->sync_time_left -= buf_usecs;
 		return 0;		/* continue */
 	}
+
+	/* timed out */
+	ectl->sync_time_left = 0;
+	return 1;
 }
 
 /**************** subroutines used by engine.c ****************/
@@ -199,7 +219,7 @@ jack_transport_init (jack_engine_t *engine)
 	ectl->new_pos = 0;
 	ectl->sync_remain = 0;
 	ectl->sync_clients = 0;
-	ectl->sync_timeout = 2000000000; /* 2 second default */
+	ectl->sync_timeout = 2000000;	/* 2 second default */
 	ectl->sync_time_left = 0;
 }
 
@@ -274,22 +294,12 @@ jack_transport_client_set_sync (jack_engine_t *engine,
 
 	if (client) {
 		if (!client->control->is_slowsync) {
-
-			/* force poll of the new slow-sync client */
 			client->control->is_slowsync = 1;
 			engine->control->sync_clients++;
-
-			// JOQ: I don't like doing this here...
-			client->control->sync_poll = 1;
-			engine->control->sync_remain++;
-			engine->control->sync_time_left =
-				engine->control->sync_timeout;
-			if (engine->control->transport_state ==
-			    JackTransportRolling)
-				engine->control->transport_state =
-					JackTransportStarting;
 		}
-		client->control->sync_new = 1;
+
+		/* force poll of the new slow-sync client */
+		jack_sync_poll_new (engine, client);
 		ret = 0;
 	}  else
 		ret = EINVAL;
