@@ -232,7 +232,6 @@ static void
 jack_main (int argc, char **argv)
 {
 	int sig;
-	int err;
 	pthread_t waiter_thread;
 	waiter_arg_t warg;
 
@@ -273,8 +272,12 @@ jack_main (int argc, char **argv)
 		sigdelset (&signals, SIGINT);
 	}
 
+	if (verbose) {
+		fprintf (stderr, "%d waiting for signals\n", getpid());
+	}
+
 	while(1) {
-		err = sigwait (&signals, &sig);
+		sigwait (&signals, &sig);
 
 		printf ("jack main caught signal %d\n", sig);
 		

@@ -205,7 +205,6 @@ hammerfall_release (jack_hardware_t *hw)
 
 static void *
 hammerfall_monitor_controls (void *arg)
-
 {
 	jack_hardware_t *hw = (jack_hardware_t *) arg;
 	hammerfall_t *h = (hammerfall_t *) hw->private;

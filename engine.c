@@ -1244,6 +1244,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine->control->buffer_size = 0;
 	engine->control->time.frame_rate = 0;
 	engine->control->time.frame = 0;
+	engine->control->in_process = 0;
 
 	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix), "%s/jack-ack-fifo-%d", jack_temp_dir, getpid());
 
@@ -1337,6 +1338,23 @@ jack_engine_notify_clients_about_delay (jack_engine_t *engine)
 	jack_unlock_graph (engine);
 }
 
+static inline void
+jack_inc_frame_time (jack_engine_t *engine, nframes_t amount)
+{
+	jack_frame_timer_t *time = &engine->control->frame_timer;
+	
+	// atomic_inc (&time->guard1, 1);
+	// really need a memory barrier here
+
+	time->guard1++;
+	time->frames += amount;
+	time->stamp = get_cycles ();
+
+	// atomic_inc (&time->guard2, 1);
+	// might need a memory barrier here
+	time->guard2++;
+}
+
 static void *
 jack_main_thread (void *arg)
 
@@ -1344,7 +1362,8 @@ jack_main_thread (void *arg)
 	jack_engine_t *engine = (jack_engine_t *) arg;
 	jack_driver_t *driver = engine->driver;
 	int consecutive_excessive_delays;
-	unsigned long long cycle_start, cycle_end;
+	unsigned long long cycle_end;
+	nframes_t nframes;
 
 	if (engine->control->real_time) {
 
@@ -1368,15 +1387,15 @@ jack_main_thread (void *arg)
 	consecutive_excessive_delays = 0;
 
 	engine->watchdog_check = 1;
+	nframes = 0;
 
 	while (1) {
 		int status;
-		nframes_t nframes;
 		float delayed_usecs;
 
 		nframes = driver->wait (driver, -1, &status, &delayed_usecs);
-		
-		cycle_start = get_cycles();
+
+		jack_inc_frame_time (engine, nframes);
 
 		engine->watchdog_check = 1;
 
@@ -1434,9 +1453,10 @@ jack_main_thread (void *arg)
 
 		cycle_end = get_cycles ();
 		
-		/* store the execution time for this this part of the graph */
+		/* store the execution time for later averaging */
 		
-		engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = (float) (cycle_end - cycle_start) / engine->cpu_mhz;
+		engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = 
+			(float) (cycle_end - engine->control->time.cycles) / engine->cpu_mhz;
 		
 		if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
 			engine->rolling_client_usecs_index = 0;
@@ -2815,3 +2835,4 @@ jack_set_asio_mode (jack_engine_t *engine, int yn)
 {
 	engine->asio_mode = yn;
 }
+

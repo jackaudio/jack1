@@ -29,6 +29,7 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <glib.h>
+#include <asm/timex.h>
 
 #include <jack/jack.h>
 #include <jack/types.h>
@@ -51,7 +52,7 @@ typedef struct _time_info
 {
     nframes_t frame;
     nframes_t frame_rate;
-    unsigned long microseconds;
+    cycles_t  cycles;
     jack_transport_state_t transport_state;
     nframes_t loop_start;
     nframes_t loop_end;
@@ -74,8 +75,18 @@ typedef struct _time_info
 } jack_time_info_t;
 
 typedef struct {
+    volatile unsigned long long guard1;
+    volatile nframes_t frames;
+    volatile cycles_t  stamp;
+    volatile unsigned long long guard2;
+} jack_frame_timer_t;
+
+typedef struct {
 
     jack_time_info_t    time;
+    jack_frame_timer_t  frame_timer;
+    int                 in_process;
+    nframes_t           frames_at_cycle_start;
     pid_t               engine_pid;
     unsigned long       buffer_size;
     char                real_time;

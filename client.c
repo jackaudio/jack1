@@ -77,6 +77,7 @@ struct _jack_client {
     void *on_shutdown_arg;
     char thread_ok : 1;
     char first_active : 1;
+    float cpu_mhz;
 };
 
 #define event_fd pollfd[0].fd
@@ -123,6 +124,7 @@ jack_client_alloc ()
 	client->thread_ok = FALSE;
 	client->first_active = TRUE;
 	client->on_shutdown = NULL;
+	client->cpu_mhz = (float) jack_get_mhz ();
 	return client;
 }
 
@@ -1560,16 +1562,50 @@ jack_get_ports (jack_client_t *client,
 	return matching_ports;
 }
 
-nframes_t
-jack_frames_since_cycle_start (jack_client_t *client)
+static inline void
+jack_read_frame_time (const jack_client_t *client, jack_frame_timer_t *copy)
 {
-	struct timeval now;
+	int tries = 0;
+
+	do {
+		/* throttle the busy wait if we don't get 
+		   the answer very quickly.
+		*/
+
+		if (tries > 10) {
+			usleep (20);
+			tries = 0;
+		}
+
+		*copy = client->engine->frame_timer;
+
+		tries++;
+
+	} while (copy->guard1 != copy->guard2);
+}
+
+nframes_t
+jack_frames_since_cycle_start (const jack_client_t *client)
+{
 	float usecs;
 
-	gettimeofday (&now, NULL);
-	usecs = ((now.tv_sec * 1000000) + now.tv_usec) - client->engine->time.microseconds;
-
+	usecs = (float) (get_cycles() - client->engine->time.cycles) / client->cpu_mhz;
 	return (nframes_t) floor ((((float) client->engine->time.frame_rate) / 1000000.0f) * usecs);
+}
+
+nframes_t
+jack_frame_time (const jack_client_t *client)
+{
+	jack_frame_timer_t current;
+	float usecs;
+	nframes_t elapsed;
+
+	jack_read_frame_time (client, &current);
+	
+	usecs = (float) (get_cycles() - current.stamp) / client->cpu_mhz;
+	elapsed = (nframes_t) floor ((((float) client->engine->time.frame_rate) / 1000000.0f) * usecs);
+	
+	return current.frames + elapsed;
 }
 
 int
@@ -1796,3 +1832,6 @@ jack_cpu_load (jack_client_t *client)
 {
 	return client->engine->cpu_load;
 }
+
+
+		

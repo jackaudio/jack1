@@ -515,7 +515,16 @@ void jack_update_time (jack_client_t *, nframes_t);
  * callbacks of all its clients.
 */
 
-nframes_t jack_frames_since_cycle_start (jack_client_t *);
+nframes_t jack_frames_since_cycle_start (const jack_client_t *);
+
+/**
+ * Return an estimate of the current time in frames. It is a running
+ * counter - no significance should be attached to the return
+ * value. it should be used to compute the difference between
+ * a previously returned value.
+ */
+
+nframes_t jack_frame_time (const jack_client_t *);
 
 /**
  * This returns the current CPU load estimated by JACK
