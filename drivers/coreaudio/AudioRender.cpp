@@ -43,6 +43,31 @@ extern "C" void JCALog(char *fmt, ...)
     va_end(ap);
 }
 
+static OSStatus GetTotalChannels(AudioDeviceID device, UInt32  *channelCount, Boolean isInput) 
+{
+    OSStatus err = noErr;
+    UInt32 outSize;
+    Boolean outWritable;
+    AudioBufferList *bufferList = NULL;
+    unsigned short i;
+
+    *channelCount = 0;
+    err = AudioDeviceGetPropertyInfo(device, 0, isInput, kAudioDevicePropertyStreamConfiguration,  &outSize, &outWritable);
+    if (err == noErr)
+    {
+        bufferList = (AudioBufferList*)malloc(outSize);
+        
+        err = AudioDeviceGetProperty(device, 0, isInput, kAudioDevicePropertyStreamConfiguration, &outSize, bufferList);
+        if (err == noErr) {                                                               
+            for (i = 0; i < bufferList->mNumberBuffers; i++) 
+                *channelCount += bufferList->mBuffers[i].mNumberChannels;
+        }
+        free(bufferList);
+    }
+ 
+    return (err);
+}
+
 void PrintStreamDesc(AudioStreamBasicDescription * inDesc)
 {
     if (!inDesc) {
@@ -77,13 +102,13 @@ vBufferSize(bufferSize)
     AudioRender::gSampleRate = vSampleRate;
     AudioRender::gBufferSize = vBufferSize;
     AudioRender::gInputChannels = vInChannels;
-    AudioRender::gOutputChannels = vChannels;
+    AudioRender::gOutputChannels = vOutChannels;
     AudioRender::theRender = this;
     isProcessing = false;
 
     if (status) {
 		inBuffers = (float **) malloc(sizeof(float *) * vInChannels);
-		outBuffers = (float **) malloc(sizeof(float *) * vChannels);
+		outBuffers = (float **) malloc(sizeof(float *) * vOutChannels);
 		JCALog("AudioRender created.\n");
 		JCALog("Standard driver.\n");
     } else
@@ -114,20 +139,16 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 
     JCALog("Wanted DEVICE: %s\n", device);
 
-    err =
-	AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDevices, &size,
-				     &isWritable);
-    if (err != noErr)
-	return false;
+    err = AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDevices, &size,
+										&isWritable);
+    if (err != noErr) return false;
 
     int manyDevices = size / sizeof(AudioDeviceID);
 
     AudioDeviceID devices[manyDevices];
-    err =
-	AudioHardwareGetProperty(kAudioHardwarePropertyDevices, &size,
-				 &devices);
-    if (err != noErr)
-	return false;
+    err = AudioHardwareGetProperty(kAudioHardwarePropertyDevices, &size,
+									&devices);
+    if (err != noErr) return false;
 
     bool found = false;
 
@@ -154,50 +175,43 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
     }
 
     char deviceName[256];
-    err =
-	AudioDeviceGetProperty(vDevice, 0, false,
-			       kAudioDevicePropertyDeviceName, &size,
-			       &deviceName);
-    if (err != noErr)
-		return false;
+    err = AudioDeviceGetProperty(vDevice, 0, false,
+								kAudioDevicePropertyDeviceName, &size,
+								&deviceName);
+    if (err != noErr) return false;
 
     JCALog("DEVICE: %s.\n", deviceName);
 
     size = sizeof(AudioStreamBasicDescription);
     AudioStreamBasicDescription SR;
-    err =
-	AudioDeviceGetProperty(vDevice, 0, false,
-			       kAudioDevicePropertyStreamFormat, &size,
-			       &SR);
-    if (err != noErr)
-		return false;
+    err = AudioDeviceGetProperty(vDevice, 0, false,
+								kAudioDevicePropertyStreamFormat, &size,
+								&SR);
+    if (err != noErr) return false;
 
-    err =
-	AudioDeviceGetPropertyInfo(vDevice, 0, false,
-				   kAudioDevicePropertyStreams, &size,
-				   &isWritable);
-    if (err != noErr)
-		return false;
+    err = AudioDeviceGetPropertyInfo(vDevice, 0, false,
+									kAudioDevicePropertyStreams, &size,
+									&isWritable);
+    if (err != noErr) return false;
 
-    vChannels =
-	(int) SR.mChannelsPerFrame * (size / sizeof(AudioStreamID));
+	err = GetTotalChannels(vDevice,(UInt32*)&vOutChannels,false);
+	if (err != noErr) return false;
 
     n_out_streams = size / sizeof(AudioStreamID);
 
-    if (channels > vChannels) {
+    if (channels > vOutChannels) {
 		JCALog("cannot find requested output channels\n");
 		return false;
     }
 
-    if (vChannels >= channels)
-	vChannels = channels;
+    if (vOutChannels >= channels)
+		vOutChannels = channels;
 
-    JCALog("OUTPUT CHANNELS: %d.\n", vChannels);
+    JCALog("OUTPUT CHANNELS: %d.\n", vOutChannels);
 
-    err =
-	AudioDeviceGetPropertyInfo(vDevice, 0, true,
-				   kAudioDevicePropertyStreamFormat, &size,
-				   &isWritable);
+    err = AudioDeviceGetPropertyInfo(vDevice, 0, true,
+									kAudioDevicePropertyStreamFormat, &size,
+									&isWritable);
     if (err != noErr) {
 		vInChannels = 0;
 		goto endInChan;
@@ -205,24 +219,20 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 
     size = sizeof(AudioStreamBasicDescription);
     AudioStreamBasicDescription inSR;
-    err =
-	AudioDeviceGetProperty(vDevice, 0, true,
-			       kAudioDevicePropertyStreamFormat, &size,
-			       &inSR);
-    if (err != noErr)
-		return false;
+    err = AudioDeviceGetProperty(vDevice, 0, true,
+								kAudioDevicePropertyStreamFormat, &size,
+								&inSR);
+    if (err != noErr) return false;
 
-    err =
-	AudioDeviceGetPropertyInfo(vDevice, 0, true,
-				   kAudioDevicePropertyStreams, &size,
-				   &isWritable);
-    if (err != noErr)
-		return false;
+    err = AudioDeviceGetPropertyInfo(vDevice, 0, true,
+									kAudioDevicePropertyStreams, &size,
+									&isWritable);
+    if (err != noErr) return false;
 
-    vInChannels =
-	(int) inSR.mChannelsPerFrame * (size / sizeof(AudioStreamID));
+	err = GetTotalChannels(vDevice,(UInt32*)&vInChannels,true);
+	if (err != noErr) return false;
 
-    n_streams = size / sizeof(AudioStreamID);
+    n_in_streams = size / sizeof(AudioStreamID);
 
   endInChan:
 
@@ -238,12 +248,10 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 
     UInt32 bufFrame;
     size = sizeof(UInt32);
-    err =
-	AudioDeviceGetProperty(vDevice, 0, false,
+    err = AudioDeviceGetProperty(vDevice, 0, false,
 			       kAudioDevicePropertyBufferFrameSize, &size,
 			       &bufFrame);
-    if (err != noErr)
-		return false;
+    if (err != noErr) return false;
 
     vBufferSize = (long) bufFrame;
 
@@ -265,8 +273,7 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 			AudioDeviceGetProperty(vDevice, 0, false,
 						   kAudioDevicePropertyBufferFrameSize,
 						   &size, &newBufFrame);
-			if (err != noErr)
-			return false;
+			if (err != noErr) return false;
 			vBufferSize = (long) newBufFrame;
 		}
     }
@@ -304,8 +311,7 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
     PrintStreamDesc(&SR);
 
     err = AudioDeviceAddIOProc(vDevice, process, this);
-    if (err != noErr)
-		return false;
+    if (err != noErr) return false;
 
     return true;
 }
@@ -364,7 +370,7 @@ OSStatus AudioRender::process(AudioDeviceID inDevice,
 	    classe->outBuffers[channel] =
 		(float *) outOutputData->mBuffers[a].mData;
 	    channel++;
-	    if (channel == classe->vChannels)
+	    if (channel == classe->vOutChannels)
 		break;
 	}
     } else {

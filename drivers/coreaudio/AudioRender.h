@@ -53,7 +53,7 @@ class AudioRender {
     AudioDeviceID vDevice;
     float vSampleRate;
     long vBufferSize;
-    int vChannels;		//output channels
+    int vOutChannels;		//output channels
     int vInChannels;		//input chennels
     static float **getADC();
     static float **getDAC();
@@ -65,7 +65,7 @@ class AudioRender {
     static const AudioTimeStamp *gTime;
     int *isInterleaved, *numberOfStreams, *channelsPerStream,
 	*out_numberOfStreams, *out_channelsPerStream;
-    int n_streams, n_out_streams;
+    int n_in_streams, n_out_streams;
   private:
     static OSStatus process(AudioDeviceID inDevice,
 			    const AudioTimeStamp * inNow,
