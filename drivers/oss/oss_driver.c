@@ -645,10 +645,10 @@ static int oss_driver_start (oss_driver_t *driver)
 	pthread_mutex_init(&driver->mutex_in, NULL);
 	pthread_mutex_init(&driver->mutex_out, NULL);
 #	ifdef USE_BARRIER
-	puts("oss_driver: using barrier mode (dual thread)");
+	puts("oss_driver: using barrier mode, (dual thread)");
 	pthread_barrier_init(&driver->barrier, NULL, 2);
 #	else
-	puts("oss_driver: not using barrier mode (single thread)");
+	puts("oss_driver: not using barrier mode, (single thread)");
 #	endif
 	sem_init(&driver->sem_start, 0, 0);
 	driver->run = 1;
