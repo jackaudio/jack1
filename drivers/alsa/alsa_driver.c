@@ -1063,7 +1063,7 @@ alsa_driver_stop (alsa_driver_t *driver)
 }
 
 static int
-alsa_driver_xrun_recovery (alsa_driver_t *driver)
+alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 {
 	snd_pcm_status_t *status;
 	int res;
@@ -1089,9 +1089,10 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver)
 		gettimeofday(&now, 0);
 		snd_pcm_status_get_trigger_tstamp(status, &tstamp);
 		timersub(&now, &tstamp, &diff);
+		*delayed_usecs = diff.tv_sec * 1000000.0 + diff.tv_usec;
 		fprintf(stderr, "\n\n**** alsa_pcm: xrun of at least %.3f "
 			"msecs\n\n",
-			diff.tv_sec * 1000 + diff.tv_usec / 1000.0);
+			*delayed_usecs / 1000.0);
 	}
 
 	if (alsa_driver_stop (driver) ||
@@ -1348,7 +1349,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 	}
 
 	if (xrun_detected) {
-		*status = alsa_driver_xrun_recovery (driver);
+		*status = alsa_driver_xrun_recovery (driver, delayed_usecs);
 		return 0;
 	}
 
@@ -1617,8 +1618,7 @@ alsa_driver_run_cycle (alsa_driver_t *driver)
 		/* we detected an xrun and restarted: notify
 		 * clients about the delay. 
 		 */
-
-		engine->delay (engine);
+		engine->delay (engine, delayed_usecs);
 		return 0;
 	} 
 

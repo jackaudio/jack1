@@ -309,6 +309,13 @@ int jack_set_xrun_callback (jack_client_t *,
 			    JackXRunCallback xrun_callback, void *arg);
 
 /**
+ * @return the delay in microseconds due to the most recent XRUN
+ * occurrence.  This probably only makes sense when called from a @ref
+ * JackXRunCallback defined using jack_set_xrun_callback().
+ */
+float jack_get_xrun_delayed_usecs (jack_client_t *client);
+
+/**
  * Tell the Jack server that the program is ready to start processing
  * audio.
  *

@@ -74,7 +74,7 @@ dummy_driver_run_cycle (dummy_driver_t *driver)
 	if (nframes == 0) {
 		/* we detected an xrun and restarted: notify
 		 * clients about the delay. */
-		engine->delay (engine);
+		engine->delay (engine, delayed_usecs);
 		return 0;
 	} 
 

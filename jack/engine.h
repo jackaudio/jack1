@@ -64,12 +64,12 @@ struct _jack_engine {
     jack_driver_desc_t    *driver_desc;
     JSList                *driver_params;
 
-    /* these are "callbacks" made by the driver */
+    /* these are "callbacks" made by the driver backend */
     int  (*set_buffer_size) (struct _jack_engine *, jack_nframes_t frames);
     int  (*set_sample_rate) (struct _jack_engine *, jack_nframes_t frames);
     int  (*run_cycle)	    (struct _jack_engine *, jack_nframes_t nframes,
 			     float delayed_usecs);
-    void (*delay)	    (struct _jack_engine *);
+    void (*delay)	    (struct _jack_engine *, float delayed_usecs);
     void (*transport_cycle_start) (struct _jack_engine *, jack_time_t time);
     void (*driver_exit)     (struct _jack_engine *);
 

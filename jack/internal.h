@@ -115,6 +115,7 @@ typedef struct {
     int32_t		  client_priority;
     int32_t		  has_capabilities;
     float                 cpu_load;
+    float		  xrun_delayed_usecs;
     uint32_t		  port_max;
     int32_t		  engine_ok;
     jack_port_type_id_t	  n_port_types;

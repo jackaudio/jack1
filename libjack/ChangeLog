@@ -1,3 +1,7 @@
+2004-10-14  Jack O'Quin  <joq@io.com>
+
+	* new API function: jack_get_xrun_delayed_usecs()
+
 2004-10-08  Jack O'Quin  <joq@io.com>
 
 	* new API functions: jack_client_open(), jack_get_client_name()

@@ -1871,6 +1871,12 @@ jack_cpu_load (jack_client_t *client)
 	return client->engine->cpu_load;
 }
 
+float
+jack_get_xrun_delayed_usecs (jack_client_t *client)
+{
+	return client->engine->xrun_delayed_usecs;
+}
+
 pthread_t
 jack_client_thread_id (jack_client_t *client)
 {

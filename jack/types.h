@@ -100,8 +100,10 @@ typedef void  (*JackThreadInitCallback)(void *arg);
 typedef int  (*JackGraphOrderCallback)(void *arg);
 
 /**
- * Prototype for the client supplied function that is called 
- * whenever an xrun has occured.
+ * Prototype for the client-supplied function that is called whenever
+ * an xrun has occured.
+ *
+ * @see jack_get_xrun_delayed_usecs()
  *
  * @param arg pointer to a client supplied structure
  *

@@ -126,7 +126,8 @@ static int  internal_client_request (void*, jack_request_t *);
 static int  jack_use_driver (jack_engine_t *engine, jack_driver_t *driver);
 static int  jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 			    float delayed_usecs);
-static void jack_engine_notify_clients_about_delay (jack_engine_t *engine);
+static void jack_engine_notify_clients_about_delay (jack_engine_t *engine,
+						    float delayed_usecs);
 static void jack_engine_driver_exit (jack_engine_t* engine);
 static int  jack_start_freewheeling (jack_engine_t* engine);
 static int  jack_stop_freewheeling (jack_engine_t* engine);
@@ -2157,6 +2158,7 @@ jack_engine_new (int realtime, int rtpriority,
 	engine->control->do_mlock = do_mlock;
 	engine->control->do_munlock = do_unlock;
 	engine->control->cpu_load = 0;
+	engine->control->xrun_delayed_usecs = 0;
  
 	engine->control->buffer_size = 0;
 	jack_transport_init (engine);
@@ -2270,10 +2272,13 @@ jack_start_watchdog (jack_engine_t *engine)
 }
 
 static void
-jack_engine_notify_clients_about_delay (jack_engine_t *engine)
+jack_engine_notify_clients_about_delay (jack_engine_t *engine,
+					float delayed_usecs)
 {
 	JSList *node;
 	jack_event_t event;
+
+	engine->control->xrun_delayed_usecs = delayed_usecs;
 
 	event.type = XRun;
 
@@ -2435,8 +2440,8 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 				    "... engine pausing");
 			return -1;	/* will exit the thread loop */
 		}
-		
-		jack_engine_notify_clients_about_delay (engine);
+
+		jack_engine_notify_clients_about_delay (engine, delayed_usecs);
 		
 		return 0;
 
@@ -2584,6 +2589,9 @@ jack_engine_delete (jack_engine_t *engine)
 		pthread_join (engine->watchdog_thread, NULL);
 	}
 #endif
+
+	VERBOSE (engine, "last xrun delay: %.3f usecs\n",
+		engine->control->xrun_delayed_usecs);
 
 	/* free engine control shm segment */
 	engine->control = NULL;
