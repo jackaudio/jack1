@@ -169,9 +169,9 @@ if test $HAVE_FLTK = "false"; then
              AC_MSG_WARN([*** no fltk found, the fltk example client will not be built])
 fi
 
-HAVE_SNDFILE=
+HAVE_SNDFILE=false
 PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
-if test x$HAVE_SNDFILE = x; then
+if test x$HAVE_SNDFILE = xfalse; then
              AC_MSG_WARN([*** the jackrec example client will not be built])
 fi
 
