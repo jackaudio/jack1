@@ -203,7 +203,6 @@ int main(int argc, char **argv)
 	gid_t gid;
 	int pipe_fds[2];
 	int err;
-	char buf[1];
 
 	parent_pid = getpid ();
 
@@ -301,7 +300,22 @@ int main(int argc, char **argv)
 		close(PIPE_WRITE_FD);
 
 		/* wait for jackd to start */
-		while (read(PIPE_READ_FD, buf, sizeof(buf)) == -1 && errno == EINTR) { }
+		while (1) {
+		  	int ret;
+			char c;
+
+			/* picking up pipe closure is a tricky business. 
+			   this seems to work as well as anything else.
+			*/
+
+			ret = read(PIPE_READ_FD, &c, 1);
+			fprintf (stderr, "back from read, ret = %d errno == %s\n", ret, strerror (errno));
+			if (ret == 1) {
+			  break;
+			} else if (errno != EINTR) {
+			  break;
+			}
+		}
 
 		/* set privileges on jackd process */
 		if (give_capabilities (parent_pid) != 0) {

@@ -329,6 +329,13 @@ main (int argc, char *argv[])
 	/* check to see if there is a pipe in the right descriptor */
 	if ((status = fstat (PIPE_WRITE_FD, &pipe_stat)) == 0 && S_ISFIFO(pipe_stat.st_mode)) {
 		/* tell jackstart we are up and running */
+
+  	        char c = 1;
+
+	        if (write (PIPE_WRITE_FD, &c, 1) != 1) {
+		        fprintf (stderr, "cannot write to jackstart sync pipe %d (%s)\n", PIPE_WRITE_FD, strerror (errno));
+	        }
+
 		if (close(PIPE_WRITE_FD) != 0) {
 			fprintf(stderr, "jackd: error on startup pipe close: %s\n", strerror (errno));
 		} else {
