@@ -277,7 +277,8 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 
 			case Shaped:
 			printf("Noise-shaped dithering at 16 bits\n");
-			driver->write_via_copy = sample_move_dither_shaped_d24_sS;
+			driver->write_via_copy =
+				sample_move_dither_shaped_d24_sS;
 			break;
 
 			default:
@@ -342,6 +343,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			      unsigned long *nchns,unsigned long sample_width)
 {
 	int err, format;
+	unsigned int frame_rate;
 	snd_pcm_uframes_t stop_th;
 	static struct {
 		char Name[16];
@@ -382,11 +384,16 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 
 	format = sample_width == 4 ? 0 : NOFORMATS - 1;
 	while (1) {
-		if ((err = snd_pcm_hw_params_set_format (handle, hw_params, formats[format].format)) < 0) {
+		if ((err = snd_pcm_hw_params_set_format (
+			     handle, hw_params, formats[format].format)) < 0) {
 			int failed_format = format; 
-			if (sample_width == 4 ? format++ < NOFORMATS - 1 : format-- > 0) {
+			if (sample_width == (4
+					     ? format++ < NOFORMATS - 1
+					     : format-- > 0)) {
 				jack_error ("Couldn't open %s for %s samples"
-					    " trying %s instead", device_name, formats[failed_format].Name, formats[format].Name);
+					    " trying %s instead", device_name,
+					    formats[failed_format].Name,
+					    formats[format].Name);
 			} else {
 				jack_error ("Sorry. The audio interface \"%s\""
 					    " doesn't support any of the"
@@ -399,9 +406,11 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			break;
 	} 
 
-	if ((err = snd_pcm_hw_params_set_rate_near (handle, hw_params,
-						    driver->frame_rate, 0))
-	    < 0) {
+	frame_rate = driver->frame_rate ;
+	err = snd_pcm_hw_params_set_rate_near (handle, hw_params,
+					       &frame_rate, NULL) ;
+	driver->frame_rate = frame_rate ;
+	if (err < 0) {
 		jack_error ("ALSA: cannot set sample/frame rate to %"
 			    PRIu32 " for %s", driver->frame_rate,
 			    stream_name);
@@ -410,7 +419,10 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 	if (!*nchns) {
 		/*if not user-specified, try to find the maximum
 		 * number of channels */
-		*nchns = snd_pcm_hw_params_get_channels_max (hw_params);
+		unsigned int channels_max ;
+		err = snd_pcm_hw_params_get_channels_max (hw_params,
+							  &channels_max);
+		*nchns = channels_max ;
 
 		if (*nchns > 1024) { 
 
@@ -452,10 +464,10 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 
 	*nperiodsp = driver->user_nperiods;
 	snd_pcm_hw_params_set_periods_min (handle, hw_params, nperiodsp, NULL);
-	*nperiodsp = driver->user_nperiods;
-	if ((*nperiodsp = snd_pcm_hw_params_set_periods_near (handle, hw_params,
-							      *nperiodsp, NULL))
-	    < 0) {
+	if (*nperiodsp < driver->user_nperiods)
+		*nperiodsp = driver->user_nperiods;
+	if (snd_pcm_hw_params_set_periods_near (handle, hw_params,
+						nperiodsp, NULL) < 0) {
 		jack_error ("ALSA: cannot set number of periods to %u for %s",
 			    *nperiodsp, stream_name);
 		return -1;
@@ -463,7 +475,8 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 
 	if (*nperiodsp < driver->user_nperiods) {
 		jack_error ("ALSA: got smaller periods %u than %u for %s",
-			    *nperiodsp, (unsigned int)driver->user_nperiods, stream_name);
+			    *nperiodsp, (unsigned int) driver->user_nperiods,
+			    stream_name);
 		return -1;
 	}
 	fprintf(stderr, "nperiods = %d for %s\n", *nperiodsp, stream_name);
@@ -535,7 +548,8 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 	if (handle == driver->playback_handle)
 		err = snd_pcm_sw_params_set_avail_min (
 			handle, sw_params,
-			driver->frames_per_cycle * (*nperiodsp - driver->user_nperiods + 1));
+			driver->frames_per_cycle
+			* (*nperiodsp - driver->user_nperiods + 1));
 	else
 		err = snd_pcm_sw_params_set_avail_min (
 			handle, sw_params, driver->frames_per_cycle);
@@ -561,11 +575,12 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 			    jack_nframes_t rate)
 {
 	int dir;
-	unsigned int p_period_size = 0;
-	unsigned int c_period_size = 0;
+	snd_pcm_uframes_t p_period_size = 0;
+	snd_pcm_uframes_t c_period_size = 0;
 	channel_t chn;
 	unsigned int pr = 0;
 	unsigned int cr = 0;
+	int err;
 
 	driver->frame_rate = rate;
 	driver->frames_per_cycle = frames_per_cycle;
@@ -610,39 +625,43 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	/* check the rate, since thats rather important */
 
 	if (driver->playback_handle) {
-		int dir;
-		pr = snd_pcm_hw_params_get_rate (driver->playback_hw_params, &dir);
+		snd_pcm_hw_params_get_rate (driver->playback_hw_params,
+					    &pr, &dir);
 	}
 
 	if (driver->capture_handle) {
-		int dir;
-		cr = snd_pcm_hw_params_get_rate (driver->capture_hw_params, &dir);
+		snd_pcm_hw_params_get_rate (driver->capture_hw_params,
+					    &cr, &dir);
 	}
 
 	if (driver->capture_handle && driver->playback_handle) {
 		if (cr != pr) {
-			jack_error ("playback and capture sample rates do not match (%d vs. %d)",
-				    pr, cr);
+			jack_error ("playback and capture sample rates do "
+				    "not match (%d vs. %d)", pr, cr);
 		}
 
-		/* only change if *both* capture and playback rates don't match requested
-		 * certain hardware actually still works properly in full-duplex with
-		 * slightly different rate values between adc and dac
+		/* only change if *both* capture and playback rates
+		 * don't match requested certain hardware actually
+		 * still works properly in full-duplex with slightly
+		 * different rate values between adc and dac
 		 */
 		if (cr != driver->frame_rate && pr != driver->frame_rate) {
-			jack_error ("sample rate in use (%d Hz) does not match requested rate (%d Hz)",
+			jack_error ("sample rate in use (%d Hz) does not "
+				    "match requested rate (%d Hz)",
 				    cr, driver->frame_rate);
 			driver->frame_rate = cr;
 		}
 		
 	}
 	else if (driver->capture_handle && cr != driver->frame_rate) {
-		jack_error ("capture sample rate in use (%d Hz) does not match requested rate (%d Hz)",
+		jack_error ("capture sample rate in use (%d Hz) does not "
+			    "match requested rate (%d Hz)",
 			    cr, driver->frame_rate);
 		driver->frame_rate = cr;
 	}
 	else if (driver->playback_handle && pr != driver->frame_rate) {
-		jack_error ("playback sample rate in use (%d Hz) does not match requested rate (%d Hz)",
+		jack_error ("playback sample rate in use (%d Hz) does not "
+			    "match requested rate (%d Hz)",
 			    pr, driver->frame_rate);
 		driver->frame_rate = pr;
 	}
@@ -651,16 +670,17 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	/* check the fragment size, since thats non-negotiable */
 	
 	if (driver->playback_handle) {
-		p_period_size =
-			snd_pcm_hw_params_get_period_size (
-				driver->playback_hw_params, &dir);
-		driver->playback_sample_format = (snd_pcm_format_t)
-			snd_pcm_hw_params_get_format (
-				driver->playback_hw_params);
-		driver->playback_interleaved =
-			(snd_pcm_hw_params_get_access (
-				driver->playback_hw_params)
-			 == SND_PCM_ACCESS_MMAP_INTERLEAVED);
+ 		snd_pcm_access_t access;
+
+ 		err = snd_pcm_hw_params_get_period_size (
+ 			driver->playback_hw_params, &p_period_size, &dir);
+ 		err = snd_pcm_hw_params_get_format (
+ 			driver->playback_hw_params,
+			&(driver->playback_sample_format));
+ 		err = snd_pcm_hw_params_get_access (driver->playback_hw_params,
+						    &access);
+ 		driver->playback_interleaved =
+			(access == SND_PCM_ACCESS_MMAP_INTERLEAVED);
 
 		if (p_period_size != driver->frames_per_cycle) {
 			jack_error ("alsa_pcm: requested an interrupt every %"
@@ -672,16 +692,18 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	}
 
 	if (driver->capture_handle) {
-		c_period_size =
-			snd_pcm_hw_params_get_period_size (
-				driver->capture_hw_params, &dir);
-		driver->capture_sample_format = (snd_pcm_format_t)
-			snd_pcm_hw_params_get_format (
-				driver->capture_hw_params);
-		driver->capture_interleaved =
-			(snd_pcm_hw_params_get_access (
-				driver->capture_hw_params)
-			 == SND_PCM_ACCESS_MMAP_INTERLEAVED);
+ 		snd_pcm_access_t access;
+
+ 		err = snd_pcm_hw_params_get_period_size (
+ 			driver->capture_hw_params, &c_period_size, &dir);
+ 		err = snd_pcm_hw_params_get_format (
+ 			driver->capture_hw_params,
+			&(driver->capture_sample_format));
+ 		err = snd_pcm_hw_params_get_access (driver->capture_hw_params,
+						    &access);
+ 		driver->capture_interleaved =
+			(access == SND_PCM_ACCESS_MMAP_INTERLEAVED);
+ 
 	
 		if (c_period_size != driver->frames_per_cycle) {
 			jack_error ("alsa_pcm: requested an interrupt every %"
@@ -1122,7 +1144,8 @@ alsa_driver_silence_untouched_channels (alsa_driver_t *driver,
 					jack_nframes_t nframes)
 {
 	channel_t chn;
-	jack_nframes_t buffer_frames = driver->frames_per_cycle * driver->playback_nperiods;
+	jack_nframes_t buffer_frames =
+		driver->frames_per_cycle * driver->playback_nperiods;
 
 	for (chn = 0; chn < driver->playback_nchannels; chn++) {
 		if ((driver->channels_not_done & (1<<chn))) { 
