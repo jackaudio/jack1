@@ -1540,11 +1540,19 @@ jack_get_mhz (void)
 			exit(1);
 		}
 
-#ifdef __powerpc__
+#if defined(__powerpc__)
 		ret = sscanf(buf, "clock\t: %" SCNu64 "MHz", &mhz);
-#else
+#elif defined( __i386__ ) || defined (__hppa__)  || defined (__ia64__)
 		ret = sscanf(buf, "cpu MHz         : %" SCNu64, &mhz);
-#endif /* __powerpc__ */
+#elif defined( __sparc__ )
+		ret = sscanf(buf, "Cpu0Bogo        : %" SCNu64, &mhz);
+#elif defined( __mc68000__ )
+		ret = sscanf(buf, "Clocking:       %" SCNu64, &mhz);
+#elif defined( __s390__  )
+		ret = sscanf(buf, "bogomips per cpu: %" SCNu64, &mhz);
+#else /* MIPS, ARM, alpha */
+		ret = sscanf(buf, "BogoMIPS        : %" SCNu64, &mhz);
+#endif 
 
 		if (ret == 1)
 		{
