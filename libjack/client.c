@@ -464,7 +464,10 @@ _start_server (void)
 	argv[i] = 0;
 
 	execv (command, argv);
-	jack_error ("exec of server failed (%s)", strerror (errno));
+
+	/* If execv() succeeds, it does not return.  There's no point
+	 * in calling jack_error() here in the child process. */
+	perror ("exec of JACK server failed");
 }
 
 int
