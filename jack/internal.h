@@ -62,10 +62,10 @@ extern void jack_error (const char *fmt, ...);
 
 /* Enable preemption checking for Linux Realtime Preemption kernels.
  *
- * This checks if any RT-safe code section does anything to cause
- * possible CPU preemption.  Examples are sleep() or other system
- * calls that block.  If a problem is detected, the kernel writes a
- * syslog entry, and sends SIGUSR2 to the client.
+ * This checks if any RT-safe code section does anything to cause CPU
+ * preemption.  Examples are sleep() or other system calls that block.
+ * If a problem is detected, the kernel writes a syslog entry, and
+ * sends SIGUSR2 to the client.
  */
 #ifdef DO_PREEMPTION_CHECKING
 #define CHECK_PREEMPTION(engine, onoff) \
