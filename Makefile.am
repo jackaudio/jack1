@@ -47,7 +47,10 @@ jack_impulse_grabber_SOURCES = impulse_grabber.c
 jack_impulse_grabber_LDFLAGS = -ldl -lpthread -lm
 jack_impulse_grabber_LDADD = libjack.la
 
-lib_LTLIBRARIES    = libjack.la jack_alsa.la
+plugindir = $(ADDON_DIR)
+
+lib_LTLIBRARIES    = libjack.la
+plugin_LTLIBRARIES = jack_alsa.la
 
 libjack_la_SOURCES = client.c pool.c driver.c
 libjack_la_LDFLAGS = $(GLIB_LIBS) -lm

@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include <jack/driver.h>
 #include <jack/internal.h>
