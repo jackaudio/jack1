@@ -2,19 +2,19 @@
     Copyright (C) 2001 Paul Davis
     
     This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
-
+    
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-
+    GNU Lesser General Public License for more details.
+    
+    You should have received a copy of the GNU Lesser General Public License
+    along with this program; if not, write to the Free Software 
+    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+    
     $Id$
 */
 
@@ -27,6 +27,7 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/poll.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <asm/msr.h>
 
@@ -34,6 +35,7 @@
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <jack/pool.h>
+#include <jack/error.h>
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
@@ -63,6 +65,20 @@ typedef struct {
     struct _jack_client *client;
     const char *client_name;
 } client_info;
+
+static void 
+default_jack_error (const char *fmt, ...)
+
+{
+	va_list ap;
+
+	va_start (ap, fmt);
+	vfprintf (stderr, fmt, ap);
+	va_end (ap);
+	fputc ('\n', stderr);
+}
+
+void (*jack_error)(const char *fmt, ...) = &default_jack_error;
 
 jack_client_t *
 jack_client_alloc ()

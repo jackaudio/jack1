@@ -134,20 +134,6 @@ jack_client_is_inprocess (jack_client_internal_t *client)
 	return (client->control->type == ClientDynamic) || (client->control->type == ClientDriver);
 }
 
-static void 
-default_jack_error (const char *fmt, ...)
-
-{
-	va_list ap;
-
-	va_start (ap, fmt);
-	vfprintf (stderr, fmt, ap);
-	va_end (ap);
-	fputc ('\n', stderr);
-}
-
-void (*jack_error)(const char *fmt, ...) = &default_jack_error;
-
 static
 void shm_destroy (int status, void *arg)
 
