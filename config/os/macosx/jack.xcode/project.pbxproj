@@ -323,66 +323,6 @@
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
 		};
-		4B1A735D07252DA3007105CE = {
-			fileEncoding = 30;
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.cpp.cpp;
-			name = AudioRender.cpp;
-			path = ../../../drivers/coreaudio/AudioRender.cpp;
-			refType = 2;
-			sourceTree = SOURCE_ROOT;
-		};
-		4B1A735E07252DA3007105CE = {
-			fileEncoding = 30;
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.h;
-			name = AudioRender.h;
-			path = ../../../drivers/coreaudio/AudioRender.h;
-			refType = 2;
-			sourceTree = SOURCE_ROOT;
-		};
-		4B1A735F07252DA3007105CE = {
-			fileRef = 4B1A735D07252DA3007105CE;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		4B1A736007252DA3007105CE = {
-			fileRef = 4B1A735E07252DA3007105CE;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		4B1A736307252DBE007105CE = {
-			fileEncoding = 30;
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.cpp.cpp;
-			name = AudioRenderBridge.cpp;
-			path = ../../../drivers/coreaudio/AudioRenderBridge.cpp;
-			refType = 2;
-			sourceTree = SOURCE_ROOT;
-		};
-		4B1A736407252DBE007105CE = {
-			fileEncoding = 30;
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.h;
-			name = AudioRenderBridge.h;
-			path = ../../../drivers/coreaudio/AudioRenderBridge.h;
-			refType = 2;
-			sourceTree = SOURCE_ROOT;
-		};
-		4B1A736507252DBE007105CE = {
-			fileRef = 4B1A736307252DBE007105CE;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		4B1A736607252DBE007105CE = {
-			fileRef = 4B1A736407252DBE007105CE;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
 		4B1A736907252DDC007105CE = {
 			fileEncoding = 30;
 			isa = PBXFileReference;
@@ -391,27 +331,6 @@
 			path = ../../../drivers/coreaudio/coreaudio_driver.h;
 			refType = 2;
 			sourceTree = SOURCE_ROOT;
-		};
-		4B1A736A07252DDC007105CE = {
-			fileRef = 4B1A736907252DDC007105CE;
-			isa = PBXBuildFile;
-			settings = {
-			};
-		};
-		4B1A737C07252E29007105CE = {
-			fileEncoding = 30;
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.c;
-			name = coreaudio_driver.c;
-			path = ../../../drivers/coreaudio/coreaudio_driver.c;
-			refType = 2;
-			sourceTree = SOURCE_ROOT;
-		};
-		4B1A737D07252E29007105CE = {
-			fileRef = 4B1A737C07252E29007105CE;
-			isa = PBXBuildFile;
-			settings = {
-			};
 		};
 		4B4DCB9405DD229F00DC3452 = {
 			fileRef = 4B117C6305DD0C8000B5DA5A;
@@ -771,11 +690,9 @@
 		4B81402107240F550025D71C = {
 			buildActionMask = 2147483647;
 			files = (
-				4B1A736007252DA3007105CE,
-				4B1A736607252DBE007105CE,
-				4B1A736A07252DDC007105CE,
 				4B77679A072D2B9500F14709,
 				4B77679F072D2BAD00F14709,
+				4BE7704207A00B15001AA2F0,
 			);
 			isa = PBXHeadersBuildPhase;
 			runOnlyForDeploymentPostprocessing = 0;
@@ -789,9 +706,7 @@
 				4B81402F07240F690025D71C,
 				4B81403007240F6A0025D71C,
 				4B81409407241E580025D71C,
-				4B1A735F07252DA3007105CE,
-				4B1A736507252DBE007105CE,
-				4B1A737D07252E29007105CE,
+				4BE7704107A00B15001AA2F0,
 			);
 			isa = PBXSourcesBuildPhase;
 			runOnlyForDeploymentPostprocessing = 0;
@@ -823,9 +738,10 @@
 				HEADER_SEARCH_PATHS = "../../../ ../../";
 				LIBRARY_STYLE = BUNDLE;
 				OTHER_CFLAGS = "";
-				OTHER_LDFLAGS = "-ljack -framework CoreAudio -framework AudioToolbox";
+				OTHER_LDFLAGS = "-ljack  -framework CoreAudio -framework AudioUnit -framework CoreServices";
 				OTHER_LIBTOOL_FLAGS = "";
 				OTHER_REZFLAGS = "";
+				PREFIX_HEADER = "$(SYSTEM_LIBRARY_DIR)/Frameworks/Carbon.framework/Headers/Carbon.h";
 				PRODUCT_NAME = jack_coreaudio.so;
 				REZ_EXECUTABLE = YES;
 				SECTORDER_FLAGS = "";
@@ -882,6 +798,15 @@
 			isa = PBXBuildFile;
 			settings = {
 			};
+		};
+		4B8254140779F6AF0016C8D6 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.c;
+			name = clientengine.c;
+			path = ../../../jackd/clientengine.c;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
 		};
 		4B89C95906F596060003AD09 = {
 			fileEncoding = 30;
@@ -991,7 +916,7 @@
 	<key>CFBundleExecutable</key>
 	<string>Jack</string>
 	<key>CFBundleGetInfoString</key>
-	<string>Jack Server 0.99.27, @03-04 Paul Davis, Grame</string>
+	<string>Jack Server 0.99.45, @03-04 Paul Davis, Grame</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -1007,7 +932,7 @@
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>0.99.27</string>
+	<string>0.99.45</string>
 </dict>
 </plist>
 ";
@@ -1192,6 +1117,7 @@
 			children = (
 				4B117C5805DD0C3600B5DA5A,
 				4B117C5A05DD0C4100B5DA5A,
+				4B8254140779F6AF0016C8D6,
 				4B117C5D05DD0C5B00B5DA5A,
 			);
 			isa = PBXGroup;
@@ -1201,12 +1127,8 @@
 		};
 		4BA716600408E047004F4E3A = {
 			children = (
-				4B1A737C07252E29007105CE,
+				4BA736DC079FE7E00041E425,
 				4B1A736907252DDC007105CE,
-				4B1A736307252DBE007105CE,
-				4B1A736407252DBE007105CE,
-				4B1A735D07252DA3007105CE,
-				4B1A735E07252DA3007105CE,
 				4B117C7F05DD0D7700B5DA5A,
 				4B117C8105DD0D7D00B5DA5A,
 			);
@@ -1214,6 +1136,15 @@
 			name = Driver;
 			refType = 4;
 			sourceTree = "<group>";
+		};
+		4BA736DC079FE7E00041E425 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.c;
+			name = coreaudio_driver.c;
+			path = ../../../drivers/coreaudio/coreaudio_driver.c;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
 		};
 		4BA9D903040E0CC200053105 = {
 			children = (
@@ -1404,6 +1335,18 @@
 			path = jack_metro;
 			refType = 3;
 			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		4BE7704107A00B15001AA2F0 = {
+			fileRef = 4BA736DC079FE7E00041E425;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4BE7704207A00B15001AA2F0 = {
+			fileRef = 4B1A736907252DDC007105CE;
+			isa = PBXBuildFile;
+			settings = {
+			};
 		};
 		4BF8712B040BDE8200053105 = {
 			buildActionMask = 2147483647;
