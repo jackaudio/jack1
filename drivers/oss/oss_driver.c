@@ -131,6 +131,21 @@ const static jack_driver_param_desc_t oss_params[OSS_DRIVER_N_PARAMS] = {
 /* internal functions */
 
 
+static void set_period_size (oss_driver_t *driver, 
+	jack_nframes_t new_period_size)
+{
+	driver->period_size = new_period_size;
+
+	driver->period_usecs = 
+		((double) driver->period_size /
+		(double) driver->sample_rate) * 1e6;
+	driver->last_wait_ust = 0;
+	driver->last_periodtime = jack_get_microseconds();
+	driver->next_periodtime = 0;
+	driver->iodelay = 0.0F;
+}
+
+
 static inline void update_times (oss_driver_t *driver)
 {
 	driver->last_periodtime = jack_get_microseconds();
@@ -818,11 +833,8 @@ static int oss_driver_bufsize (oss_driver_t *driver, jack_nframes_t nframes)
 {
 	oss_driver_stop(driver);
 
-	driver->period_size = nframes;
-	driver->period_usecs = 
-		((double) driver->period_size / 
-		 (double) driver->sample_rate) * 1e6;
-	printf("oss_driver: period size update: %u\n", driver->period_size);
+	set_period_size(driver, nframes);
+	printf("oss_driver: period size update: %u\n", nframes);
 
 	oss_driver_start(driver);
 
@@ -1107,12 +1119,7 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	driver->capture_channels = capture_channels;
 	driver->playback_channels = playback_channels;
 
-	driver->period_usecs = 
-		((double) period_size / (double) sample_rate) * 1e6;
-	driver->last_wait_ust = 0;
-	driver->last_periodtime = jack_get_microseconds();
-	driver->next_periodtime = 0;
-	driver->iodelay = 0.0F;
+	set_period_size(driver, period_size);
 	
 	driver->finish = driver_finish;
 
