@@ -1,17 +1,5 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
-if HAVE_FLTK
-FLTK_CLIENT = jack_fltk_client
-dist-check-fltk:
-else
-FLTK_CLIENT =
-dist-check-fltk:
-	@echo
-	@echo ' ******' You need fltk installed to make dist.' ******'
-	@echo
-	@false
-endif
-
 if HAVE_SNDFILE
 JACKREC = jackrec
 dist-check-sndfile:
@@ -34,7 +22,7 @@ bin_PROGRAMS = jack_load \
 	       jack_metro \
 	       jack_showtime \
 	       jack_lsp \
-	       $(FLTK_CLIENT) $(JACKREC)
+		   jackrec
 
 if HAVE_SNDFILE
 # note! jackrec_CFLAGS syntax not supported by automake-1.4
@@ -42,7 +30,7 @@ sndfile_cflags = @SNDFILE_CFLAGS@
 endif
 
 AM_CFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
-AM_CXXFLAGS = -I.. $(FLTK_CXXFLAGS) $(JACK_CFLAGS) $(sndfile_cflags)
+AM_CXXFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
 
 jack_simple_client_SOURCES = simple_client.c
 jack_simple_client_LDFLAGS = -lrt -ldl -lpthread
@@ -72,12 +60,6 @@ jack_showtime_SOURCES = showtime.c
 jack_showtime_LDFLAGS = -lrt -ldl -lpthread
 jack_showtime_LDADD = ../libjack/libjack.la
 
-
-if HAVE_FLTK
-jack_fltk_client_SOURCES = fltk_client.cc
-jack_fltk_client_LDFLAGS = -lrt $(FLTK_LDFLAGS)
-jack_fltk_client_LDADD = ../libjack/libjack.la
-endif
 
 if HAVE_SNDFILE
 jackrec_SOURCES = capture_client.c
@@ -112,4 +94,4 @@ ip_client_LTLIBRARIES = inprocess.la
 inprocess_la_LDFLAGS = -module -avoid-version
 inprocess_la_SOURCES = inprocess.c
 
-dist-hook: dist-check-fltk dist-check-sndfile
+dist-hook: dist-check-sndfile

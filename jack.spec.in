@@ -86,7 +86,6 @@ make install DESTDIR=$RPM_BUILD_ROOT
 
 %files example-clients
 %defattr(-,root,root)
-%{_bindir}/jack_fltk_client
 %{_bindir}/jackrec
 %{_bindir}/jack_cache_killer
 %{_bindir}/jack_connect

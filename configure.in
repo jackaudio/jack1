@@ -14,7 +14,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=71
-JACK_MICRO_VERSION=1
+JACK_MICRO_VERSION=2
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -217,7 +217,7 @@ AC_DEFINE_UNQUOTED(DEFAULT_TMP_DIR,"$DEFAULT_TMP_DIR",[Default tmp directory])
 
 
 
-# jack depends on alsa 0.9. some example apps depend on libsndfile and fltk.
+# jack depends on alsa 0.9. some example apps depend on libsndfile.
 
 AC_CHECK_LIB(asound,snd_pcm_drop,
 	     [
@@ -241,37 +241,6 @@ if test "x$HAVE_ALSA" != "xtrue"; then
    fi
 fi
 
-#
-# FLTK
-#
-jack_enable_fltk="yes"
-AC_ARG_ENABLE(fltk, [  --disable-fltk          disable fltk-dependant code],[
-  case "$enableval" in
-    "yes")
-      ;;
-    "no")
-      jack_enable_fltk="no"
-      ;;
-    *)
-      AC_MSG_ERROR([must use --enable-fltk(=yes/no) or --disable-fltk])
-      ;;
-  esac
-])
-                                                                                                                                                       
-if test "$jack_enable_fltk" = "yes"; then
-  AC_LIB_FLTK
-  if test "$FLTK_FOUND" = "yes"; then
-    HAVE_FLTK=true
-    AC_DEFINE(HAVE_FLTK, 1, [whether or not we have fltk])
-  else
-    HAVE_FLTK=false
-    AC_MSG_WARN([*** no fltk found, the fltk example client will not be built])
-  fi
-else
-  FLTK_FOUND="no"
-  HAVE_FLTK=false
-fi
-
 HAVE_SNDFILE=false
 PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
 if test x$HAVE_SNDFILE = xfalse; then
@@ -284,7 +253,6 @@ if test $HAVE_DOXYGEN = "false"; then
              AC_MSG_WARN([*** doxygen not found, docs will not be built])
 fi
 
-AM_CONDITIONAL(HAVE_FLTK, $HAVE_FLTK)
 AM_CONDITIONAL(HAVE_SNDFILE, $HAVE_SNDFILE)
 AM_CONDITIONAL(HAVE_DOXYGEN, $HAVE_DOXYGEN)
 AM_CONDITIONAL(USE_CAPABILITIES, $USE_CAPABILITIES)
