@@ -476,28 +476,32 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	driver->playback_sample_bytes = snd_pcm_format_physical_width (driver->playback_sample_format) / 8;
 	driver->capture_sample_bytes = snd_pcm_format_physical_width (driver->capture_sample_format) / 8;
 
-	switch (driver->playback_sample_format) {
-	case SND_PCM_FORMAT_S32_LE:
-	case SND_PCM_FORMAT_S16_LE:
-	case SND_PCM_FORMAT_S32_BE:
-	case SND_PCM_FORMAT_S16_BE:
-		break;
+	if (driver->playback_handle) {
+		switch (driver->playback_sample_format) {
+		case SND_PCM_FORMAT_S32_LE:
+		case SND_PCM_FORMAT_S16_LE:
+		case SND_PCM_FORMAT_S32_BE:
+		case SND_PCM_FORMAT_S16_BE:
+			break;
 
-	default:
-		jack_error ("programming error: unhandled format type for playback");
-		exit (1);
+		default:
+			jack_error ("programming error: unhandled format type for playback");
+			exit (1);
+		}
 	}
 
-	switch (driver->capture_sample_format) {
-	case SND_PCM_FORMAT_S32_LE:
-	case SND_PCM_FORMAT_S16_LE:
-	case SND_PCM_FORMAT_S32_BE:
-	case SND_PCM_FORMAT_S16_BE:
-		break;
+	if (driver->capture_handle) {
+		switch (driver->capture_sample_format) {
+		case SND_PCM_FORMAT_S32_LE:
+		case SND_PCM_FORMAT_S16_LE:
+		case SND_PCM_FORMAT_S32_BE:
+		case SND_PCM_FORMAT_S16_BE:
+			break;
 
-	default:
-		jack_error ("programming error: unhandled format type for capture");
-		exit (1);
+		default:
+			jack_error ("programming error: unhandled format type for capture");
+			exit (1);
+		}
 	}
 
 	if (driver->playback_interleaved) {
