@@ -1,0 +1,4 @@
+Files in this tree are mainly licensed under the GPL, as noted in the
+file headers. However, the libjack/ tree is licensed under the LGPL in
+order to allow for proprietary usage of Jack. Please see COPYING.GPL and
+COPYING.LGPL for more information on these two licenses.
