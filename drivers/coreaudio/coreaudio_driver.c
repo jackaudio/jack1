@@ -27,6 +27,7 @@
  Feb 03, 2004: Stephane Letz: some fix in AudioRender.cpp code.
  Feb 03, 2004: Johnny Petrantoni: removed the default device stuff (useless, in jackosx, because JackPilot manages this behavior), the device must be specified. and all parameter must be correct.
  Feb 04, 2004: Johnny Petrantoni: now the driver supports interfaces with multiple interleaved streams (such as the MOTU 828).
+ Nov 05, 2004: S. Letz: correct management of -I option for use with JackPilot.
  
  TODO:
 	- fix cpu load behavior.
@@ -153,7 +154,6 @@ coreaudio_driver_attach(coreaudio_driver_t * driver,
     }
 
     jack_activate(driver->client);
-
     return 0;
 }
 
@@ -164,25 +164,24 @@ coreaudio_driver_detach(coreaudio_driver_t * driver,
     JSList *node;
 
     if (driver->engine == 0) {
-	return -1;
+		return -1;
     }
 
     for (node = driver->capture_ports; node; node = jack_slist_next(node)) {
-	jack_port_unregister(driver->client, ((jack_port_t *) node->data));
+		jack_port_unregister(driver->client, ((jack_port_t *) node->data));
     }
 
     jack_slist_free(driver->capture_ports);
     driver->capture_ports = 0;
 
     for (node = driver->playback_ports; node; node = jack_slist_next(node)) {
-	jack_port_unregister(driver->client, ((jack_port_t *) node->data));
+		jack_port_unregister(driver->client, ((jack_port_t *) node->data));
     }
 
     jack_slist_free(driver->playback_ports);
     driver->playback_ports = 0;
 
     driver->engine = 0;
-
     return 0;
 }
 
@@ -193,12 +192,12 @@ coreaudio_driver_null_cycle(coreaudio_driver_t * driver,
     int i;
 
     if (!driver->isInterleaved) {
-	for (i = 0; i < driver->playback_nchannels; i++) {
-	    memset(driver->outcoreaudio[i], 0x0, nframes * sizeof(float));
-	}
+		for (i = 0; i < driver->playback_nchannels; i++) {
+			memset(driver->outcoreaudio[i], 0x0, nframes * sizeof(float));
+		}
     } else {
-	memset(driver->outcoreaudio[0], 0x0,
-	       nframes * sizeof(float) * driver->playback_nchannels);
+		memset(driver->outcoreaudio[0], 0x0,
+		nframes * sizeof(float) * driver->playback_nchannels);
     }
 
     return 0;
@@ -216,39 +215,39 @@ coreaudio_driver_read(coreaudio_driver_t * driver, jack_nframes_t nframes)
     int b = 0;
 
     for (chn = 0, node = driver->capture_ports; node;
-	 node = jack_slist_next(node), chn++) {
+		node = jack_slist_next(node), chn++) {
 
-	port = (jack_port_t *) node->data;
+		port = (jack_port_t *) node->data;
 
-	if (!driver->isInterleaved) {
-	    if (jack_port_connected(port)
-		&& (driver->incoreaudio[chn] != NULL)) {
-		float *in = driver->incoreaudio[chn];
-		buf = jack_port_get_buffer(port, nframes);
-		memcpy(buf, in, sizeof(float) * nframes);
-	    }
-	} else {
-	    if (jack_port_connected(port)
-		&& (driver->incoreaudio[b] != NULL)) {
-		int channels = driver->channelsPerStream[b];
-		if (channels <= chn) {
-		    b++;
-		    if (driver->numberOfStreams > 1
-			&& b < driver->numberOfStreams) {
-			channels = driver->channelsPerStream[b];
-			chn = 0;
-		    } else
-			return 0;
+		if (!driver->isInterleaved) {
+			if (jack_port_connected(port)
+			&& (driver->incoreaudio[chn] != NULL)) {
+				float *in = driver->incoreaudio[chn];
+				buf = jack_port_get_buffer(port, nframes);
+				memcpy(buf, in, sizeof(float) * nframes);
+			}
+		} else {
+			if (jack_port_connected(port)
+			&& (driver->incoreaudio[b] != NULL)) {
+				int channels = driver->channelsPerStream[b];
+				if (channels <= chn) {
+					b++;
+					if (driver->numberOfStreams > 1
+					&& b < driver->numberOfStreams) {
+					channels = driver->channelsPerStream[b];
+					chn = 0;
+					} else
+					return 0;
+				}
+				if (channels > 0) {
+					float *in = driver->incoreaudio[b];
+					buf = jack_port_get_buffer(port, nframes);
+					for (i = 0; i < nframes; i++)
+					buf[i] = in[channels * i + chn];
+				}
+			}
 		}
-		if (channels > 0) {
-		    float *in = driver->incoreaudio[b];
-		    buf = jack_port_get_buffer(port, nframes);
-		    for (i = 0; i < nframes; i++)
-			buf[i] = in[channels * i + chn];
-		}
-	    }
 	}
-    }
 
     driver->engine->transport_cycle_start(driver->engine,
 					  jack_get_microseconds());
@@ -274,9 +273,9 @@ coreaudio_driver_write(coreaudio_driver_t * driver, jack_nframes_t nframes)
 		if (!driver->isInterleaved) {
 			if (jack_port_connected(port)
 			&& (driver->outcoreaudio[chn] != NULL)) {
-			float *out = driver->outcoreaudio[chn];
-			buf = jack_port_get_buffer(port, nframes);
-			memcpy(out, buf, sizeof(float) * nframes);
+				float *out = driver->outcoreaudio[chn];
+				buf = jack_port_get_buffer(port, nframes);
+				memcpy(out, buf, sizeof(float) * nframes);
 			}
 		} else {
 			if (jack_port_connected(port)
@@ -342,7 +341,6 @@ coreaudio_driver_bufsize(coreaudio_driver_t * driver,
     driver->incoreaudio = getPandaAudioInputs(driver->stream);
     driver->outcoreaudio = getPandaAudioOutputs(driver->stream);
 
-
     return startPandaAudioProcess(driver->stream);
 }
 #endif
@@ -369,8 +367,8 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     jack_driver_init((jack_driver_t *) driver);
 
     if (!jack_power_of_two(frames_per_cycle)) {
-	fprintf(stderr, "CA: -p must be a power of two.\n");
-	goto error;
+		fprintf(stderr, "CA: -p must be a power of two.\n");
+		goto error;
     }
 
     driver->frames_per_cycle = frames_per_cycle;
@@ -393,10 +391,10 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     bzero(&deviceName[0], sizeof(char) * 60);
 
     if (!driver_name) {
-	if (GetDeviceNameFromID(deviceID, deviceName) != noErr)
-	    goto error;
+		if (GetDeviceNameFromID(deviceID, deviceName) != noErr)
+			goto error;
     } else {
-	strcpy(&deviceName[0], driver_name);
+		strcpy(&deviceName[0], driver_name);
     }
 
     driver->stream =
@@ -404,7 +402,7 @@ static jack_driver_t *coreaudio_driver_new(char *name,
 			       chan_out, &deviceName[0]);
 
     if (!driver->stream)
-	goto error;
+		goto error;
 
     driver->client = client;
     driver->period_usecs =
@@ -435,9 +433,7 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     driver->capture_nchannels = chan_in;
 
     strcpy(&driver->driver_name[0], &deviceName[0]);
-
     jack_init_time();
-
     return ((jack_driver_t *) driver);
 
   error:
@@ -616,7 +612,7 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 			break;
 
 		case 'I':
-			get_device_id_from_num((int) param->value.ui, &deviceID);
+			deviceID = (AudioDeviceID) param->value.ui;
 			break;
 		}
     }
@@ -624,8 +620,8 @@ jack_driver_t *driver_initialize(jack_client_t * client,
     /* duplex is the default */
 
     if (!capture && !playback) {
-	capture = TRUE;
-	playback = TRUE;
+		capture = TRUE;
+		playback = TRUE;
     }
 
     return coreaudio_driver_new("coreaudio", client, frames_per_interrupt,
