@@ -1197,9 +1197,8 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 	return 0;
 }
 
-static void
+static int
 alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
-
 {
 	char buf[32];
 	channel_t chn;
@@ -1210,13 +1209,6 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 
 	driver->engine->set_buffer_size (engine, driver->frames_per_cycle);
 	driver->engine->set_sample_rate (engine, driver->frame_rate);
-
-	/* Now become a client of the engine */
-
-	if ((driver->client = jack_driver_become_client ("alsa_pcm")) == NULL) {
-		jack_error ("ALSA: cannot become client");
-		return;
-	}
 
 	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
 
@@ -1260,6 +1252,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 	}
 
 	jack_activate (driver->client);
+	return 0;
 }
 
 static void
@@ -1394,6 +1387,7 @@ alsa_driver_delete (alsa_driver_t *driver)
 
 static jack_driver_t *
 alsa_driver_new (char *name, char *alsa_device,
+		 jack_client_t *client, 
 		 jack_nframes_t frames_per_cycle,
 		 jack_nframes_t user_nperiods,
 		 jack_nframes_t rate,
@@ -1532,6 +1526,8 @@ alsa_driver_new (char *name, char *alsa_device,
 
 	alsa_driver_hw_specific (driver, hw_monitoring);
 
+	driver->client = client;
+
 	return (jack_driver_t *) driver;
 }
 
@@ -1587,8 +1583,6 @@ alsa_driver_clock_sync_notify (alsa_driver_t *driver, channel_t chn, ClockSyncSt
 
 }
 
-/* DRIVER "PLUGIN" INTERFACE */
-
 static void
 alsa_usage ()
 {
@@ -1608,8 +1602,10 @@ alsa_usage ()
 );
 }
 
+/* DRIVER "PLUGIN" INTERFACE */
+
 jack_driver_t *
-driver_initialize (int argc, char **argv)
+driver_initialize (jack_client_t *client, int argc, char **argv)
 {
 	jack_nframes_t srate = 48000;
 	jack_nframes_t frames_per_interrupt = 1024;
@@ -1710,7 +1706,7 @@ driver_initialize (int argc, char **argv)
 		playback = TRUE;
 	}
 
-	return alsa_driver_new ("alsa_pcm", pcm_name, frames_per_interrupt, 
+	return alsa_driver_new ("alsa_pcm", pcm_name, client, frames_per_interrupt, 
 				user_nperiods, srate, hw_monitoring, capture,
 			        playback, dither, soft_mode);
 }

@@ -51,6 +51,7 @@
 #endif
 
 typedef struct _jack_engine  jack_engine_t;
+typedef struct _jack_request jack_request_t;
 
 typedef void * dlhandle;
 
@@ -112,6 +113,7 @@ typedef struct {
     float               cpu_load;
     unsigned long       port_max;
     int                 engine_ok;
+    jack_engine_t      *engine;
     jack_port_shared_t  ports[0];
 
 } jack_control_t;
@@ -134,15 +136,17 @@ typedef struct {
 	unsigned long n;
 	jack_port_id_t port_id;
 	jack_port_id_t self_id;
+	int key;
     } x;
     union {
 	unsigned long n;
 	jack_port_id_t other_id;
+	void* addr;
     } y;
 } jack_event_t;
 
 typedef enum {
-	ClientDynamic,     /* connect request just names .so */
+	ClientInProcess,   /* connect request just names .so */
 	ClientDriver,      /* code is loaded along with driver */
 	ClientOutOfProcess /* client is in another process */
 } ClientType;
@@ -184,6 +188,13 @@ typedef volatile struct {
     JackXRunCallback xrun;
     void *xrun_arg;
 
+    /* OOP clients: set by libjack
+        IP clients: set by engine
+    */
+    
+    int (*deliver_request)(void*, jack_request_t*);
+    void *deliver_arg;
+
     /* for engine use only */
 
     void *private_internal_client;
@@ -192,10 +203,12 @@ typedef volatile struct {
 
 typedef struct {
     
+    int        load;
     ClientType type;
 
     char name[JACK_CLIENT_NAME_SIZE+1];
     char object_path[PATH_MAX+1];
+    char object_data[1024];
 
 } jack_client_connect_request_t;
 
@@ -247,10 +260,10 @@ typedef enum {
 	GetPortConnections = 10,
 	GetPortNConnections = 11,
 	AddAlias = 12,
-	RemoveAlias = 13
+	RemoveAlias = 13,
 } RequestType;
 
-typedef struct {
+struct _jack_request {
     
     RequestType type;
     union {
@@ -275,7 +288,7 @@ typedef struct {
 	unsigned int nports;
     } x;
     int status;
-}  jack_request_t;
+};
 
 typedef struct _jack_port_alias {
     char port[JACK_PORT_NAME_SIZE+1];
@@ -285,9 +298,15 @@ typedef struct _jack_port_alias {
 extern void jack_cleanup_shm ();
 extern void jack_cleanup_files ();
 
-extern int jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event);
+extern int  jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event);
+extern void jack_client_handle_new_port_segment (jack_client_t *client, int key, void* addr);
 
-jack_client_t *jack_driver_become_client (const char *client_name);
+extern jack_client_t *jack_driver_client_new (jack_engine_t *, const char *client_name);
+jack_client_t *jack_client_alloc_inprocess(jack_client_control_t*, jack_control_t*);
+
+/* in process clients call this. its defined in jack/engine.c */
+
+void handle_in_process_client_request (jack_control_t*, jack_request_t*);
 
 extern char *jack_server_dir;
 

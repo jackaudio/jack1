@@ -39,7 +39,6 @@ static int dummy_start (jack_driver_t *drv) { return 0; }
 
 void
 jack_driver_init (jack_driver_t *driver)
-
 {
 	memset (driver, 0, sizeof (*driver));
 
@@ -51,58 +50,3 @@ jack_driver_init (jack_driver_t *driver)
 	driver->stop = dummy_stop;
 }
 
-jack_driver_t *
-jack_driver_load (int argc, char **argv)
-
-{
-	const char *errstr;
-	dlhandle handle;
-	jack_driver_t *driver;
-	jack_driver_t *(*initialize)(int, char **);
-	void (*finish)(jack_driver_t *);
-	char path_to_so[PATH_MAX+1];
-
-	snprintf (path_to_so, sizeof (path_to_so), ADDON_DIR "/jack_%s.so", argv[0]);
-	
-	handle = dlopen (path_to_so, RTLD_NOW|RTLD_GLOBAL);
-	
-	if (handle == 0) {
-		if ((errstr = dlerror ()) != 0) {
-			jack_error ("can't load \"%s\": %s", path_to_so, errstr);
-		} else {
-			jack_error ("bizarre error loading driver shared object %s", path_to_so);
-		}
-		return 0;
-	}
-
-	initialize = dlsym (handle, "driver_initialize");
-
-	if ((errstr = dlerror ()) != 0) {
-		jack_error ("no initialize function in shared object %s\n", path_to_so);
-		dlclose (handle);
-		return 0;
-	}
-
-	finish = dlsym (handle, "driver_finish");
-
-	if ((errstr = dlerror ()) != 0) {
-		jack_error ("no finish function in in shared driver object %s", path_to_so);
-		dlclose (handle);
-		return 0;
-	}
-
-	if ((driver = initialize (argc, argv)) != 0) {
-		driver->handle = handle;
-		driver->finish = finish;
-	}
-
-	return driver;
-
-}
-
-void
-jack_driver_unload (jack_driver_t *driver)
-{
-	driver->finish (driver);
-	dlclose (driver->handle);
-}

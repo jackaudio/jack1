@@ -1,3 +1,9 @@
+2003-02-21  Paul Davis  <paul>
+
+	* jackd.c: modified signal catching design to actually follow
+	sigwait() specifications (ie. install handlers for all blocked
+	signals). also removed some dead code from benchmarking/debugging.
+
 2003-2-10 Taybin Rutkin <trutkin@physics.clarku.edu>
 	* Initial Changelog
 	* engine.c (handle_new_client): Returns protocol version for checking.

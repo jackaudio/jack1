@@ -43,10 +43,10 @@ struct _jack_engine {
 
     /* "private" sections starts here */
 
-
     pthread_mutex_t client_lock;
     pthread_mutex_t buffer_lock;
     pthread_mutex_t port_lock;
+    pthread_mutex_t request_lock;
     int process_errors;
     int period_msecs;
     unsigned int port_max;
@@ -109,7 +109,7 @@ jack_engine_t  *jack_engine_new (int real_time, int real_time_priority, int verb
 int             jack_engine_delete (jack_engine_t *);
 int             jack_run (jack_engine_t *engine);
 int             jack_wait (jack_engine_t *engine);
-int             jack_use_driver (jack_engine_t *, struct _jack_driver *);
+int             jack_engine_load_driver (jack_engine_t *, int, char **);
 void            jack_set_asio_mode (jack_engine_t *, int yn);
 void            jack_dump_configuration(jack_engine_t *engine, int take_lock);
 

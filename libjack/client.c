@@ -87,6 +87,7 @@ struct _jack_client {
     char first_active : 1;
     float cpu_mhz;
     pthread_t thread_id;
+
 };
 
 #define event_fd pollfd[0].fd
@@ -118,9 +119,36 @@ void default_jack_error_callback (const char *desc)
 
 void (*jack_error_callback)(const char *desc) = &default_jack_error_callback;
 
+static int
+oop_client_deliver_request (void *ptr, jack_request_t *req)
+{
+	jack_client_t *client = (jack_client_t*) ptr;
+
+	if (write (client->request_fd, req, sizeof (*req)) != sizeof (*req)) {
+		jack_error ("cannot send request type %d to server", req->type);
+		req->status = -1;
+	}
+	if (read (client->request_fd, req, sizeof (*req)) != sizeof (*req)) {
+		jack_error ("cannot read result for request type %d from server (%s)", req->type, strerror (errno));
+		req->status = -1;
+	}
+
+	return req->status;
+}
+
+static int
+deliver_request (const jack_client_t *client, jack_request_t *req)
+{
+	/* indirect through the function pointer that was set 
+	   either by jack_client_new() (OOP) or handle_new_client()
+	   in the server.
+	*/
+
+	return client->control->deliver_request (client->control->deliver_arg, req);
+}
+
 jack_client_t *
 jack_client_alloc ()
-
 {
 	jack_client_t *client;
 
@@ -140,7 +168,30 @@ jack_client_alloc ()
 	client->first_active = TRUE;
 	client->on_shutdown = NULL;
 	client->cpu_mhz = (float) jack_get_mhz ();
+
 	return client;
+}
+
+jack_client_t *
+jack_client_alloc_inprocess (jack_client_control_t *cc, jack_control_t *ec)
+{
+	jack_client_t* client;
+
+	client = jack_client_alloc ();
+	client->control = cc;
+	client->engine = ec;
+	
+	return client;
+}
+
+static void
+jack_client_free (jack_client_t *client)
+{
+	if (client->pollfd) {
+		free (client->pollfd);
+	}
+
+	free (client);
 }
 
 jack_port_t *
@@ -368,66 +419,106 @@ server_event_connect (jack_client_t *client)
 	return fd;
 }
 
-jack_client_t *
-jack_client_new (const char *client_name)
-
+static int
+jack_request_client (ClientType type, const char* client_name, const char* so_name, 
+		     const char* so_data, jack_client_connect_result_t *res, int *req_fd)
 {
-	int req_fd = -1;
-	int ev_fd = -1;
-	void *addr;
 	jack_client_connect_request_t req;
-	jack_client_connect_result_t  res;
-	jack_port_segment_info_t *si;
-	jack_client_t *client;
-	int client_shm_id;
-	int control_shm_id;
-	int port_segment_shm_id;
-	int n;
+
+	*req_fd = -1;
 
 	if (strlen (client_name) > sizeof (req.name) - 1) {
 		jack_error ("\"%s\" is too long to be used as a JACK client name.\n"
 			     "Please use %lu characters or less.",
-			     sizeof (req.name) - 1);
-		return NULL;
+			    client_name, sizeof (req.name) - 1);
+		return -1;
 	}
 
-	if ((req_fd = server_connect (0)) < 0) {
+	if (strlen (so_name) > sizeof (req.object_path) - 1) {
+		jack_error ("\"%s\" is too long to be used as a JACK shared object name.\n"
+			     "Please use %lu characters or less.",
+			    so_name, sizeof (req.object_path) - 1);
+		return -1;
+	}
+
+	if (strlen (so_data) > sizeof (req.object_data) - 1) {
+		jack_error ("\"%s\" is too long to be used as a JACK shared object data string.\n"
+			     "Please use %lu characters or less.",
+			    so_data, sizeof (req.object_data) - 1);
+		return -1;
+	}
+
+	if ((*req_fd = server_connect (0)) < 0) {
 		jack_error ("cannot connect to default JACK server");
-		return NULL;
+		goto fail;
 	}
 
-	req.type = ClientOutOfProcess;
-	strncpy (req.name, client_name, sizeof (req.name) - 1);
-	
-	if (write (req_fd, &req, sizeof (req)) != sizeof (req)) {
+	req.load = TRUE;
+	req.type = type;
+	snprintf (req.name, sizeof (req.name), "%s", client_name);
+	snprintf (req.object_path, sizeof (req.object_path), "%s", so_name);
+	snprintf (req.object_data, sizeof (req.object_data), "%s", so_data);
+
+	if (write (*req_fd, &req, sizeof (req)) != sizeof (req)) {
 		jack_error ("cannot send request to jack server (%s)", strerror (errno));
-		close (req_fd);
-		return NULL;
+		goto fail;
 	}
 	
-	if ((n = read (req_fd, &res, sizeof (res))) != sizeof (res)) {
+	if (read (*req_fd, res, sizeof (*res)) != sizeof (*res)) {
 
 		if (errno == 0) {
 			/* server shut the socket */
 			jack_error ("could not attach as client (duplicate client name?)");
-			close (req_fd);
-			return NULL;
+			goto fail;
 		}
 
 		jack_error ("cannot read response from jack server (%s)", strerror (errno));
-		close (req_fd);
-		return NULL;
+		goto fail;
 	}
 
-	if (res.status) {
-		close (req_fd);
+	if (res->status) {
 		jack_error ("could not attach as client (duplicate client name?)");
-		return NULL;
+		goto fail;
 	}
 
-	if (res.protocol_v != jack_protocol_version){
-		close (req_fd);
-		jack_error ("application linked against too old of a version of libjack.");
+	if (res->protocol_v != jack_protocol_version){
+		jack_error ("application linked against too wrong of a version of libjack.");
+		goto fail;
+	}
+
+	switch (type) {
+	case ClientDriver:
+	case ClientInProcess:
+		close (*req_fd);
+		*req_fd = -1;
+		break;
+
+	default:
+		break;
+	}
+
+	return 0;
+
+  fail:
+	if (*req_fd >= 0) {
+		close (*req_fd);
+		*req_fd = -1;
+	}
+	return -1;
+}
+
+jack_client_t *
+jack_client_new (const char *client_name)
+{
+	int req_fd = -1;
+	int ev_fd = -1;
+	jack_client_connect_result_t  res;
+	jack_client_t *client;
+	int client_shm_id;
+	int control_shm_id;
+	void *addr;
+
+	if (jack_request_client (ClientOutOfProcess, client_name, "", "", &res, &req_fd)) {
 		return NULL;
 	}
 
@@ -438,34 +529,6 @@ jack_client_new (const char *client_name)
 
 	client->pollfd[0].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
 	client->pollfd[1].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
-
-	/* Lookup, attach and register the port/buffer segments in use
-	   right now.
-	*/
-
-	if ((port_segment_shm_id = shmget (res.port_segment_key, 0, 0)) < 0) {
-		jack_error ("cannot determine shared memory segment for port segment key 0x%x (%s)", res.port_segment_key, strerror (errno));
-		goto fail;
-	}
-
-	if ((addr = shmat (port_segment_shm_id, 0, 0)) == (void *) -1) {
-		jack_error ("cannot attached port segment shared memory (%s)", strerror (errno));
-		goto fail;
-	}
-
-	si = (jack_port_segment_info_t *) malloc (sizeof (jack_port_segment_info_t));
-	si->shm_key = res.port_segment_key;
-	si->address = addr;
-	
-	/* the first chunk of the first port segment is always set by the engine
-	   to be a conveniently-sized, zero-filled lump of memory.
-	*/
-
-	if (client->port_segments == NULL) {
-		jack_zero_filled_buffer = si->address;
-	}
-
-	client->port_segments = jack_slist_prepend (client->port_segments, si);
 
 	/* attach the engine control/info block */
 
@@ -495,6 +558,13 @@ jack_client_new (const char *client_name)
 
 	client->control = (jack_client_control_t *) addr;
 
+	jack_client_handle_new_port_segment (client, res.port_segment_key, 0);
+
+	/* set up the client so that it does the right thing for an OOP client */
+
+	client->control->deliver_request = oop_client_deliver_request;
+	client->control->deliver_arg = client;
+
 	if ((ev_fd = server_event_connect (client)) < 0) {
 		jack_error ("cannot connect to server for event stream (%s)", strerror (errno));
 		goto fail;
@@ -519,6 +589,84 @@ jack_client_new (const char *client_name)
 	}
 
 	return 0;
+}
+
+int
+jack_inprocess_client_new (const char *client_name, const char *so_name, const char *so_data)
+{
+	jack_client_connect_result_t res;
+	int req_fd;
+	
+	return jack_request_client (ClientInProcess, client_name, so_name, so_data, &res, &req_fd);
+}
+
+void
+jack_inprocess_client_close (const char *client_name)
+{
+	jack_client_connect_request_t req;
+	int fd;
+
+	req.load = FALSE;
+	snprintf (req.name, sizeof (req.name), "%s", client_name);
+	
+	if ((fd = server_connect (0)) < 0) {
+		jack_error ("cannot connect to default JACK server.");
+		return;
+	}
+
+	if (write (fd, &req, sizeof (req)) != sizeof(req)) {
+		jack_error ("cannot deliver ClientUnload request to JACK server.");
+	}
+	
+	/* no response to this request */
+	
+	close (fd);
+	return;
+}
+
+void
+jack_client_handle_new_port_segment (jack_client_t *client, int key, void* addr)
+{
+	jack_port_segment_info_t *si;
+	int port_segment_shm_id;
+
+	/* Lookup, attach and register the port/buffer segments in use
+	   right now.
+	*/
+
+	if (client->control->type == ClientOutOfProcess) {
+
+		/* map shared memory */
+
+		if ((port_segment_shm_id = shmget (key, 0, 0)) < 0) {
+			jack_error ("cannot determine shared memory segment for port segment key 0x%x (%s)",
+				    key, strerror (errno));
+			return;
+		}
+		
+		if ((addr = shmat (port_segment_shm_id, 0, 0)) == (void *) -1) {
+			jack_error ("cannot attached port segment shared memory (%s)", strerror (errno));
+			return;
+		}
+
+	} else {
+
+		/* client is in same address space as server, so just use `addr' directly */
+	}
+
+	si = (jack_port_segment_info_t *) malloc (sizeof (jack_port_segment_info_t));
+	si->shm_key = key;
+	si->address = addr;
+
+	/* the first chunk of the first port segment is always set by the engine
+	   to be a conveniently-sized, zero-filled lump of memory.
+	*/
+
+	if (client->port_segments == NULL) {
+		jack_zero_filled_buffer = si->address;
+	}
+
+	client->port_segments = jack_slist_prepend (client->port_segments, si);
 }
 
 static void *
@@ -643,6 +791,7 @@ jack_client_thread (void *arg)
 				break;
 
 			case NewPortBufferSegment:
+				jack_client_handle_new_port_segment (client, event.x.key, event.y.addr);
 				break;
 			}
 
@@ -892,7 +1041,12 @@ jack_activate (jack_client_t *client)
 
 #undef BIG_ENOUGH_STACK
 
+	if (client->control->type == ClientInProcess || client->control->type == ClientDriver) {
+		goto startit;
+	}
+
 	/* get the pid of the client process to pass it to engine */
+
 	client->control->pid = getpid ();
 
 #ifdef USE_CAPABILITIES
@@ -906,15 +1060,9 @@ jack_activate (jack_client_t *client)
 
 		req.type = SetClientCapabilities;
 		req.x.client_id = client->control->id;
+		
+		deliver_request (client, &request);
 
-		if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-			jack_error ("cannot send set client capabilities request to server");
-			return -1;
-		}
-		if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-			jack_error ("cannot read set client capabilities result from server (%s)", strerror (errno));
-			return -1;
-		}
 		if (req.status) {
 
 			/* what to do? engine is running realtime, it is using capabilities and has
@@ -931,7 +1079,7 @@ jack_activate (jack_client_t *client)
 	}
 #endif
 
-	if (client->control->type == ClientOutOfProcess && client->first_active) {
+	if (client->first_active) {
 
 		pthread_mutex_init (&client_lock, NULL);
 		pthread_cond_init (&client_ready, NULL);
@@ -954,20 +1102,12 @@ jack_activate (jack_client_t *client)
 		client->first_active = FALSE;
 	}
 
+  startit:
+
 	req.type = ActivateClient;
 	req.x.client_id = client->control->id;
 
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send activate client request to server");
-		return -1;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read activate client result from server (%s)", strerror (errno));
-		return -1;
-	}
-
-	return req.status;
+	return deliver_request (client, &req);
 }
 
 int 
@@ -979,22 +1119,11 @@ jack_deactivate (jack_client_t *client)
 	req.type = DeactivateClient;
 	req.x.client_id = client->control->id;
 
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send deactivate client request to server");
-		return -1;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read deactivate client result from server (%s)", strerror (errno));
-		return -1;
-	}
-
-	return req.status;
+	return deliver_request (client, &req);
 }
 
 int
 jack_client_close (jack_client_t *client)
-
 {
 	JSList *node;
 	void *status;
@@ -1003,154 +1132,40 @@ jack_client_close (jack_client_t *client)
 		jack_deactivate (client);
 	}
 
-	/* stop the thread that communicates with the jack server */
-	pthread_cancel (client->thread);
-	pthread_join (client->thread, &status);
+	if (client->control->type == ClientOutOfProcess) {
+		/* stop the thread that communicates with the jack server */
+		pthread_cancel (client->thread);
+		pthread_join (client->thread, &status);
 
-	shmdt ((char *) client->control);
-	shmdt (client->engine);
+		shmdt ((char *) client->control);
+		shmdt (client->engine);
 
-	for (node = client->port_segments; node; node = jack_slist_next (node)) {
-		shmdt (((jack_port_segment_info_t *) node->data)->address);
-		free (node->data);
+		for (node = client->port_segments; node; node = jack_slist_next (node)) {
+			shmdt (((jack_port_segment_info_t *) node->data)->address);
+			free (node->data);
+		}
+		jack_slist_free (client->port_segments);
+
+		if (client->graph_wait_fd) {
+			close (client->graph_wait_fd);
+		}
+		
+		if (client->graph_next_fd) {
+			close (client->graph_next_fd);
+		}
+		
+		close (client->event_fd);
+		close (client->request_fd);
 	}
-	jack_slist_free (client->port_segments);
 
 	for (node = client->ports; node; node = jack_slist_next (node)) {
 		free (node->data);
 	}
 	jack_slist_free (client->ports);
-
-	if (client->graph_wait_fd) {
-		close (client->graph_wait_fd);
-	}
-
-	if (client->graph_next_fd) {
-		close (client->graph_next_fd);
-	}
-
-	close (client->event_fd);
-	close (client->request_fd);
-
-	free (client->pollfd);
-	free (client);
-
+	jack_client_free (client);
+	
 	return 0;
 }	
-
-int
-jack_load_client (const char *client_name, const char *path_to_so)
-{
-	int fd;
-	jack_client_connect_request_t req;
-	jack_client_connect_result_t res;
-
-	if ((fd = server_connect (0)) < 0) {
-		jack_error ("cannot connect to jack server");
-		return 0;
-	}
-
-	req.type = ClientDynamic;
-
-	strncpy (req.name, client_name, sizeof (req.name) - 1);
-	req.name[sizeof(req.name)-1] = '\0';
-	strncpy (req.object_path, path_to_so, sizeof (req.name) - 1);
-	req.object_path[sizeof(req.object_path)-1] = '\0';
-	
-	if (write (fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send request to jack server (%s)", strerror (errno));
-		close (fd);
-		return 0;
-	}
-
-	if (read (fd, &res, sizeof (res)) != sizeof (res)) {
-		jack_error ("cannot read response from jack server (%s)", strerror (errno));
-		close (fd);
-		return 0;
-	}
-
-	close (fd);
-	return res.status;
-}
-
-jack_client_t *
-jack_driver_become_client (const char *client_name)
-{
-	int fd;
-	jack_client_connect_request_t req;
-	jack_client_connect_result_t res;
-	jack_client_t *client = 0;
-	int port_segment_shm_id;
-	jack_port_segment_info_t *si;
-	void *addr;
-
-	if ((fd = server_connect (0)) < 0) {
-		jack_error ("cannot connect to jack server");
-		return 0;
-	}
-
-	req.type = ClientDriver;
-	strncpy (req.name, client_name, sizeof (req.name) - 1);
-	req.name[sizeof(req.name)-1] = '\0';
-
-	if (write (fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send request to jack server (%s)", strerror (errno));
-		close (fd);
-		return 0;
-	}
-
-	if (read (fd, &res, sizeof (res)) != sizeof (res)) {
-		jack_error ("cannot read response from jack server (%s)", strerror (errno));
-		close (fd);
-		return 0;
-	}
-
-	if (res.status) {
-		return 0;
-	}
-
-	client = jack_client_alloc ();
-
-	client->request_fd = fd;
-	client->control = res.client_control;
-	client->engine = res.engine_control;
-
-	/* Lookup, attach and register the port/buffer segments in use
-	   right now.
-	*/
-
-	if ((port_segment_shm_id = shmget (res.port_segment_key, 0, 0)) < 0) {
-		jack_error ("cannot determine shared memory segment for port segment key 0x%x (%s)", res.port_segment_key, strerror (errno));
-		return NULL;
-	}
-
-	if ((addr = shmat (port_segment_shm_id, 0, 0)) == (void *) -1) {
-		jack_error ("cannot attached port segment shared memory (%s)", strerror (errno));
-		return NULL;
-	}
-
-	si = (jack_port_segment_info_t *) malloc (sizeof (jack_port_segment_info_t));
-	si->shm_key = res.port_segment_key;
-	si->address = addr;
-	
-	/* the first chunk of the first port segment is always set by the engine
-	   to be a conveniently-sized, zero-filled lump of memory.
-	*/
-
-	if (client->port_segments == NULL) {
-		jack_zero_filled_buffer = si->address;
-	}
-
-	client->port_segments = jack_slist_prepend (client->port_segments, si);
-
-	/* allow the engine to act on the client's behalf
-	   when dealing with in-process clients.
-	*/
-
-	client->control->private_internal_client = client;
-
-	return client;
-}
 
 unsigned long jack_get_buffer_size (jack_client_t *client)
 
@@ -1183,11 +1198,11 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control
 	port->shared->tied = NULL;
 
 	si = NULL;
-
+	
 	for (node = client->port_segments; node; node = jack_slist_next (node)) {
-
+		
 		si = (jack_port_segment_info_t *) node->data;
-
+		
 		if (si->shm_key == port->shared->shm_key) {
 			break;
 		}
@@ -1197,9 +1212,9 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control
 		jack_error ("cannot find port segment to match newly registered port\n");
 		return NULL;
 	}
-
+	
 	port->client_segment_base = si->address;
-
+	
 	return port;
 }
 
@@ -1221,22 +1236,12 @@ jack_port_register (jack_client_t *client,
 	strcat ((char *) req.x.port_info.name, ":");
 	strcat ((char *) req.x.port_info.name, port_name);
 
-	strncpy (req.x.port_info.type, port_type, sizeof (req.x.port_info.type) - 1);
+	snprintf (req.x.port_info.type, sizeof (req.x.port_info.type), "%s", port_type);
 	req.x.port_info.flags = flags;
 	req.x.port_info.buffer_size = buffer_size;
 	req.x.port_info.client_id = client->control->id;
 
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send port registration request to server");
-		return 0;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read port registration result from server");
-		return 0;
-	}
-	
-	if (req.status != 0) {
+	if (deliver_request (client, &req)) {
 		return NULL;
 	}
 
@@ -1283,17 +1288,7 @@ jack_port_unregister (jack_client_t *client, jack_port_t *port)
 	req.x.port_info.port_id = port->shared->id;
 	req.x.port_info.client_id = client->control->id;
 
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send port registration request to server");
-		return -1;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read port registration result from server");
-		return -1;
-	}
-	
-	return req.status;
+	return deliver_request (client, &req);
 }
 
 int 
@@ -1304,28 +1299,10 @@ jack_connect (jack_client_t *client, const char *source_port, const char *destin
 
 	req.type = ConnectPorts;
 
-	strncpy (req.x.connect.source_port, source_port, sizeof (req.x.connect.source_port) - 1);
-	req.x.connect.source_port[sizeof(req.x.connect.source_port) - 1] = '\0';
-	strncpy (req.x.connect.destination_port, destination_port, sizeof (req.x.connect.destination_port) - 1);
-	req.x.connect.destination_port[sizeof(req.x.connect.destination_port) - 1] = '\0';
+	snprintf (req.x.connect.source_port, sizeof (req.x.connect.source_port), "%s", source_port);
+	snprintf (req.x.connect.destination_port, sizeof (req.x.connect.destination_port), "%s", destination_port);
 
-	DEBUG ("writing to request_fd");
-
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send port connection request to server");
-		return -1;
-	}
-
-	DEBUG ("reading from request_fd");
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read port connection result from server");
-		return -1;
-	}
-
-	DEBUG ("connected: %d", req.status);
-
-	return req.status;
+	return deliver_request (client, &req);
 }
 
 int
@@ -1345,17 +1322,7 @@ jack_port_disconnect (jack_client_t *client, jack_port_t *port)
 	req.type = DisconnectPort;
 	req.x.port_info.port_id = port->shared->id;
 
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send port disconnect request to server");
-		return -1;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read port disconnect result from server");
-		return -1;
-	}
-	
-	return req.status;
+	return deliver_request (client, &req);
 }
 
 int 
@@ -1365,22 +1332,10 @@ jack_disconnect (jack_client_t *client, const char *source_port, const char *des
 
 	req.type = DisconnectPorts;
 
-	strncpy (req.x.connect.source_port, source_port, sizeof (req.x.connect.source_port) - 1);
-	req.x.connect.source_port[sizeof(req.x.connect.source_port) - 1] = '\0';
-	strncpy (req.x.connect.destination_port, destination_port, sizeof (req.x.connect.destination_port) - 1);
-	req.x.connect.destination_port[sizeof(req.x.connect.destination_port) - 1] = '\0';
-
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send port connection request to server");
-		return -1;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read port connection result from server");
-		return -1;
-	}
+	snprintf (req.x.connect.source_port, sizeof (req.x.connect.source_port), "%s", source_port);
+	snprintf (req.x.connect.destination_port, sizeof (req.x.connect.destination_port), "%s", destination_port);
 	
-	return req.status;
+	return deliver_request (client, &req);
 }
 
 int
@@ -1392,17 +1347,7 @@ jack_engine_takeover_timebase (jack_client_t *client)
 	req.type = SetTimeBaseClient;
 	req.x.client_id = client->control->id;
 
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send set time base request to server");
-		return -1;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read set time base result from server");
-		return -1;
-	}
-	
-	return req.status;
+	return deliver_request (client, &req);
 }	
 
 void
@@ -1544,7 +1489,6 @@ jack_set_process_callback (jack_client_t *client, JackProcessCallback callback, 
 
 int
 jack_set_buffer_size_callback (jack_client_t *client, JackBufferSizeCallback callback, void *arg)
-
 {
 
 	jack_error("\n*** libjack: WARNING! Use of function jack_set_buffer_size_callback() is deprecated! ***\n\n");
@@ -1553,7 +1497,6 @@ jack_set_buffer_size_callback (jack_client_t *client, JackBufferSizeCallback cal
 
 int
 jack_set_sample_rate_callback (jack_client_t *client, JackSampleRateCallback callback, void *arg)
-
 {
 	if (client->control->active) {
 		jack_error ("You cannot set callbacks on an active client.");
@@ -1992,17 +1935,9 @@ jack_port_get_all_connections (const jack_client_t *client, const jack_port_t *p
 	req.x.port_info.client_id = 0;
 	req.x.port_info.port_id = port->shared->id;
 
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send port connections request to server");
-		return 0;
-	}
+	deliver_request (client, &req);
 
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read port connections result from server");
-		return 0;
-	}
-	
-	if (req.x.nports == 0) {
+	if (req.status != 0 || req.x.nports == 0) {
 		return NULL;
 	}
 
@@ -2126,18 +2061,8 @@ jack_add_alias (jack_client_t *client, const char *portname, const char *alias)
 	req.type = AddAlias;
 	snprintf (req.x.alias.port, sizeof (req.x.alias.port), "%s", portname);
 	snprintf (req.x.alias.alias, sizeof (req.x.alias.alias), "%s", alias);
-
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send add alias request to server");
-		return -1;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read add alias result from server (%s)", strerror (errno));
-		return -1;
-	}
-
-	return req.status;
+	
+	return deliver_request (client, &req);
 }
 
 int
@@ -2147,19 +2072,8 @@ jack_remove_alias (jack_client_t *client, const char *alias)
 	
 	req.type = RemoveAlias;
 	snprintf (req.x.alias.alias, sizeof (req.x.alias.alias), "%s", alias);
-
-
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send remove alias request to server");
-		return -1;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot remove alias result from server (%s)", strerror (errno));
-		return -1;
-	}
-
-	return req.status;
+	
+	return deliver_request (client, &req);
 }
 
 pthread_t

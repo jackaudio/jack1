@@ -1,3 +1,11 @@
+2003-02-23  Paul Davis  <paul>
+
+	* client.c: 
+		 
+		added deliver_request().
+		removed all use of strncpy().
+		changed ClientDynamic to ClientInProcess.
+
 2003-02-10  Taybin Rutkin <trutkin@physics.clarku.edu>
 
 	* client.c (jack_client_new): Checks jack_protocol_version returned

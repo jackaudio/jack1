@@ -24,7 +24,9 @@ dist-check-sndfile:
 	@false
 endif
 
-bin_PROGRAMS = jack_simple_client \
+bin_PROGRAMS = jack_load \
+	       jack_unload \
+	       jack_simple_client \
 	       jack_monitor_client \
 	       jack_impulse_grabber \
 	       jack_connect \
@@ -86,5 +88,28 @@ endif
 jack_impulse_grabber_SOURCES = impulse_grabber.c
 jack_impulse_grabber_LDFLAGS = -ldl -lpthread -lm
 jack_impulse_grabber_LDADD = ../libjack/libjack.la
+
+#
+# general purpose in-process loader
+#
+
+jack_load_SOURCES = ipload.c
+jack_load_LDFLAGS = -ldl -lpthread -lm
+jack_load_LDADD = ../libjack/libjack.la
+
+jack_unload_SOURCES = ipunload.c
+jack_unload_LDFLAGS = -ldl -lpthread -lm
+jack_unload_LDADD = ../libjack/libjack.la
+
+#
+# sample in-process client(s)
+#
+
+ip_clientdir = $(ADDON_DIR)
+
+ip_client_LTLIBRARIES = inprocess.la
+
+inprocess_la_LDFLAGS = -module -avoid-version
+inprocess_la_SOURCES = inprocess.c
 
 dist-hook: dist-check-fltk dist-check-sndfile

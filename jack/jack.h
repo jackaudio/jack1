@@ -40,22 +40,28 @@ extern "C" {
  */
 jack_client_t *jack_client_new (const char *client_name);
 
+/**
+ * Disconnects an out-of-process client from a JACK server.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+int jack_client_close (jack_client_t *client);
 
 /**
  * @param client_name The name for the new client
  * @param so_name A path to a shared object file containing the code for the new client 
  * @param so_data An arbitary string containing information to be passed to the init() routine of the new client
  *
- * Attemps to create an in-process client of the Jack server.
+ * Attemps to load an in-process client into the Jack server.
  */
-jack_client_t *jack_client_new_inprocess (const char *client_name, const char *so_name, const char *so_data);
+int jack_inprocess_client_new (const char *client_name, const char *so_name, const char *so_data);
 
 /**
- * Disconnects from Jack server.
+ * Removes an in-process client from a JACK server.
  *
  * @return 0 on success, otherwise a non-zero error code
  */
-int jack_client_close (jack_client_t *client);
+void jack_inprocess_client_close (const char *client_name);
 
 /** 
  * @param client The Jack client structure.

@@ -60,87 +60,88 @@ typedef struct {
     char **argv;
 } waiter_arg_t;
 
-#define ILOWER 0
-#define IRANGE 3000
-int wait_times[IRANGE];
-int unders = 0;
-int overs = 0;
-int max_over = 0;
-int min_under = INT_MAX;
-
-#define WRANGE 3000
-int work_times[WRANGE];
-int work_overs = 0;
-int work_max = 0;
-
-void
-store_work_time (int howlong)
-{
-	if (howlong < WRANGE) {
-		work_times[howlong]++;
-	} else {
-		work_overs++;
-	}
-
-	if (work_max < howlong) {
-		work_max = howlong;
-	}
-}
-
-void
-show_work_times ()
-{
-	int i;
-	for (i = 0; i < WRANGE; ++i) {
-		printf ("%d %d\n", i, work_times[i]);
-	}
-	printf ("work overs = %d\nmax = %d\n", work_overs, work_max);
-}
-
-void
-store_wait_time (int interval)
-{
-	if (interval < ILOWER) {
-		unders++;
-	} else if (interval >= ILOWER + IRANGE) {
-		overs++;
-	} else {
-		wait_times[interval-ILOWER]++;
-	}
-
-	if (interval > max_over) {
-		max_over = interval;
-	}
-
-	if (interval < min_under) {
-		min_under = interval;
-	}
-}
-
-void
-show_wait_times ()
-{
-	int i;
-
-	for (i = 0; i < IRANGE; i++) {
-		printf ("%d %d\n", i+ILOWER, wait_times[i]);
-	}
-
-	printf ("unders: %d\novers: %d\n", unders, overs);
-	printf ("max: %d\nmin: %d\n", max_over, min_under);
-}	
-
 static void
 signal_handler (int sig)
 {
+	/* this is used by the parent (waiter) process */
+
 	fprintf (stderr, "jackd: signal %d received\n", sig);
 	kill (jackd_pid, SIGTERM);
 }
 
-static void
-posix_me_harder (void)
-
+static void 
+do_nothing_handler (int sig)
 {
+	/* this is used by the child (active) process, but it never 
+	   gets called unless we are already shutting down
+	   after another signal.
+	*/
+
+	char buf[32];
+	snprintf (buf, sizeof(buf), "received signal %d during shutdown (ignored)\n", sig);
+	write (1, buf, strlen (buf));
+}
+
+static void *
+jack_engine_waiter_thread (void *arg)
+{
+	waiter_arg_t *warg = (waiter_arg_t *) arg;
+
+	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
+	if ((engine = jack_engine_new (realtime, realtime_priority, verbose)) == 0) {
+		fprintf (stderr, "cannot create engine\n");
+		kill (warg->pid, SIGTERM);
+		return 0;
+	}
+
+	if (warg->argc) {
+
+		fprintf (stderr, "loading driver ..\n");
+		
+		if (jack_engine_load_driver (engine, warg->argc, warg->argv)) {
+			fprintf (stderr, "cannot load driver module %s\n", warg->argv[0]);
+			kill (warg->pid, SIGTERM);
+			return 0;
+		}
+
+	} else {
+
+		fprintf (stderr, "No driver specified ... hmm. JACK won't do anything when run like this.\n");
+	}
+
+	if (asio_mode) {
+		jack_set_asio_mode (engine, TRUE);
+	} 
+
+	fprintf (stderr, "starting engine\n");
+
+	if (jack_run (engine)) {
+		fprintf (stderr, "cannot start main JACK thread\n");
+		kill (warg->pid, SIGTERM);
+		return 0;
+	}
+
+	jack_wait (engine);
+
+	fprintf (stderr, "telling signal thread that the engine is done\n");
+	kill (warg->pid, SIGHUP);
+
+	return 0; /* nobody cares what this returns */
+}
+
+static void
+jack_main (int argc, char **argv)
+{
+	int sig;
+	int i;
+	pthread_t waiter_thread;
+	waiter_arg_t warg;
+	sigset_t allsignals;
+	struct sigaction action;
+
+	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
 	/* what's this for?
 
 	   POSIX says that signals are delivered like this:
@@ -182,80 +183,11 @@ posix_me_harder (void)
 	sigaddset(&signals, SIGPIPE);
 	sigaddset(&signals, SIGTERM);
 	sigaddset(&signals, SIGUSR1);
-
-	/* this can make debugging a pain, but it also makes
-	   segv-exits cleanup_files after themselves rather than
-	   leaving the audio thread active. i still
-	   find it truly wierd that _exit() or whatever is done
-	   by the default SIGSEGV handler does not
-	   cancel all threads in a process, but what
-	   else can we do?
-	*/
-
 	sigaddset(&signals, SIGSEGV);
 
-	/* all child threads will inherit this mask */
+	/* all child threads will inherit this mask unless they explicitly reset it */
 
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
-}
-
-static void *
-jack_engine_waiter_thread (void *arg)
-{
-	waiter_arg_t *warg = (waiter_arg_t *) arg;
-	jack_driver_t *driver;
-
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-	if ((engine = jack_engine_new (realtime, realtime_priority, verbose)) == 0) {
-		fprintf (stderr, "cannot create engine\n");
-		kill (warg->pid, SIGTERM);
-		return 0;
-	}
-
-	if (warg->argc) {
-
-		fprintf (stderr, "loading driver ..\n");
-		
-		if ((driver = jack_driver_load (warg->argc, warg->argv)) == 0) {
-			fprintf (stderr, "cannot load driver module %s\n", warg->argv[0]);
-			kill (warg->pid, SIGTERM);
-			return 0;
-		}
-
-		jack_use_driver (engine, driver);
-	}
-
-	if (asio_mode) {
-		jack_set_asio_mode (engine, TRUE);
-	} 
-
-	fprintf (stderr, "starting engine\n");
-
-	if (jack_run (engine)) {
-		fprintf (stderr, "cannot start main JACK thread\n");
-		kill (warg->pid, SIGTERM);
-		return 0;
-	}
-
-	jack_wait (engine);
-
-	fprintf (stderr, "telling signal thread that the engine is done\n");
-	kill (warg->pid, SIGHUP);
-
-	return 0; /* nobody cares what this returns */
-}
-
-static void
-jack_main (int argc, char **argv)
-{
-	int sig;
-	pthread_t waiter_thread;
-	waiter_arg_t warg;
-
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-	posix_me_harder ();
 	
 	/* what we'd really like to do here is to be able to 
 	   wait for either the engine to stop or a POSIX signal,
@@ -283,13 +215,23 @@ jack_main (int argc, char **argv)
 		return;
 	}
 
-	/* Note: normal operation has with_fork == 1 */
+	/* install a do-nothing handler because otherwise
+	   pthreads behaviour is undefined when we enter
+	   sigwait.
+	*/
+	
+	sigfillset (&allsignals);
 
-	if (with_fork) {
-		/* let the parent handle SIGINT */
-		sigdelset (&signals, SIGINT);
+	action.sa_handler = do_nothing_handler;
+	action.sa_mask = allsignals;
+	action.sa_flags = SA_RESTART|SA_RESETHAND;
+
+	for (i = 0; i < NSIG; i++) {
+		if (sigismember (&signals, i)) {
+			sigaction (i, &action, 0);
+		} 
 	}
-
+	
 	if (verbose) {
 		fprintf (stderr, "%d waiting for signals\n", getpid());
 	}
@@ -297,7 +239,7 @@ jack_main (int argc, char **argv)
 	while(1) {
 		sigwait (&signals, &sig);
 
-		printf ("jack main caught signal %d\n", sig);
+		fprintf (stderr, "jack main caught signal %d\n", sig);
 		
 		if (sig == SIGUSR1) {
 			jack_dump_configuration(engine, 1);
@@ -306,6 +248,16 @@ jack_main (int argc, char **argv)
 			break;
 		}
 	} 
+
+	if (sig != SIGSEGV) {
+
+	/* unblock signals so we can see them during shutdown.
+		   this will help prod developers not to lose sight
+		   of bugs that cause segfaults etc. during shutdown.
+		*/
+
+		sigprocmask (SIG_UNBLOCK, &signals, 0);
+	}
 
 	pthread_cancel (waiter_thread);
 	jack_engine_delete (engine);
