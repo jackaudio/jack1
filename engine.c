@@ -1745,15 +1745,15 @@ jack_trace_terminal (jack_client_internal_t *c1, jack_client_internal_t *rbase)
 
 		if (g_slist_find (rbase->fed_by, c2) == NULL) {
 			rbase->fed_by = g_slist_prepend (rbase->fed_by, c2);
-		}
 
-		if (c2 != rbase && c2 != c1) {
+			if (c2 != rbase && c2 != c1) {
 
-			/* now recurse, so that we can mark base as being fed by
-			   all routes that feed c2
-			*/
+				/* now recurse, so that we can mark base as being fed by
+				   all routes that feed c2
+				*/
 
-			jack_trace_terminal (c2, rbase);
+				jack_trace_terminal (c2, rbase);
+			}
 		}
 
 	}
