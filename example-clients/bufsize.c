@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 
 	rc = jack_set_buffer_size(client, nframes);
 	if (rc)
-		fprintf(stderr, "jack_set_buffer_size() returns %d\n", rc);
+		fprintf(stderr, "jack_set_buffer_size(): %s\n", strerror(rc));
 
 	jack_client_close(client);
 

@@ -298,6 +298,7 @@ jack_cleanup_files ()
 	closedir (dir);
 }
 
+// JOQ: this should have a return code...
 static void
 jack_resize_port_segment (jack_engine_t *engine,
 			  jack_port_type_info_t *port_type,
@@ -370,8 +371,8 @@ jack_resize_port_segment (jack_engine_t *engine,
 		pthread_mutex_unlock (&pti->buffer_lock);
 
 	} else {
-		/* resize existing buffer segment */
 
+		/* resize existing buffer segment */
 		if ((addr = jack_resize_shm (port_type->shm_info.shm_name,
 					     size, perm, 0666,
 					     PROT_READ|PROT_WRITE))
@@ -409,6 +410,14 @@ jack_resize_port_segment (jack_engine_t *engine,
 
 	port_type->shm_info.size = size;
 	engine->port_type[ptid].seg_addr = addr;
+
+	if (engine->control->real_time) {
+		int rc = mlock (addr, size);
+		if (rc < 0) {
+			jack_error("JACK: unable to mlock() port buffers: "
+				   "%s", strerror(errno));
+		}
+	}
 
 	/* Tell everybody about this segment. */
 	event.type = AttachPortSegment;
@@ -494,7 +503,6 @@ jack_set_buffer_size_request (jack_engine_t *engine, jack_nframes_t nframes)
 		return EIO;
 	}
 
-#if USE_POSIX_SHM
 	rc = driver->bufsize(driver, nframes);
 	if (rc == 0)
 		engine->rolling_interval =
@@ -502,10 +510,6 @@ jack_set_buffer_size_request (jack_engine_t *engine, jack_nframes_t nframes)
 	else
 		jack_error("driver does not support %" PRIu32
 			   "-frame buffers", nframes);
-#else
-	/* jack_resize_shm() not implemented for SysV shm */
-	rc = ENOSYS;			/* function not implemented */
-#endif
 
 	if (driver->start (driver)) {
 		jack_error ("cannot restart driver after setting buffer size");

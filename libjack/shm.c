@@ -37,11 +37,8 @@
 
 typedef struct {
     shm_name_t name;
-#ifdef USE_POSIX_SHM
     char *address;
-#else
-    int  shmid;
-#endif
+    int  shmid;				/* only needed for SysV shm */
 } jack_shm_registry_entry_t;
 
 static jack_shm_registry_entry_t *jack_shm_registry;
@@ -51,14 +48,27 @@ void
 jack_register_shm (char *shm_name, char *addr, int id)
 {
 	if (jack_shm_id_cnt < MAX_SHM_ID) {
-		snprintf (jack_shm_registry[jack_shm_id_cnt++].name,
-			  sizeof (shm_name_t), "%s", shm_name);
-#ifdef USE_POSIX_SHM
-		jack_shm_registry[jack_shm_id_cnt].address = addr;
-#else
-		jack_shm_registry[jack_shm_id_cnt].shmid = id;
-#endif
+		int entry = jack_shm_id_cnt++;
+		strncpy (jack_shm_registry[entry].name, shm_name,
+			 sizeof (shm_name_t));
+		jack_shm_registry[entry].address = addr;
+		jack_shm_registry[entry].shmid = id;
 	}
+}
+
+static inline int
+jack_lookup_shm (const char *shm_name)
+{
+	/***** NOT THREAD SAFE *****/
+
+	int i;
+
+	for (i = 0; i < jack_shm_id_cnt; ++i) {
+		if (strcmp (jack_shm_registry[i].name, shm_name) == 0) {
+			return i;
+		}
+	}
+	return -1;			/* not found */
 }
 
 int
@@ -209,26 +219,17 @@ char *
 jack_resize_shm (const char *shm_name, size_t size, int perm, int mode,
 		 int prot)
 {
-	int i;
+	int entry;
 	int shm_fd;
 	char *addr;
 	struct stat statbuf;
 
-	for (i = 0; i < jack_shm_id_cnt; ++i) {
-		if (strcmp (jack_shm_registry[i].name, shm_name) == 0) {
-			break;
-		}
-	}
-
-	if (i == jack_shm_id_cnt) {
+	if ((entry = jack_lookup_shm (shm_name)) < 0) {
 		jack_error ("attempt to resize unknown shm segment \"%s\"",
 			    shm_name);
 		return MAP_FAILED;
 	}
 
-	// JOQ: this does not work reliably for me.  After a few
-	// resize operations, the open starts failing.  Maybe my
-	// system is running out of some tmpfs resource?
 	if ((shm_fd = shm_open (shm_name, perm, mode)) < 0) {
 		jack_error ("cannot create shm segment %s (%s)", shm_name,
 			    strerror (errno));
@@ -237,7 +238,7 @@ jack_resize_shm (const char *shm_name, size_t size, int perm, int mode,
 
 	fstat (shm_fd, &statbuf);
 	
-	munmap (jack_shm_registry[i].address, statbuf.st_size);
+	munmap (jack_shm_registry[entry].address, statbuf.st_size);
 
 	if (perm & O_CREAT) {
 		if (ftruncate (shm_fd, size) < 0) {
@@ -262,29 +263,30 @@ jack_resize_shm (const char *shm_name, size_t size, int perm, int mode,
 
 #else /* USE_POSIX_SHM */
 
-int
-jack_get_shmid (const char *name)
+char
+jack_hash_shm (jack_shmsize_t size)
 {
-	int i;
+	char log2size = 0;		/* log2 of size */
 
-	/* **** NOT THREAD SAFE *****/
+	if (size == 0)
+		return log2size;	/* don't loop forever */
 
-	for (i = 0; i < jack_shm_id_cnt; ++i) {
-		if (strcmp (jack_shm_registry[i].name, name) == 0) {
-			return jack_shm_registry[i].shmid;
-		}
+	/* remove low-order zeroes, counting them */
+	while ((size & 1) == 0) {
+		++log2size;
+		size >>= 1;
 	}
-	return -1;
+
+	return (char) ((size + log2size) & 0x7f);
 }
 
 void
 jack_destroy_shm (const char *shm_name)
 {
-	int shmid = jack_get_shmid (shm_name);
+	int i = jack_lookup_shm (shm_name);
 
-	if (shmid >= 0) {
-		shmctl (IPC_RMID, shmid, NULL);
-	}
+	if (i >= 0)
+		shmctl (IPC_RMID, jack_shm_registry[i].shmid, NULL);
 }
 
 void
@@ -305,10 +307,7 @@ jack_get_shm (const char *shm_name, size_t size, int perm, int mode,
 	int status;
 
 	/* note: no trailing '/' on basic path because we expect shm_name to
-	   begin with one (as per POSIX shm API).
-	*/
-
-	
+	   begin with one (as per POSIX shm API). */
 	snprintf (path, sizeof(path), "%s/jack", jack_server_dir);
 	if (mkdir (path, 0775)) {
 		if (errno != EEXIST) {
@@ -340,7 +339,11 @@ jack_get_shm (const char *shm_name, size_t size, int perm, int mode,
 		close (fd);
 	}
 
-	if ((key = ftok (path, 'j')) < 0) {
+	/* Hash the shm size to distinguish differently-sized segments
+	 * with the same path name.  This allows jack_resize_shm() to
+	 * allocate a new segment when the size changes with the same
+	 * name but a different shmid. */
+	if ((key = ftok (path, jack_hash_shm(size))) < 0) {
 		jack_error ("cannot generate IPC key for shm segment %s (%s)",
 			    path, strerror (errno));
 		unlink (path);
@@ -397,9 +400,25 @@ char *
 jack_resize_shm (const char *shm_name, size_t size, int perm, int mode,
 		 int prot)
 {
-	jack_error ("jack_resize_shm() is not implemented for the System V "
-		    "shared memory API");
-	return 0;
+	int entry = jack_lookup_shm (shm_name);
+
+	if (entry < 0) {
+		jack_error ("attempt to resize unknown shm segment \"%s\"",
+			    shm_name);
+		return MAP_FAILED;
+	}
+
+	/* There is no way to resize a System V shm segment.  So, we
+	 * delete it and allocate a new one.  This is tricky, because
+	 * the old segment will not disappear until all the clients
+	 * have released it. */
+	jack_destroy_shm (shm_name);
+	jack_release_shm (jack_shm_registry[entry].address, size);
+	jack_shm_registry[entry].address =
+		jack_get_shm (shm_name, size, perm, mode, prot,
+			      &jack_shm_registry[entry].shmid);
+
+	return jack_shm_registry[entry].address;
 }
 
 #endif /* USE_POSIX_SHM */

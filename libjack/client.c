@@ -473,6 +473,13 @@ jack_attach_port_segment (jack_client_t *client, shm_name_t shm_name,
 		abort();
 	}
 
+	/* release any previous segment */
+	if (client->port_segment[ptid].size) {
+		jack_release_shm (client->port_segment[ptid].address,
+				  client->port_segment[ptid].size);
+		client->port_segment[ptid].size = 0;
+	}
+
 	if ((addr = jack_get_shm (shm_name, size, O_RDWR, 0,
 				  (PROT_READ|PROT_WRITE),
 				  &shmid)) == MAP_FAILED) {
