@@ -145,10 +145,20 @@ Number of capture channels.  Default is maximum supported by hardware.
 .TP
 \fB\-n, \-\-nperiods \fIint\fR
 .br
-Specify the number of periods in the hardware buffer.  The default is
-2.  The period size (\fB\-p\fR) times \fB\-\-nperiods\fR times four is
-the JACK buffer size in bytes.  The JACK output latency in seconds is
-\fB\-\-nperiods\fR times \fB\-\-period\fR divided by \fB\-\-rate\fR.
+Specify the number of periods of playback latency.  In seconds, this
+corresponds to \fB\-\-nperiods\fR times \fB\-\-period\fR divided by
+\fB\-\-rate\fR.  The default is 2, the minimum allowable.  For most
+devices, there is no need for any other value with the
+\fB\-\-realtime\fR option.  Without realtime privileges or with boards
+providing unreliable interrupts (like ymfpci), a larger value may
+yield fewer xruns.  This can also help if the system is not tuned for
+reliable realtime scheduling.
+
+For most ALSA devices, the hardware buffer has exactly
+\fB\-\-period\fR times \fB\-\-nperiods\fR frames.  Some devices demand
+a larger buffer.  If so, JACK will use the smallest possible buffer
+containing at least \fB\-\-nperiods\fR, but the playback latency does
+not increase.
 .TP
 \fB\-o, \-\-outchannels \fIint\fR
 .br
@@ -163,7 +173,7 @@ playback device name.
 Specify the number of frames between JACK \fBprocess()\fR calls.  The
 default is 1024.  If you need low latency, set \fB\-p\fR as low as you
 can go without seeing xruns.  A larger period size yields higher
-latency, but makes xruns less likely.  The JACK input latency in
+latency, but makes xruns less likely.  The JACK capture latency in
 seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
 .TP
 \fB\-r, \-\-rate \fIint\fR
@@ -221,10 +231,10 @@ Specify number of playback ports. The default value is 2.
 Specify sample rate. The default value is 48000.
 .TP
 \fB\-p, \-\-period \fIint\fR
-Specify number of frames per period. THe default value is 1024.
+Specify number of frames per period. The default value is 1024.
 If you need low latency, set \fB\-p\fR as low as you
 can go without seeing xruns.  A larger period size yields higher
-latency, but makes xruns less likely.  The JACK input latency in
+latency, but makes xruns less likely.  The JACK capture latency in
 seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
 .TP
 \fB\-w, \-\-wait \fIint\fR 
@@ -239,7 +249,7 @@ Specify the sample rate.  The default is 48000.
 Specify number of frames between JACK \fBprocess()\fR calls.  The
 default is 1024.  If you need low latency, set \fB\-p\fR as low as you
 can go without seeing xruns.  A larger period size yields higher
-latency, but makes xruns less likely.  The JACK input latency in
+latency, but makes xruns less likely.  The JACK capture latency in
 seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
 .TP
 \fB\-n, \-\-nperiods \fIint\fR
@@ -324,7 +334,7 @@ system for low latency can be challenging.  The JACK FAQ,
 .I http://jackit.sourceforge.net/docs/faq.php\fR
 has some useful suggestions.
 .IP
-\fBjackstart \-Rv \-d alsa \-p 128 \-n 3 \-r 44100\fR
+\fBjackstart \-Rv \-d alsa \-p 128 \-n 2 \-r 44100\fR
 .PP
 Run \fBjackd\fR with realtime priority using the "sblive" ALSA device
 defined in ~/.asoundrc.  Apply shaped dithering to playback audio.

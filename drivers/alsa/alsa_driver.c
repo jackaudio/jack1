@@ -325,6 +325,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			      snd_pcm_t *handle, 
 			      snd_pcm_hw_params_t *hw_params, 
 			      snd_pcm_sw_params_t *sw_params, 
+			      unsigned int *nperiodsp,
 			      unsigned long *nchns,unsigned long sample_width)
 {
 	int err, format;
@@ -436,13 +437,23 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		return -1;
 	}
 
-	if ((err = snd_pcm_hw_params_set_periods (handle, hw_params,
-						  driver->user_nperiods, 0))
+	*nperiodsp = driver->user_nperiods;
+	snd_pcm_hw_params_set_periods_min (handle, hw_params, nperiodsp, NULL);
+	*nperiodsp = driver->user_nperiods;
+	if ((*nperiodsp = snd_pcm_hw_params_set_periods_near (handle, hw_params,
+							      *nperiodsp, NULL))
 	    < 0) {
 		jack_error ("ALSA: cannot set number of periods to %u for %s",
-			    driver->user_nperiods, stream_name);
+			    *nperiodsp, stream_name);
 		return -1;
 	}
+
+	if (*nperiodsp < driver->user_nperiods) {
+		jack_error ("ALSA: got smaller periods %u than %u for %s",
+			    *nperiodsp, (unsigned int)driver->user_nperiods, stream_name);
+		return -1;
+	}
+	fprintf(stderr, "nperiods = %d for %s\n", *nperiodsp, stream_name);
 	
 	if (!jack_power_of_two(driver->frames_per_cycle)) {
 		jack_error("JACK: frames must be a power of two "
@@ -451,12 +462,12 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 	}
 
 	if ((err = snd_pcm_hw_params_set_buffer_size (handle, hw_params,
-						      driver->user_nperiods *
+						      *nperiodsp *
 						      driver->frames_per_cycle))
 	    < 0) {
 		jack_error ("ALSA: cannot set buffer length to %" PRIu32
 			    " for %s",
-			    driver->user_nperiods * driver->frames_per_cycle,
+			    *nperiodsp * driver->frames_per_cycle,
 			    stream_name);
 		return -1;
 	}
@@ -475,7 +486,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		return -1;
 	}
 
-	stop_th = driver->user_nperiods * driver->frames_per_cycle;
+	stop_th = *nperiodsp * driver->frames_per_cycle;
 	if (driver->soft_mode) {
 		stop_th = (snd_pcm_uframes_t)-1;
 	}
@@ -496,20 +507,27 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 
 #if 0
 	fprintf (stderr, "set silence size to %lu * %lu = %lu\n",
-		 driver->frames_per_cycle, driver->user_nperiods,
-		 driver->frames_per_cycle * driver->user_nperiods);
+		 driver->frames_per_cycle, *nperiodsp,
+		 driver->frames_per_cycle * *nperiodsp);
 
 	if ((err = snd_pcm_sw_params_set_silence_size (
 		     handle, sw_params,
-		     driver->frames_per_cycle * driver->user_nperiods)) < 0) {
+		     driver->frames_per_cycle * *nperiodsp)) < 0) {
 		jack_error ("ALSA: cannot set silence size for %s",
 			    stream_name);
 		return -1;
 	}
 #endif
 
-	if ((err = snd_pcm_sw_params_set_avail_min (
-		     handle, sw_params, driver->frames_per_cycle)) < 0) {
+	if (handle == driver->playback_handle)
+		err = snd_pcm_sw_params_set_avail_min (
+			handle, sw_params,
+			driver->frames_per_cycle * (*nperiodsp - driver->user_nperiods + 1));
+	else
+		err = snd_pcm_sw_params_set_avail_min (
+			handle, sw_params, driver->frames_per_cycle);
+			
+	if (err < 0) {
 		jack_error ("ALSA: cannot set avail min for %s", stream_name);
 		return -1;
 	}
@@ -532,8 +550,6 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	int dir;
 	unsigned int p_period_size = 0;
 	unsigned int c_period_size = 0;
-	unsigned int p_nfragments = 0;
-	unsigned int c_nfragments = 0;
 	channel_t chn;
 	unsigned int pr = 0;
 	unsigned int cr = 0;
@@ -554,6 +570,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 			    driver->capture_handle,
 			    driver->capture_hw_params,
 			    driver->capture_sw_params,
+			    &driver->capture_nperiods,
 			    &driver->capture_nchannels,
 			    driver->capture_sample_bytes)) {
 			jack_error ("ALSA: cannot configure capture channel");
@@ -569,6 +586,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 			    driver->playback_handle,
 			    driver->playback_hw_params,
 			    driver->playback_sw_params,
+			    &driver->playback_nperiods,
 			    &driver->playback_nchannels,
 			    driver->playback_sample_bytes)) {
 			jack_error ("ALSA: cannot configure playback channel");
@@ -623,9 +641,6 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 		p_period_size =
 			snd_pcm_hw_params_get_period_size (
 				driver->playback_hw_params, &dir);
-		p_nfragments =
-			snd_pcm_hw_params_get_periods (
-				driver->playback_hw_params, &dir);
 		driver->playback_sample_format = (snd_pcm_format_t)
 			snd_pcm_hw_params_get_format (
 				driver->playback_hw_params);
@@ -647,9 +662,6 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 		c_period_size =
 			snd_pcm_hw_params_get_period_size (
 				driver->capture_hw_params, &dir);
-		c_nfragments =
-			snd_pcm_hw_params_get_periods (
-				driver->capture_hw_params, &dir);
 		driver->capture_sample_format = (snd_pcm_format_t)
 			snd_pcm_hw_params_get_format (
 				driver->capture_hw_params);
@@ -667,26 +679,6 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 		}
 	}
 
-	if (driver->capture_handle && driver->playback_handle) {
-		if (p_nfragments != c_nfragments) {
-			jack_error ("alsa_pcm: different period counts for "
-				    "playback and capture!");
-			return -1;
-		}
-
-		driver->nfragments = c_nfragments;
-
-	} else if (driver->capture_handle) {
-
-		driver->nfragments = c_nfragments;
-
-	} else {
-
-		driver->nfragments = p_nfragments;
-
-	}
-
-	driver->buffer_frames = driver->frames_per_cycle * driver->nfragments;
 	driver->playback_sample_bytes =
 		snd_pcm_format_physical_width (driver->playback_sample_format)
 		/ 8;
@@ -965,7 +957,7 @@ alsa_driver_start (alsa_driver_t *driver)
 		
 		pavail = snd_pcm_avail_update (driver->playback_handle);
 
-		if (pavail != driver->buffer_frames) {
+		if (pavail != driver->frames_per_cycle * driver->playback_nperiods) {
 			jack_error ("ALSA: full buffer not available at start");
 			return -1;
 		}
@@ -986,11 +978,11 @@ alsa_driver_start (alsa_driver_t *driver)
 		
 		for (chn = 0; chn < driver->playback_nchannels; chn++) {
 			alsa_driver_silence_on_channel (driver, chn,
-							driver->buffer_frames);
+							driver->user_nperiods * driver->frames_per_cycle);
 		}
 		
 		snd_pcm_mmap_commit (driver->playback_handle, poffset,
-				     driver->buffer_frames);
+				     driver->user_nperiods * driver->frames_per_cycle);
 		
 		if ((err = snd_pcm_start (driver->playback_handle)) < 0) {
 			jack_error ("could not start playback (%s)",
@@ -1107,10 +1099,11 @@ alsa_driver_silence_untouched_channels (alsa_driver_t *driver,
 					jack_nframes_t nframes)
 {
 	channel_t chn;
+	jack_nframes_t buffer_frames = driver->frames_per_cycle * driver->playback_nperiods;
 
 	for (chn = 0; chn < driver->playback_nchannels; chn++) {
 		if ((driver->channels_not_done & (1<<chn))) { 
-			if (driver->silent[chn] < driver->buffer_frames) {
+			if (driver->silent[chn] < buffer_frames) {
 				alsa_driver_silence_on_channel_no_mark (
 					driver, chn, nframes);
 				driver->silent[chn] += nframes;
@@ -1685,7 +1678,7 @@ alsa_driver_attach (alsa_driver_t *driver)
 		 * (external) latency
 		*/
 		jack_port_set_latency (port, driver->frames_per_cycle
-				       * driver->nfragments);
+				       * driver->user_nperiods);
 
 		driver->playback_ports =
 			jack_slist_append (driver->playback_ports, port);
@@ -1900,7 +1893,6 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 	driver->ctl_handle = 0;
 	driver->hw = 0;
 	driver->capture_and_playback_not_synced = FALSE;
-	driver->nfragments = 0;
 	driver->max_nchannels = 0;
 	driver->user_nchannels = 0;
 	driver->playback_nchannels = user_playback_nchnls;

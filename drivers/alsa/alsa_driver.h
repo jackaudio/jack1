@@ -84,14 +84,14 @@ typedef struct {
     char                         *alsa_name_playback;
     char                         *alsa_name_capture;
     char                         *alsa_driver;
-    snd_pcm_uframes_t             buffer_frames;
     unsigned long                 channels_not_done;
     unsigned long                 channel_done_bits;
     snd_pcm_format_t              playback_sample_format;
     snd_pcm_format_t              capture_sample_format;
     float                         max_sample_val;
     unsigned long                 user_nperiods;
-    unsigned long                 nfragments;
+    unsigned int                  playback_nperiods;
+    unsigned int                  capture_nperiods;
     unsigned long                 last_mask;
     snd_ctl_t                    *ctl_handle;
     snd_pcm_t                    *playback_handle;
