@@ -32,8 +32,6 @@
    
 */
 
-#include <sysdeps/os_defines.h>
-#include GETOPT_H
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>

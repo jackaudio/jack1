@@ -51,28 +51,22 @@ Compiler Collective, <http://gcc.gnu.org>.
 
 @section portopsys Operating System Dependencies
 
-JACK is intended to conform with C99, as defined in International
-Standard ISO/IEC 9899.  Because many existing C compilers do not fully
-support this standard, some new features should be avoided for better
-portablility.  For example, variables should not be declared in the
-middle of a compound statement, because many compilers still cannot
-handle that extension to the language.
-
-Whenever possible, OS dependencies should be isolated in OS-specific
-header files.  Each target OS may optionally provide a @c
-<sysdeps/os_defines.h> header, otherwise @c
-conf/os/generic/os_defines.h will be used.  The @c configure.host
-script distinguishes OS variations using a case statement based on the
-host system's type and version.
+JACK is written to conform with C99, as defined in International
+Standard ISO/IEC 9899.  Because many existing compilers do not fully
+support this standard, some new features should be avoided for
+portablility reasons.  For example, variables should not be declared
+in the middle of a compound statement, because many compilers still
+cannot handle that language extension.
 
 Some needed POSIX features may be missing on certain platforms.  If
 so, the preferred solution is to provide a substitute, like the @c
 fakepoll.c implementation for Mac OS X.
 
-If conditional compilation is required in mainline
+Whenever possible, OS dependencies should be auto-detected by @c
+configure.  Sometimes they can be isolated in OS-specific header
+files.  If conditional compilation must be used in mainline
 platform-independent code, avoid using the system name.  Instead, @c
-#define a descriptive name in your @c <sysdeps/os_defines.h>, and test
-it like this:
+#define a descriptive name in @c <config.h>, and test it like this:
 
 @code
   #ifdef JACK_USE_MACH_THREADS

@@ -235,12 +235,11 @@ jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
 {
 	jack_shm_registry_t* registry;
 	int shm_fd;
+	int perm = O_RDWR|O_CREAT;
 
 	if ((registry = jack_get_free_shm_info ()) == NULL) {
 		return -1;
 	}
-        
-	int perm = O_RDWR|O_CREAT;
 
 	if ((shm_fd = shm_open (shm_name, O_RDWR|O_CREAT, 0666)) < 0) {
 		jack_error ("cannot create shm segment %s (%s)", shm_name,

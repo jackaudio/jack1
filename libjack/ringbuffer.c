@@ -20,7 +20,8 @@
   This is safe for the case of one read thread and one write thread.
 */
 
-#include <sysdeps/os_defines.h>
+#include <config.h>
+
 #include <stdlib.h>
 #include <string.h>
 #ifndef JACK_DO_NOT_MLOCK

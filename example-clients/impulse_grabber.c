@@ -18,13 +18,12 @@
  *     $Id$
  */
 
-#include <sysdeps/os_defines.h>
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <math.h>
-#include GETOPT_H
+#include <getopt.h>
 
 #include <jack/jack.h>
 

@@ -23,7 +23,7 @@
 #define __jack_portaudio_driver_h__
 
 
-#include PORTAUDIO_H
+#include <portaudio.h>
 
 #include <jack/types.h>
 #include <jack/hardware.h>

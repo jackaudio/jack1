@@ -20,8 +20,6 @@
     $Id$
 */
 
-#include <sysdeps/os_defines.h>
-#include GETOPT_H
 #include <math.h>
 #include <stdio.h>
 #include <memory.h>

@@ -16,13 +16,12 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#include <sysdeps/os_defines.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
 #include <math.h>
-#include GETOPT_H
+#include <getopt.h>
 #include <string.h>
 
 #include <jack/jack.h>

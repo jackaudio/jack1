@@ -20,11 +20,10 @@
 */
 
 #include <config.h>
-#include <sysdeps/os_defines.h>
 
 #include <stdio.h>
 #include <signal.h>
-#include GETOPT_H
+#include <getopt.h>
 #include <sys/types.h>
 #include <sys/shm.h>
 #include <sys/wait.h>

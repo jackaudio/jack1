@@ -34,7 +34,6 @@
 #include <jack/internal.h>
 #include <jack/engine.h>
 
-#include GETOPT_H
 #include <sysdeps/time.h>
 
 #include "alsa_driver.h"

@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=96
-JACK_MICRO_VERSION=1
+JACK_MICRO_VERSION=2
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -77,9 +77,6 @@ AM_PROG_LIBTOOL
 AC_PROG_LN_S
 AC_C_BIGENDIAN
 
-# default OS variables
-JACK_THREAD_STACK_TOUCH=1000000
-
 # configure CPU and OS dependencies for host platform
 AC_MSG_CHECKING([platform dependencies])
 source $srcdir/config/configure.host
@@ -88,13 +85,36 @@ AC_SUBST(OS_LDFLAGS)
 AC_SUBST(os_include_dir)
 AC_SUBST(cpu_include_dir)
 
-# config.h variables
+# config.h
+test "x$JACK_THREAD_STACK_TOUCH" = "x" && JACK_THREAD_STACK_TOUCH=1000000
 AC_DEFINE_UNQUOTED(JACK_THREAD_STACK_TOUCH,
-	[${JACK_THREAD_STACK_TOUCH}],
-	[guaranteed size of realtime stack])
+	[$JACK_THREAD_STACK_TOUCH],
+	[Guaranteed size of realtime stack])
+if test "x$JACK_DO_NOT_MLOCK" != "x"; then
+    AC_DEFINE_UNQUOTED(JACK_DO_NOT_MLOCK,
+	[$JACK_DO_NOT_MLOCK],
+	[Don't use mlock() or mlockall() functions])
+fi
+if test "x$JACK_CPP_VARARGS_BROKEN" != "x"; then
+    AC_DEFINE_UNQUOTED(JACK_CPP_VARARGS_BROKEN,
+	[$JACK_CPP_VARARGS_BROKEN],
+	[CPP has a broken varargs implementation])
+fi
+if test "x$JACK_USE_MACH_THREADS" != "x"; then
+    AC_DEFINE_UNQUOTED(JACK_USE_MACH_THREADS,
+	[$JACK_USE_MACH_THREADS],
+	[Use MACH threads where possible])
+fi
 
+# headers
 AC_CHECK_HEADERS(string.h strings.h)
+AC_CHECK_HEADERS(getopt.h, [], [
+    for d in /Developer/SDKs/MacOSX10.3.0.sdk/usr/include/ ; do
+	AC_CHECK_HEADERS($d/getopt.h, [], [INCLUDES=-I$d ${INCLUDES}])
+    done]
+)
 
+# functions
 AC_CHECK_FUNC(getopt_long, ,
 	AC_MSG_ERROR([GNU getopt is required to build jack]))
 AC_CHECK_FUNC(gethostent, , AC_CHECK_LIB(nsl, gethostent))
@@ -121,9 +141,11 @@ else
 	AC_MSG_RESULT([System V shmget().])
 fi
 
-JACK_CORE_CFLAGS="$CFLAGS -I\$(top_builddir)/config -I\$(top_srcdir) -I\$(top_builddir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
+JACK_CORE_CFLAGS="$CFLAGS -I\$(top_builddir)/config -I\$(top_srcdir) \
+-I\$(top_builddir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
 JACK_CFLAGS="$JACK_CORE_CFLAGS -g"
-JACK_OPT_CFLAGS="$JACK_CORE_CFLAGS -g -march=pentium2 -mcpu=pentium4 -O3 -ffast-math -funroll-loops -fprefetch-loop-arrays"
+JACK_OPT_CFLAGS="$JACK_CORE_CFLAGS -g -march=pentium2 -mcpu=pentium4 -O3 \
+-ffast-math -funroll-loops -fprefetch-loop-arrays"
 
 dnl
 dnl figure out how best to optimize
@@ -329,7 +351,7 @@ if test "x$TRY_PORTAUDIO" = "xyes"
 then
 	# check for portaudio V18
 	AC_CHECK_LIB(portaudio, Pa_Initialize,
-		[ AC_CHECK_HEADERS(portaudio.h PortAudio.h,
+		[ AC_CHECK_HEADERS(portaudio.h,
 			[ HAVE_PA="true"
 			  PA_LIBS=-lportaudio
 			  jack_have_driver="yes"

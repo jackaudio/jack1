@@ -20,8 +20,6 @@
  *
  */
 
-#include <sysdeps/os_defines.h>
-#include GETOPT_H
 #include <unistd.h>
 #include <stdarg.h>
 #include <stdio.h>

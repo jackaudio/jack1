@@ -27,8 +27,6 @@
 #ifndef __jack_internal_h__
 #define __jack_internal_h__
 
-#include <sysdeps/os_defines.h>
-
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
