@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <jack/jack.h>
 #include <jack/intclient.h>

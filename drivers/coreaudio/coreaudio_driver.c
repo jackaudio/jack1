@@ -570,7 +570,7 @@ jack_driver_t *driver_initialize(jack_client_t * client,
     int chan_in = 2;
     int chan_out = 2;
     char *name = NULL;
-    AudioDeviceID deviceID;
+    AudioDeviceID deviceID = 0;
     const JSList *node;
     const jack_driver_param_t *param;
 
