@@ -227,12 +227,18 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 	*nchns = snd_pcm_hw_params_get_channels_max (hw_params);
 
 	if (*nchns > 1024) { 
+
 		/* the hapless user is an unwitting victim of the "default"
 		   ALSA PCM device, which can support up to 16 million
 		   channels. since they can't be bothered to set up
 		   a proper default device, limit the number of channels
 		   for them to a sane default.
 		*/
+
+		jack_error ("You appear to be using the ALSA software \"plug\" layer, probably\n"
+			    "a result of using the \"default\" ALSA device. This is less\n"
+			    "efficient than it could be. Consider using a ~/.asoundrc file\n"
+			    "to define a hardware audio device rather than using the plug layer\n");
 		*nchns = 2;  
 	}				
 

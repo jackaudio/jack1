@@ -81,11 +81,11 @@ main (int argc, char *argv[])
 
 	printf ("client activated\n");
 
-	if (jack_port_connect (client, "ALSA I/O:Input 1", "myinput")) {
+	if (jack_port_connect (client, "ALSA I/O:Input 1", jack_port_name (my_input_port))) {
 		fprintf (stderr, "cannot connect input ports\n");
 	} 
 	
-	if (jack_port_connect (client, "myoutput", "ALSA I/O:Output 1")) {
+	if (jack_port_connect (client, jack_port_name (my_output_port), "ALSA I/O:Output 1")) {
 		fprintf (stderr, "cannot connect output ports\n");
 	} 
 
