@@ -1,14 +1,31 @@
-TODO
+=======================================================================
+*** TODO - A one file mini-bugzilla for JACK developers             ***
+=======================================================================
 
-- figure out how to have pools of buffers for ports by type
-- proper handling of client return values in libjack
-- passing args to drivers and clients?
-- getting callbacks and args from dynamically loaded clients?
-- how do dynamically loaded clients (un)register ports, activate, etc.
-- pool based malloc for rt client-local mem allocation
+Version: $Id$
 
-TO THINK ABOUT:
+-----------------------------------------------------------------------
+
+TO BE DECIDED (owner)
+
+- dropping the use of CAP_RESOURCE (nando)
+
+TODO (owner)
+
+- figure out how to have pools of buffers for ports by type (pbd)
+- proper handling of client return values in libjack (kaiv)
+- passing args to drivers and clients? (pbd)
+- getting callbacks and args from dynamically loaded clients? (pbd)
+- how do dynamically loaded clients (un)register ports, activate, etc. (pbd)
+- pool based malloc for rt client-local mem allocation (pbd)
+
+TO THINK ABOUT
 
 - multiple port buffer shm segments (i.e. dynamically
-         increase the total number of ports in the system)
+         increase the total number of ports in the system) 
 
+CLOSED (date,who,comment)
+
+- call time client before all others (28.01.2003, kaiv, another solution)
+
+-----------------------------------------------------------------------

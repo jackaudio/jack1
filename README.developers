@@ -13,6 +13,34 @@ development. If you have questions, or would like to make
 changes, raise the issue on jackit-devel (see 
 http://jackit.sourceforge.net/lists ).
 
+---------------------------------------------------------------------
+ Contents
+-----------------------------------------------------------------------
+
+- What is this?
+- Version numbers
+- Important files for developers
+- Sending patches
+- CVS Access
+- Decision Process
+
+-----------------------------------------------------------------------
+ Important files for developers
+-----------------------------------------------------------------------
+
+AUTHORS
+	List of contributors. If you have contributed code, mail Paul 
+	Davis to get your name added to the list, or if you have 
+	CVS-access, help yourself. :)
+README.developers 
+	This file.
+TODO
+	A one file mini-bugzilla for JACK developers. Contains a list
+ 	of open and closed items. You can update this directly or 
+ 	contact Kai Vehmanen if you don't have CVS access.
+libjack/ChangeLog
+	A list of _all_ changes to the public interface!
+
 -----------------------------------------------------------------------
  Version numbers 
 -----------------------------------------------------------------------
@@ -31,7 +59,7 @@ to CVS:
                    changes are made
 
 2. Client API versioning
- 
+
 JACK clients are affected by two interfaces, the JACK Client API (libjack)
 and the JACK Client Protocol API (interface between jackd and 
 libjack). The former one is versioned using libtool interface 
@@ -44,11 +72,19 @@ to CVS:
     age      = current libjack is both source and binary compatible with
                libjack interfaces current,current-1,...,current-age
 
+Note! It was decided in January 2003 that current interface number
+      will remain as zero until the first stable JACK version
+      is released.
+
 JACK Client Protocol is versioned... <TBD>.
 
 Note! All changes that affect the libjack API must be documented 
 in jack/libjack/ChangeLog using the standard ChangeLog style
 (see GNU developer docs).
+
+---------------------------------------------------------------------
+ Important files
+-----------------------------------------------------------------------
 
 ---------------------------------------------------------------------
  Sending patches
@@ -77,7 +113,7 @@ common sense is recommended. ;)
  CVS Access
 -----------------------------------------------------------------------
 
-<TBD>
+Contact Paul Davis.
 
 ---------------------------------------------------------------------
  Uses of external libraries and other packages
