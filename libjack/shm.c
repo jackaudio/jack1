@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2003 Paul Davis
+    Copyright (C) 2004 Jack O'Quin
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -38,8 +39,10 @@
 
 #ifdef USE_POSIX_SHM
 static jack_shmtype_t jack_shmtype = shm_POSIX;
+static char *shmtype_name = "POSIX";
 #else
 static jack_shmtype_t jack_shmtype = shm_SYSV;
+static char *shmtype_name = "System V";
 #endif
 
 /* interface-dependent forward declarations */
@@ -234,6 +237,8 @@ jack_register_server (const char *server_name)
 {
 	int i;
 	pid_t my_pid = getpid ();
+
+	fprintf (stderr, "JACK compiled with %s SHM support.\n", shmtype_name);
 
 	jack_shm_lock_registry ();
 
