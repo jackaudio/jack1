@@ -816,8 +816,11 @@ jack_client_thread (void *arg)
 
 #ifdef WITH_TIMESTAMPS
 			jack_timestamp ("read done");
+			jack_dump_timestamps (stdout);
 #endif			
 
+
+			
 		}
 	}
 	
@@ -1220,6 +1223,18 @@ jack_set_graph_order_callback (jack_client_t *client, JackGraphOrderCallback cal
 	client->control->graph_order = callback;
 	client->control->graph_order_arg = arg;
 	return 0;
+}
+
+int jack_set_xrun_callback (jack_client_t *client, JackXRunCallback callback, void *arg)
+{
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+
+	client->control->xrun = callback;
+	client->control->xrun_arg = arg;
+	return 0;       
 }
 
 int

@@ -51,18 +51,6 @@
 #include <sys/capability.h>
 #endif
 
-/**
- * Time to wait for clients in msecs. Used when jackd is 
- * run in non-ASIO mode and without realtime priority enabled.
- */
-#define DEBUGGING_SLOW_CLIENTS
-
-#ifdef DEBUGGING_SLOW_CLIENTS
-#define JACKD_SOFT_MODE_TIMEOUT 5000
-#else
-#define JACKD_SOFT_MODE_TIMEOUT 500
-#endif
-
 #define JACK_ERROR_WITH_SOCKETS 10000000
 
 typedef struct {
@@ -493,7 +481,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 		engine->driver->wait (engine->driver, client->subgraph_wait_fd, &status, &delayed_usecs);
 	} else {
 		struct pollfd pfd[1];
-		int poll_timeout = (engine->control->real_time == 0 ? JACKD_SOFT_MODE_TIMEOUT : engine->driver->period_usecs/1000);
+		int poll_timeout = (engine->control->real_time == 0 ? engine->client_timeout_msecs : engine->driver->period_usecs/1000);
 
 		pfd[0].fd = client->subgraph_wait_fd;
 		pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
@@ -1624,7 +1612,7 @@ jack_server_thread (void *arg)
 				handle_client_socket_error (engine, pfd[i].fd);
 			} else if (pfd[i].revents & POLLIN) {
 				if (handle_external_client_request (engine, pfd[i].fd)) {
-					jack_error ("bad hci\n");
+					jack_error ("could not handle external client request");
 				}
 			}
 		}
@@ -1634,7 +1622,7 @@ jack_server_thread (void *arg)
 }
 
 jack_engine_t *
-jack_engine_new (int realtime, int rtpriority, int verbose)
+jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 {
 	jack_engine_t *engine;
 	void *addr;
@@ -1651,6 +1639,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine->driver = 0;
 	engine->set_sample_rate = jack_set_sample_rate;
 	engine->set_buffer_size = jack_set_buffer_size;
+	engine->client_timeout_msecs = client_timeout;
 
 	engine->next_client_id = 1;
 	engine->timebase_client = 0;
@@ -2017,6 +2006,7 @@ jack_main_thread (void *arg)
 	
 		if ((nframes = driver->wait (driver, -1, &wait_status, &delayed_usecs)) == 0) {
 			/* the driver detected an xrun, and restarted */
+			jack_engine_notify_clients_about_delay (engine);
 			continue;
 		}
 
@@ -2241,7 +2231,6 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	
 	close (client->event_fd);
 	close (client->request_fd);
-	
 
 	if (client->control->type == ClientExternal) {
 

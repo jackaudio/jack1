@@ -54,6 +54,7 @@ static int realtime_priority = 10;
 static int with_fork = 1;
 static int verbose = 0;
 static int asio_mode = 0;
+static int client_timeout = 500; /* msecs */
 
 typedef struct {
     pid_t  pid;
@@ -90,7 +91,7 @@ jack_engine_waiter_thread (void *arg)
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
-	if ((engine = jack_engine_new (realtime, realtime_priority, verbose)) == 0) {
+	if ((engine = jack_engine_new (realtime, realtime_priority, verbose, client_timeout)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
 		kill (warg->pid, SIGTERM);
 		return 0;
@@ -270,12 +271,22 @@ jack_main (int argc, char **argv)
 	return;
 }
 
-static void usage (FILE *file) 
-
+static void copyright (FILE* file)
 {
+	fprintf (file, "jackd " VERSION "\n"
+		 "Copyright 2001-2003 Paul Davis and others.\n"
+		 "jackd comes with ABSOLUTELY NO WARRANTY\n"
+		 "This is free software, and you are welcome to redistribute it\n"
+		 "under certain conditions; see the file COPYING for details\n\n");
+}
+
+static void usage (FILE *file) 
+{
+	copyright (file);
 	fprintf (file, "\n"
 		 "usage: jackd [ --asio OR -a ]\n"
 		 "             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
+		 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
 		 "             [ --verbose OR -v ]\n"
 		 "             [ --tmpdir OR -D directory-for-temporary-files ]\n"
 		 "             [ --version OR -V ]\n"
@@ -296,6 +307,7 @@ main (int argc, char *argv[])
 		{ "help", 0, 0, 'h' },
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
+		{ "timeout", 1, 0, 't' },
 		{ "spoon", 0, 0, 'F' },
 		{ "version", 0, 0, 'V' },
 		{ 0, 0, 0, 0 }
@@ -364,6 +376,10 @@ main (int argc, char *argv[])
 			realtime = 1;
 			break;
 
+		case 't':
+			client_timeout = atoi (optarg);
+			break;
+
 		case 'V':
 			show_version = 1;
 			break;
@@ -400,11 +416,7 @@ main (int argc, char *argv[])
 		driver_args[i] = argv[optind++];
 	}
 
-	printf ( "jackd " VERSION "\n"
-		 "Copyright 2001-2003 Paul Davis and others.\n"
-		 "jackd comes with ABSOLUTELY NO WARRANTY\n"
-		 "This is free software, and you are welcome to redistribute it\n"
-		 "under certain conditions; see the file COPYING for details\n\n");
+	copyright (stdout);
 
 	if (!with_fork) {
 

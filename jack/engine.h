@@ -44,6 +44,9 @@ struct _jack_engine {
     pthread_mutex_t request_lock;
     int process_errors;
     int period_msecs;
+    int client_timeout_msecs;  /* Time to wait for clients in msecs. Used when jackd is 
+				* run in non-ASIO mode and without realtime priority enabled.
+				*/
     unsigned int port_max;
     shm_name_t control_shm_name;
     size_t     control_size;
@@ -92,7 +95,7 @@ struct _jack_engine {
 
 /* public functions */
 
-jack_engine_t  *jack_engine_new (int real_time, int real_time_priority, int verbose);
+jack_engine_t  *jack_engine_new (int real_time, int real_time_priority, int verbose, int client_timeout);
 int             jack_engine_delete (jack_engine_t *);
 int             jack_run (jack_engine_t *engine);
 int             jack_wait (jack_engine_t *engine);

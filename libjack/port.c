@@ -504,8 +504,8 @@ jack_ensure_port_monitor_input (jack_port_t *port, int yn)
 			port->shared->monitor_requests++;
 		}
 	} else {
-		if (port->shared->monitor_requests == 1) {
-			port->shared->monitor_requests--;
+		if (port->shared->monitor_requests > 0) {
+			port->shared->monitor_requests = 0;
 		}
 	}
 
