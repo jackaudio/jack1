@@ -28,6 +28,10 @@ fullname = $(shell awk -F: '/$(user)/ { print $$5}' /etc/passwd)
 .PHONY: manual
 .PHONY: upload
 
+all: html
+install:
+	@:
+
 html: $(HTML-FILES)
 
 upload: build-updir
