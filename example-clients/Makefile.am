@@ -45,48 +45,48 @@ AM_CFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
 AM_CXXFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
 
 jack_simple_client_SOURCES = simple_client.c
-jack_simple_client_LDFLAGS = -ldl -lpthread
+jack_simple_client_LDFLAGS = -lrt -ldl -lpthread
 jack_simple_client_LDADD = ../libjack/libjack.la
 
 jack_connect_SOURCES = connect.c
-jack_connect_LDFLAGS = -ldl -lpthread
+jack_connect_LDFLAGS = -lrt -ldl -lpthread
 jack_connect_LDADD = ../libjack/libjack.la
 
 jack_disconnect_SOURCES = connect.c
-jack_disconnect_LDFLAGS = -ldl -lpthread
+jack_disconnect_LDFLAGS = -lrt -ldl -lpthread
 jack_disconnect_LDADD = ../libjack/libjack.la
 
 jack_monitor_client_SOURCES = monitor_client.c
-jack_monitor_client_LDFLAGS = -ldl -lpthread
+jack_monitor_client_LDFLAGS = -lrt -ldl -lpthread
 jack_monitor_client_LDADD = ../libjack/libjack.la
 
 jack_metro_SOURCES = metro.c
-jack_metro_LDFLAGS = -ldl -lpthread
+jack_metro_LDFLAGS = -lrt -ldl -lpthread
 jack_metro_LDADD = ../libjack/libjack.la
 
 jack_lsp_SOURCES = lsp.c
-jack_lsp_LDFLAGS = -ldl -lpthread
+jack_lsp_LDFLAGS = -lrt -ldl -lpthread
 jack_lsp_LDADD = ../libjack/libjack.la
 
 jack_showtime_SOURCES = showtime.c
-jack_showtime_LDFLAGS = -ldl -lpthread
+jack_showtime_LDFLAGS = -lrt -ldl -lpthread
 jack_showtime_LDADD = ../libjack/libjack.la
 
 
 if HAVE_FLTK
 jack_fltk_client_SOURCES = fltk_client.cc
-jack_fltk_client_LDFLAGS = -L/usr/X11R6/lib -lfltk -lX11 -lXext -ldl -lpthread
+jack_fltk_client_LDFLAGS = -L/usr/X11R6/lib -lfltk -lX11 -lXext -lrt -ldl -lpthread
 jack_fltk_client_LDADD = ../libjack/libjack.la
 endif
 
 if HAVE_SNDFILE
 jackrec_SOURCES = capture_client.c
-jackrec_LDFLAGS = @SNDFILE_LIBS@ -ldl -lpthread
+jackrec_LDFLAGS = @SNDFILE_LIBS@ -lrt -ldl -lpthread
 jackrec_LDADD = ../libjack/libjack.la
 endif
 
 jack_impulse_grabber_SOURCES = impulse_grabber.c
-jack_impulse_grabber_LDFLAGS = -ldl -lpthread -lm
+jack_impulse_grabber_LDFLAGS = -lrt -ldl -lpthread -lm
 jack_impulse_grabber_LDADD = ../libjack/libjack.la
 
 #
@@ -94,11 +94,11 @@ jack_impulse_grabber_LDADD = ../libjack/libjack.la
 #
 
 jack_load_SOURCES = ipload.c
-jack_load_LDFLAGS = -ldl -lpthread -lm
+jack_load_LDFLAGS = -lrt -ldl -lpthread -lm
 jack_load_LDADD = ../libjack/libjack.la
 
 jack_unload_SOURCES = ipunload.c
-jack_unload_LDFLAGS = -ldl -lpthread -lm
+jack_unload_LDFLAGS = -lrt -ldl -lpthread -lm
 jack_unload_LDADD = ../libjack/libjack.la
 
 #

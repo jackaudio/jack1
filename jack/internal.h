@@ -56,13 +56,14 @@ typedef struct _jack_request jack_request_t;
 typedef void * dlhandle;
 
 typedef struct {
-    int    shm_key;
+    shm_name_t shm_name;
     size_t offset;
 } jack_port_buffer_info_t;
 
 typedef struct {
-    int    shm_key;
-    char  *address;
+    shm_name_t    shm_name;
+    char         *address;
+    size_t        size;
 } jack_port_segment_info_t;
 
 typedef struct _time_info
@@ -136,13 +137,16 @@ typedef struct {
 	unsigned long n;
 	jack_port_id_t port_id;
 	jack_port_id_t self_id;
-	int key;
+	shm_name_t shm_name;
     } x;
     union {
 	unsigned long n;
 	jack_port_id_t other_id;
 	void* addr;
     } y;
+    union { 
+	size_t size;
+    } z;
 } jack_event_t;
 
 typedef enum {
@@ -216,10 +220,10 @@ typedef struct {
 
     int status;
 
-	unsigned int protocol_v;
+    unsigned int protocol_v;
 
-    int client_key;
-    int control_key;
+    shm_name_t client_shm_name;
+    shm_name_t control_shm_name;
 
     char fifo_prefix[PATH_MAX+1];
 
@@ -231,11 +235,13 @@ typedef struct {
     */
 
     jack_client_control_t *client_control;
-    jack_control_t *engine_control;
+    jack_control_t        *engine_control;
+    size_t                 control_size;
 
-    /* XXX need to be able to use more than one port segment key */
+    /* XXX need to be able to use more than one port segment */
 
-    key_t port_segment_key;
+    shm_name_t    port_segment_name;
+    size_t        port_segment_size;
 
 } jack_client_connect_result_t;
 
@@ -291,7 +297,7 @@ extern void jack_cleanup_shm ();
 extern void jack_cleanup_files ();
 
 extern int  jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event);
-extern void jack_client_handle_new_port_segment (jack_client_t *client, int key, void* addr);
+extern void jack_client_handle_new_port_segment (jack_client_t *client, shm_name_t, size_t, void* addr);
 
 extern jack_client_t *jack_driver_client_new (jack_engine_t *, const char *client_name);
 jack_client_t *jack_client_alloc_internal (jack_client_control_t*, jack_control_t*);
@@ -303,6 +309,8 @@ void handle_internal_client_request (jack_control_t*, jack_request_t*);
 extern char *jack_server_dir;
 
 extern void jack_error (const char *fmt, ...);
+
+extern char *jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot);
 
 #endif /* __jack_internal_h__ */
 

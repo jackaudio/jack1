@@ -23,6 +23,8 @@
 
 #include <limits.h> /* ULONG_MAX */
 
+typedef char shm_name_t[64];
+
 /**
  * Type used to represent sample frame counts.
  */

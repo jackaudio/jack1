@@ -202,6 +202,8 @@ int jack_port_unregister (jack_client_t *, jack_port_t *);
  * zero-filled. if there are multiple inbound connections, the data
  * will be mixed appropriately.  
  *
+ * FOR OUTPUT PORTS ONLY
+ * ---------------------
  * You may cache the value returned, but only between calls to
  * your "blocksize" callback. For this reason alone, you should
  * either never cache the return value or ensure you have

@@ -23,11 +23,10 @@
 #include <sys/socket.h>
 #include <sys/poll.h>
 #include <sys/un.h>
-#include <sys/shm.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <sys/shm.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <dirent.h>
@@ -36,7 +35,6 @@
 #include <sys/types.h>
 #include <string.h>
 #include <limits.h>
-#include <sys/mman.h>
 
 #include <config.h>
 
@@ -73,20 +71,20 @@ typedef struct _jack_client_internal {
 
     jack_client_control_t *control;
 
-    int      request_fd;
-    int      event_fd;
-    int      subgraph_start_fd;
-    int      subgraph_wait_fd;
-    JSList  *ports;    /* protected by engine->client_lock */
-    JSList  *fed_by;   /* protected by engine->client_lock */
-    int      shm_id;
-    int      shm_key;
-    unsigned long execution_order;
-    struct  _jack_client_internal *next_client; /* not a linked list! */
-    dlhandle handle;
-    int     (*initialize)(jack_client_t*, const char*);  /* for internal clients only */
-    void    (*finish)(void);  /* for internal clients only */
-    int      error;
+    int        request_fd;
+    int        event_fd;
+    int        subgraph_start_fd;
+    int        subgraph_wait_fd;
+    JSList    *ports;    /* protected by engine->client_lock */
+    JSList    *fed_by;   /* protected by engine->client_lock */
+    int        shm_fd;
+    shm_name_t shm_name;
+    unsigned   long execution_order;
+    struct    _jack_client_internal *next_client; /* not a linked list! */
+    dlhandle   handle;
+    int      (*initialize)(jack_client_t*, const char*);  /* for internal clients only */
+    void     (*finish)(void);  /* for internal clients only */
+    int        error;
 
 } jack_client_internal_t;
 
@@ -137,8 +135,8 @@ static int  internal_client_request (void*, jack_request_t *);
 
 static int  jack_use_driver (jack_engine_t *engine, jack_driver_t *driver);
 
-static int *jack_shm_registry;
-static int  jack_shm_id_cnt;
+static shm_name_t *jack_shm_registry;
+static int         jack_shm_id_cnt;
 
 static char *client_state_names[] = {
 	"Not triggered",
@@ -261,7 +259,6 @@ make_sockets (int fd[2])
 static int
 jack_initialize_shm ()
 {
-	int shmid_id;
 	void *addr;
 
 	if (jack_shm_registry != NULL) {
@@ -274,31 +271,24 @@ jack_initialize_shm ()
 	   or debugger driven exits.
 	*/
 	
-	if ((shmid_id = shmget (random(), sizeof(int) * MAX_SHM_ID, IPC_CREAT|0600)) < 0) {
-		jack_error ("cannot create engine shm ID registry (%s)", strerror (errno));
-		return -1;
-	}
-	if ((addr = shmat (shmid_id, 0, 0)) == (void *) -1) {
-		jack_error ("cannot attach shm ID registry (%s)", strerror (errno));
-		shmctl (shmid_id, IPC_RMID, 0);
-		return -1;
-	}
-	if (shmctl (shmid_id, IPC_RMID, NULL)) {
-		jack_error ("cannot mark shm ID registry as destroyed (%s)", strerror (errno));
+	if ((addr = jack_get_shm ("/jack-shm-registry", sizeof (shm_name_t) * MAX_SHM_ID, 
+				  O_RDWR|O_CREAT|O_TRUNC, 0600, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
 		return -1;
 	}
 
-	jack_shm_registry = (int *) addr;
+	jack_shm_registry = (shm_name_t *) addr;
 	jack_shm_id_cnt = 0;
+
+	sprintf (jack_shm_registry[0], "hello");
 
 	return 0;
 }
 
 static void
-jack_register_shm (int shmid)
+jack_register_shm (char *shm_name)
 {
 	if (jack_shm_id_cnt < MAX_SHM_ID) {
-		jack_shm_registry[jack_shm_id_cnt++] = shmid;
+		snprintf (jack_shm_registry[jack_shm_id_cnt++], sizeof (shm_name_t), shm_name);
 	}
 }
 
@@ -308,7 +298,7 @@ jack_cleanup_shm ()
 	int i;
 
 	for (i = 0; i < jack_shm_id_cnt; i++) {
-		shmctl (jack_shm_registry[i], IPC_RMID, NULL);
+		shm_unlink (jack_shm_registry[i]);
 	}
 }
 
@@ -344,36 +334,35 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 {
 	jack_event_t event;
 	jack_port_segment_info_t *si;
-	key_t key;
-	int id;
 	char *addr;
 	size_t offset;
 	size_t size;
 	size_t step;
+	shm_name_t shm_name;
 
-	key = random();
+	snprintf (shm_name, sizeof(shm_name), "/jack-port-segment-%d", jack_slist_length (engine->port_segments));
 	size = nports * sizeof (jack_default_audio_sample_t) * engine->control->buffer_size;
 
-	if ((id = shmget (key, size, IPC_CREAT|0666)) < 0) {
-		jack_error ("cannot create new port segment of %d bytes, key = 0x%x (%s)", size, key, strerror (errno));
+	if ((addr = jack_get_shm (shm_name, size, (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
+		jack_error ("cannot create new port segment of %d bytes, shm_name = %s (%s)", size, shm_name, strerror (errno));
 		return -1;
 	}
 	
-	jack_register_shm (id);
-
-	if ((addr = shmat (id, 0, 0)) == (char *) -1) {
-		jack_error ("cannot attach new port segment (%s)", strerror (errno));
-		shmctl (id, IPC_RMID, 0);
-		return -1;
-	}
+	jack_register_shm (shm_name);
 		
 	si = (jack_port_segment_info_t *) malloc (sizeof (jack_port_segment_info_t));
-	si->shm_key = key;
+	strcpy (si->shm_name, shm_name);
 	si->address = addr;
 
 	engine->port_segments = jack_slist_prepend (engine->port_segments, si);
-	engine->port_segment_key = key; /* XXX fix me */
-	engine->port_segment_address = addr; /* XXX fix me */
+	
+	/* XXXX this needs fixing so that we can support multiple port segments.
+	   or does it?
+	*/
+
+	strcpy (engine->port_segment_name, shm_name); 
+	engine->port_segment_address = addr;
+	engine->port_segment_size = size;
 
 	pthread_mutex_lock (&engine->buffer_lock);
 
@@ -385,7 +374,7 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 		jack_port_buffer_info_t *bi;
 
 		bi = (jack_port_buffer_info_t *) malloc (sizeof (jack_port_buffer_info_t));
-		bi->shm_key = key;
+		strcpy (bi->shm_name, si->shm_name);
 		bi->offset = offset;
 
 		/* we append because we want the list to be in memory-address order */
@@ -411,7 +400,7 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 	/* tell everybody about it */
 
 	event.type = NewPortBufferSegment;
-	event.x.key = key;
+	strcpy (event.x.shm_name, shm_name);
 	event.y.addr = addr;
 
 	jack_deliver_event_to_all (engine, &event);
@@ -789,9 +778,11 @@ setup_client (jack_engine_t *engine, int client_fd, jack_client_connect_request_
 	}
 	
 	res->protocol_v = jack_protocol_version;
-	res->client_key = client->shm_key;
-	res->control_key = engine->control_key;
-	res->port_segment_key = engine->port_segment_key;
+	strcpy (res->client_shm_name, client->shm_name);
+	strcpy (res->control_shm_name, engine->control_shm_name);
+	strcpy (res->port_segment_name, engine->port_segment_name);
+	res->port_segment_size = engine->port_segment_size;
+	res->control_size = engine->control_size;
 	res->realtime = engine->control->real_time;
 	res->realtime_priority = engine->rtpriority - 1;
 	
@@ -808,7 +799,7 @@ setup_client (jack_engine_t *engine, int client_fd, jack_client_connect_request_
 		
 		res->client_control = client->control;
 		res->engine_control = engine->control;
-		
+
 	} else {
 		strcpy (res->fifo_prefix, engine->fifo_prefix);
 	}
@@ -839,7 +830,8 @@ setup_client (jack_engine_t *engine, int client_fd, jack_client_connect_request_
 			/* tell it about the port segment. XXX fix to work with multiples */
 
 			jack_client_handle_new_port_segment (client->control->private_client, 
-							     engine->port_segment_key,
+							     engine->port_segment_name,
+							     engine->port_segment_size,
 							     engine->port_segment_address);
 
 			if (client->initialize (client->control->private_client, req->object_data)) {
@@ -982,7 +974,6 @@ handle_unload_client (jack_engine_t *engine, int client_fd, jack_client_connect_
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		if (strcmp ((char *) ((jack_client_internal_t *) node->data)->control->name, req->name) == 0) {
 			jack_remove_client (engine, (jack_client_internal_t *) node->data);
-			fprintf (stderr, "found it\n");
 			res.status = 0;
 			break;
 		}
@@ -1191,7 +1182,7 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 	jack_client_internal_t *client;
 	JSList *node;
 	int ret = -1;
-	
+
 	jack_lock_graph (engine);
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
@@ -1581,7 +1572,6 @@ jack_engine_t *
 jack_engine_new (int realtime, int rtpriority, int verbose)
 {
 	jack_engine_t *engine;
-	size_t control_size;
 	void *addr;
 	unsigned int i;
 #ifdef USE_CAPABILITIES
@@ -1633,26 +1623,21 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 
 	srandom (time ((time_t *) 0));
 
-	engine->control_key = random();
-	control_size = sizeof (jack_control_t) + (sizeof (jack_port_shared_t) * engine->port_max);
+	snprintf (engine->control_shm_name, sizeof (engine->control_shm_name), "/jack-engine");
+	engine->control_size = sizeof (jack_control_t) + (sizeof (jack_port_shared_t) * engine->port_max);
 
 	if (jack_initialize_shm (engine)) {
 		return 0;
 	}
 
-	if ((engine->control_shm_id = shmget (engine->control_key, control_size, IPC_CREAT|0644)) < 0) {
+	if ((addr = jack_get_shm (engine->control_shm_name, engine->control_size, 
+				  O_RDWR|O_CREAT|O_TRUNC, 0644, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
 		jack_error ("cannot create engine control shared memory segment (%s)", strerror (errno));
 		return 0;
 	}
 
-	jack_register_shm (engine->control_shm_id);
+	jack_register_shm (engine->control_shm_name);
 	
-	if ((addr = shmat (engine->control_shm_id, 0, 0)) == (void *) -1) {
-		jack_error ("cannot attach control shared memory segment (%s)", strerror (errno));
-		shmctl (engine->control_shm_id, IPC_RMID, 0);
-		return 0;
-	}
-
 	engine->control = (jack_control_t *) addr;
 	engine->control->engine = engine;
 
@@ -2041,8 +2026,10 @@ jack_engine_delete (jack_engine_t *engine)
 
 {
 	if (engine) {
+		close (engine->control_shm_fd);
 		return pthread_cancel (engine->main_thread);
 	}
+
 	return 0;
 }
 
@@ -2051,8 +2038,8 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 
 {
 	jack_client_internal_t *client;
-	key_t shm_key = 0;
-	int shm_id = 0;
+	shm_name_t shm_name;
+	int shm_fd = 0;
 	void *addr = 0;
 
 	switch (req->type) {
@@ -2062,21 +2049,13 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 
 	case ClientExternal:
 
-		shm_key = random();
-		
-		if ((shm_id = shmget (shm_key, sizeof (jack_client_control_t), IPC_CREAT|0666)) < 0) {
-			jack_error ("cannot create client control block");
+		snprintf (shm_name, sizeof (shm_name), "/jack-c-%s", req->name);
+		if ((addr = jack_get_shm (shm_name, sizeof (jack_client_control_t), 
+					  (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
+			jack_error ("cannot create client control block for %s", req->name);
 			return 0;
 		}
-		
-		jack_register_shm (shm_id);
-
-		if ((addr = shmat (shm_id, 0, 0)) == (void *) -1) {
-			jack_error ("cannot attach new client control block");
-			shmctl (shm_id, IPC_RMID, 0);
-			return 0;
-		}
-
+		jack_register_shm (shm_name);
 		break;
 	}
 
@@ -2098,8 +2077,8 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 
 	} else {
 
-		client->shm_id = shm_id;
-		client->shm_key = shm_key;
+		client->shm_fd = shm_fd;
+		strcpy (client->shm_name, shm_name);
 		client->control = (jack_client_control_t *) addr;
 	}
 
@@ -2236,8 +2215,9 @@ jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 		jack_client_unload (client);
 		free ((char *) client->control);
 	} else {
-		shmdt ((void *) client->control);
-		shmctl(client->shm_id,IPC_RMID,0);
+		munmap ((void*) client->control, sizeof (*client->control));
+		shm_unlink (client->shm_name);
+		close (client->shm_fd);
 	}
 
 	free (client);
@@ -2309,8 +2289,6 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 
 	if (jack_client_is_internal (client)) {
 
-		fprintf (stderr, "delivering event %d to IP client %s\n", event->type, client->control->name);
-
 		switch (event->type) {
 		case PortConnected:
 		case PortDisconnected:
@@ -2342,7 +2320,8 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 			break;
 
 		case NewPortBufferSegment:
-			jack_client_handle_new_port_segment (client->control->private_client, event->x.key, event->y.addr);
+			jack_client_handle_new_port_segment (client->control->private_client, 
+							     event->x.shm_name, event->z.size, event->y.addr);
 			break;
 
 		default:
@@ -2840,8 +2819,6 @@ jack_port_do_connect (jack_engine_t *engine,
 	jack_connection_internal_t *connection;
 	jack_port_internal_t *srcport, *dstport;
 	jack_port_id_t src_id, dst_id;
-
-	fprintf (stderr, "got connect request\n");
 
 	if ((srcport = jack_get_port_by_name (engine, source_port)) == NULL) {
 		jack_error ("unknown source port in attempted connection [%s]", source_port);
@@ -3392,7 +3369,7 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 	jack_port_segment_info_t *psi = 0;
 	jack_port_buffer_info_t *bi;
 
-	port->shared->shm_key = -1;
+	port->shared->shm_name[0] = '\0';
 
 	if (port->shared->flags & JackPortIsInput) {
 		port->shared->offset = 0;
@@ -3413,8 +3390,8 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 
 		psi = (jack_port_segment_info_t *) node->data;
 
-		if (bi->shm_key == psi->shm_key) {
-			port->shared->shm_key = psi->shm_key;
+		if (strcmp (bi->shm_name, psi->shm_name) == 0) {
+			strcpy (port->shared->shm_name, psi->shm_name);
 			port->shared->offset = bi->offset;
 			port->buffer_info = bi;
 			break;
@@ -3422,23 +3399,23 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 	}
 
 	if (engine->verbose) {
-		fprintf (stderr, "port %s buf shm key 0x%x at offset %d bi = %p\n", 
+		fprintf (stderr, "port %s buf shm name %s at offset %d bi = %p\n", 
 			 port->shared->name,
-			 port->shared->shm_key,
+			 port->shared->shm_name,
 			 (int)port->shared->offset,
 			 port->buffer_info);
 	}
 
-	if (port->shared->shm_key >= 0) {
+	if (port->shared->shm_name[0] != '\0') {
 		engine->port_buffer_freelist = jack_slist_remove (engine->port_buffer_freelist, bi);
 		
 	} else {
-		jack_error ("port segment info for 0x%x:%d not found!", bi->shm_key, bi->offset);
+		jack_error ("port segment info for %s:%d not found!", bi->shm_name, bi->offset);
 	}
 
 	pthread_mutex_unlock (&engine->buffer_lock);
 
-	if (port->shared->shm_key < 0) {
+	if (port->shared->shm_name[0] == '\0') {
 		return -1;
 	} else {
 		return 0;

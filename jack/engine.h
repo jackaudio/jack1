@@ -50,9 +50,11 @@ struct _jack_engine {
     int process_errors;
     int period_msecs;
     unsigned int port_max;
-    int control_shm_id;
-    key_t control_key;
-    key_t port_segment_key; /* XXX fix me */
+    int control_shm_fd;
+    shm_name_t control_shm_name;
+    size_t     control_size;
+    shm_name_t port_segment_name; /* XXX fix me */
+    size_t port_segment_size; /* XXX fix me */
     void *port_segment_address; /* XXX fix me */
     pthread_t main_thread;
     pthread_t server_thread;

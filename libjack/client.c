@@ -25,7 +25,6 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
-#include <sys/shm.h>
 #include <sys/mman.h>
 #include <sys/poll.h>
 #include <stdarg.h>
@@ -73,6 +72,32 @@ typedef struct {
     struct _jack_client *client;
     const char *client_name;
 } client_info;
+
+char *
+jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot)
+{
+	int shm_fd;
+	char *addr;
+
+	if ((shm_fd = shm_open (shm_name, perm, mode)) < 0) {
+		jack_error ("cannot create shm segment %s (%s)", shm_name, strerror (errno));
+		return MAP_FAILED;
+	}
+
+	if (ftruncate (shm_fd, size) < 0) {
+		jack_error ("cannot set size of engine shm registry (%s)", strerror (errno));
+		return MAP_FAILED;
+	}
+
+	if ((addr = mmap (0, size, prot, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
+		jack_error ("cannot mmap shm segment %s (%s)", shm_name, strerror (errno));
+		shm_unlink (shm_name);
+		close (shm_fd);
+		return MAP_FAILED;
+	}
+
+	return addr;
+}
 
 void 
 jack_error (const char *fmt, ...)
@@ -446,8 +471,6 @@ jack_client_new (const char *client_name)
 	int ev_fd = -1;
 	jack_client_connect_result_t  res;
 	jack_client_t *client;
-	int client_shm_id;
-	int control_shm_id;
 	void *addr;
 
 	/* external clients need this initialized; internal clients
@@ -470,12 +493,8 @@ jack_client_new (const char *client_name)
 
 	/* attach the engine control/info block */
 
-	if ((control_shm_id = shmget (res.control_key, 0, 0)) < 0) {
-		jack_error ("cannot determine shared memory segment for control key 0x%x", res.control_key);
-		goto fail;
-	}
-
-	if ((addr = shmat (control_shm_id, 0, 0)) == (void *) -1) {
+	if ((addr = jack_get_shm (res.control_shm_name, res.control_size, O_RDWR, 
+				  0, (PROT_READ|PROT_WRITE))) == MAP_FAILED) {
 		jack_error ("cannot attached engine control shared memory segment");
 		goto fail;
 	}
@@ -484,19 +503,15 @@ jack_client_new (const char *client_name)
 
 	/* now attach the client control block */
 
-	if ((client_shm_id = shmget (res.client_key, 0, 0)) < 0) {
-		jack_error ("cannot determine shared memory segment for client key 0x%x", res.client_key);
-		goto fail;
-	}
-
-	if ((addr = shmat (client_shm_id, 0, 0)) == (void *) -1) {
+	if ((addr = jack_get_shm (res.client_shm_name, sizeof (jack_client_control_t), O_RDWR, 
+				  0, (PROT_READ|PROT_WRITE))) == MAP_FAILED) {
 		jack_error ("cannot attached client control shared memory segment");
 		goto fail;
 	}
 
 	client->control = (jack_client_control_t *) addr;
 
-	jack_client_handle_new_port_segment (client, res.port_segment_key, 0);
+	jack_client_handle_new_port_segment (client, res.port_segment_name, res.port_segment_size, 0);
 
 	/* set up the client so that it does the right thing for an external client */
 
@@ -514,10 +529,10 @@ jack_client_new (const char *client_name)
 	
   fail:
 	if (client->engine) {
-		shmdt (client->engine);
+		munmap ((char *) client->engine, sizeof (jack_control_t));
 	}
 	if (client->control) {
-		shmdt ((char *) client->control);
+		munmap ((char *) client->control, sizeof (jack_client_control_t));
 	}
 	if (req_fd >= 0) {
 		close (req_fd);
@@ -563,10 +578,9 @@ jack_internal_client_close (const char *client_name)
 }
 
 void
-jack_client_handle_new_port_segment (jack_client_t *client, int key, void* addr)
+jack_client_handle_new_port_segment (jack_client_t *client, shm_name_t shm_name, size_t size, void* addr)
 {
 	jack_port_segment_info_t *si;
-	int port_segment_shm_id;
 
 	/* Lookup, attach and register the port/buffer segments in use
 	   right now.
@@ -574,15 +588,8 @@ jack_client_handle_new_port_segment (jack_client_t *client, int key, void* addr)
 
 	if (client->control->type == ClientExternal) {
 
-		/* map shared memory */
-
-		if ((port_segment_shm_id = shmget (key, 0, 0)) < 0) {
-			jack_error ("cannot determine shared memory segment for port segment key 0x%x (%s)",
-				    key, strerror (errno));
-			return;
-		}
 		
-		if ((addr = shmat (port_segment_shm_id, 0, 0)) == (void *) -1) {
+		if ((addr = jack_get_shm(shm_name, size, O_RDWR, 0, (PROT_READ|PROT_WRITE))) == MAP_FAILED) {
 			jack_error ("cannot attached port segment shared memory (%s)", strerror (errno));
 			return;
 		}
@@ -593,8 +600,9 @@ jack_client_handle_new_port_segment (jack_client_t *client, int key, void* addr)
 	}
 
 	si = (jack_port_segment_info_t *) malloc (sizeof (jack_port_segment_info_t));
-	si->shm_key = key;
+	strcpy (si->shm_name, shm_name);
 	si->address = addr;
+	si->size = size;
 
 	/* the first chunk of the first port segment is always set by the engine
 	   to be a conveniently-sized, zero-filled lump of memory.
@@ -625,10 +633,6 @@ jack_client_thread (void *arg)
 	client->thread_id = pthread_self();
 	pthread_cond_signal (&client_ready);
 	pthread_mutex_unlock (&client_lock);
-
-	/* XXX reset the PID to be the actual client thread. Kai and Fernando know
-	   about this and it needs fixing.
-	*/
 
 	client->control->pid = getpid();
 
@@ -725,7 +729,7 @@ jack_client_thread (void *arg)
 				break;
 
 			case NewPortBufferSegment:
-				jack_client_handle_new_port_segment (client, event.x.key, event.y.addr);
+				jack_client_handle_new_port_segment (client, event.x.shm_name, event.z.size, event.y.addr);
 				break;
 			}
 
@@ -1044,7 +1048,7 @@ jack_activate (jack_client_t *client)
 			pthread_mutex_unlock (&client_lock);
 			return -1;
 		}
-		
+
 		pthread_cond_wait (&client_ready, &client_lock);
 		pthread_mutex_unlock (&client_lock);
 		
@@ -1091,11 +1095,12 @@ jack_client_close (jack_client_t *client)
 		pthread_cancel (client->thread);
 		pthread_join (client->thread, &status);
 
-		shmdt ((char *) client->control);
-		shmdt (client->engine);
+		munmap ((char *) client->control, sizeof (jack_client_control_t));
+		munmap ((char *) client->engine, sizeof (jack_control_t));
 
 		for (node = client->port_segments; node; node = jack_slist_next (node)) {
-			shmdt (((jack_port_segment_info_t *) node->data)->address);
+			jack_port_segment_info_t *si = (jack_port_segment_info_t *) node->data;
+			munmap ((char *) si->address, si->size);
 			free (node->data);
 		}
 		jack_slist_free (client->port_segments);

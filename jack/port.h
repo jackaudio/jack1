@@ -72,7 +72,7 @@ typedef struct _jack_port_type_info {
 */
 
 typedef struct _jack_port_shared {
-    int                      shm_key;
+    shm_name_t               shm_name;
     size_t                   offset;
     
     unsigned long            flags; 

@@ -98,7 +98,9 @@ main (int argc, char *argv[])
 	/* create two ports */
 
 	input_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+	fprintf (stderr, "got ip\n");
 	output_port = jack_port_register (client, "output", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+	fprintf (stderr, "got op\n");
 
 	/* tell the JACK server that we are ready to roll */
 
@@ -106,6 +108,8 @@ main (int argc, char *argv[])
 		fprintf (stderr, "cannot activate client");
 		return 1;
 	}
+
+	fprintf (stderr, "activated\n");
 
 	/* connect the ports. Note: you can't do this before
 	   the client is activated, because we can't allow
