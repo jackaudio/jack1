@@ -243,7 +243,9 @@ typedef enum {
 	DisconnectPort = 8,
 	SetClientCapabilities = 9,
 	GetPortConnections = 10,
-	GetPortNConnections = 11
+	GetPortNConnections = 11,
+	AddAlias = 12,
+	RemoveAlias = 13
 } RequestType;
 
 typedef struct {
@@ -262,12 +264,21 @@ typedef struct {
 	    char source_port[JACK_PORT_NAME_SIZE+1];
 	    char destination_port[JACK_PORT_NAME_SIZE+1];
 	} connect;
+	struct {
+	    char port[JACK_PORT_NAME_SIZE+1];
+	    char alias[JACK_PORT_NAME_SIZE+1];
+	} alias;
 	jack_client_id_t client_id;
 	jack_nframes_t nframes;
 	unsigned int nports;
     } x;
     int status;
 }  jack_request_t;
+
+typedef struct _jack_port_alias {
+    char port[JACK_PORT_NAME_SIZE+1];
+    char alias[JACK_PORT_NAME_SIZE+1];
+} jack_port_alias_t;
 
 extern void jack_cleanup_shm ();
 extern void jack_cleanup_files ();

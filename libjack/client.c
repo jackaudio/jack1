@@ -2104,5 +2104,47 @@ jack_cpu_load (jack_client_t *client)
 	return client->engine->cpu_load;
 }
 
+int
+jack_add_alias (jack_client_t *client, const char *portname, const char *alias)
+{
+	jack_request_t req;
+	
+	req.type = AddAlias;
+	snprintf (req.x.alias.port, sizeof (req.x.alias.port), "%s", portname);
+	snprintf (req.x.alias.alias, sizeof (req.x.alias.alias), "%s", alias);
 
-		
+	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot send add alias request to server");
+		return -1;
+	}
+
+	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot read add alias result from server (%s)", strerror (errno));
+		return -1;
+	}
+
+	return req.status;
+}
+
+int
+jack_remove_alias (jack_client_t *client, const char *alias)
+{
+	jack_request_t req;
+	
+	req.type = RemoveAlias;
+	snprintf (req.x.alias.alias, sizeof (req.x.alias.alias), "%s", alias);
+
+
+	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot send remove alias request to server");
+		return -1;
+	}
+
+	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot remove alias result from server (%s)", strerror (errno));
+		return -1;
+	}
+
+	return req.status;
+}
+

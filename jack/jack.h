@@ -479,6 +479,27 @@ float jack_cpu_load (jack_client_t *client);
  */
 void jack_set_server_dir (const char *path);
 
+/**
+ * Create an alias for a port. Returns zero if
+ * successful, non-zero otherwise. After a successful
+ * return, `alias' may be used to refer to a port
+ * instead of the port's actual name. the naming
+ * scheme is "alias:<alias>", so if the port alias
+ * was "left", and the port name was "foo:out1",
+ * then "alias:left" will refer to "foo:out1".
+ */
+
+int jack_add_alias    (jack_client_t *, const char *portname, const char *alias);
+
+/**
+ * Remove `alias' from a JACK system.
+ * Returns zero if successful, less than zero if the alias
+ * did not exist, greater than zero if the alias could not
+ * be removed.
+ */
+
+int jack_remove_alias (jack_client_t *, const char *alias);
+
 #ifdef __cplusplus
 }
 #endif

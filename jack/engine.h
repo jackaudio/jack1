@@ -66,7 +66,7 @@ struct _jack_engine {
 
     JSList *clients;
     JSList *clients_waiting;
-    JSList *connections;
+    JSList *aliases;
 
     struct _jack_port_internal *internal_ports;
 
@@ -89,6 +89,8 @@ struct _jack_engine {
     int reordered;
     int watchdog_check;
     float cpu_mhz;
+
+    
 
 #define JACK_ENGINE_ROLLING_COUNT 32
 #define JACK_ENGINE_ROLLING_INTERVAL 1024

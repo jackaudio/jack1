@@ -105,6 +105,9 @@ static int  jack_port_do_connect (jack_engine_t *engine, const char *source_port
 static int  jack_port_do_disconnect (jack_engine_t *engine, const char *source_port, const char *destination_port);
 static int  jack_port_do_disconnect_all (jack_engine_t *engine, jack_port_id_t);
 
+static int  jack_do_add_alias (jack_engine_t *engine, jack_request_t *);
+static int  jack_do_remove_alias (jack_engine_t *engine, jack_request_t *);
+
 static int  jack_port_do_unregister (jack_engine_t *engine, jack_request_t *);
 static int  jack_port_do_register (jack_engine_t *engine, jack_request_t *);
 static int  jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int reply_fd);
@@ -120,6 +123,8 @@ static int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_
 static int  jack_engine_process_lock (jack_engine_t *);
 static void jack_engine_process_unlock (jack_engine_t *);
 static int  jack_engine_post_process (jack_engine_t *);
+
+static const char *jack_lookup_alias (jack_engine_t *engine, const char *alias);
 
 static int *jack_shm_registry;
 static int  jack_shm_id_cnt;
@@ -1199,6 +1204,14 @@ handle_client_request (jack_engine_t *engine, int fd)
 			reply_fd = -1;
 		break;
 
+	case AddAlias:
+		req.status = jack_do_add_alias (engine, &req);
+		break;
+
+	case RemoveAlias:
+		req.status = jack_do_remove_alias (engine, &req);
+		break;
+
 	default:
 		/* some requests are handled entirely on the client side,
 		   by adjusting the shared memory area(s)
@@ -1371,6 +1384,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	pthread_mutex_init (&engine->port_lock, 0);
 
 	engine->clients = 0;
+	engine->aliases = 0;
 
 	engine->port_segments = 0;
 	engine->port_buffer_freelist = 0;
@@ -3178,3 +3192,84 @@ jack_set_asio_mode (jack_engine_t *engine, int yn)
 	engine->asio_mode = yn;
 }
 
+int
+jack_do_add_alias (jack_engine_t *engine, jack_request_t *req)
+{
+	JSList *list;
+	jack_port_alias_t *alias;
+	int ret = -1;
+
+	jack_lock_graph (engine);
+
+	for (list = engine->aliases; list; list = jack_slist_next (list)) {
+
+		alias = (jack_port_alias_t *) list->data;
+
+		if (strcmp (alias->port, req->x.alias.port) == 0 && strcmp (alias->alias, req->x.alias.alias) == 0) {
+			break;
+		}
+	}
+	
+	if (list == NULL) {
+		alias = (jack_port_alias_t *) malloc (sizeof (jack_port_alias_t));
+		strcpy (alias->port, req->x.alias.port);
+		strcpy (alias->alias, req->x.alias.alias);
+		
+		engine->aliases = jack_slist_append (engine->aliases, alias);
+		ret = 0;
+	}
+
+	jack_unlock_graph (engine);
+	return ret;
+}
+
+int
+jack_do_remove_alias (jack_engine_t *engine, jack_request_t *req)
+{
+	JSList *list;
+	jack_port_alias_t *alias;
+	int ret = -1;
+
+	jack_lock_graph (engine);
+
+	for (list = engine->aliases; list; list = jack_slist_next (list)) {
+
+		alias = (jack_port_alias_t *) list->data;
+
+		if (strcmp (alias->port, req->x.alias.port) == 0 && strcmp (alias->alias, req->x.alias.alias) == 0) {
+			engine->aliases = jack_slist_remove_link (engine->aliases, list);
+			jack_slist_free_1 (list);
+			free (alias);
+			ret = 0;
+		}
+	}
+
+	jack_unlock_graph (engine);
+	return ret;
+}
+
+const char *
+jack_lookup_alias (jack_engine_t *engine, const char *alias_name)
+{
+	JSList *list;
+	jack_port_alias_t *alias;
+
+	jack_lock_graph (engine);
+
+	for (list = engine->aliases; list; list = jack_slist_next (list)) {
+
+		alias = (jack_port_alias_t *) list->data;
+
+		if (strcmp (alias->alias, alias_name) == 0) {
+			break;
+		}
+	}
+
+	jack_unlock_graph (engine);
+
+	if (list) {
+		return ((jack_port_alias_t *) list->data)->port;
+	} else {
+		return 0;
+	}
+}

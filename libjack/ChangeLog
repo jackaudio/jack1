@@ -1,3 +1,7 @@
+2002-11-15  Paul Davis  <paul>
+
+	* client.c: added port alias functions. untested.
+
 2002-11-05  Kai Vehmanen  <kai.vehmanen@wakkanet.fi>
 
 	* Created this file. Current JACK version is 
