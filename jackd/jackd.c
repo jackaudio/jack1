@@ -405,7 +405,7 @@ main (int argc, char *argv[])
 	int status;
 #endif
 
-	setvbuf (stdout, NULL, _IOLBF, 120);
+	setvbuf (stdout, NULL, _IOLBF, 0);
 
 #ifdef USE_CAPABILITIES
 
