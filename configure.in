@@ -14,7 +14,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=66
-JACK_MICRO_VERSION=2
+JACK_MICRO_VERSION=3
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -41,7 +41,7 @@ dnl slacker than this, and closer to those for the JACK version
 dnl number.
 dnl ---
 JACK_API_CURRENT=0
-JACK_API_REVISION=16
+JACK_API_REVISION=17
 JACK_API_AGE=0
 
 AC_SUBST(JACK_MAJOR_VERSION)

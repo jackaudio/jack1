@@ -2077,8 +2077,34 @@ jack_main_thread (void *arg)
 	jack_nframes_t nframes;
 	int consecutive_excessive_delays;
 
+	if (engine->control->real_time) {
+
+		if (jack_start_watchdog (engine)) {
+			pthread_exit (0);
+		}
+
+		if (jack_become_real_time (pthread_self(), engine->rtpriority)) {
+			engine->control->real_time = 0;
+		}
+	}
+
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-	
+#ifdef HAVE_ON_EXIT
+	on_exit (cancel_cleanup, engine);
+#else
+#ifdef HAVE_ATEXIT
+	global_engine = engine;
+	atexit (cancel_cleanup);
+#else
+#error "Don't know how to install an exit handler"
+#endif /* HAVE_ATEXIT */
+#endif /* HAVE_ON_EXIT */
+
+	if (driver->start (driver)) {
+		jack_error ("cannot start driver");
+		pthread_exit (0);
+	}	
+
 	consecutive_excessive_delays = 0;
 	engine->watchdog_check = 1; /* really needed here ? */
 	nframes = 0; /* really needed here ? */
@@ -2126,34 +2152,6 @@ jack_run (jack_engine_t *engine)
 		return -1;
 	}
 	
-	if (engine->control->real_time) {
-
-		if (jack_start_watchdog (engine)) {
-			return -1;
-		}
-
-		if (jack_become_real_time (pthread_self(), engine->rtpriority)) {
-			engine->control->real_time = 0;
-		}
-	}
-
-#ifdef HAVE_ON_EXIT
-	on_exit (cancel_cleanup, engine);
-#else
-#ifdef HAVE_ATEXIT
-	global_engine = engine;
-	atexit (cancel_cleanup);
-#else
-#error "Don't know how to install an exit handler"
-#endif /* HAVE_ATEXIT */
-#endif /* HAVE_ON_EXIT */
-
-	
-	if (engine->driver->start (engine->driver)) {
-		jack_error ("cannot start driver");
-		return -1;
-	}
-
 	return pthread_create (&engine->main_thread, 0, jack_main_thread, engine);
 }
 
