@@ -348,15 +348,13 @@ jack_transport_cycle_end (jack_engine_t *engine)
 
 	/* See if an asynchronous position request arrived during the
 	 * last cycle.  The request_time could change during the
-	 * guarded copy.  If so, we'll handle it now, but mistake it
-	 * for a new request in the following cycle.  That may cause
-	 * an extra sync poll cycle, but should work. */
+	 * guarded copy.  If so, we'll use that new request. */
 	if (ectl->request_time.unique_1 != ectl->prev_request) {
-		ectl->prev_request = ectl->request_time.unique_1;
 		jack_transport_copy_position(&ectl->request_time,
 					     &ectl->pending_time);
 		VERBOSE (engine, "new transport position: %lu, id=0x%llx\n",
 		       ectl->pending_time.frame, ectl->pending_time.unique_1);
+		ectl->prev_request = ectl->pending_time.unique_1;
 		ectl->new_pos = 1;
 	} else
 		ectl->new_pos = 0;
