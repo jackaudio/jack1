@@ -37,6 +37,12 @@ srate (jack_nframes_t nframes, void *arg)
 }
 
 void
+error (const char *desc)
+{
+	printf ("JACK experienced an error: %s\n", desc);
+}
+
+void
 jack_shutdown (void *arg)
 {
 	exit (1);
@@ -52,6 +58,15 @@ main (int argc, char *argv[])
 		fprintf (stderr, "usage: jack_simple_client <name>\n");
 		return 1;
 	}
+
+	/* tell the JACK server to call error() whenever it
+	   experiences an error.  Notice that this callback is
+	   global to this process, not specific to each client.
+	
+	   This is set here so that it can catch errors in the
+	   connection process
+	*/
+	jack_set_error_function (error);
 
 	/* try to become a client of the JACK server */
 

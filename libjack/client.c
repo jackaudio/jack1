@@ -97,19 +97,25 @@ typedef struct {
     const char *client_name;
 } client_info;
 
-static void 
-default_jack_error (const char *fmt, ...)
+void 
+jack_error (const char *fmt, ...)
 
 {
 	va_list ap;
+	char buffer[300];
 
 	va_start (ap, fmt);
-	vfprintf (stderr, fmt, ap);
+	vsnprintf (buffer, 300, fmt, ap);
+	jack_error_callback (buffer);
 	va_end (ap);
-	fputc ('\n', stderr);
 }
 
-void (*jack_error)(const char *fmt, ...) = &default_jack_error;
+void default_jack_error_callback (const char *desc)
+{
+    fprintf(stderr, "%s\n", desc);
+}
+
+void (*jack_error_callback)(const char *desc) = &default_jack_error_callback;
 
 jack_client_t *
 jack_client_alloc ()
@@ -1392,9 +1398,9 @@ jack_engine_takeover_timebase (jack_client_t *client)
 }	
 
 void
-jack_set_error_function (void (*func) (const char *, ...))
+jack_set_error_function (void (*func) (const char *))
 {
-	jack_error = func;
+	jack_error_callback = func;
 }
 
 jack_nframes_t

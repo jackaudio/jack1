@@ -291,6 +291,8 @@ extern char *jack_server_dir;
 
 extern int jack_get_mhz (void);
 
+extern void jack_error (const char *fmt, ...);
+
 #endif /* __jack_internal_h__ */
 
 
