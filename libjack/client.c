@@ -14,7 +14,7 @@
     You should have received a copy of the GNU Lesser General Public License
     along with this program; if not, write to the Free Software 
     Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-    
+
     $Id$
 */
 
@@ -992,10 +992,11 @@ jack_client_close (jack_client_t *client)
 	JSList *node;
 	void *status;
 
-	jack_deactivate (client);
+	if (client->control->active) {
+		jack_deactivate (client);
+	}
 
 	/* stop the thread that communicates with the jack server */
-
 	pthread_cancel (client->thread);
 	pthread_join (client->thread, &status);
 
@@ -1538,17 +1539,8 @@ int
 jack_set_buffer_size_callback (jack_client_t *client, JackBufferSizeCallback callback, void *arg)
 
 {
-	if (client->control->active) {
-		jack_error ("You cannot set callbacks on an active client.");
-		return -1;
-	}
-	client->control->bufsize_arg = arg;
-	client->control->bufsize = callback;
 
-	/* Now invoke it */
-
-	callback (client->engine->buffer_size, arg);
-
+	jack_error("\n*** libjack: WARNING! Use of function jack_set_buffer_size_callback() is deprecated! ***\n\n");
 	return 0;
 }
 
