@@ -82,7 +82,6 @@ typedef struct _jack_client_internal {
     int        subgraph_wait_fd;
     JSList    *ports;    /* protected by engine->client_lock */
     JSList    *fed_by;   /* protected by engine->client_lock */
-    int        shm_fd;
     shm_name_t shm_name;
     unsigned   long execution_order;
     struct    _jack_client_internal *next_client; /* not a linked list! */
@@ -1560,7 +1559,7 @@ jack_server_thread (void *arg)
 		   short of copying the entire
 		   contents of the pfd struct. Ick.
 		*/
-
+	
 		max = engine->pfd_max;
 		pfd = engine->pfd;
 	
@@ -2092,7 +2091,6 @@ int
 jack_engine_delete (jack_engine_t *engine)
 {
 	if (engine) {
-		close (engine->control_shm_fd);
 		return pthread_cancel (engine->main_thread);
 	}
 
@@ -2105,7 +2103,6 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	jack_client_internal_t *client;
 	shm_name_t shm_name;
 	int shmid;
-	int shm_fd = 0;
 	void *addr = 0;
 
 	switch (req->type) {
@@ -2142,8 +2139,6 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 		client->control = (jack_client_control_t *) malloc (sizeof (jack_client_control_t));		
 
 	} else {
-
-		client->shm_fd = shm_fd;
 		strcpy (client->shm_name, shm_name);
 		client->control = (jack_client_control_t *) addr;
 	}
@@ -2243,7 +2238,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	}
 
 	/* try to force the server thread to return from poll */
-
+	
 	close (client->event_fd);
 	close (client->request_fd);
 	
@@ -2285,7 +2280,6 @@ jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 	} else {
 		jack_destroy_shm (client->shm_name);
 		jack_release_shm ((char*)client->control, sizeof (jack_client_control_t));
-		close (client->shm_fd);
 	}
 
 	free (client);

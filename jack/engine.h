@@ -45,7 +45,6 @@ struct _jack_engine {
     int process_errors;
     int period_msecs;
     unsigned int port_max;
-    int control_shm_fd;
     shm_name_t control_shm_name;
     size_t     control_size;
     shm_name_t port_segment_name; /* XXX fix me */
