@@ -35,7 +35,13 @@ extern "C" {
  */
 
 /**
- * Attemps to become an external client of the Jack server.
+ * Attempts to become an external client of the Jack server.
+ *
+ * @return opaque client handle if successful, otherwise NULL.
+ *
+ * Note: failure generally means that the JACK server is not running.
+ * If there was some other problem, it will be reported via the
+ * @ref jack_error_callback mechanism.
  */
 jack_client_t *jack_client_new (const char *client_name);
 
@@ -630,10 +636,21 @@ void jack_set_server_dir (const char *path);
  */
 pthread_t jack_client_thread_id (jack_client_t *);
 
-extern void (*jack_error_callback)(const char *desc);
+/**
+ * Function called for displaying JACK error messages.
+ *
+ * Set via jack_set_error_function(), otherwise a JACK-provided
+ * default will print @a msg (plus a newline) to stderr.
+ *
+ * @param msg error message text (no newline at end).
+ */
+extern void (*jack_error_callback)(const char *msg);
 
 /**
- * Sets callback to be called to print error messages.
+ * Set the @ref jack_error_callback for error message display.
+ *
+ * The JACK library provides two built-in callbacks for this purpose:
+ * default_jack_error_callback() and silent_jack_error_callback().
  */
 void jack_set_error_function (void (*func)(const char *));
 

@@ -67,7 +67,8 @@ char *jack_server_dir = "/tmp";
 void
 jack_set_server_dir (const char *path)
 {
-	fprintf (stderr, "jack_set_server_dir() is deprecated.\n  Please contact the program's author\n");
+	jack_error ("jack_set_server_dir() is deprecated.\n"
+		    "Please contact the program's author");
 	jack_server_dir = strdup (path);
 }
 
@@ -96,12 +97,14 @@ jack_error (const char *fmt, ...)
 	va_end (ap);
 }
 
-void default_jack_error_callback (const char *desc)
+void 
+default_jack_error_callback (const char *desc)
 {
-    fprintf(stderr, "%s\n", desc);
+	fprintf(stderr, "%s\n", desc);
 }
 
-void silent_jack_error_callback (const char *desc)
+void 
+silent_jack_error_callback (const char *desc)
 {
 }
 
@@ -308,15 +311,16 @@ server_connect (int which)
 	struct sockaddr_un addr;
 
 	if ((fd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
-		jack_error ("cannot create client socket (%s)", strerror (errno));
+		jack_error ("cannot create client socket (%s)",
+			    strerror (errno));
 		return -1;
 	}
 
 	addr.sun_family = AF_UNIX;
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d", jack_server_dir, which);
+	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d",
+		  jack_server_dir, which);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
-		jack_error ("cannot connect to jack server", strerror (errno));
 		close (fd);
 		return -1;
 	}
@@ -333,15 +337,18 @@ server_event_connect (jack_client_t *client)
 	jack_client_connect_ack_result_t res;
 
 	if ((fd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
-		jack_error ("cannot create client event socket (%s)", strerror (errno));
+		jack_error ("cannot create client event socket (%s)",
+			    strerror (errno));
 		return -1;
 	}
 
 	addr.sun_family = AF_UNIX;
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0", jack_server_dir);
+	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0",
+		  jack_server_dir);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
-		jack_error ("cannot connect to jack server for events", strerror (errno));
+		jack_error ("cannot connect to jack server for events",
+			    strerror (errno));
 		close (fd);
 		return -1;
 	}
@@ -349,18 +356,22 @@ server_event_connect (jack_client_t *client)
 	req.client_id = client->control->id;
 
 	if (write (fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot write event connect request to server (%s)", strerror (errno));
+		jack_error ("cannot write event connect request to server (%s)",
+			    strerror (errno));
 		close (fd);
 		return -1;
 	}
 
 	if (read (fd, &res, sizeof (res)) != sizeof (res)) {
-		jack_error ("cannot read event connect result from server (%s)", strerror (errno));
+		jack_error ("cannot read event connect result from server (%s)",
+			    strerror (errno));
 		close (fd);
 		return -1;
 	}
 
 	if (res.status != 0) {
+		jack_error ("cannot connect to server for event stream (%s)",
+			    strerror (errno));
 		close (fd);
 		return -1;
 	}
@@ -379,28 +390,30 @@ jack_request_client (ClientType type, const char* client_name, const char* so_na
 	memset (&req, 0, sizeof (req));
 
 	if (strlen (client_name) > sizeof (req.name) - 1) {
-		jack_error ("\"%s\" is too long to be used as a JACK client name.\n"
-			     "Please use %lu characters or less.",
+		jack_error ("\"%s\" is too long to be used as a JACK client"
+			    " name.\n"
+			    "Please use %lu characters or less.",
 			    client_name, sizeof (req.name) - 1);
 		return -1;
 	}
 
 	if (strlen (so_name) > sizeof (req.object_path) - 1) {
-		jack_error ("\"%s\" is too long to be used as a JACK shared object name.\n"
+		jack_error ("\"%s\" is too long to be used as a JACK shared"
+			    " object name.\n"
 			     "Please use %lu characters or less.",
 			    so_name, sizeof (req.object_path) - 1);
 		return -1;
 	}
 
 	if (strlen (so_data) > sizeof (req.object_data) - 1) {
-		jack_error ("\"%s\" is too long to be used as a JACK shared object data string.\n"
+		jack_error ("\"%s\" is too long to be used as a JACK shared"
+			    " object data string.\n"
 			     "Please use %lu characters or less.",
 			    so_data, sizeof (req.object_data) - 1);
 		return -1;
 	}
 
 	if ((*req_fd = server_connect (0)) < 0) {
-		jack_error ("cannot connect to default JACK server");
 		goto fail;
 	}
 
@@ -411,29 +424,34 @@ jack_request_client (ClientType type, const char* client_name, const char* so_na
 	snprintf (req.object_data, sizeof (req.object_data), "%s", so_data);
 
 	if (write (*req_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send request to jack server (%s)", strerror (errno));
+		jack_error ("cannot send request to jack server (%s)",
+			    strerror (errno));
 		goto fail;
 	}
-	
+
 	if (read (*req_fd, res, sizeof (*res)) != sizeof (*res)) {
 
 		if (errno == 0) {
 			/* server shut the socket */
-			jack_error ("could not attach as client (duplicate client name?)");
+			jack_error ("could not attach as client "
+				    "(duplicate client name?)");
 			goto fail;
 		}
 
-		jack_error ("cannot read response from jack server (%s)", strerror (errno));
+		jack_error ("cannot read response from jack server (%s)",
+			    strerror (errno));
 		goto fail;
 	}
 
 	if (res->status) {
-		jack_error ("could not attach as client (duplicate client name?)");
+		jack_error ("could not attach as client "
+			    "(duplicate client name?)");
 		goto fail;
 	}
 
 	if (res->protocol_v != jack_protocol_version){
-		jack_error ("application linked against too wrong of a version of libjack.");
+		jack_error ("application linked against incompatible libjack"
+			    " version.");
 		goto fail;
 	}
 
@@ -567,7 +585,8 @@ jack_client_new (const char *client_name)
 		goto fail;
 	}
 	
-	client->control = (jack_client_control_t *) jack_shm_addr (&client->control_shm);
+	client->control = (jack_client_control_t *)
+		jack_shm_addr (&client->control_shm);
 
 	/* nobody else needs to access this shared memory any more, so
 	   destroy it. because we have our own attachment to it, it won't
@@ -576,8 +595,8 @@ jack_client_new (const char *client_name)
 	jack_destroy_shm (&client->control_shm);
 
 	client->n_port_types = client->engine->n_port_types;
-	client->port_segment = (jack_shm_info_t *) malloc (sizeof (jack_shm_info_t) * 
-							   client->n_port_types);
+	client->port_segment = (jack_shm_info_t *)
+		malloc (sizeof (jack_shm_info_t) * client->n_port_types);
 	
 	for (ptid = 0; ptid < client->n_port_types; ++ptid) {
 		client->port_segment[ptid].index =
@@ -592,8 +611,6 @@ jack_client_new (const char *client_name)
 	client->control->deliver_arg = client;
 
 	if ((ev_fd = server_event_connect (client)) < 0) {
-		jack_error ("cannot connect to server for event stream (%s)",
-			    strerror (errno));
 		goto fail;
 	}
 
@@ -654,7 +671,6 @@ jack_internal_client_close (const char *client_name)
 	snprintf (req.name, sizeof (req.name), "%s", client_name);
 	
 	if ((fd = server_connect (0)) < 0) {
-		jack_error ("cannot connect to default JACK server.");
 		return;
 	}
 
@@ -777,7 +793,6 @@ jack_client_thread (void *arg)
                 
 		if (poll (client->pollfd, client->pollmax, 1000) < 0) {
 			if (errno == EINTR) {
-				fprintf (stderr, "poll interrupted\n");
 				continue;
 			}
 			jack_error ("poll failed in client (%s)",
@@ -1761,9 +1776,9 @@ jack_get_mhz (void)
 		int ret;
 		char buf[1000];
 
-		if (fgets(buf, sizeof(buf), f) == NULL)
-		{
-			fprintf(stderr, "cannot locate cpu MHz in /proc/cpuinfo\n");
+		if (fgets(buf, sizeof(buf), f) == NULL) {
+			jack_error ("FATAL: cannot locate cpu MHz in "
+				    "/proc/cpuinfo\n");
 			exit(1);
 		}
 
