@@ -395,10 +395,13 @@ jack_resize_port_segment (jack_engine_t *engine,
 
 		/* update any existing output port offsets */
 		for (i = 0; i < engine->port_max; i++) {
-			if (engine->control->ports[i].flags|JackPortIsOutput &&
-			    engine->control->ports[i].ptype_id == ptid) {
+			if (engine->control->ports[i].flags & JackPortIsOutput
+			    && engine->control->ports[i].ptype_id == ptid) {
 				bi = engine->internal_ports[i].buffer_info;
-				engine->control->ports[i].offset = bi->offset;
+				if (bi) {
+					engine->control->ports[i].offset =
+						bi->offset;
+				}
 			}
 		}
 		pthread_mutex_unlock (&pti->buffer_lock);

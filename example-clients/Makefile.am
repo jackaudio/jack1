@@ -33,6 +33,7 @@ bin_PROGRAMS = jack_load \
 	       jack_disconnect \
 	       jack_metro \
 	       jack_showtime \
+               jack_bufsize \
 	       jack_lsp \
 	       $(JACKREC) \
 	       $(JACK_TRANSPORT)
@@ -72,6 +73,10 @@ jack_lsp_LDADD = ../libjack/libjack.la
 jack_showtime_SOURCES = showtime.c
 jack_showtime_LDFLAGS = -lrt -ldl -lpthread
 jack_showtime_LDADD = ../libjack/libjack.la
+
+jack_bufsize_SOURCES = bufsize.c
+jack_bufsize_LDFLAGS =
+jack_bufsize_LDADD = ../libjack/libjack.la
 
 
 if HAVE_SNDFILE
