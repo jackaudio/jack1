@@ -12,6 +12,18 @@ dist-check-sndfile:
 	@false
 endif
 
+if HAVE_READLINE
+JACK_TRANSPORT = jack_transport
+dist-check-readline:
+else
+JACK_TRANSPORT =
+dist-check-readline:
+	@echo
+	@echo ' ******' You need readline installed to make dist.' ******'
+	@echo
+	@false
+endif
+
 bin_PROGRAMS = jack_load \
 	       jack_unload \
 	       jack_simple_client \
@@ -22,7 +34,8 @@ bin_PROGRAMS = jack_load \
 	       jack_metro \
 	       jack_showtime \
 	       jack_lsp \
-		   jackrec
+	       jackrec \
+	       $(JACK_TRANSPORT)
 
 if HAVE_SNDFILE
 # note! jackrec_CFLAGS syntax not supported by automake-1.4
@@ -65,6 +78,12 @@ if HAVE_SNDFILE
 jackrec_SOURCES = capture_client.c ringbuffer.c ringbuffer.h
 jackrec_LDFLAGS = @SNDFILE_LIBS@ -lrt -ldl -lpthread
 jackrec_LDADD = ../libjack/libjack.la
+endif
+
+if HAVE_READLINE
+jack_transport_SOURCES = transport.c
+jack_transport_LDFLAGS = -lhistory -lreadline -lrt -ldl -lpthread
+jack_transport_LDADD = ../libjack/libjack.la
 endif
 
 jack_impulse_grabber_SOURCES = impulse_grabber.c

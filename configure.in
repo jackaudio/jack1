@@ -14,7 +14,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=72
-JACK_MICRO_VERSION=0
+JACK_MICRO_VERSION=1
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -247,6 +247,11 @@ if test x$HAVE_SNDFILE = xfalse; then
              AC_MSG_WARN([*** the jackrec example client will not be built])
 fi
 
+AC_CHECK_LIB(readline, readline, [HAVE_READLINE=true], [HAVE_READLINE=false])
+if test x$HAVE_READLINE = xfalse; then
+	AC_MSG_WARN([*** the jack_transport example client will not be built])
+fi
+
 # you need doxygen to make dist.
 AC_CHECK_PROG(HAVE_DOXYGEN, doxygen, true, false)
 if test $HAVE_DOXYGEN = "false"; then
@@ -254,6 +259,7 @@ if test $HAVE_DOXYGEN = "false"; then
 fi
 
 AM_CONDITIONAL(HAVE_SNDFILE, $HAVE_SNDFILE)
+AM_CONDITIONAL(HAVE_READLINE, $HAVE_READLINE)
 AM_CONDITIONAL(HAVE_DOXYGEN, $HAVE_DOXYGEN)
 AM_CONDITIONAL(USE_CAPABILITIES, $USE_CAPABILITIES)
 AM_CONDITIONAL(STRIPPED_JACKD, $STRIPPED_JACKD)
