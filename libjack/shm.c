@@ -141,6 +141,7 @@ jack_initialize_shm (void)
 	jack_shmsize_t size;
 	int new_registry = FALSE;
 	int ret = -1;
+	int perm;
 
 	if (jack_shm_registry != NULL) {
 		return 0;
@@ -154,16 +155,20 @@ jack_initialize_shm (void)
 	size = sizeof (jack_shm_registry_t) * MAX_SHM_ID;
 
 	jack_shm_lock_registry ();
+	
+	perm = O_RDWR;
 
 	/* try without O_CREAT to see if it already exists */
-
-	if ((shm_fd = shm_open ("/jack-shm-registry", O_RDWR, 0666)) < 0) {
+	
+	if ((shm_fd = shm_open ("/jack-shm-registry", perm, 0666)) < 0) {
 
 		if (errno == ENOENT) {
+				
+			perm = O_RDWR|O_CREAT;
 			
 			/* it doesn't exist, so create it */
 
-			if ((shm_fd = shm_open ("/jack-shm-registry", O_RDWR|O_CREAT, 0666)) < 0) {
+			if ((shm_fd = shm_open ("/jack-shm-registry", perm, 0666)) < 0) {
 				jack_error ("cannot create shm registry segment (%s)",
 					    strerror (errno));
 				goto out;
@@ -178,12 +183,14 @@ jack_initialize_shm (void)
 		}
 	}
 
-	if (ftruncate (shm_fd, size) < 0) {
-		jack_error ("cannot set size of engine shm registry "
-			    "(%s)", strerror (errno));
-		goto out;
+	if (perm & O_CREAT) {
+		if (ftruncate (shm_fd, size) < 0) {
+			jack_error ("cannot set size of engine shm registry 1"
+			"(%s)", strerror (errno));
+			goto out;
+		}
 	}
-
+  
 	if ((jack_shm_registry = mmap (0, size, PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
 		jack_error ("cannot mmap shm registry segment (%s)",
 			    strerror (errno));
@@ -232,17 +239,21 @@ jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
 	if ((registry = jack_get_free_shm_info ()) == NULL) {
 		return -1;
 	}
+        
+	int perm = O_RDWR|O_CREAT;
 
 	if ((shm_fd = shm_open (shm_name, O_RDWR|O_CREAT, 0666)) < 0) {
 		jack_error ("cannot create shm segment %s (%s)", shm_name,
 			    strerror (errno));
 		return -1;
 	}
-
-	if (ftruncate (shm_fd, size) < 0) {
-		jack_error ("cannot set size of engine shm registry "
-			    "(%s)", strerror (errno));
-		return -1;
+        
+	if (perm & O_CREAT) {
+		if (ftruncate (shm_fd, size) < 0) {
+				jack_error ("cannot set size of engine shm registry 0"
+							"(%s)", strerror (errno));
+				return -1;
+		}
 	}
 
 	close (shm_fd);

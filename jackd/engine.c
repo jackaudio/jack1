@@ -1252,6 +1252,8 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 	jack_client_internal_t *client;
 	jack_client_connect_request_t req;
 	jack_client_connect_result_t res;
+	
+	res.status = 0;
 
 	if (read (client_fd, &req, sizeof (req)) != sizeof (req)) {
 		jack_error ("cannot read connection request from client");
@@ -1261,11 +1263,11 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 	if (!req.load) {
 		return handle_unload_client (engine, client_fd, &req);
 	}
-
+	
 	if ((client = setup_client (engine, client_fd, &req, &res)) == NULL) {
 		return -1;
 	}
-
+	
 	if (write (client->request_fd, &res, sizeof (res)) != sizeof (res)) {
 		jack_error ("cannot write connection response to client");
 		jack_client_delete (engine, client);
