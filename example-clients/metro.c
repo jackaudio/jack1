@@ -86,22 +86,18 @@ process_audio (jack_nframes_t nframes)
 int
 process (jack_nframes_t nframes, void *arg)
 {
-	jack_transport_info_t ti;
-	
 	if (transport_aware) {
-		int mask = JackTransportPosition | JackTransportState;
-		jack_get_transport_info (client, &ti);
+		jack_position_t pos;
 
-		if (((ti.valid & mask) != mask) || ti.transport_state == JackTransportStopped) {
-			// no valid information, or not rolling, bail out
+		if (jack_transport_query (client, &pos)
+		    != JackTransportRolling) {
+
 			process_silence (nframes);
 			return 0;
 		}
-		offset = ti.frame % wave_length;
+		offset = pos.frame % wave_length;
 	}
-
 	process_audio (nframes);
-
 	return 0;
 }
 
