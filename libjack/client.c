@@ -1273,6 +1273,12 @@ jack_client_process_thread (void *arg)
 	jack_client_control_t *control = client->control;
 	int err = 0;
       
+	if (client->control->thread_init) {
+	/* this means that the init callback will be called twice -taybin*/
+		DEBUG ("calling client thread init callback");
+		client->control->thread_init (client->control->thread_init_arg);
+	}
+
 	client->control->pid = getpid();
 	DEBUG ("client process thread is now running");
         
