@@ -20,6 +20,9 @@ noinst_HEADERS = jack_md5.h md5.h md5_loc.h
 BUILT_SOURCES = jack_md5.h
 
 jack_md5.h: jackd
+if STRIPPED_JACKD
+	strip -R .note -R .comment .libs/jackd
+endif
 	echo "#define JACKD_MD5_SUM \"`md5sum .libs/jackd | awk '{print $$1}'`\"" > jack_md5.h
 
 jackstart_SOURCES = jackstart.c md5.c

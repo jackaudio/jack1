@@ -12,10 +12,6 @@ Source0:	%{name}-%{version}.tar.gz
 URL:		http://jackit.sourceforge.net
 BuildRoot:	/var/tmp/%{name}-%{version}-root-%(id -u -n)
 
-# disable build root strip policy, otherwise rpm strips the executables
-# and the jackd md5 checksum checked by jackstart does not match.
-%define __spec_install_post /usr/lib/rpm/brp-compress || :
-
 %description
 JACK is a low-latency audio server, written primarily for the Linux
 operating system. It can connect a number of different applications to
@@ -50,7 +46,7 @@ Small example clients that use the Jack Audio Connection Kit.
 
 %build
 %if "%{enable_capabilities}" == "1"
-%configure --enable-capabilities
+%configure --enable-capabilities --enable-stripped-jackd
 %else
 %configure
 %endif
