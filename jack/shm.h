@@ -12,12 +12,20 @@
 #define JACK_SHM_NULL_INDEX -1		/* NULL SHM index */
 #define JACK_SHM_REGISTRY_INDEX -2	/* pseudo SHM index for registry */
 
+
+/* On Mac OS X, SHM_NAME_MAX is the maximum length of a shared memory
+ * segment name (instead of NAME_MAX or PATH_MAX as defined by the
+ * standard).
+ */
 #ifdef USE_POSIX_SHM
-typedef char	   shm_name_t[JACK_SERVER_NAME_SIZE];
+#ifndef SHM_NAME_MAX
+#define SHM_NAME_MAX NAME_MAX
+#endif
+typedef char	   shm_name_t[SHM_NAME_MAX];
 typedef shm_name_t jack_shm_id_t;
 #else /* System V SHM */
 typedef int	   jack_shm_id_t;
-#endif
+#endif /* SHM type */
 
 /* shared memory type */
 typedef enum {

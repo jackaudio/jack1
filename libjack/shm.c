@@ -665,59 +665,60 @@ jack_release_shm (jack_shm_info_t* si)
 	}
 }
 
-/* allocate a POSIX shared memory segment
- *
- * The shm_name should not have a leading slash, that will be provided
- * here along with a prefix making it unique to this server.
- */
+/* allocate a POSIX shared memory segment */
 int
 jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
 {
 	jack_shm_registry_t* registry;
 	int shm_fd;
 	int rc = -1;
-	char name[NAME_MAX+1];
-
-	/* concatenate jack_shm_server_prefix and shm_name to build a
-	 * unique name per user and per server  */
-	snprintf (name, sizeof (name), "%s%s",
-		  jack_shm_server_prefix, shm_name);
-
-	if (strlen (name) >= sizeof (jack_shm_id_t)) {
-		jack_error ("shm segment name too long %s", name);
-		return -1;
-	}
+	char name[SHM_NAME_MAX+1];
 
 	jack_shm_lock_registry ();
 
-	if ((registry = jack_get_free_shm_info ())) {
-
-		if ((shm_fd = shm_open (name, O_RDWR|O_CREAT, 0666)) >= 0) {
-
-			if (ftruncate (shm_fd, size) >= 0) {
-
-				close (shm_fd);
-				registry->size = size;
-				//JOQ: better to use strncpy() here...
-				snprintf (registry->id, sizeof (registry->id),
-					  "%s", name);
-				registry->allocator = getpid();
-				si->index = registry->index;
-				si->attached_at = MAP_FAILED; /* not attached */
-				rc = 0;	/* success */
-
-			} else {
-				jack_error ("cannot set size of engine shm "
-					    "registry 0 (%s)",
-					    strerror (errno));
-			}
-
-		} else {
-			jack_error ("cannot create shm segment %s (%s)",
-				    name, strerror (errno));
-		}
+	if ((registry = jack_get_free_shm_info ()) == NULL) {
+		jack_error ("shm registry full");
+		goto unlock;
 	}
 
+	/* On Mac OS X, the maximum length of a shared memory segment
+	 * name is SHM_NAME_MAX (instead of NAME_MAX or PATH_MAX as
+	 * defined by the standard).  Unfortunately, Apple sets this
+	 * value so small (about 31 bytes) that it is useless for
+	 * actual names.  So, we construct a short name from the
+	 * registry index for uniqueness and ignore the shm_name
+	 * parameter.  Bah!
+	 */
+	snprintf (name, sizeof (name), "/jack-%d", registry->index);
+
+	if (strlen (name) >= sizeof (registry->id)) {
+		jack_error ("shm segment name too long %s", name);
+		goto unlock;
+	}
+
+	if ((shm_fd = shm_open (name, O_RDWR|O_CREAT, 0666)) < 0) {
+		jack_error ("cannot create shm segment %s (%s)",
+			    name, strerror (errno));
+		goto unlock;
+	}
+
+	if (ftruncate (shm_fd, size) < 0) {
+		jack_error ("cannot set size of engine shm "
+			    "registry 0 (%s)",
+			    strerror (errno));
+		close (shm_fd);
+		goto unlock;
+	}
+
+	close (shm_fd);
+	registry->size = size;
+	strncpy (registry->id, name, sizeof (registry->id));
+	registry->allocator = getpid();
+	si->index = registry->index;
+	si->attached_at = MAP_FAILED;	/* not attached */
+	rc = 0;				/* success */
+
+ unlock:
 	jack_shm_unlock_registry ();
 	return rc;
 }
