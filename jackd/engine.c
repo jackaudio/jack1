@@ -3290,6 +3290,7 @@ jack_port_do_connect (jack_engine_t *engine,
 	jack_port_internal_t *srcport, *dstport;
 	jack_port_id_t src_id, dst_id;
 	jack_client_internal_t *client;
+	JSList *it;
 
 	if ((srcport = jack_get_port_by_name (engine, source_port)) == NULL) {
 		jack_error ("unknown source port in attempted connection [%s]",
@@ -3363,6 +3364,12 @@ jack_port_do_connect (jack_engine_t *engine,
 		jack_error ("cannot connect ports owned by inactive clients;"
 			    " \"%s\" is not active", client->control->name);
 		return -1;
+	}
+
+	for (it = srcport->connections; it; it = it->next) {
+		if (((jack_connection_internal_t *)it->data)->destination == dstport) {
+			return 0;
+		}
 	}
 
 	connection = (jack_connection_internal_t *)
