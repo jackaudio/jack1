@@ -47,7 +47,18 @@
 
 const int CAVersion = 3;
 
-void JCALog(char *fmt, ...);
+#define PRINTDEBUG 1
+
+static void JCALog(char *fmt, ...)
+{
+#ifdef PRINTDEBUG
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "JCA: ");
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+#endif
+}
 
 static void printError1(OSStatus err)
 {
