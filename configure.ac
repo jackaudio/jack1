@@ -269,7 +269,8 @@ if test "x$enable_mmx" = xyes; then
 fi
 
 AC_ARG_ENABLE(optimize,
-    AC_HELP_STRING([--disable-optimize], [do not ask the compiler to optimize]),
+    AC_HELP_STRING([--enable-optimize],
+		   [ask the compiler for its best optimizations]),
     [ if test x$enable_optimize != xno ; then
 	JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS" ;
       fi 
