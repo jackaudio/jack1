@@ -100,11 +100,7 @@ jack_driver_nt_detach (jack_driver_nt_t * driver, jack_engine_t * engine)
 static int
 jack_driver_nt_become_real_time (jack_driver_nt_t* driver)
 {
-	/* On some systems the driver thread appears to start running
-	 * before pthread_create() actually stores the nt_thread
-	 * value.  If so, that is probably a Linuxthreads bug.  Using
-	 * pthread_self() here seems to help. */
-        if (jack_acquire_real_time_scheduling (pthread_self(),
+        if (jack_acquire_real_time_scheduling (driver->nt_thread,
                                                driver->engine->rtpriority)) {
                 return -1;
         }
@@ -125,6 +121,11 @@ jack_driver_nt_thread (void * arg)
 	jack_driver_nt_t * driver = (jack_driver_nt_t *) arg;
 	int rc = 0;
 	int run;
+
+	/* This thread may start running before pthread_create()
+	 * actually stores the driver->nt_thread value.  It's safer to
+	 * store it here as well. */
+	driver->nt_thread = pthread_self();
 
 	if (driver->engine->control->real_time)
 		jack_driver_nt_become_real_time (driver);
@@ -165,9 +166,6 @@ jack_driver_nt_start (jack_driver_nt_t * driver)
 
 	driver->nt_run = DRIVER_NT_RUN;
 
-	/* On some systems the driver thread appears to start running
-	 * before pthread_create() actually stores the nt_thread
-	 * value.  If so, that is probably a Linuxthreads bug. */
 	err = pthread_create (&driver->nt_thread, NULL,
 			      jack_driver_nt_thread, driver);
 	if (err) {
