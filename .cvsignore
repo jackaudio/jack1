@@ -18,3 +18,8 @@ Makefile
 Makefile.in
 jack_fltk_client
 configure
+*.tar.gz
+typescript
+*.desc
+*diff
+*diffs
