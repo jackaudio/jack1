@@ -1,31 +1,90 @@
-MAINTAINERCLEANFILES = Makefile.in aclocal.m4 configure config.h.in \
-                       stamp-h.in config.log config.cache \
-                       config.guess mkinstalldirs config.status \
-                       missing install-sh config.sub ltconfig \
-                       ltmain.sh
+MAINTAINERCLEANFILES    = Makefile.in
 
-if HAVE_DOXYGEN
-DOC_DIR = doc
-dist-check-doxygen:
+if HAVE_FLTK
+FLTK_CLIENT = jack_fltk_client
+dist-check-fltk:
 else
-DOC_DIR =
-dist-check-doxygen:
+FLTK_CLIENT =
+dist-check-fltk:
 	@echo
-	@echo ' ******' You need doxygen installed to make dist.' ******'
+	@echo ' ******' You need fltk installed to make dist.' ******'
 	@echo
 	@false
 endif
 
-SUBDIRS = jack libjack jackd drivers example-clients $(DOC_DIR)
+if HAVE_SNDFILE
+JACKREC = jackrec
+dist-check-sndfile:
+else
+JACKREC =
+dist-check-sndfile:
+	@echo
+	@echo ' ******' You need sndfile installed to make dist.' ******'
+	@echo
+	@false
+endif
 
-DIST_SUBDIRS = jack libjack jackd drivers example-clients doc
+bin_PROGRAMS = jack_simple_client \
+	       jack_monitor_client \
+	       jack_impulse_grabber \
+	       jack_connect \
+	       jack_disconnect \
+	       jack_metro \
+	       jack_showtime \
+	       jack_lsp \
+	       $(FLTK_CLIENT) $(JACKREC)
 
-pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = jack.pc
+if HAVE_SNDFILE
+# note! jackrec_CFLAGS syntax not supported by automake-1.4
+sndfile_cflags = @SNDFILE_CFLAGS@
+endif
 
-rpm: dist
-	rpm -ta $(distdir).tar.gz
+AM_CFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
+AM_CXXFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
 
-dist-hook: dist-check-doxygen
+jack_simple_client_SOURCES = simple_client.c
+jack_simple_client_LDFLAGS = -ldl -lpthread
+jack_simple_client_LDADD = ../libjack/libjack.la
 
-EXTRA_DIST = depcomp COPYING COPYING.GPL COPYING.LGPL
+jack_connect_SOURCES = connect.c
+jack_connect_LDFLAGS = -ldl -lpthread
+jack_connect_LDADD = ../libjack/libjack.la
+
+jack_disconnect_SOURCES = connect.c
+jack_disconnect_LDFLAGS = -ldl -lpthread
+jack_disconnect_LDADD = ../libjack/libjack.la
+
+jack_monitor_client_SOURCES = monitor_client.c
+jack_monitor_client_LDFLAGS = -ldl -lpthread
+jack_monitor_client_LDADD = ../libjack/libjack.la
+
+jack_metro_SOURCES = metro.c
+jack_metro_LDFLAGS = -ldl -lpthread
+jack_metro_LDADD = ../libjack/libjack.la
+
+jack_lsp_SOURCES = lsp.c
+jack_lsp_LDFLAGS = -ldl -lpthread
+jack_lsp_LDADD = ../libjack/libjack.la
+
+jack_showtime_SOURCES = showtime.c
+jack_showtime_LDFLAGS = -ldl -lpthread
+jack_showtime_LDADD = ../libjack/libjack.la
+
+
+if HAVE_FLTK
+jack_fltk_client_SOURCES = fltk_client.cc
+jack_fltk_client_LDFLAGS = -L/usr/X11R6/lib -lfltk -lX11 -lXext -ldl -lpthread
+jack_fltk_client_LDADD = ../libjack/libjack.la
+endif
+
+if HAVE_SNDFILE
+jackrec_SOURCES = capture_client.c
+jackrec_LDFLAGS = @SNDFILE_LIBS@ -ldl -lpthread
+jackrec_LDADD = ../libjack/libjack.la
+endif
+
+jack_impulse_grabber_SOURCES = impulse_grabber.c
+jack_impulse_grabber_LDFLAGS = -ldl -lpthread -lm
+jack_impulse_grabber_LDADD = ../libjack/libjack.la
+
+dist-hook: dist-check-fltk dist-check-sndfile
