@@ -175,7 +175,7 @@ typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, 
    appropriate steps to handle this (possibly no steps at all)
  */
 
-    JackDriverStartFunction stop; \
+    JackDriverStopFunction stop; \
 
 /* the engine will call this to let the driver know that it plans
    to start calling the `wait' function on a regular basis. the driver
@@ -183,7 +183,7 @@ typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, 
    at all)
  */
 
-    JackDriverStopFunction start;
+    JackDriverStartFunction start;
 
 #else
 
@@ -198,8 +198,8 @@ typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, 
     JackDriverReadFunction read; \
     JackDriverWriteFunction write; \
     JackDriverNullCycleFunction null_cycle; \
-    JackDriverStartFunction stop; \
-    JackDriverStopFunction start;
+    JackDriverStopFunction stop; \
+    JackDriverStartFunction start;
 
 #endif /* _ANNOTATED_DRIVER_DECLARATION_ */
 

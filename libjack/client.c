@@ -1099,15 +1099,19 @@ jack_client_close (jack_client_t *client)
 {
 	JSList *node;
 	void *status;
-
+	
 	if (client->control->active) {
 		jack_deactivate (client);
 	}
 
 	if (client->control->type == ClientExternal) {
-		/* stop the thread that communicates with the jack server */
-		pthread_cancel (client->thread);
-		pthread_join (client->thread, &status);
+	
+		/* stop the thread that communicates with the jack server, only if it was actually running */
+		
+		if (client->thread_ok){
+			pthread_cancel (client->thread);
+			pthread_join (client->thread, &status);
+		}
 
 		munmap ((char *) client->control, sizeof (jack_client_control_t));
 		munmap ((char *) client->engine, sizeof (jack_control_t));

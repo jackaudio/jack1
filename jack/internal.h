@@ -61,10 +61,10 @@ typedef struct {
 } jack_port_buffer_info_t;
 
 typedef struct {
-    volatile unsigned long long guard1;
+    volatile jack_time_t guard1;
     volatile jack_nframes_t frames;
-    volatile jack_time_t    stamp;
-    volatile unsigned long long guard2;
+    volatile jack_time_t stamp;
+    volatile jack_time_t guard2;
 } jack_frame_timer_t;
 
 /* the relatively low value of this constant

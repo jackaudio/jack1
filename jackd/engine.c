@@ -1569,6 +1569,7 @@ jack_server_thread (void *arg)
 	engine->pfd[1].events = POLLIN|POLLERR;
 	engine->pfd_max = 2;
 
+
 	while (!done) {
 		DEBUG ("start while");
 
@@ -1589,13 +1590,30 @@ jack_server_thread (void *arg)
 			jack_error ("poll failed (%s)", strerror (errno));
 			break;
 		}
+			
+		/* check each client socket before handling other request*/
 
+		for (i = 2; i < max; i++) {
+			if (pfd[i].fd < 0) {
+				continue;
+			}
+
+			if (pfd[i].revents & ~POLLIN) {
+				handle_client_socket_error (engine, pfd[i].fd);
+			} else if (pfd[i].revents & POLLIN) {
+				if (handle_external_client_request (engine, pfd[i].fd)) {
+					jack_error ("could not handle external client request");
+				}
+			}
+		}
+		
 		/* check the master server socket */
 
 		if (pfd[0].revents & POLLERR) {
 			jack_error ("error on server socket");
 			break;
 		}
+	
 
 		if (pfd[0].revents & POLLIN) {
 			DEBUG ("pfd[0].revents & POLLIN");
@@ -1632,21 +1650,7 @@ jack_server_thread (void *arg)
 			}
 		}
 
-		/* check each client socket */
-
-		for (i = 2; i < max; i++) {
-			if (pfd[i].fd < 0) {
-				continue;
-			}
-
-			if (pfd[i].revents & ~POLLIN) {
-				handle_client_socket_error (engine, pfd[i].fd);
-			} else if (pfd[i].revents & POLLIN) {
-				if (handle_external_client_request (engine, pfd[i].fd)) {
-					jack_error ("could not handle external client request");
-				}
-			}
-		}
+		
 	}
 
 	return 0;
