@@ -226,13 +226,16 @@ if test "x$enable_mmx" = xyes; then
 	      AC_MSG_CHECKING(whether we can compile SSE code)
 	      
 	      AC_COMPILE_IFELSE([asm ("movntps %xmm0, 0");],
-		  AC_DEFINE(USE_SSE, 1, [Define to 1 if SSE assembly is available.])
+		  AC_DEFINE(USE_SSE, 1,
+                            [Define to 1 if SSE assembly is available.])
 		  SSE_FLAGS="-msse -mfpmath=sse"
 		  AC_MSG_RESULT(yes)
 		  ,
 		  enable_sse=no
 		  AC_MSG_RESULT(no)
-		  AC_MSG_WARN([The assembler does not support the SSE command set.])
+		  AC_MSG_WARN(
+                      [The assembler does not support the SSE command set.]
+                  )
 	      )
 	      
 	  fi
@@ -259,7 +262,7 @@ if test "x$enable_mmx" = xyes; then
 fi
 
 AC_ARG_ENABLE(optimize,
-    [  --enable-optimize       ask the compiler for its best optimizations],
+    AC_HELP_STRING([--disable-optimize], [do not ask the compiler to optimize]),
     [ if test x$enable_optimize != xno ; then
 	JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS" ;
       fi 
