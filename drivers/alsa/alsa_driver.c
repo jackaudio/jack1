@@ -44,6 +44,9 @@ extern void show_work_times ();
 
 #undef DEBUG_WAKEUP
 
+/* Delay (in process calls) before jackd will report an xrun */
+#define XRUN_REPORT_DELAY 64
+
 static void
 alsa_driver_release_channel_dependent_memory (alsa_driver_t *driver)
 
@@ -784,8 +787,9 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver)
 		}
 	}
 
-	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_XRUN) {
+	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_XRUN && driver->xrun_count == 0 && driver->process_count > XRUN_REPORT_DELAY) {
 		struct timeval now, diff, tstamp;
+		driver->xrun_count++;
 		gettimeofday(&now, 0);
 		snd_pcm_status_get_trigger_tstamp(status, &tstamp);
 		timersub(&now, &tstamp, &diff);
@@ -1167,6 +1171,8 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 	snd_pcm_sframes_t offset;
 	jack_port_t *port;
 
+	driver->process_count++;
+
 	if (!driver->playback_handle) {
 		return 0;
 	}
@@ -1509,6 +1515,9 @@ alsa_driver_new (char *name, char *playback_alsa_device, char *capture_alsa_devi
 
 	pthread_mutex_init (&driver->clock_sync_lock, 0);
 	driver->clock_sync_listeners = 0;
+
+	driver->xrun_count = 0;
+	driver->process_count = 0;
 
 	if (playing) {
 		if (snd_pcm_open (&driver->playback_handle, playback_alsa_device, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK) < 0) {

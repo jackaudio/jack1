@@ -119,6 +119,9 @@ typedef struct {
     char has_clock_sync_reporting : 1;
     char has_hw_monitoring : 1;
     char has_hw_metering : 1;
+
+    int xrun_count;
+    int process_count;
 } alsa_driver_t;
 
 static __inline__ void alsa_driver_mark_channel_done (alsa_driver_t *driver, channel_t chn) {
