@@ -1,6 +1,7 @@
 #ifndef __jack_libjack_local_h__
 #define __jack_libjack_local_h__
 
+/* Client data structure, in the client's address space. */
 struct _jack_client {
 
     jack_control_t        *engine;
@@ -17,6 +18,7 @@ struct _jack_client {
     void *on_shutdown_arg;
     char thread_ok : 1;
     char first_active : 1;
+    char new_timebase : 1;
     pthread_t thread_id;
     
 #if defined(__APPLE__) && defined(__POWERPC__)
@@ -30,7 +32,10 @@ struct _jack_client {
 
 extern int jack_client_deliver_request (const jack_client_t *client, jack_request_t *req);
 extern jack_port_t *jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control_t *control);
+extern void jack_call_sync_client (jack_client_t *client);
+extern void jack_call_timebase_master (jack_client_t *client);
 
-extern void*                 jack_zero_filled_buffer;
+
+extern void *jack_zero_filled_buffer;
 
 #endif /* __jack_libjack_local_h__ */

@@ -163,7 +163,8 @@ portaudio_driver_read (portaudio_driver_t *driver, jack_nframes_t nframes)
     
         }
        
-        driver->engine->control->current_time.usecs = jack_get_microseconds ();
+        driver->engine->transport_cycle_start (driver->engine,
+					       jack_get_microseconds ());
         return 0;
 }          
 

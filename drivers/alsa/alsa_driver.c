@@ -911,7 +911,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 			} 
 			driver->poll_last = poll_ret;
 			driver->poll_next = poll_ret + driver->period_usecs;
-			driver->engine->control->current_time.usecs = poll_ret;
+			driver->engine->transport_cycle_start (driver->engine, 
+							       poll_ret);
 		}
 
 #ifdef DEBUG_WAKEUP

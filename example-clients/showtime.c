@@ -7,84 +7,38 @@
 #include <jack/jack.h>
 #include <jack/transport.h>
 
-typedef struct {
-    volatile jack_nframes_t guard1;
-    volatile jack_transport_info_t info;
-    volatile jack_nframes_t guard2;
-} guarded_transport_info_t;
-
-guarded_transport_info_t now;
 jack_client_t *client;
 
 
 void
 showtime ()
 {
-	guarded_transport_info_t current;
-	int tries = 0;
+	jack_position_t current;
+	jack_transport_state_t transport_state;
 
-	/* Since "now" is updated from the process() thread every
-	 * buffer period, we must copy it carefully to avoid getting
-	 * an incoherent hash of multiple versions. */
-	do {
-		/* Throttle the busy wait if we don't get the a clean
-		 * copy very quickly. */
-		if (tries > 10) {
-			usleep (20);
-			tries = 0;
-		}
-		current = now;
-		tries++;
+	transport_state = jack_transport_query (client, &current);
 
-	} while (current.guard1 != current.guard2);
+	printf ("frame: %7lu\t", current.frame);
 
-	if (current.info.valid & JackTransportPosition)
-		printf ("frame: %7lu\t", current.info.frame);
-	else
-		printf ("frame: [-]\t");
-
-	if (current.info.valid & JackTransportState) {
-		switch (current.info.transport_state) {
-		case JackTransportStopped:
-			printf ("state: Stopped\t");
-			break;
-		case JackTransportRolling:
-			printf ("state: Rolling\t");
-			break;
-		case JackTransportLooping:
-			printf ("state: Looping\t");
-			break;
-		default:
-			printf ("state: [unknown]\t");
-		}
+	switch (transport_state) {
+	case JackTransportStopped:
+		printf ("state: Stopped\t");
+		break;
+	case JackTransportRolling:
+		printf ("state: Rolling\t");
+		break;
+	case JackTransportStarting:
+		printf ("state: Starting\t");
+		break;
+	default:
+		printf ("state: [unknown]\t");
 	}
-	else
-		printf ("state: [-]\t");
 
-	if (current.info.valid & JackTransportLoop)
-		printf ("loop: %lu-%lu\t", current.info.loop_start,
-			current.info.loop_end);
-	else
-		printf ("loop: [-]\t");
-
-	if (current.info.valid & JackTransportBBT)
-		printf ("BBT: %3d|%d|%04d\n", current.info.bar,
-			current.info.beat, current.info.tick);
+	if (current.valid & JackPositionBBT)
+		printf ("BBT: %3d|%d|%04d\n",
+			current.bar, current.beat, current.tick);
 	else
 		printf ("BBT: [-]\n");
-}
-
-int
-process (jack_nframes_t nframes, void *arg)
-{
-	/* The guard flags contain a running counter of sufficiently
-	 * high resolution, that showtime() can detect whether the
-	 * last update is complete. */
-	now.guard1 = jack_frame_time(client);
-	jack_get_transport_info (client, (jack_transport_info_t *) &now.info);
-	now.guard2 = now.guard1;
-
-	return 0;      
 }
 
 void
@@ -117,12 +71,6 @@ main (int argc, char *argv[])
 	signal (SIGHUP, signal_handler);
 	signal (SIGINT, signal_handler);
 
-	/* tell the JACK server to call `process()' whenever
-	   there is work to be done.
-	*/
-
-	jack_set_process_callback (client, process, 0);
-
 	/* tell the JACK server to call `jack_shutdown()' if
 	   it ever shuts down, either entirely, or if it
 	   just decides to stop calling us.
@@ -145,4 +93,3 @@ main (int argc, char *argv[])
 	jack_client_close (client);
 	exit (0);
 }
-

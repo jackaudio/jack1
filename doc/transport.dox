@@ -1,0 +1,244 @@
+/*
+ * This file documents the JACK transport design.  It is part of the
+ * JACK reference manual, built using doxygen.
+ */
+
+/**
+
+@page transport-design JACK Transport Design
+
+The @ref index provides simple transport interfaces for starting,
+stopping and repositioning a set of clients.  This document describes
+the overall design of these interfaces, their detailed specifications
+are in <jack/transport.h>
+
+  - @ref requirements
+  - @ref overview
+  - @ref timebase
+  - @ref transportcontrol
+  - @ref transportclients
+  - @ref compatibility
+  - @ref issues
+
+
+@subsection requirements Requirements
+
+  - We need sample-level accuracy for transport control.  This implies
+  that the transport client logic has to be part of the realtime
+  process chain.
+
+  - We don't want to add another context switch.  So, the transport
+  client logic has to run in the context of the client's process
+  thread.  To avoid making an extra pass through the process graph, no
+  transport changes take effect until the following process cycle.
+  That way, the transport info is stable throughout each cycle.
+
+  - We want to allow multiple clients to change the transport state.
+  This is mostly a usability issue.  Any client can start or stop
+  playback, or seek to a new location.  The user need not switch
+  windows to accomplish these tasks.
+
+  - We want a way for clients with heavyweight state to sync up when
+  the user presses "play", before the transport starts rolling.
+
+  - We need to provide for ongoing binary compatibility as the
+  transport design evolves.
+
+
+@subsection overview Overview
+
+The former transport master role has been divided into two layers:
+
+  - @ref timebase - counting beats, frames, etc. on every cycle.
+  - @ref transportcontrol - start, stop and reposition the playback.  
+
+Existing clients continue to work in compatibility mode.
+
+
+@subsection timebase Timebase Master
+
+The timebase master continuously updates extended position
+information, counting beats, SMPTE frames, etc.  Without this extended
+information, there is no need for this function.  There is at most one
+master active at a time.  If no client is registered as timebase
+master, the JACK engine will provide simple frame counting whenever
+the transport is rolling.
+
+The timebase master registers a callback that updates position
+information while the transport is rolling.  This function is called
+immediately after the process callback in the same thread whenever the
+transport is rolling, or when any client has set a new position in the
+previous cycle.  The first cycle after jack_set_timebase_callback() is
+also treated as a new position.  Its output affects all of the
+following process cycle, unless a new position request arrives during
+the current cycle.
+
+@code
+  typedef int  (*JackTimebaseCallback)(jack_transport_state_t state,
+                                       jack_nframes_t nframes,
+                                       jack_position_t *pos,
+                                       int new_pos,
+                                       void *arg);
+@endcode
+
+When a new client takes over, the former timebase callback is no
+longer called.  Taking over the timebase may be done conditionally, in
+which case the takeover fails when there is a master already.  The
+existing master can release it voluntarily, if desired.
+
+@code
+  int  jack_set_timebase_callback (jack_client_t *client,
+                                   int conditional,
+                                   JackTimebaseCallback timebase_callback,
+                                   void *arg);
+
+  int  jack_release_timebase(jack_client_t *client);
+@endcode
+
+If the timebase master releases the timebase or exits the JACK graph
+for any reason, the JACK engine takes over at the start of the next
+process cycle.  The transport state does not change.  If rolling, it
+continues to play, with frame numbers as the only available position
+information.
+
+
+@subsection transportcontrol Transport Control
+
+The JACK engine itself manages stopping and starting of the transport.
+Any client can make transport control requests at any time.  These
+requests take effect no sooner than the next process cycle, sometimes
+later.  The transport state is always valid, initially it is
+::JackTransportStopped.
+
+@code
+  void jack_transport_start (jack_client_t *client);
+  void jack_transport_stop (jack_client_t *client);
+@endcode
+
+The engine handles polling of slow-sync clients.  When someone calls
+jack_transport_start(), the engine resets the poll bits and changes to
+a new state, ::JackTransportStarting.  The @a sync_callback function
+for each slow-sync client will be invoked in the JACK process thread
+while the transport is starting.  If it has not already done so, the
+client needs to initiate a seek to reach the starting position.  The
+@a sync_callback returns false until the seek completes and the client
+is ready to play.  When all slow-sync clients are ready, the state
+changes to ::JackTransportRolling.
+
+@code
+  typedef int  (*JackSyncCallback)(jack_transport_state_t state,
+                                   jack_position_t *pos, void *arg);
+@endcode
+
+This callback is a realtime function that runs in the JACK process
+thread.
+
+@code
+  int  jack_set_sync_callback (jack_client_t *client,
+                               JackSyncCallback sync_callback, void *arg);
+@endcode
+
+Clients that don't declare a @a sync_callback are assumed to be ready
+immediately, any time the transport wants to start.  If a client no
+longer requires slow-sync processing, it can set its @a sync_callback
+to NULL.
+
+@code
+  int  jack_set_sync_timeout (jack_client_t *client,
+                              jack_nframes_t timeout);
+@endcode
+
+There must be a @a timeout to prevent unresponsive slow-sync clients
+from completely halting the transport mechanism.  Two seconds is the
+default.  When this @a timeout expires, the transport will start
+rolling, even if some slow-sync clients are still unready.  The @a
+sync_callback for these clients continues being invoked, giving them
+an opportunity to catch up.
+
+@code
+  int  jack_transport_reposition (jack_client_t *client,
+                                  jack_position_t *pos);
+  int  jack_transport_goto_frame (jack_client_t *client,
+                                  jack_nframes_t frame);
+@endcode
+
+These request a new transport position.  They can be called at any
+time by any client.  Even the timebase master must use them.  If the
+request is valid, it goes into effect on the next process cycle.  If
+there are slow-sync clients and the transport is already rolling, it
+will enter the ::JackTransportStarting state and begin invoking their
+@a sync_callback until they find the new position.
+
+
+@image html	fsm.png "Transport State Transition Diagram"
+@image latex	fsm.png "Transport State Transition Diagram"
+
+
+@subsection transportclients Transport Clients
+
+Transport clients were formerly known as "transport slaves".  We want
+to make it easy for almost every JACK client to be a transport client.
+
+@code
+   jack_transport_state_t jack_transport_query (jack_client_t *client,
+		                                jack_position_t *pos);
+@endcode
+
+This function can be called from any thread.  If called from the
+process thread, @a pos corresponds to the first frame of the current
+cycle and the state returned is valid for the entire cycle.
+
+
+@subsection compatibility Compatibility
+
+We want to support the existing functions in compatibility mode as
+deprecated interfaces for a while.  The main reasons are:
+
+  - facilitate testing with clients that already have transport
+  support
+  - provide a clean migration path, so application developers are
+  not discouraged from supporting the transport interface
+  - inter-operate with ardour 0.9 beta.
+
+So, these interfaces continue to be supported (but deprecated):
+
+@code
+  typedef struct jack_transport_info_t;
+
+  void jack_set_transport_info (jack_client_t *client,
+                                jack_transport_info_t *tinfo);
+  void jack_get_transport_info (jack_client_t *client,
+                                jack_transport_info_t *tinfo);
+  int  jack_engine_takeover_timebase (jack_client_t *);
+@endcode
+
+
+For compatibility with future changes, it would be good to avoid
+structures entirely.  Nevertheless, the jack_position_t structure
+provides a convenient way to collect timebase information in several
+formats that clearly all refer to a single moment.  To minimize future
+binary compatibility problems, this structure has some padding at the
+end, making it possible to extend it without necessarily breaking
+compatibility.  New fields can be allocated from the padding area,
+with access controlled by newly defined valid bits, all of which are
+currently forced to zero.  That allows the structure size and offsets
+to remain constant.
+
+
+@subsection issues Issues Not Addressed
+
+This design currently does not address several issues. This means they
+will probably not be included in JACK release 1.0.
+
+  - variable speed -- does the frame_rate field in the transport
+  info structure have anything to do with this?
+  - reverse play
+  - SMPTE -- slave mode depends on variable speed and interacts
+  badly with slow-sync clients.  These are deep issues.  Until they
+  are addressed there's no reason to retain those two SMPTE fields in
+  the jack_position_t structure.
+  - looping -- unless we get feedback that this is really required
+  - internal timebase master or slow-sync clients
+       - probably a good idea
+       - haven't studied it
+*/

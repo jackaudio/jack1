@@ -1,0 +1,54 @@
+/*
+ * This is the main page of the JACK reference manual, built using
+ * doxygen.
+ */
+
+/**
+@mainpage JACK Audio Connection Kit
+
+@section intro Introduction
+
+JACK is a low-latency audio server, written primarily for the
+GNU/Linux operating system.  It can connect several client
+applications to an audio device, and allow them to share audio with
+each other.  Clients can run as separate processes like normal
+applications, or within the JACK server as "plugins".
+
+JACK differs from other audio servers in being designed from the
+ground up for professional audio work, focusing on two key areas:
+synchronous execution of all clients, and low latency operation.
+
+@see <http://jackit.sourceforge.net>
+
+
+@section contents Contents
+
+The JACK programming interfaces are described in several header files:
+
+  - <jack/jack.h> defines most of the interfaces used by JACK clients.
+  - <jack/transport.h> provides a simple transport control mechanism
+  for starting, stopping and repositioning clients.  This is described
+  in the @ref transport-design document.
+  - <jack/types.h> defines most of the data types for JACK.
+
+
+@section license License
+
+Copyright (C) 2001-2003 by Paul Davis and others.
+
+JACK is free software; you can redistribute it and/or modify it under
+the terms of the GNU GPL and LGPL licenses as published by the Free
+Software Foundation, <http://www.gnu.org>.  Most of JACK uses the GPL,
+as noted in the source file headers.  But, the library interfaces are
+licensed under the LGPL, allowing proprietary programs to link with
+JACK and call its services.  You should have received a copy of these
+Licenses along with the program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307,
+USA.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+*/

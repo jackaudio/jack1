@@ -1,4 +1,9 @@
 /*
+    Internal shared data and functions.
+
+    If you edit this file, you should carefully consider changing the
+    JACK_PROTOCOL_VERSION in configure.in.
+
     Copyright (C) 2001-2003 Paul Davis
     
     This program is free software; you can redistribute it and/or modify
@@ -68,6 +73,12 @@ typedef struct {
     size_t offset;
 } jack_port_buffer_info_t;
 
+typedef enum {
+    TransportCommandNone = 0,
+    TransportCommandPlay = 1,
+    TransportCommandStop = 2,
+} transport_command_t;
+
 typedef struct {
     volatile jack_time_t guard1;
     volatile jack_nframes_t frames;
@@ -82,10 +93,18 @@ typedef struct {
 
 #define JACK_MAX_PORT_TYPES 4
 
+/* JACK engine shared memory data structure. */
 typedef struct {
 
-    jack_transport_info_t current_time;
-    jack_transport_info_t pending_time;
+    jack_transport_state_t transport_state;
+    volatile transport_command_t transport_cmd;
+    jack_position_t	  current_time;	/* position for current cycle */
+    jack_position_t	  pending_time;	/* position for next cycle */
+    jack_position_t	  request_time;	/* latest requested position */
+    int			  new_pos;	/* new position this cycle */
+    unsigned long	  sync_remain;	/* remaining sync count */
+    unsigned long	  sync_cycle;	/* number ready this cycle */
+    unsigned long	  sync_clients;	/* number of slow-sync clients */
     jack_frame_timer_t    frame_timer;
     int                   internal;
     jack_nframes_t        frames_at_cycle_start;
@@ -100,7 +119,7 @@ typedef struct {
     jack_engine_t        *engine;
     unsigned long         n_port_types;
     jack_port_type_info_t port_types[JACK_MAX_PORT_TYPES];
-    jack_port_shared_t  ports[0];
+    jack_port_shared_t    ports[0];
 
 } jack_control_t;
 
@@ -147,17 +166,19 @@ typedef enum {
 	Finished
 } jack_client_state_t;
 
+/* JACK client shared memory data structure. */
 typedef volatile struct {
 
-    volatile jack_client_id_t id;              /* w: engine r: engine and client */
-    volatile jack_nframes_t  nframes;          /* w: engine r: client */
+    volatile jack_client_id_t id;         /* w: engine r: engine and client */
+    volatile jack_nframes_t  nframes;     /* w: engine r: client */
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
     volatile char       name[JACK_CLIENT_NAME_SIZE+1];
     volatile ClientType type;             /* w: engine r: engine and client */
     volatile char       active : 1;       /* w: engine r: engine and client */
     volatile char       dead : 1;         /* r/w: engine */
     volatile char       timed_out : 1;    /* r/w: engine */
-    volatile pid_t      pid;              /* w: client r: engine; pid of client */
+    volatile char       sync_ready : 1;   /* w: engine and client, r: engine */
+    volatile pid_t      pid;              /* w: client r: engine; client pid */
     volatile unsigned long long signalled_at;
     volatile unsigned long long awake_at;
     volatile unsigned long long finished_at;
@@ -176,16 +197,17 @@ typedef volatile struct {
     void *graph_order_arg;
     JackXRunCallback xrun;
     void *xrun_arg;
+    JackSyncCallback sync_cb;
+    void *sync_arg;
+    JackTimebaseCallback timebase_cb;
+    void *timebase_arg;
 
-    /* OOP clients: set by libjack
-        IP clients: set by engine
-    */
-    
+    /* external clients: set by libjack
+     * internal clients: set by engine */
     int (*deliver_request)(void*, jack_request_t*);
     void *deliver_arg;
 
     /* for engine use only */
-
     void *private_client;
 
 } jack_client_control_t;
@@ -256,6 +278,8 @@ typedef enum {
 	SetClientCapabilities = 9,
 	GetPortConnections = 10,
 	GetPortNConnections = 11,
+	ResetTimeBaseClient = 12,
+	SetSyncClient = 13,
 } RequestType;
 
 struct _jack_request {
@@ -278,6 +302,10 @@ struct _jack_request {
 	    unsigned int nports;
 	    const char **ports;  
 	} port_connections;
+	struct {
+	    jack_client_id_t client_id;
+	    int conditional;
+	} timebase;
 	jack_client_id_t client_id;
 	jack_nframes_t nframes;
     } x;
@@ -331,6 +359,9 @@ extern void jack_error (const char *fmt, ...);
 extern jack_port_type_info_t jack_builtin_port_types[];
 
 extern void jack_client_invalidate_port_buffers (jack_client_t *client);
+
+extern void jack_transport_copy_position (jack_position_t *from,
+					  jack_position_t *to);
 
 #endif /* __jack_internal_h__ */
 

@@ -3,7 +3,10 @@ MAINTAINERCLEANFILES=Makefile.in
 
 DOX=reference.doxygen
 
+
 EXTRA_DIST=
+
+INSTIMAGES=reference/html/doxygen.png reference/html/fsm.png
 
 DOC_STAMPS=html-build.stamp
 
@@ -11,7 +14,8 @@ DOC_DIR=$(HTML_DIR)
 
 all-local: doxygen-build.stamp
 
-doxygen-build.stamp: $(DOX)
+doxygen-build.stamp: $(DOX) mainpage.dox transport.dox fsm.png \
+../jack/jack.h ../jack/types.h ../jack/transport.h
 	@echo '*** Running doxygen ***'
 	doxygen $(DOX)
 	touch doxygen-build.stamp
@@ -29,7 +33,7 @@ install-data-local:
 	if test "$$installfiles" = 'reference/html/*.html'; \
 	then echo '-- Nothing to install' ; \
 	else \
-	  for i in $$installfiles reference/html/doxygen.png reference/html/doxygen.css; do \
+	  for i in $$installfiles $(INSTIMAGES) reference/html/doxygen.css; do \
 	    echo '-- Installing '$$i ; \
 	    $(INSTALL_DATA) $$i $(DESTDIR)$(DOC_DIR)/reference/html; \
 	  done; \
@@ -41,7 +45,7 @@ uninstall-local: doxygen-build.stamp
 	if test "$$installfiles" = 'reference/html/*.html'; \
 	then echo '-- Nothing to uninstall' ; \
 	else \
-	  for i in $$installfiles reference/html/doxygen.png reference/html/doxygen.css; do \
+	  for i in $$installfiles $(INSTIMAGES) reference/html/doxygen.css; do \
 	    echo '-- Unstalling '$$i ; \
 	    rm $(DESTDIR)$(DOC_DIR)/$$i; \
 	  done; \

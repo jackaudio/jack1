@@ -36,7 +36,9 @@ struct _jack_engine {
 
     int  (*set_buffer_size)(struct _jack_engine *, jack_nframes_t frames);
     int  (*set_sample_rate)(struct _jack_engine *, jack_nframes_t frames);
-    int  (*run_cycle)(struct _jack_engine *, jack_nframes_t nframes, float delayed_usecs);
+    int  (*run_cycle)(struct _jack_engine *, jack_nframes_t nframes,
+		      float delayed_usecs);
+    void (*transport_cycle_start)(struct _jack_engine *, jack_time_t time);
 
     /* "private" sections starts here */
 
@@ -110,5 +112,25 @@ int             jack_wait (jack_engine_t *engine);
 int             jack_engine_load_driver (jack_engine_t *, int, char **);
 void            jack_set_asio_mode (jack_engine_t *, int yn);
 void            jack_dump_configuration(jack_engine_t *engine, int take_lock);
+
+extern jack_client_internal_t *
+jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
+
+static inline void jack_lock_graph (jack_engine_t* engine) {
+	DEBUG ("acquiring graph lock");
+	pthread_mutex_lock (&engine->client_lock);
+}
+
+static inline int jack_try_lock_graph (jack_engine_t *engine)
+{
+	DEBUG ("TRYING to acquiring graph lock");
+	return pthread_mutex_trylock (&engine->client_lock);
+}
+
+static inline void jack_unlock_graph (jack_engine_t* engine) 
+{
+	DEBUG ("releasing graph lock");
+	pthread_mutex_unlock (&engine->client_lock);
+}
 
 #endif /* __jack_engine_h__ */

@@ -33,32 +33,61 @@ char *package;				/* program name */
 int done = 0;
 
 jack_client_t *client;
-jack_transport_info_t tinfo;		/* multi-threaded access */
 
-
-/* JACK process() handler.
+/* JACK timebase callback.
  *
- * Runs in a separate realtime thread.  Must not wait.
+ * Runs in the process realtime thread.  Must not wait.
  */
-int process(jack_nframes_t nframes, void *arg)
+void timebase(jack_transport_state_t state, jack_nframes_t nframes, 
+	      jack_position_t *pos, int new_pos, void *arg)
 {
-    jack_set_transport_info(client, &tinfo);
+    if (state == JackTransportRolling)
+	pos->frame += nframes;
 
-    /* frame number for next cycle */
-    if (tinfo.transport_state != JackTransportStopped) {
- 	tinfo.frame += nframes;
+    if ((pos->valid & JackPositionBBT) == 0) {
 
-	/* When looping, adjust the frame number periodically.  Make
-	 * sure improper loop limits don't lock up the system in an
-	 * infinite while(). */
-        if ((tinfo.transport_state == JackTransportLooping) &&
-	    (tinfo.loop_end > tinfo.loop_start)) {
-            while (tinfo.frame >= tinfo.loop_end)
-                tinfo.frame -= (tinfo.loop_end - tinfo.loop_start);
-        }
+	/* set "march time" parameters: 4/4, 120bpm */
+	pos->valid |= JackPositionBBT;
+	pos->beats_per_bar = 4.0;
+	pos->beat_type = 0.25;
+	pos->ticks_per_beat = 1920.0;
+	pos->beats_per_minute = 120.0;
     }
 
-    return 0;      
+    if (new_pos) {
+
+	/* Compute BBT info from frame number.  This is relatively
+	 * simple here, but could become complex if there were tempo
+	 * or time signature changes. */
+
+	double min = (double) pos->frame / ((double) pos->frame_rate * 60.0);
+	long abs_tick = min * pos->beats_per_minute * pos->ticks_per_beat;
+	long abs_beat = abs_tick / pos->ticks_per_beat;
+
+	pos->bar = abs_beat / pos->beats_per_bar;
+	pos->beat = abs_beat - (pos->bar * pos->beats_per_bar) + 1;
+	pos->tick = abs_tick - (abs_beat * pos->ticks_per_beat);
+	pos->bar_start_tick = pos->bar * pos->beats_per_bar *
+	    pos->ticks_per_beat;
+	pos->bar++;			/* adjust start to bar 1 */
+
+    } else {
+
+	/* Compute BBT info from previous period. */
+	pos->tick +=
+	    nframes * pos->ticks_per_beat * pos->beats_per_minute
+	    / (pos->frame_rate * 60);
+
+	while (pos->tick >= pos->ticks_per_beat) {
+	    pos->tick -= pos->ticks_per_beat;
+	    if (++pos->beat > pos->beats_per_bar) {
+		pos->beat = 1;
+		++pos->bar;
+		pos->bar_start_tick +=
+		    pos->beats_per_bar * pos->ticks_per_beat;
+	    }
+	}
+    }
 }
 
 void jack_shutdown(void *arg)
@@ -83,25 +112,19 @@ void com_exit(char *arg)
 
 void com_help(char *);			/* forward declaration */
 
-void com_loop(char *arg)
-{
-    tinfo.transport_state = JackTransportLooping;
-}
-
 void com_play(char *arg)
 {
-    tinfo.transport_state = JackTransportRolling;
+    jack_transport_start(client);
 }
 
 void com_rewind(char *arg)
 {
-    tinfo.transport_state = JackTransportStopped;
-    tinfo.frame = 0;
+    jack_transport_goto_frame(client, 0);
 }
 
 void com_stop(char *arg)
 {
-    tinfo.transport_state = JackTransportStopped;
+    jack_transport_stop(client);
 }
 
 
@@ -120,7 +143,6 @@ typedef struct {
 command_t commands[] = {
     { "exit",	com_exit,	"Exit transport program" },
     { "help",	com_help,	"Display help text" },
-    { "loop",	com_loop,	"Start transport looping" },
     { "play",	com_play,	"Start transport rolling" },
     { "quit",	com_exit,	"Synonym for `exit'"},
     { "rewind",	com_rewind,	"Reset transport position to beginning" },
@@ -313,16 +335,6 @@ void command_loop()
     }
 }
 
-void initialize_transport()
-{
-    /* must run before jack_activate */
-    tinfo.loop_start = 0;		/* default loop is one second */
-    tinfo.loop_end = jack_get_sample_rate(client);
-    tinfo.valid = JackTransportState|JackTransportPosition|JackTransportLoop;
-    com_rewind(NULL);
-}
-
-
 int main(int argc, char *argv[])
 {
     /* basename $0 */
@@ -343,16 +355,10 @@ int main(int argc, char *argv[])
     signal(SIGHUP, signal_handler);
     signal(SIGINT, signal_handler);
 
-    if (jack_engine_takeover_timebase(client) != 0) {
+    if (jack_set_timebase_callback(client, 1, timebase, NULL) != 0)
 	fprintf(stderr, "Unable to take over timebase.\n");
-	fprintf(stderr, "Is another transport master already running?\n");
-	return 1;
-    }
 
-    jack_set_process_callback(client, process, 0);
     jack_on_shutdown(client, jack_shutdown, 0);
-
-    initialize_transport();
 
     if (jack_activate(client)) {
 	fprintf(stderr, "cannot activate client");

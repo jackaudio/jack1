@@ -39,7 +39,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <regex.h>
-#include <math.h>
 
 #include <config.h>
 
@@ -792,6 +791,9 @@ jack_client_thread (void *arg)
 
 			control->state = Running;
 
+			if (control->sync_cb)
+				jack_call_sync_client (client);
+
 			if (control->process) {
 				if (control->process (control->nframes, control->process_arg) == 0) {
 					control->state = Finished;
@@ -799,7 +801,10 @@ jack_client_thread (void *arg)
 			} else {
 				control->state = Finished;
 			}
-			
+
+			if (control->timebase_cb)
+				jack_call_timebase_master (client);
+
 			control->finished_at = jack_get_microseconds();
 
 #ifdef WITH_TIMESTAMPS
@@ -1279,12 +1284,6 @@ unsigned long jack_get_buffer_size (jack_client_t *client)
 	return client->engine->buffer_size;
 }
 
-unsigned long jack_get_sample_rate (jack_client_t *client)
-
-{
-	return client->engine->current_time.frame_rate;
-}
-
 int 
 jack_connect (jack_client_t *client, const char *source_port, const char *destination_port)
 
@@ -1381,23 +1380,6 @@ jack_set_buffer_size_callback (jack_client_t *client, JackBufferSizeCallback cal
 {
 	client->control->bufsize_arg = arg;
 	client->control->bufsize = callback;
-	return 0;
-}
-
-int
-jack_set_sample_rate_callback (jack_client_t *client, JackSampleRateCallback callback, void *arg)
-{
-	if (client->control->active) {
-		jack_error ("You cannot set callbacks on an active client.");
-		return -1;
-	}
-	client->control->srate_arg = arg;
-	client->control->srate = callback;
-
-	/* Now invoke it */
-
-	callback (client->engine->current_time.frame_rate, arg);
-
 	return 0;
 }
 
@@ -1507,52 +1489,6 @@ jack_get_ports (jack_client_t *client,
 	}
 
 	return matching_ports;
-}
-
-static inline void
-jack_read_frame_time (const jack_client_t *client, jack_frame_timer_t *copy)
-{
-	int tries = 0;
-
-	do {
-		/* throttle the busy wait if we don't get 
-		   the answer very quickly.
-		*/
-
-		if (tries > 10) {
-			usleep (20);
-			tries = 0;
-		}
-
-		*copy = client->engine->frame_timer;
-
-		tries++;
-
-	} while (copy->guard1 != copy->guard2);
-}
-
-jack_nframes_t
-jack_frames_since_cycle_start (const jack_client_t *client)
-{
-	float usecs;
-
-	usecs = jack_get_microseconds() - client->engine->current_time.usecs;
-	return (jack_nframes_t) floor ((((float) client->engine->current_time.frame_rate) / 1000000.0f) * usecs);
-}
-
-jack_nframes_t
-jack_frame_time (const jack_client_t *client)
-{
-	jack_frame_timer_t current;
-	float usecs;
-	jack_nframes_t elapsed;
-
-	jack_read_frame_time (client, &current);
-	
-	usecs = jack_get_microseconds() - current.stamp;
-	elapsed = (jack_nframes_t) floor ((((float) client->engine->current_time.frame_rate) / 1000000.0f) * usecs);
-	
-	return current.frames + elapsed;
 }
 
 float

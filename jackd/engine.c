@@ -85,7 +85,6 @@ static void jack_remove_client (jack_engine_t *engine, jack_client_internal_t *c
 static void jack_client_delete (jack_engine_t *, jack_client_internal_t *);
 
 static jack_client_internal_t *jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_request_t *);
-static jack_client_internal_t *jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
 
 static void jack_sort_graph (jack_engine_t *engine);
 static int  jack_rechain_graph (jack_engine_t *engine);
@@ -126,23 +125,6 @@ static inline int
 jack_client_is_internal (jack_client_internal_t *client)
 {
 	return (client->control->type == ClientInternal) || (client->control->type == ClientDriver);
-}
-
-static inline void jack_lock_graph (jack_engine_t* engine) {
-	DEBUG ("acquiring graph lock");
-	pthread_mutex_lock (&engine->client_lock);
-}
-
-static inline int jack_try_lock_graph (jack_engine_t *engine)
-{
-	DEBUG ("TRYING to acquiring graph lock");
-	return pthread_mutex_trylock (&engine->client_lock);
-}
-
-static inline void jack_unlock_graph (jack_engine_t* engine) 
-{
-	DEBUG ("releasing graph lock");
-	pthread_mutex_unlock (&engine->client_lock);
 }
 
 static inline void
@@ -425,6 +407,9 @@ jack_process_internal(jack_engine_t *engine, JSList *node, jack_nframes_t nframe
 		       engine->process_errors++;
 		       return NULL; /* will stop the loop */
 	       }
+
+	       //JOQ: can an internal client be slow sync?
+	       //JOQ: can an internal client have a timebase master?
 
        } else {
 	       DEBUG ("internal client has no process() function");
@@ -1338,7 +1323,7 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 
 			if (client == engine->timebase_client) {
 				engine->timebase_client = 0;
-				jack_transport_reset (engine);
+				jack_timebase_exit (engine);
 			}
 			
 			for (portnode = client->ports; portnode; portnode = jack_slist_next (portnode)) {
@@ -1355,22 +1340,6 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 
 	return ret;
 }	
-
-static int
-jack_set_timebase (jack_engine_t *engine, jack_client_id_t client)
-{
-	int ret = -1;
-
-	jack_lock_graph (engine);
-
-	if ((engine->timebase_client = jack_client_internal_by_id (engine, client)) != 0) {
-		ret = 0;
-	}
-
-	jack_unlock_graph (engine);
-
-	return ret;
-}
 
 static int
 handle_client_socket_error (jack_engine_t *engine, int fd)
@@ -1468,7 +1437,17 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		break;
 
 	case SetTimeBaseClient:
-		req->status = jack_set_timebase (engine, req->x.client_id);
+		req->status = jack_timebase_set (engine,
+						 req->x.timebase.client_id,
+						 req->x.timebase.conditional);
+		break;
+
+	case ResetTimeBaseClient:
+		req->status = jack_timebase_reset (engine, req->x.client_id);
+		break;
+
+	case SetSyncClient:
+		req->status = jack_set_sync_client (engine, req->x.client_id);
 		break;
 
 #ifdef USE_CAPABILITIES
@@ -1695,6 +1674,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 	engine->set_sample_rate = jack_set_sample_rate;
 	engine->set_buffer_size = jack_set_buffer_size;
         engine->run_cycle = jack_run_cycle;
+        engine->transport_cycle_start = jack_transport_cycle_start;
 	engine->client_timeout_msecs = client_timeout;
 
 	engine->next_client_id = 1;
@@ -1804,7 +1784,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
  
 	engine->control->buffer_size = 0;
 	jack_set_sample_rate (engine, 0);
-	jack_transport_reset (engine);
+	jack_timebase_init (engine);
 	engine->control->internal = 0;
 
 	engine->control->has_capabilities = 0;
@@ -2311,7 +2291,7 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 	
 	if (client == engine->timebase_client) {
 		engine->timebase_client = 0;
-		jack_transport_reset (engine);
+		jack_timebase_exit (engine);
 	}
 
 	jack_client_disconnect (engine, client);

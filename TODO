@@ -11,15 +11,11 @@ send a change request to Kai Vehmanen (mailto:k_at_eca.cx).
 
 TO BE DECIDED (owner)
 
-- whether to hide the transport.h structs from clients (kaiv)
 - dropping the use of CAP_RESOURCE (nando)
 - whether to default to triangular dithering the at 16bit (swh)
 
 TODO for 1.0 (owner)
 
-- finalize discussion on transport API, and implement
-        - how to support sync (client "synced" bit)
-        - should we separate transport+time?
 - ensure that UST/MSC pairs work for transport API
 - resolve helper thread design question?
 
@@ -61,5 +57,7 @@ CLOSED (date,who,comment)
 - alsa-driver parameter parsing patch (2003/02/25, joq, done)
 - jack_deactive called unconditionally in jack_client_close (2003/02/05, kaiv, fixed)
 - call time client before all others (2003/01/28, kaiv, another solution)
+- finalize discussion on transport API, and implement (2003/08/04, joq)
+- whether to hide the transport.h structs from clients (2003/08/04, joq)
 
 -----------------------------------------------------------------------
