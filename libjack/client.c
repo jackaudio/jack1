@@ -452,8 +452,8 @@ _start_server (void)
 			good = 1;
 		}
 	}
+
 	if (!good) {
-#define JACK_LOCATION
 #if defined(USE_CAPABILITIES)
 		command = JACK_LOCATION "/jackstart";
 		strncpy(arguments, JACK_LOCATION "/jackstart -T -R -d "

@@ -57,8 +57,10 @@ jack_client_disconnect_ports (jack_engine_t *engine,
 	}
 
 	jack_slist_free (client->ports);
-	jack_slist_free (client->fed_by);
-	client->fed_by = 0;
+	jack_slist_free (client->truefeeds);
+	jack_slist_free (client->sortfeeds);
+	client->truefeeds = 0;
+	client->sortfeeds = 0;
 	client->ports = 0;
 }			
 
@@ -422,7 +424,8 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	client->request_fd = fd;
 	client->event_fd = -1;
 	client->ports = 0;
-	client->fed_by = 0;
+	client->truefeeds = 0;
+	client->sortfeeds = 0;
 	client->execution_order = UINT_MAX;
 	client->next_client = NULL;
 	client->handle = NULL;

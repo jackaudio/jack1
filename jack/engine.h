@@ -114,6 +114,7 @@ struct _jack_engine {
     char	    temporary;
     int		    reordered;
     int		    watchdog_check;
+	int			feedbackcount;
     pid_t           wait_pid;
     pthread_t       freewheel_thread;
 

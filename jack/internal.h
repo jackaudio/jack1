@@ -361,7 +361,10 @@ typedef struct _jack_client_internal {
     int        subgraph_start_fd;
     int        subgraph_wait_fd;
     JSList    *ports;    /* protected by engine->client_lock */
-    JSList    *fed_by;   /* protected by engine->client_lock */
+    JSList    *truefeeds;    /* protected by engine->client_lock */
+    JSList    *sortfeeds;    /* protected by engine->client_lock */
+    int	       fedcount;
+    int	       tfedcount;
     jack_shm_info_t control_shm;
     unsigned long execution_order;
     struct  _jack_client_internal *next_client; /* not a linked list! */
