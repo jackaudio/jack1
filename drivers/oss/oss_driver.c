@@ -740,6 +740,7 @@ static int oss_driver_read (oss_driver_t *driver, jack_nframes_t nframes)
 	JSList *node;
 	jack_port_t *port;
 
+	if (!driver->run) return 0;
 	if (nframes != driver->period_size)
 	{
 		jack_error(
@@ -782,6 +783,7 @@ static int oss_driver_write (oss_driver_t *driver, jack_nframes_t nframes)
 	JSList *node;
 	jack_port_t *port;
 
+	if (!driver->run) return 0;
 	if (nframes != driver->period_size)
 	{
 		jack_error(
