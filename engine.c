@@ -95,15 +95,10 @@ static void jack_port_registration_notify (jack_engine_t *, jack_port_id_t, int)
 static int  jack_send_connection_notification (jack_engine_t *, jack_client_id_t, jack_port_id_t, jack_port_id_t, int);
 static int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_event_t *);
 
-static void jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes);
+static int  jack_get_total_latency (jack_engine_t *engine, const char *portname, nframes_t *latency);
 
 static int *jack_shm_registry;
 static int  jack_shm_id_cnt;
-
-jack_port_type_info_t builtin_port_types[] = {
-	{ JACK_DEFAULT_AUDIO_TYPE, jack_audio_port_mixdown, 1 },
-	{ 0, NULL }
-};
 
 static inline int 
 jack_client_is_inprocess (jack_client_internal_t *client)
@@ -398,7 +393,7 @@ static int
 jack_set_sample_rate (jack_engine_t *engine, nframes_t nframes)
 
 {
-	engine->control->sample_rate = nframes;
+	engine->control->time.frame_rate = nframes;
 	return 0;
 }
 
@@ -412,9 +407,6 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 	struct pollfd pollfd[1];
 	char c;
 
-	unsigned long then, now;
-//	rdtscl (then);
-
 	if (pthread_mutex_trylock (&engine->graph_lock) != 0) {
 		return 0;
 	}
@@ -426,7 +418,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 	}
 
 	if (engine->timebase_client) {
-		engine->control->frame_time = engine->timebase_client->control->frame_time;
+		engine->control->time.frame = engine->timebase_client->control->frame_time;
 	} 
 
 	for (node = engine->clients; err == 0 && node; ) {
@@ -472,18 +464,14 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 			pollfd[0].fd = client->subgraph_wait_fd;
 			pollfd[0].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
 
-			rdtscl (then);
 			if (poll (pollfd, 1, engine->driver->period_interval) < 0) {
 				jack_error ("engine cannot poll for graph completion (%s)", strerror (errno));
 				err++;
 				break;
 			}
-			rdtscl (now);
 			
 			if (pollfd[0].revents == 0) {
-				jack_error ("subgraph starting at %s timed out (state = %d) (time = %f usecs)", 
-					     client->control->name, client->control->state,
-					    ((float)(now - then))/450.0f);
+				jack_error ("subgraph starting at %s timed out (state = %d)", client->control->name, client->control->state);
 				err++;
 				break;
 			} else if (pollfd[0].revents & ~POLLIN) {
@@ -514,8 +502,6 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 		jack_cleanup_clients (engine);
 	} 
 
-//	rdtscl (now);
-//	printf ("engine cycle time: %.6f usecs\n", ((float) (now - then)) / 450.00f);
 	return 0;
 }
 
@@ -574,7 +560,7 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 
 {
 	GSList *node;
-	jack_client_internal_t *client;
+	jack_client_internal_t *client = NULL;
 	jack_client_connect_request_t req;
 	jack_client_connect_result_t res;
 
@@ -587,6 +573,7 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 
 	for (node = engine->clients; node; node = g_slist_next (node)) {
 	        client = (jack_client_internal_t *) node->data;
+
 		if (strncmp(req.name, (char*)client->control->name, sizeof(req.name)) == 0) {
 		        jack_error ("cannot create new client; %s already exists", client->control->name);
 
@@ -596,7 +583,7 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 
 	if (res.status == 0) {
 
-	        if ((client = jack_client_internal_new (engine, client_fd, &req)) == 0) {
+	        if ((client = jack_client_internal_new (engine, client_fd, &req)) == NULL) {
 		        jack_error ("cannot create new client object");
 			return -1;
 		}
@@ -617,8 +604,12 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 		}
 	}
 
+	if (client == NULL) {
+		return -1;
+	}
+
 	if (write (client->request_fd, &res, sizeof (res)) != sizeof (res)) {
-	        jack_error ("cannot write connection response to client");
+		jack_error ("cannot write connection response to client");
 		jack_client_delete (engine, client);
 		return -1;
 	}
@@ -692,23 +683,6 @@ jack_client_drop (jack_engine_t *engine, jack_client_id_t id)
 	jack_remove_client (engine, client);
 	return 0;
 }
-
-#if 0
-static int
-jack_client_has_connections (jack_client_internal_t *client)
-
-{
-	GSList *node;
-
-	for (node = client->ports; node; node = g_slist_next (node)) {
-		if (((jack_port_internal_t *) node->data)->connections) {
-			return TRUE;
-		}
-	}
-
-	return FALSE;
-}
-#endif
 
 static int
 jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
@@ -803,7 +777,7 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id, int to_wait)
 
 			if (client == engine->timebase_client) {
 				engine->timebase_client = 0;
-				engine->control->frame_time = 0;
+				engine->control->time.frame = 0;
 			}
 			
 			for (portnode = client->ports; portnode; portnode = g_slist_next (portnode)) {
@@ -829,7 +803,7 @@ jack_set_timebase (jack_engine_t *engine, jack_client_id_t client)
 	pthread_mutex_lock (&engine->graph_lock);
 
 	if ((engine->timebase_client = jack_client_internal_by_id (engine, client)) != 0) {
-		engine->control->frame_time = engine->timebase_client->control->frame_time;
+		engine->control->time.frame = engine->timebase_client->control->frame_time;
 		ret = 0;
 	}
 	pthread_mutex_unlock (&engine->graph_lock);
@@ -861,41 +835,6 @@ handle_client_jack_error (jack_engine_t *engine, int fd)
 
 	jack_remove_client (engine, client);
 	return 0;
-}
-
-static int
-jack_client_port_monitor (jack_engine_t *engine, jack_port_id_t port_id, int onoff)
-
-{
-	jack_port_shared_t *port;
-	jack_client_internal_t *client = NULL;
-	jack_event_t event;
-	
-	if (port_id < 0 || port_id >= engine->port_max) {
-		jack_error ("illegal port ID in port monitor request");
-		return -1;
-	}
-
-	port = &engine->control->ports[port_id];
-
-	if (!(port->flags & JackPortCanMonitor)) {
-		jack_error ("port monitor request made on a port (%s) that doesn't support monitoring",
-			     port->name);
-		return -1;
-	}
-
-	pthread_mutex_lock (&engine->graph_lock);
-	if ((client = jack_client_internal_by_id (engine, port->client_id)) == NULL) {
-		jack_error ("unknown client owns port %d!!", port_id);
-		pthread_mutex_unlock (&engine->graph_lock);
-		return -1;
-	}
-	pthread_mutex_unlock (&engine->graph_lock);
-
-	event.type = (onoff ? PortMonitor : PortUnMonitor);
-	event.x.port_id = port_id;
-
-	return jack_deliver_event (engine, client, &event);
 }
 
 static int
@@ -965,12 +904,14 @@ handle_client_io (jack_engine_t *engine, int fd)
 		req.status = jack_set_timebase (engine, req.x.client_id);
 		break;
 
-	case RequestPortMonitor:
-		req.status = jack_client_port_monitor (engine, req.x.port_info.port_id, TRUE);
+	case GetPortTotalLatency:
+		req.status = jack_get_total_latency (engine, req.x.port_info.name, &req.x.nframes);
 		break;
-
-	case RequestPortUnMonitor:
-		req.status = jack_client_port_monitor (engine, req.x.port_info.port_id, FALSE);
+		
+	default:
+		/* some requests are handled entirely on the client side,
+		   by adjusting the shared memory area(s)
+		*/
 		break;
 	}
 
@@ -1133,16 +1074,6 @@ jack_engine_new (int realtime, int rtpriority)
 		engine->fifo[i] = -1;
 	}
 
-	/* Build a linked list of known port types. We use a list so that 
-	   we can easily manage other data types without messing with
-	   reallocation of arrays, etc.
-	*/
-
-	engine->port_types = NULL;
-	for (i = 0; builtin_port_types[i].type_name; i++) {
-		engine->port_types = g_slist_append (engine->port_types, &builtin_port_types[i]);
-	}
-
 	engine->external_client_cnt = 0;
 
 	srandom (time ((time_t *) 0));
@@ -1195,9 +1126,9 @@ jack_engine_new (int realtime, int rtpriority)
 	engine->control->real_time = realtime;
 	engine->control->client_priority = engine->rtpriority - 1;
  
-	engine->control->sample_rate = 0;
 	engine->control->buffer_size = 0;
-	engine->control->frame_time = 0;
+	engine->control->time.frame_rate = 0;
+	engine->control->time.frame = 0;
 
 	sprintf (engine->fifo_prefix, "%s/ack_fifo_%d", jack_temp_dir, getpid());
 
@@ -1392,8 +1323,6 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	client->control->srate_arg = NULL;
 	client->control->port_register = NULL;
 	client->control->port_register_arg = NULL;
-	client->control->port_monitor = NULL;
-	client->control->port_monitor_arg = NULL;
 
 	if (req->type == ClientDynamic) {
 		if (jack_load_client (engine, client, req->object_path)) {
@@ -1439,7 +1368,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	if (client == engine->timebase_client) {
 		engine->timebase_client = 0;
-		engine->control->frame_time = 0;
+		engine->control->time.frame = 0;
 	}
 
 	jack_client_disconnect (engine, client);
@@ -1560,18 +1489,6 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 		case SampleRateChange:
 			if (client->control->srate) {
 				client->control->srate (event->x.n, client->control->bufsize_arg);
-			}
-			break;
-
-		case PortMonitor:
-			if (client->control->port_monitor) {
-				client->control->port_monitor (event->x.port_id, TRUE, client->control->port_monitor_arg);
-			}
-			break;
-
-		case PortUnMonitor:
-			if (client->control->port_monitor) {
-				client->control->port_monitor (event->x.port_id, FALSE, client->control->port_monitor_arg);
 			}
 			break;
 
@@ -1901,6 +1818,16 @@ jack_port_do_connect (jack_engine_t *engine,
 		return -1;
 	}
 
+	if (srcport->shared->locked) {
+		jack_error ("source port is locked against connection changes");
+		return -1;
+	}
+
+	if (dstport->shared->locked) {
+		jack_error ("destination port is locked against connection changes");
+		return -1;
+	}
+
 	if (strcmp (srcport->shared->type_info.type_name,
 		    dstport->shared->type_info.type_name) != 0) {
 		jack_error ("ports used in attemped connection are not of the same data type");
@@ -1964,6 +1891,16 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 			src_id = srcport->shared->id;
 			dst_id = dstport->shared->id;
 
+			/* this is a bit harsh, but it basically says that if we actually
+			   do a disconnect, and its the last one, then make sure that
+			   any input monitoring is turned off on the srcport. this isn't
+			   ideal for all situations, but it works better for most of them.
+			*/
+
+			if (srcport->connections == NULL) {
+				srcport->shared->monitor_requests = 0;
+			}
+
 			jack_send_connection_notification (engine, srcport->shared->client_id, src_id, dst_id, FALSE);
 			jack_send_connection_notification (engine, dstport->shared->client_id, dst_id, src_id, FALSE);
 
@@ -2008,6 +1945,51 @@ jack_port_do_disconnect (jack_engine_t *engine,
 
 	pthread_mutex_unlock (&engine->graph_lock);
 	return ret;
+}
+
+static int
+jack_port_get_total_latency (jack_engine_t *engine, jack_port_internal_t *port, nframes_t *latency)
+{
+	GSList *node;
+
+	/* call tree should hold engine->graph_lock. */
+	
+	(*latency) = port->shared->latency;
+
+	for (node = port->connections; node; node = g_slist_next (node)) {
+
+		nframes_t this_latency;
+		jack_connection_internal_t *connection;
+
+		connection = (jack_connection_internal_t *) node->data;
+
+		/* if we're a destination in the connection, recurse on the source to
+		   get its total latency
+		*/
+		
+		if (connection->destination == port) {
+
+			jack_port_get_total_latency (engine, connection->source, &this_latency);
+			
+			if (this_latency > *latency) {
+				(*latency) = this_latency;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static int
+jack_get_total_latency (jack_engine_t *engine, const char *portname, nframes_t *latency)
+{
+	jack_port_internal_t *port;
+
+	if ((port = jack_get_port_by_name (engine, portname)) == NULL) {
+		return -1;
+	}
+
+	return jack_port_get_total_latency (engine, port, latency);
 }
 
 static int 
@@ -2139,12 +2121,10 @@ int
 jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	
 {
-	GSList *node;
 	jack_port_id_t port_id;
 	jack_port_shared_t *shared;
 	jack_port_internal_t *port;
 	jack_client_internal_t *client;
-	jack_port_type_info_t *type_info;
 
 	pthread_mutex_lock (&engine->graph_lock);
 	if ((client = jack_client_internal_by_id (engine, req->x.port_info.client_id)) == 0) {
@@ -2164,41 +2144,15 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 
 	shared->client_id = req->x.port_info.client_id;
 	shared->flags = req->x.port_info.flags;
-	shared->locked = 0;
 	shared->buffer_size = req->x.port_info.buffer_size;
+	shared->latency = 0;
+	shared->monitor_requests = 0;
+	shared->locked = 0;
 
 	port = &engine->internal_ports[port_id];
 
 	port->shared = shared;
 	port->connections = 0;
-
-	type_info = NULL;
-
-	for (node = engine->port_types; node; node = g_slist_next (node)) {
-		
-		if (strcmp (req->x.port_info.type, ((jack_port_type_info_t *) node->data)->type_name) == 0) {
-			type_info = (jack_port_type_info_t *) node->data;
-			break;
-		}
-	}
-
-	if (type_info == NULL) {
-
-		/* not a builtin type, so allocate a new type_info structure,
-		   and fill it appropriately.
-		*/
-		
-		type_info = (jack_port_type_info_t *) malloc (sizeof (jack_port_type_info_t));
-
-		type_info->type_name = strdup (req->x.port_info.type);
-		type_info->mixdown = NULL;            /* we have no idea how to mix this */
-		type_info->buffer_scale_factor = -1;  /* use specified port buffer size */
-
-		engine->port_types = g_slist_prepend (engine->port_types, type_info);
-	}
-
-
-	memcpy (&port->shared->type_info, type_info, sizeof (jack_port_type_info_t));
 
 	if (jack_port_assign_buffer (engine, port)) {
 		jack_error ("cannot assign buffer for port");
@@ -2288,6 +2242,7 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 	port->shared->shm_key = -1;
 
 	if (port->shared->flags & JackPortIsInput) {
+		port->shared->offset = 0;
 		return 0;
 	}
 	
@@ -2372,35 +2327,3 @@ jack_send_connection_notification (jack_engine_t *engine, jack_client_id_t clien
 	return 0;
 }
 
-static void 
-jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
-{
-	GSList *node;
-	jack_port_t *input;
-	nframes_t n;
-	sample_t *buffer;
-	sample_t *dst, *src;
-
-	/* by the time we've called this, we've already established
-	   the existence of more than 1 connection to this input port.
-	*/
-
-	node = port->connections;
-	input = (jack_port_t *) node->data;
-	buffer = jack_port_buffer (port);
-
-	memcpy (buffer, jack_port_buffer (input), sizeof (sample_t) * nframes);
-	
-	for (node = g_slist_next (node); node; node = g_slist_next (node)) {
-
-		input = (jack_port_t *) node->data;
-
-		n = nframes;
-		dst = buffer;
-		src = jack_port_buffer (input);
-
-		while (n--) {
-			*dst++ += *src++;
-		}
-	}
-}

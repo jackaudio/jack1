@@ -283,7 +283,7 @@ setup_ports (int sources, char *source_names[], thread_info_t *info)
 	}
 
 	for (i = 0; i < nports; i++) {
-		if (jack_port_connect (info->client, source_names[i], jack_port_name (ports[i]))) {
+		if (jack_connect (info->client, source_names[i], jack_port_name (ports[i]))) {
 			fprintf (stderr, "cannot connect input port %s to %s\n", jack_port_name (ports[i]), source_names[i]);
 			jack_client_close (info->client);
 			exit (1);

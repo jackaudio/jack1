@@ -49,7 +49,6 @@ typedef struct {
     char                        **capture_addr;
     const snd_pcm_channel_area_t *capture_areas;
     const snd_pcm_channel_area_t *playback_areas;
-    unsigned long long            time_at_interrupt;
     struct pollfd                *pfd;
     unsigned int                  playback_nfds;
     unsigned int                  capture_nfds;
@@ -78,7 +77,6 @@ typedef struct {
     snd_ctl_t                    *ctl_handle;
     snd_pcm_t                    *playback_handle;
     snd_pcm_t                    *capture_handle;
-    unsigned long                *input_monitor_requests;
     snd_pcm_hw_params_t          *playback_hw_params;
     snd_pcm_sw_params_t          *playback_sw_params;
     snd_pcm_hw_params_t          *capture_hw_params;
@@ -114,6 +112,18 @@ static __inline__ void alsa_driver_silence_on_channel (alsa_driver_t *driver, ch
 		memset (driver->playback_addr[chn], 0, nframes * driver->sample_bytes);
 	}
 	alsa_driver_mark_channel_done (driver,chn);
+}
+
+static __inline__ void alsa_driver_silence_on_channel_no_mark (alsa_driver_t *driver, channel_t chn, nframes_t nframes) {
+	if (driver->interleaved) {
+		memset_interleave 
+			(driver->playback_addr[chn],
+			 0, nframes * driver->sample_bytes,
+			 driver->interleave_unit,
+			 driver->playback_interleave_skip);
+	} else {
+		memset (driver->playback_addr[chn], 0, nframes * driver->sample_bytes);
+	}
 }
 
 static __inline__ void alsa_driver_read_from_channel (alsa_driver_t *driver, 

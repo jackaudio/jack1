@@ -29,3 +29,9 @@ jack_pool_alloc (size_t bytes)
 
 	return malloc (bytes);
 }
+
+void
+jack_pool_release (void *ptr)
+{
+	free (ptr);
+}

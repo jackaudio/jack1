@@ -24,9 +24,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <asm/msr.h>
 #include <glib.h>
 #include <stdarg.h>
+#include <asm/msr.h>
 
 #include <jack/alsa_driver.h>
 #include <jack/types.h>
@@ -37,12 +37,6 @@
 
 static int  config_max_level = 0;
 static int  config_min_level = 0;
-
-static unsigned long long current_cycles () {
-	unsigned long long now;
-	rdtscll (now);
-	return now;
-}
 
 static void
 alsa_driver_release_channel_dependent_memory (alsa_driver_t *driver)
@@ -61,11 +55,6 @@ alsa_driver_release_channel_dependent_memory (alsa_driver_t *driver)
 	if (driver->silent) {
 		free (driver->silent);
 		driver->silent = 0;
-	}
-
-	if (driver->input_monitor_requests) {
-		free (driver->input_monitor_requests);
-		driver->input_monitor_requests = 0;
 	}
 }
 
@@ -118,7 +107,7 @@ alsa_driver_generic_hardware (alsa_driver_t *driver)
 }
 
 static int
-alsa_driver_hw_specific (alsa_driver_t *driver)
+alsa_driver_hw_specific (alsa_driver_t *driver, int hw_monitoring)
 
 {
 	int err;
@@ -135,13 +124,12 @@ alsa_driver_hw_specific (alsa_driver_t *driver)
 
 	if (driver->hw->capabilities & Cap_HardwareMonitoring) {
 		driver->has_hw_monitoring = TRUE;
+		/* XXX need to ensure that this is really FALSE or TRUE or whatever*/
+		driver->hw_monitoring = hw_monitoring;
 	} else {
 		driver->has_hw_monitoring = FALSE;
+		driver->hw_monitoring = FALSE;
 	}
-	
-	/* XXX need to ensure that this is really FALSE */
-
-	driver->hw_monitoring = FALSE;
 
 	if (driver->hw->capabilities & Cap_ClockLockReporting) {
 		driver->has_clock_sync_reporting = TRUE;
@@ -460,9 +448,6 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 		driver->silent[chn] = 0;
 	}
 
-	driver->input_monitor_requests = (unsigned long *) malloc (sizeof (unsigned long) * driver->max_nchannels);
-	memset (driver->input_monitor_requests, 0, sizeof (unsigned long) * driver->max_nchannels);
-
 	driver->clock_sync_data = (ClockSyncStatus *) malloc (sizeof (ClockSyncStatus) * 
 							      driver->capture_nchannels > driver->playback_nchannels ?
 							      driver->capture_nchannels : driver->playback_nchannels);
@@ -607,8 +592,10 @@ alsa_driver_audio_start (alsa_driver_t *driver)
 
 	driver->playback_nfds = snd_pcm_poll_descriptors_count (driver->playback_handle);
 	driver->capture_nfds = snd_pcm_poll_descriptors_count (driver->capture_handle);
+	if (driver->pfd)
+		free (driver->pfd);
 	driver->pfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 
-		(driver->playback_nfds + driver->capture_nfds));
+		(driver->playback_nfds + driver->capture_nfds + 1));
 
 	return 0;
 }
@@ -675,7 +662,7 @@ alsa_driver_silence_untouched_channels (alsa_driver_t *driver, nframes_t nframes
 	for (chn = 0; chn < driver->playback_nchannels; chn++) {
 		if ((driver->channels_not_done & (1<<chn))) { 
 			if (driver->silent[chn] < driver->buffer_frames) {
-				alsa_driver_silence_on_channel (driver, chn, nframes);
+				alsa_driver_silence_on_channel_no_mark (driver, chn, nframes);
 				driver->silent[chn] += nframes;
 			}
 		}
@@ -709,7 +696,6 @@ alsa_driver_wait (alsa_driver_t *driver)
 	int need_capture = 1;
 	int need_playback = 1;
 	int i;
-	unsigned long long before;
 
   again:
 
@@ -731,16 +717,17 @@ alsa_driver_wait (alsa_driver_t *driver)
 			ci = nfds;
 			nfds += driver->capture_nfds;
 		}
+
+		if (need_capture != need_playback) {
+			fprintf (stderr, "poll needs capture: %s playback: %s\n", need_capture ? "yes":"no",
+				 need_playback ? "yes":"no");
+		}
 		
 		/* ALSA doesn't set POLLERR in some versions of 0.9.X */
 		
 		for (i = 0; i < nfds; i++) {
 			driver->pfd[nfds].events |= POLLERR;
 		}
-		
-//		printf ("c? %d p? %d poll on %d fds\n", need_capture, need_playback, nfds);
-		
-		before = current_cycles();
 		
 		if (poll (driver->pfd, nfds, 1000) < 0) {
 			if (errno == EINTR) {
@@ -756,13 +743,13 @@ alsa_driver_wait (alsa_driver_t *driver)
 			jack_error ("ALSA::Device: poll call failed (%s)", strerror (errno));
 			return -1;
 		}
-		
-		driver->time_at_interrupt = current_cycles();
-//		printf ("time in poll: %f usecs since last = %f usecs\n", 
-//			((float) (driver->time_at_interrupt - before)/450.0f),
-//			((float) (driver->time_at_interrupt - last_time)/450.0f));
-//		last_time = driver->time_at_interrupt;
-		
+
+		if (driver->engine) {
+			struct timeval tv;
+			gettimeofday (&tv, NULL);
+			driver->engine->control->time.microseconds = tv.tv_sec * 1000000 + tv.tv_usec;
+		}
+
 		p_timed_out = 0;
 		
 		if (need_playback) {
@@ -827,11 +814,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 	}
 
 	if (xrun_detected) {
-		if (alsa_driver_xrun_recovery (driver)) {
-			return -1;
-		} else {
-			return 0;
-		}
+		return alsa_driver_xrun_recovery (driver);
 	}
 
 	avail = capture_avail < playback_avail ? capture_avail : playback_avail;
@@ -854,10 +837,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 			return -1;
 		}
 
-
 		contiguous = capture_avail < playback_avail ? capture_avail : playback_avail;
-
-//		printf ("\tcontiguous = %lu\n", contiguous);
 
 		/* XXX possible race condition here with silence_pending */
 		
@@ -871,21 +851,15 @@ alsa_driver_wait (alsa_driver_t *driver)
 			}
 			driver->silence_pending = 0;
 		}
-		
+
 		driver->channels_not_done = driver->channel_done_bits;
-		
-		if ((driver->hw->input_monitor_mask != driver->input_monitor_mask) && 
-		    driver->hw_monitoring && !driver->all_monitor_in) {
-			driver->hw->set_input_monitor_mask (driver->hw, driver->input_monitor_mask);
-		} 
-		
+
 		/* XXX race condition on engine ptr */
 
 		if (driver->engine && driver->engine->process (driver->engine, contiguous)) {
 			jack_error ("alsa_pcm: engine processing error - stopping.");
 			return -1;
 		}
-
 		/* now move data from ports to channels */
 
 		for (chn = 0, node = driver->playback_ports; node; node = g_slist_next (node), chn++) {
@@ -904,7 +878,16 @@ alsa_driver_wait (alsa_driver_t *driver)
 
 		/* Now handle input monitoring */
 		
+		driver->input_monitor_mask = 0;
+		
+		for (chn = 0, node = driver->capture_ports; node; node = g_slist_next (node), chn++) {
+			if (((jack_port_t *) node->data)->shared->monitor_requests) {
+				driver->input_monitor_mask |= (1<<chn);
+			}
+		}
+			
 		if (!driver->hw_monitoring) {
+
 			if (driver->all_monitor_in) {
 				for (chn = 0; chn < driver->playback_nchannels; chn++) {
 					alsa_driver_copy_channel (driver, chn, chn, contiguous);
@@ -916,20 +899,26 @@ alsa_driver_wait (alsa_driver_t *driver)
 					}
 				}
 			}
+
+		} else {
+
+			if ((driver->hw->input_monitor_mask != driver->input_monitor_mask) && !driver->all_monitor_in) {
+				driver->hw->set_input_monitor_mask (driver->hw, driver->input_monitor_mask);
+			} 
 		}
 
 		if (driver->channels_not_done) {
 			alsa_driver_silence_untouched_channels (driver, contiguous);
 		}
-		
+
 		snd_pcm_mmap_commit (driver->capture_handle, capture_offset, contiguous);
 		snd_pcm_mmap_commit (driver->playback_handle, playback_offset, contiguous);
-		
+
 		avail -= contiguous;
 	}
 
-//	end = current_cycles();
-//	printf ("entire cycle took %f usecs\n", ((float)(end - driver->time_at_interrupt))/450.0f);
+//	rdtscl (now);
+//	fprintf (stderr, "engine cycle took %.6f usecs\n", (((float) (now - start))/450.0f));
 
 	return 0;
 }
@@ -958,18 +947,6 @@ alsa_driver_process (nframes_t nframes, void *arg)
 }
 
 static void
-alsa_driver_port_monitor_handler (jack_port_id_t port_id, int onoff, void *arg)
-{
-	alsa_driver_t *driver = (alsa_driver_t *) arg;
-	jack_port_shared_t *port;
-	int channel;
-
-	port = &driver->engine->control->ports[port_id];
-	sscanf (port->name, "%*s%*s%*s%d", &channel);
-	driver->request_monitor_input ((jack_driver_t *) driver, channel, onoff);
-}
-
-static void
 alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 
 {
@@ -990,7 +967,6 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 	}
 
 	jack_set_process_callback (driver->client, alsa_driver_process, driver);
-	jack_set_port_monitor_callback (driver->client, alsa_driver_port_monitor_handler, driver);
 
 	for (chn = 0; chn < driver->capture_nchannels; chn++) {
 		snprintf (buf, sizeof(buf) - 1, "in_%lu", chn+1);
@@ -1001,6 +977,12 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 			jack_error ("ALSA: cannot register port for %s", buf);
 			break;
 		}
+
+		/* XXX fix this so that it can handle: systemic (external) latency
+		*/
+
+		jack_port_set_latency (port, driver->frames_per_cycle * driver->nfragments);
+
 		driver->capture_ports = g_slist_append (driver->capture_ports, port);
 	}
 
@@ -1013,6 +995,12 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 			jack_error ("ALSA: cannot register port for %s", buf);
 			break;
 		}
+		
+		/* XXX fix this so that it can handle: systemic (external) latency
+		*/
+
+		jack_port_set_latency (port, driver->frames_per_cycle * driver->nfragments);
+
 		driver->playback_ports = g_slist_append (driver->playback_ports, port);
 	}
 
@@ -1062,45 +1050,6 @@ alsa_driver_mark_channel_silent (alsa_driver_t *driver, unsigned long chn)
 }
 
 static void
-alsa_driver_request_monitor_input (alsa_driver_t *driver, unsigned long chn, int yn)
-	
-{
-	int changed;
-
-	if (chn >= driver->max_nchannels) {
-		return;
-	}
-
-	changed = FALSE;
-
-	if (yn) {
-		if (++driver->input_monitor_requests[chn] == 1) {
-			if (!(driver->input_monitor_mask & (1<<chn))) {
-				driver->input_monitor_mask |= (1<<chn);
-				changed = TRUE;
-			}
-		}
-	} else {
-		if (driver->input_monitor_requests[chn] && --driver->input_monitor_requests[chn] == 0) {
-			if (driver->input_monitor_mask & (1<<chn)) {
-				driver->input_monitor_mask &= ~(1<<chn);
-				changed = TRUE;
-			}
-		}
-	}
-
-	if (changed) {
-		if (!driver->hw_monitoring && !yn) {
-			alsa_driver_mark_channel_silent (driver, chn);
-		}
-
-		/* Tell anyone who cares about the state of input monitoring */
-		
-		jack_driver_input_monitor_notify ((jack_driver_t *) driver, chn, yn);
-	}
-}
-
-static void
 alsa_driver_request_all_monitor_input (alsa_driver_t *driver, int yn)
 
 {
@@ -1131,12 +1080,6 @@ alsa_driver_set_hw_monitoring (alsa_driver_t *driver, int yn)
 		driver->hw_monitoring = FALSE;
 		driver->hw->set_input_monitor_mask (driver->hw, 0);
 	}
-}
-
-static nframes_t
-alsa_driver_frames_since_cycle_start (alsa_driver_t *driver)
-{
-	return (nframes_t) ((driver->frame_rate / 1000000.0) * ((float) (current_cycles() - driver->time_at_interrupt)));
 }
 
 static ClockSyncStatus
@@ -1199,13 +1142,16 @@ alsa_driver_delete (alsa_driver_t *driver)
 static jack_driver_t *
 alsa_driver_new (char *name, char *alsa_device,
 		 nframes_t frames_per_cycle,
-		 nframes_t rate)
+		 nframes_t rate,
+		 int hw_monitoring)
 {
 	int err;
 
 	alsa_driver_t *driver;
 
-	printf ("creating alsa driver ... %s|%lu|%lu\n", alsa_device, frames_per_cycle, rate);
+	printf ("creating alsa driver ... %s|%lu|%lu|%s\n", 
+		alsa_device, frames_per_cycle, rate,
+		hw_monitoring ? "hwmon":"swmon");
 
 	driver = (alsa_driver_t *) calloc (1, sizeof (alsa_driver_t));
 
@@ -1220,9 +1166,7 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->set_hw_monitoring  = (JackDriverSetHwMonitoringFunction) alsa_driver_set_hw_monitoring ;
 	driver->reset_parameters  = (JackDriverResetParametersFunction) alsa_driver_reset_parameters;
 	driver->mark_channel_silent  = (JackDriverMarkChannelSilentFunction) alsa_driver_mark_channel_silent;
-	driver->request_monitor_input  = (JackDriverRequestMonitorInputFunction) alsa_driver_request_monitor_input;
 	driver->request_all_monitor_input = (JackDriverRequestAllMonitorInputFunction) alsa_driver_request_all_monitor_input;
-	driver->frames_since_cycle_start = (JackDriverFramesSinceCycleStartFunction) alsa_driver_frames_since_cycle_start;
 	driver->clock_sync_status = (JackDriverClockSyncStatusFunction) alsa_driver_clock_sync_status;
 	driver->change_sample_clock  = (JackDriverChangeSampleClockFunction) alsa_driver_change_sample_clock;
 
@@ -1238,7 +1182,6 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->capture_addr = 0;
 	driver->silence_pending = 0;
 	driver->silent = 0;
-	driver->input_monitor_requests = 0;
 	driver->all_monitor_in = FALSE;
 
 	driver->clock_mode = ClockMaster; /* XXX is it? */
@@ -1310,7 +1253,7 @@ alsa_driver_new (char *name, char *alsa_device,
 		driver->capture_and_playback_not_synced = FALSE;
 	}
 
-	alsa_driver_hw_specific (driver);
+	alsa_driver_hw_specific (driver, hw_monitoring);
 
 	return (jack_driver_t *) driver;
 }
@@ -1323,12 +1266,14 @@ driver_initialize (va_list ap)
 	nframes_t srate;
 	nframes_t frames_per_interrupt;
 	char *pcm_name;
+	int hw_monitoring;
 
 	pcm_name = va_arg (ap, char *);
 	frames_per_interrupt = va_arg (ap, nframes_t);
 	srate = va_arg (ap, nframes_t);
+	hw_monitoring = va_arg (ap, int);
 
-	return alsa_driver_new ("alsa_pcm", pcm_name, frames_per_interrupt, srate);
+	return alsa_driver_new ("alsa_pcm", pcm_name, frames_per_interrupt, srate, hw_monitoring);
 }
 
 void

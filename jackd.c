@@ -40,6 +40,7 @@ static nframes_t srate = 48000;
 static int realtime = 0;
 static int realtime_priority = 10;
 static int with_fork = 1;
+static int hw_monitoring = 0;
 
 static void
 signal_handler (int sig)
@@ -123,7 +124,11 @@ jack_engine_waiter_thread (void *arg)
 		return 0;
 	}
 
-	if ((driver = jack_driver_load (ADDON_DIR "/jack_alsa.so", alsa_pcm_name, frames_per_interrupt, srate)) == 0) {
+	if ((driver = jack_driver_load (ADDON_DIR "/jack_alsa.so", 
+					alsa_pcm_name, 
+					frames_per_interrupt, 
+					srate, 
+					hw_monitoring)) == 0) {
 		fprintf (stderr, "cannot load ALSA driver module\n");
 		kill (signal_pid, SIGTERM);
 		return 0;
@@ -203,6 +208,7 @@ static void usage ()
               [ --srate OR -r sample-rate ] 
               [ --frames-per-interrupt OR -p frames_per_interrupt ] 
               [ --realtime OR -R [ --realtime-priority OR -P priority ] ]
+              [ --hw-monitor OR -h ]
               [ --spoon OR -F ]  (don't fork)
 ");
 }	
@@ -211,7 +217,7 @@ int
 main (int argc, char *argv[])
 
 {
-	const char *options = "hd:r:p:RP:FD:";
+	const char *options = "hd:r:p:RP:FD:H";
 	struct option long_options[] = 
 	{ 
 		{ "tmpdir", 1, 0, 'D' },
@@ -221,6 +227,7 @@ main (int argc, char *argv[])
 		{ "help", 0, 0, 'h' },
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
+		{ "hw-monitor", 0, 0, 'H' },
 		{ "spoon", 0, 0, 'F' },
 		{ 0, 0, 0, 0 }
 	};
@@ -256,6 +263,10 @@ main (int argc, char *argv[])
 
 		case 'R':
 			realtime = 1;
+			break;
+
+		case 'H':
+			hw_monitoring = 1;
 			break;
 
 		case 'h':

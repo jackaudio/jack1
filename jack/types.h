@@ -21,6 +21,8 @@
 #ifndef __jack_engine_types_h__
 #define __jack_engine_types_h__
 
+#include <limits.h>
+
 typedef float         sample_t;
 typedef unsigned long nframes_t;
 typedef long          jack_port_id_t;
@@ -28,11 +30,12 @@ typedef unsigned long jack_client_id_t;
 typedef float         gain_t;
 typedef long          channel_t;
 
+static  const nframes_t max_frames = ULONG_MAX;
+
 typedef int  (*JackProcessCallback)(nframes_t, void *);
 typedef int  (*JackBufferSizeCallback)(nframes_t, void *);
 typedef int  (*JackSampleRateCallback)(nframes_t, void *);
 typedef void (*JackPortRegistrationCallback)(jack_port_id_t,int,void*);
-typedef void (*JackPortMonitorCallback)(jack_port_id_t,int,void*);
 
 #define NoChannel -1
 #define NoPort    -1

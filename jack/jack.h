@@ -51,10 +51,6 @@ int jack_set_process_callback (jack_client_t *, JackProcessCallback, void *arg);
 int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback, void *arg);
 int jack_set_sample_rate_callback (jack_client_t *, JackSampleRateCallback, void *arg);
 int jack_set_port_registration_callback (jack_client_t *, JackPortRegistrationCallback, void *);
-int jack_set_port_monitor_callback (jack_client_t *, JackPortMonitorCallback, void *);
-
-int jack_get_process_start_fd (jack_client_t *);
-int jack_get_process_done_fd (jack_client_t *);
 
 int jack_activate (jack_client_t *client);
 int jack_deactivate (jack_client_t *client);
@@ -123,9 +119,16 @@ jack_port_register (jack_client_t *,
 
 int jack_port_unregister (jack_client_t *, jack_port_t *);
 
-/* a port is an opaque type, and its name is not inferable */
+/* a port is an opaque type. these help with a few things */
 
 const char * jack_port_name (const jack_port_t *port);
+const char * jack_port_short_name (const jack_port_t *port);
+int          jack_port_flags (const jack_port_t *port);
+const char * jack_port_type (const jack_port_t *port);
+int          jack_port_connected (const jack_port_t *port);
+int          jack_port_equal (const jack_port_t *a, const jack_port_t *b);
+
+int jack_port_set_name (jack_port_t *port, const char *name);
 
 /* This returns a pointer to the memory area associated with the
    specified port. It can only be called from within the client's
@@ -149,13 +152,27 @@ void *jack_port_get_buffer (jack_port_t *, nframes_t);
    the flags of the destination port must include PortIsInput.
 */
 
-int jack_port_connect (jack_client_t *,
-			const char *source_port,
-			const char *destination_port);
+int jack_connect (jack_client_t *,
+		  const char *source_port,
+		  const char *destination_port);
 
-int jack_port_disconnect (jack_client_t *,
-			   const char *source_port,
-			   const char *destination_port);
+int jack_disconnect (jack_client_t *,
+		     const char *source_port,
+		     const char *destination_port);
+
+/* these two functions perform the exact same function
+   as the jack_connect() and jack_disconnect(), but they
+   use port handles rather than names, which avoids
+   the name lookup inherent in the name-based versions.
+
+   it is envisaged that clients (dis)connecting their own
+   ports will use these two, wherease generic connection
+   clients (e.g. patchbays) will use the name-based
+   versions
+*/
+
+int jack_port_connect (jack_client_t *, jack_port_t *src, jack_port_t *dst);
+int jack_port_disconnect (jack_client_t *, jack_port_t *);
 
 /* A client may call this on a pair of its own ports to 
    semi-permanently wire them together. This means that
@@ -171,7 +188,7 @@ int jack_port_disconnect (jack_client_t *,
    clients. Thats what a connection is for.
 */
 
-int  jack_port_tie (jack_port_t *dst, jack_port_t *src);
+int  jack_port_tie (jack_port_t *src, jack_port_t *dst);
 
 /* This undoes the effect of jack_port_tie(). The port
    should be same as the `destination' port passed to
@@ -181,19 +198,60 @@ int  jack_port_tie (jack_port_t *dst, jack_port_t *src);
 int  jack_port_untie (jack_port_t *port);
 
 /* a client may call this function to prevent other objects
-   from changing the connection status of the named port.
+   from changing the connection status of a port. the port
+   must be owned by the calling client.
 */
 
 int jack_port_lock (jack_client_t *, jack_port_t *);
 int jack_port_unlock (jack_client_t *, jack_port_t *);
 
+/* returns the time (in frames) between data being available
+   or delivered at/to a port, and the time at which it
+   arrived at or is delivered to the "other side" of the port.
+
+   e.g. for a physical audio output port, this is the time between
+   writing to the port and when the audio will be audible.
+
+   for a physical audio input port, this is the time between the sound
+   being audible and the corresponding frames being readable from the
+   port.  
+*/
+
+nframes_t jack_port_get_latency (jack_port_t *port);
+
+/* the port latency is zero by default. clients that control
+   physical hardware with non-zero latency should call this
+   to set the latency to its correct value. note that the value
+   should include any systemic latency present "outside" the
+   physical hardware controlled by the client. for example,
+   for a client controlling a digital audio interface connected
+   to an external digital converter, the latency setting should
+   include both buffering by the audio interface *and* the converter. 
+*/
+
+void jack_port_set_latency (jack_port_t *, nframes_t);
 
 /* if JackPortCanMonitor is set for a port, then this function will
    turn on/off input monitoring for the port.  if JackPortCanMonitor
    is not set, then this function will do nothing.  
 */
 
-int jack_port_request_monitor (jack_client_t *, const char *port_name, int onoff);
+int jack_port_request_monitor (jack_port_t *port, int onoff);
+int jack_port_request_monitor_by_name (jack_client_t *client, const char *port_name, int onoff);
+
+/* if JackPortCanMonitor is set for a port, then this function will
+   turn on input monitoring if it was off, and will turn it off it
+   only one request has been made to turn it on. if JackPortCanMonitor
+   is not set, then this function will do nothing.
+*/
+
+int jack_port_ensure_monitor (jack_port_t *port, int onoff);
+
+/* returns a true or false value depending on whether or not 
+   input monitoring has been requested for `port'.
+*/
+
+int jack_port_monitoring_input (jack_port_t *port);
 
 /* this returns the sample rate of the jack */
 
@@ -226,6 +284,8 @@ char * const * jack_get_ports (jack_client_t *,
 			       const char *type_name_pattern,
 			       unsigned long flags);
 
+jack_port_t *jack_port_by_name (jack_client_t *, const char *portname);
+
 /* If a client is told to become the timebase for the entire system,
    it calls this function. If it returns zero, then the client has
    the responsibility to call jack_update_time() at the end
@@ -237,6 +297,11 @@ char * const * jack_get_ports (jack_client_t *,
 int  jack_engine_takeover_timebase (jack_client_t *);
 void jack_update_time (jack_client_t *, nframes_t);
 
+/* this estimates the time that has passed since the
+   start of the current cycle. 
+*/
+
+nframes_t jack_frames_since_cycle_start (jack_client_t *);
 
 #ifdef __cplusplus
 }

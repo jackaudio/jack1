@@ -25,7 +25,7 @@
 #include <jack/types.h>
 
 typedef struct _jack_port_type_info {
-    const char *type_name;                       /* what do you think ? */
+    const char type_name[32];                     /* what do you think ? */
 
     void (*mixdown)(jack_port_t *, nframes_t);   /* function to mixdown multiple inputs to a buffer. can be
 						    NULL, indicating that multiple input connections
@@ -61,9 +61,12 @@ typedef struct _jack_port_shared {
     char                  name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
     jack_port_type_info_t type_info;
     jack_client_id_t      client_id;
+    nframes_t             latency;
+    unsigned char         monitor_requests;
 
-    char                  in_use : 1;
-    char                  locked : 1;
+    char                  in_use     : 1;
+    char                  locked     : 1;
+
 } jack_port_shared_t;
 
 /* This is the data structure allocated by the client

@@ -1,7 +1,10 @@
 TODO
 
-fix graph sorting to use same approach as in ARDOUR::Session for
-    routes
+* silence ports when they are disconnected from for the last time
+* use a VSTTimeInfo-like structure for time info
+* call time client before all others
+* support frames_since_interrupt()
+* fix monitor system to be exactly like audioengine's
 
 figure out how to have pools of buffers for ports by type
 figure out how to use the same buffer over and over when possible
@@ -16,5 +19,3 @@ TO THINK ABOUT:
 multiple port buffer shm segments (i.e. dynamically
          increase the total number of ports in the system)
 
-wingo (apwingo@eos.ncsu.edu) adds:
- - add helper functions to access _jack_port_shared without requiring glib

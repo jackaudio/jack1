@@ -24,6 +24,7 @@
 #include <glib.h>
 #include <pthread.h>
 #include <jack/types.h>
+#include <jack/port.h>
 
 typedef void (*ClockSyncListenerFunction)(channel_t,ClockSyncStatus,void*);
 
@@ -32,14 +33,6 @@ typedef struct {
     ClockSyncListenerFunction function;
     void *arg;
 } ClockSyncListener;
-
-typedef void (*InputMonitorListenerFunction)(channel_t,int,void*);
-
-typedef struct {
-    unsigned long id;
-    InputMonitorListenerFunction function;
-    void *arg;
-} InputMonitorListener;
 
 struct _jack_engine;
 struct _jack_driver;
@@ -55,9 +48,7 @@ typedef void            (*JackDriverSetHwMonitoringFunction) (struct _jack_drive
 typedef int             (*JackDriverChangeSampleClockFunction) (struct _jack_driver *, SampleClockMode mode);
 typedef int             (*JackDriverResetParametersFunction) (struct _jack_driver *, nframes_t frames_per_cycle, nframes_t rate);
 typedef void            (*JackDriverMarkChannelSilentFunction) (struct _jack_driver *, unsigned long chn);
-typedef void            (*JackDriverRequestMonitorInputFunction) (struct _jack_driver *, unsigned long chn, int yn);
 typedef void            (*JackDriverRequestAllMonitorInputFunction) (struct _jack_driver *, int yn);
-typedef int             (*JackDriverMonitoringInputFunction)(struct _jack_driver *,channel_t chn);
 
 #define JACK_DRIVER_DECL \
     nframes_t frame_rate; \
@@ -91,7 +82,6 @@ typedef int             (*JackDriverMonitoringInputFunction)(struct _jack_driver
        could/should be provided by a different kind of object. \
     */ \
 \
-    JackDriverFramesSinceCycleStartFunction frames_since_cycle_start; \
     JackDriverClockSyncStatusFunction clock_sync_status; \
     JackDriverAudioStopFunction audio_stop; \
     JackDriverAudioStartFunction audio_start; \
@@ -99,9 +89,7 @@ typedef int             (*JackDriverMonitoringInputFunction)(struct _jack_driver
     JackDriverChangeSampleClockFunction change_sample_clock; \
     JackDriverResetParametersFunction reset_parameters; \
     JackDriverMarkChannelSilentFunction mark_channel_silent; \
-    JackDriverRequestMonitorInputFunction request_monitor_input; \
     JackDriverRequestAllMonitorInputFunction request_all_monitor_input; \
-    JackDriverMonitoringInputFunction monitoring_input;
 
 typedef struct _jack_driver {
 
@@ -118,11 +106,8 @@ void jack_driver_unload (jack_driver_t *);
 int jack_driver_listen_for_clock_sync_status (jack_driver_t *, ClockSyncListenerFunction, void *arg);
 int jack_driver_stop_listen_for_clock_sync_status (jack_driver_t *, int);
 
-int jack_driver_listen_for_input_monitor_status (jack_driver_t *, InputMonitorListenerFunction, void *arg);
-int jack_driver_stop_listen_for_input_monitor_status (jack_driver_t *, int);
-
 void jack_driver_clock_sync_notify (jack_driver_t *, channel_t chn, ClockSyncStatus);
-void jack_driver_input_monitor_notify (jack_driver_t *, channel_t chn, int);
+void jack_driver_input_monitor_notify (jack_driver_t *, jack_port_shared_t *, int);
 
 #endif /* __jack_driver_h__ */
 

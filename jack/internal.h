@@ -48,11 +48,30 @@ typedef struct {
     char  *address;
 } jack_port_segment_info_t;
 
+typedef struct _time_info
+{
+    nframes_t frame;
+    nframes_t frame_rate;
+    unsigned long microseconds;
+
+    double ppqPos;        // 1 ppq
+    double tempo;         // in bpm
+    double barStartPos;   // last bar start, in 1 ppq
+    double cycleStartPos; // 1 ppq
+    double cycleEndPos;   // 1 ppq
+
+    float timeSigNumerator;  // time signature
+    float timeSigDenominator;
+    long smpteOffset;
+    long smpteFrameRate;  // 0:24, 1:25, 2:29.97, 3:30, 4:29.97 df, 5:30 df
+    long samplesToNextClock; // midi clock resolution (24 ppq), can be negative
+    long flags;     // see below
+} time_info;
+
 typedef struct {
 
-    nframes_t           frame_time;
+    time_info           time;
     pid_t               engine_pid;
-    unsigned long       sample_rate;
     unsigned long       buffer_size;
     char                real_time;
     int                 client_priority;
@@ -70,8 +89,6 @@ typedef enum  {
   GraphReordered,
   PortRegistered,
   PortUnregistered,
-  PortMonitor,
-  PortUnMonitor,
 } AudioEngineEventType;
 
 typedef struct {
@@ -118,8 +135,6 @@ typedef volatile struct {
     void *srate_arg;
     JackPortRegistrationCallback port_register;
     void *port_register_arg;
-    JackPortMonitorCallback port_monitor;
-    void *port_monitor_arg;
 
     /* for engine use only */
 
@@ -178,8 +193,7 @@ typedef enum {
 	DropClient = 6,
 	ActivateClient = 7,
 	DeactivateClient = 8,
-	RequestPortMonitor = 9,
-	RequestPortUnMonitor = 10
+	GetPortTotalLatency = 9
 } AudioEngineRequestType;
 
 typedef struct {
@@ -199,6 +213,7 @@ typedef struct {
 	    char destination_port[JACK_PORT_NAME_SIZE+1];
 	} connect;
 	jack_client_id_t client_id;
+	nframes_t nframes;
     } x;
     int status;
 }  jack_request_t;
