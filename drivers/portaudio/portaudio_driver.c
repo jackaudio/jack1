@@ -394,21 +394,27 @@ static int portaudio_load_driver (portaudio_driver_t *driver,
         printf("---------------------------------------------- #%d\n", i);
         
         //if (strcmp(driver_name,pdi->name) == 0) {
-		 if (strncmp(driver_name,pdi->name,JACK_DRIVER_PARAM_STRING_MAX) == 0) { // compare the JACK_DRIVER_PARAM_STRING_MAX first character
+	// compare the first character
+	if (strncmp (driver_name, pdi->name,
+		     JACK_DRIVER_PARAM_STRING_MAX) == 0) {
             if (pdi->maxInputChannels > 0) {
                 *inputDeviceID = i;
-                driver->capture_nchannels = (capturing) ? pdi->maxInputChannels : 0;
+                driver->capture_nchannels =
+			(capturing) ? pdi->maxInputChannels : 0;
                 strcpy(driver->driver_name,pdi->name);
                 printf("Found input driver = %s\n", driver_name);
                 found = 1;
-            }else if (pdi->maxOutputChannels > 0) {
+            }
+	    if (pdi->maxOutputChannels > 0) {
                 *outputDeviceID = i;
-                driver->playback_nchannels = (playing) ? pdi->maxOutputChannels : 0;
+                driver->playback_nchannels =
+			(playing) ? pdi->maxOutputChannels : 0;
                 strcpy (driver->driver_name,pdi->name);
                 printf("Found output driver = %s\n", driver_name);
                 found = 1;
-            }else {
-                printf("Found driver without input or ouput = %s\n", driver_name);
+            } else {
+                printf("Found driver without input or ouput = %s\n",
+		       driver_name);
             }
         }
                         
@@ -416,7 +422,8 @@ static int portaudio_load_driver (portaudio_driver_t *driver,
         printf("Max Inputs = %d ", pdi->maxInputChannels);
         printf("Max Outputs = %d\n", pdi->maxOutputChannels);
         if( pdi->numSampleRates == -1 ){
-            printf("Sample Rate Range = %f to %f\n", pdi->sampleRates[0], pdi->sampleRates[1]);
+            printf("Sample Rate Range = %f to %f\n", pdi->sampleRates[0],
+		   pdi->sampleRates[1]);
         }else{
             printf("Sample Rates =");
             for(j=0; j<pdi->numSampleRates; j++){
