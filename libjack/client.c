@@ -670,7 +670,11 @@ jack_client_new (const char *client_name)
 	   will use the setup in the server's address space.
 	*/
 	jack_init_time ();
-	jack_initialize_shm ();
+
+	if (jack_initialize_shm ()) {
+		jack_error ("Unable to initialize shared memory.");
+		return NULL;
+	}
 
 	if (jack_request_client (ClientExternal, client_name, "", "",
 				 &res, &req_fd)) {
