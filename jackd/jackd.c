@@ -351,7 +351,8 @@ static void usage (FILE *file)
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
 "         -d driver [ ... driver args ... ]\n"
-"             driver can be `alsa', `dummy', `oss' or `portaudio'\n\n"
+"             where driver can be `alsa', `coreaudio', `dummy',\n"
+"                                 `oss' or `portaudio'\n\n"
 "       jackd -d driver --help\n"
 "             to display options for each driver\n\n");
 }	
