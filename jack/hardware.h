@@ -34,7 +34,8 @@ typedef enum {
 	Cap_AutoSync = 0x2,
 	Cap_WordClock = 0x4,
 	Cap_ClockMaster = 0x8,
-	Cap_ClockLockReporting = 0x10
+	Cap_ClockLockReporting = 0x10,
+	Cap_HardwareMetering = 0x20
 } Capabilities;
 
 struct _jack_hardware;
@@ -42,6 +43,9 @@ struct _jack_hardware;
 typedef void (*JackHardwareReleaseFunction)(struct _jack_hardware *);
 typedef int (*JackHardwareSetInputMonitorMaskFunction)(struct _jack_hardware *, unsigned long);
 typedef int (*JackHardwareChangeSampleClockFunction)(struct _jack_hardware *, SampleClockMode);
+typedef double (*JackHardwareGetHardwarePeak)(jack_port_t *port, jack_nframes_t frames);
+typedef double (*JackHardwareGetHardwarePower)(jack_port_t *port, jack_nframes_t frames);
+
 
 typedef struct _jack_hardware {
 
@@ -51,7 +55,8 @@ typedef struct _jack_hardware {
     JackHardwareChangeSampleClockFunction change_sample_clock;
     JackHardwareSetInputMonitorMaskFunction set_input_monitor_mask;
     JackHardwareReleaseFunction release;
-
+    JackHardwareGetHardwarePeak get_hardware_peak;
+    JackHardwareGetHardwarePower get_hardware_power;
     void *private;
 
 } jack_hardware_t;

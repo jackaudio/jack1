@@ -174,6 +174,16 @@ static int hdsp_change_sample_clock (jack_hardware_t *hw, SampleClockMode mode)
   return -1;
 }
 
+static double hdsp_get_hardware_peak (jack_port_t *port, jack_nframes_t frame)
+{
+	return 0;
+}
+
+static double hdsp_get_hardware_power (jack_port_t *port, jack_nframes_t frame)
+{
+	return 0;
+}
+
 void
 jack_alsa_hdsp_release (jack_hardware_t *hw)
 
@@ -198,14 +208,16 @@ jack_alsa_hdsp_hw_new (alsa_driver_t *driver)
 	/* Not using clock lock-sync-whatever in home hardware setup */
 	/* yet.  Will write this code when can test it. */
 	/* hw->capabilities = Cap_HardwareMonitoring|Cap_AutoSync|Cap_WordClock|Cap_ClockMaster|Cap_ClockLockReporting; */
-	hw->capabilities = Cap_HardwareMonitoring;
+	hw->capabilities = Cap_HardwareMonitoring | Cap_HardwareMetering;
 	hw->input_monitor_mask = 0;
 	hw->private = 0;
 
 	hw->set_input_monitor_mask = hdsp_set_input_monitor_mask;
 	hw->change_sample_clock = hdsp_change_sample_clock;
 	hw->release = jack_alsa_hdsp_release;
-
+	hw->get_hardware_peak = hdsp_get_hardware_peak;
+	hw->get_hardware_power = hdsp_get_hardware_power;
+	
 	h = (hdsp_t *) malloc (sizeof (hdsp_t));
 	h->driver = driver;
 	hw->private = h;

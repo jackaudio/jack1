@@ -22,10 +22,10 @@
 #include <string.h>
 #include <jack/timestamps.h>
 #include <jack/internal.h>
-#include <jack/cycles.h>
+#include <jack/time.h>
 
 typedef struct {
-    cycles_t when;
+    jack_time_t when;
     const char *what;
 } jack_timestamp_t;
 
@@ -49,7 +49,7 @@ void
 jack_timestamp (const char *what)
 {
 	if (timestamp_index < timestamp_cnt) {
-		timestamps[timestamp_index].when = get_cycles();
+		timestamps[timestamp_index].when = jack_get_microseconds();
 		timestamps[timestamp_index].what = what;
 		++timestamp_index;
 	}

@@ -87,7 +87,6 @@ struct _jack_engine {
     char asio_mode;
     int reordered;
     int watchdog_check;
-    float cpu_mhz;
 
     struct _jack_client_internal *current_client;
 

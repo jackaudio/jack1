@@ -40,7 +40,7 @@
 #include <jack/engine.h>
 #include <jack/pool.h>
 #include <jack/error.h>
-#include <jack/cycles.h>
+#include <jack/time.h>
 #include <jack/jslist.h>
 #include <jack/version.h>
 
@@ -49,6 +49,8 @@
 #ifdef WITH_TIMESTAMPS
 #include <jack/timestamps.h>
 #endif /* WITH_TIMESTAMPS */
+
+jack_time_t __jack_cpu_mhz;
 
 char *jack_server_dir = "/tmp";
 
@@ -139,7 +141,6 @@ jack_client_alloc ()
 	client->thread_ok = FALSE;
 	client->first_active = TRUE;
 	client->on_shutdown = NULL;
-	client->cpu_mhz = (float) jack_get_mhz ();
 
 	return client;
 }
@@ -449,6 +450,12 @@ jack_client_new (const char *client_name)
 	int control_shm_id;
 	void *addr;
 
+	/* external clients need this initialized; internal clients
+	   will use the setup in the server's address space.
+	*/
+
+	jack_init_time ();
+
 	if (jack_request_client (ClientExternal, client_name, "", "", &res, &req_fd)) {
 		return NULL;
 	}
@@ -654,7 +661,7 @@ jack_client_thread (void *arg)
 		*/
 
 		if (client->pollfd[1].revents & POLLIN) {
-			control->awake_at = get_cycles();
+			control->awake_at = jack_get_microseconds();
 		}
 
 		if (client->pollfd[0].revents & ~POLLIN || client->control->dead) {
@@ -741,7 +748,7 @@ jack_client_thread (void *arg)
 			       getpid(),
 			       control->signalled_at, 
 			       control->awake_at, 
-			       ((float) (control->awake_at - control->signalled_at))/client->cpu_mhz, 
+			       control->awake_at - control->signalled_at,
 			       client->pollfd[1].fd);
 
 			control->state = Running;
@@ -754,7 +761,7 @@ jack_client_thread (void *arg)
 				control->state = Finished;
 			}
 			
-			control->finished_at = get_cycles();
+			control->finished_at = jack_get_microseconds();
 
 #ifdef WITH_TIMESTAMPS
 			jack_timestamp ("finished");
@@ -772,7 +779,8 @@ jack_client_thread (void *arg)
 				break;
 			}
 
-			DEBUG ("client sent message to next stage by %Lu, client reading on graph_wait_fd==%d", get_cycles(), client->graph_wait_fd);
+			DEBUG ("client sent message to next stage by %Lu, client reading on graph_wait_fd==%d", 
+			       jack_get_microseconds(), client->graph_wait_fd);
 
 #ifdef WITH_TIMESTAMPS
 			jack_timestamp ("read pending byte from wait");
@@ -1376,7 +1384,7 @@ jack_frames_since_cycle_start (const jack_client_t *client)
 {
 	float usecs;
 
-	usecs = (float) (get_cycles() - client->engine->current_time.cycles) / client->cpu_mhz;
+	usecs = jack_get_microseconds() - client->engine->current_time.usecs;
 	return (jack_nframes_t) floor ((((float) client->engine->current_time.frame_rate) / 1000000.0f) * usecs);
 }
 
@@ -1389,7 +1397,7 @@ jack_frame_time (const jack_client_t *client)
 
 	jack_read_frame_time (client, &current);
 	
-	usecs = (float) (get_cycles() - current.stamp) / client->cpu_mhz;
+	usecs = jack_get_microseconds() - current.stamp;
 	elapsed = (jack_nframes_t) floor ((((float) client->engine->current_time.frame_rate) / 1000000.0f) * usecs);
 	
 	return current.frames + elapsed;
@@ -1442,42 +1450,6 @@ jack_set_transport_info (jack_client_t *client,
 	return 0;
 }	
 
-int
-jack_get_mhz (void)
-{
-	FILE *f = fopen("/proc/cpuinfo", "r");
-	if (f == 0)
-	{
-		perror("can't open /proc/cpuinfo\n");
-		exit(1);
-	}
-
-	for ( ; ; )
-	{
-		int mhz;
-		int ret;
-		char buf[1000];
-
-		if (fgets(buf, sizeof(buf), f) == NULL)
-		{
-			fprintf(stderr, "cannot locate cpu MHz in /proc/cpuinfo\n");
-			exit(1);
-		}
-
-#ifdef __powerpc__
-		ret = sscanf(buf, "clock\t: %dMHz", &mhz);
-#else
-		ret = sscanf(buf, "cpu MHz         : %d", &mhz);
-#endif /* __powerpc__ */
-
-		if (ret == 1)
-		{
-			fclose(f);
-			return mhz;
-		}
-	}
-}
-
 float
 jack_cpu_load (jack_client_t *client)
 {
@@ -1490,3 +1462,47 @@ jack_client_thread_id (jack_client_t *client)
 	return client->thread_id;
 }
 
+#if defined(linux)
+
+jack_time_t
+jack_get_mhz (void)
+{
+	FILE *f = fopen("/proc/cpuinfo", "r");
+	if (f == 0)
+	{
+		perror("can't open /proc/cpuinfo\n");
+		exit(1);
+	}
+
+	for ( ; ; )
+	{
+		jack_time_t mhz;
+		int ret;
+		char buf[1000];
+
+		if (fgets(buf, sizeof(buf), f) == NULL)
+		{
+			fprintf(stderr, "cannot locate cpu MHz in /proc/cpuinfo\n");
+			exit(1);
+		}
+
+#ifdef __powerpc__
+		ret = sscanf(buf, "clock\t: %LuMHz", &mhz);
+#else
+		ret = sscanf(buf, "cpu MHz         : %Lu", &mhz);
+#endif /* __powerpc__ */
+
+		if (ret == 1)
+		{
+			fclose(f);
+			return mhz;
+		}
+	}
+}
+
+void jack_init_time ()
+{
+	__jack_cpu_mhz = jack_get_mhz ();
+}
+
+#endif

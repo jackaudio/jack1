@@ -13,7 +13,7 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=62
+JACK_MINOR_VERSION=63
 JACK_MICRO_VERSION=0
 
 dnl ---
@@ -41,7 +41,7 @@ dnl slacker than this, and closer to those for the JACK version
 dnl number.
 dnl ---
 JACK_API_CURRENT=0
-JACK_API_REVISION=10
+JACK_API_REVISION=11
 JACK_API_AGE=0
 
 AC_SUBST(JACK_MAJOR_VERSION)

@@ -35,7 +35,7 @@
 #include <jack/hdsp.h>
 #include <jack/ice1712.h>
 #include <jack/generic.h>
-#include <jack/cycles.h>
+#include <jack/time.h>
 
 extern void store_work_time (int);
 extern void store_wait_time (int);
@@ -134,7 +134,7 @@ alsa_driver_generic_hardware (alsa_driver_t *driver)
 }
 
 static int
-alsa_driver_hw_specific (alsa_driver_t *driver, int hw_monitoring)
+alsa_driver_hw_specific (alsa_driver_t *driver, int hw_monitoring, int hw_metering)
 
 {
 	int err;
@@ -170,6 +170,14 @@ alsa_driver_hw_specific (alsa_driver_t *driver, int hw_monitoring)
 		driver->has_clock_sync_reporting = TRUE;
 	} else {
 		driver->has_clock_sync_reporting = FALSE;
+	}
+
+	if (driver->hw->capabilities & Cap_HardwareMetering) {
+		driver->has_hw_metering = TRUE;
+		driver->hw_metering = hw_metering;
+	} else {
+		driver->has_hw_metering = FALSE;
+		driver->hw_metering = FALSE;
 	}
 
 	return 0;
@@ -860,7 +868,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 			nfds++;
 		}
 
-		poll_enter = get_cycles ();
+		poll_enter = jack_get_microseconds ();
 
 		if (poll (driver->pfd, nfds, (int) floor ((1.5f * driver->period_usecs) / 1000.0f)) < 0) {
 			if (errno == EINTR) {
@@ -880,7 +888,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 			
 		}
 
-		poll_ret = get_cycles ();
+		poll_ret = jack_get_microseconds ();
 
 		if (extra_fd < 0) {
 			if (driver->poll_next && poll_ret > driver->poll_next) {
@@ -888,7 +896,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 			} 
 			driver->poll_last = poll_ret;
 			driver->poll_next = poll_ret + (unsigned long long) floor ((driver->period_usecs * driver->cpu_mhz));
-			driver->engine->control->current_time.cycles = poll_ret;
+			driver->engine->control->current_time.usecs = poll_ret;
 		}
 
 #ifdef DEBUG_WAKEUP
@@ -1228,6 +1236,11 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 			break;
 		}
 
+		if (driver->hw_metering) {
+			jack_port_set_peak_function(port, driver->hw->get_hardware_peak);
+			jack_port_set_power_function(port, driver->hw->get_hardware_power);
+		}
+		
 		/* XXX fix this so that it can handle: systemic (external) latency
 		*/
 
@@ -1244,6 +1257,11 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 		if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
 			jack_error ("ALSA: cannot register port for %s", buf);
 			break;
+		}
+		
+		if (driver->hw_metering) {
+			jack_port_set_peak_function(port, driver->hw->get_hardware_peak);
+			jack_port_set_power_function(port, driver->hw->get_hardware_power);
 		}
 		
 		/* XXX fix this so that it can handle: systemic (external) latency
@@ -1397,6 +1415,7 @@ alsa_driver_new (char *name, char *alsa_device,
 		 jack_nframes_t user_nperiods,
 		 jack_nframes_t rate,
 		 int hw_monitoring,
+		 int hw_metering,
 		 int capturing,
 		 int playing,
 		 DitherAlgorithm dither,
@@ -1406,9 +1425,9 @@ alsa_driver_new (char *name, char *alsa_device,
 
 	alsa_driver_t *driver;
 
-	printf ("creating alsa driver ... %s|%lu|%lu|%lu|%s|%s\n", 
+	printf ("creating alsa driver ... %s|%lu|%lu|%lu|%s|%s|%s\n", 
 		alsa_device, frames_per_cycle, user_nperiods, rate,
-		hw_monitoring ? "hwmon":"swmon", soft_mode ? "soft-mode":"rt");
+		hw_monitoring ? "hwmon":"swmon", hw_metering ? "hwmeter":"swmeter", soft_mode ? "soft-mode":"rt");
 
 	driver = (alsa_driver_t *) calloc (1, sizeof (alsa_driver_t));
 
@@ -1560,7 +1579,7 @@ alsa_driver_new (char *name, char *alsa_device,
 		} 
 	}
 
-	alsa_driver_hw_specific (driver, hw_monitoring);
+	alsa_driver_hw_specific (driver, hw_monitoring, hw_metering);
 
 	driver->client = client;
 
@@ -1630,6 +1649,7 @@ alsa_usage ()
 "    -p,--period <n>    \tframes per period (default: 1024)\n"
 "    -n,--nperiods <n>  \tnumber of periods in hardware buffer (default: 2)\n"
 "    -H,--hwmon   \tuse hardware monitoring, if available (default: no)\n"
+"    -M,--hwmeter \tuse hardware metering, if available (default: no)\n"
 "    -D,--duplex  \tduplex I/O (default: yes)\n"
 "    -C,--capture \tcapture input (default: duplex)\n"
 "    -P,--playback\tplayback output (default: duplex)\n"
@@ -1649,6 +1669,34 @@ alsa_error (char *type, char *value)
 	alsa_usage();
 }
 
+static int
+dither_opt (char c, DitherAlgorithm* dither)
+{
+	switch (*optarg) {
+	case '-':
+		*dither = None;
+		break;
+		
+	case 'r':
+		*dither = Rectangular;
+		break;
+		
+	case 's':
+		*dither = Shaped;
+		break;
+		
+	case 't':
+		*dither = Triangular;
+		break;
+		
+	default:
+		alsa_error ("illegal dithering mode", "");
+		return -1;
+	}
+	return 0;
+}
+
+
 /* DRIVER "PLUGIN" INTERFACE */
 
 const char driver_client_name[] = "alsa_pcm";
@@ -1661,11 +1709,13 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 	unsigned long user_nperiods = 2;
 	char *pcm_name = "default";
 	int hw_monitoring = FALSE;
+	int hw_metering = FALSE;
 	int capture = FALSE;
 	int playback = FALSE;
 	int soft_mode = FALSE;
 	DitherAlgorithm dither = None;
 	int opt;
+	char *envvar;
 	char optstring[2];		/* string made from opt char */
 	struct option long_options[] = 
 	{ 
@@ -1673,6 +1723,7 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 		{ "duplex",	0, NULL, 'D' },
 		{ "device",	1, NULL, 'd' },
 		{ "hwmon",	0, NULL, 'H' },
+		{ "hwmeter",	0, NULL, 'M' },
 		{ "help",	0, NULL, 'h' },
 		{ "playback",	0, NULL, 'P' },
 		{ "period",	1, NULL, 'p' },
@@ -1683,13 +1734,57 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 		{ 0, 0, 0, 0 }
 	};
 
+	/* before we do anything else, see if there are environment variables
+	   for each parameter.
+	*/
+	
+	if ((envvar = getenv ("JACK_ALSA_DEVICE")) != NULL) {
+		pcm_name = envvar;
+	}
+
+	if ((envvar = getenv ("JACK_ALSA_HWMON")) != NULL) {
+		hw_monitoring = TRUE;
+	}
+
+	if ((envvar = getenv ("JACK_ALSA_SOFTMODE")) != NULL) {
+		soft_mode = TRUE;
+	}
+	
+	if ((envvar = getenv ("JACK_ALSA_PERIOD_FRAMES")) != NULL) {
+		frames_per_interrupt = atoi (envvar);
+	}
+
+	if ((envvar = getenv ("JACK_ALSA_PERIODS")) != NULL) {
+		user_nperiods = atoi (envvar);
+	}
+
+	if ((envvar = getenv ("JACK_ALSA_SRATE")) != NULL) {
+		srate = atoi (envvar);
+	}
+
+	if ((envvar = getenv ("JACK_ALSA_DITHER")) != NULL) {
+		if (dither_opt (*envvar, &dither)) {
+			return NULL;
+		}
+	}
+
+	if ((envvar = getenv ("JACK_ALSA_CAPTURE")) != NULL) {
+		capture = atoi (envvar);
+	}
+
+	if ((envvar = getenv ("JACK_ALSA_PLAYBACK")) != NULL) {
+		playback = atoi (envvar);
+	}
+		
+
+
 	/*
 	 * Setting optind back to zero is a hack to reinitialize a new
 	 * getopts() loop.  See declaration in <getopt.h>.
 	 */
 	optind = 0;
 	opterr = 0;
-	while ((opt = getopt_long(argc, argv, "-CDd:HPp:r:n:sz::",
+	while ((opt = getopt_long(argc, argv, "-CDd:HMPp:r:n:sz::",
 				  long_options, NULL))
 	       != EOF) {
 		switch (opt) {
@@ -1715,6 +1810,10 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 			alsa_usage();
 			return NULL;
 
+		case 'M':
+			hw_metering = TRUE;
+			break;
+			
 		case 'P':
 			playback = TRUE;
 			break;
@@ -1739,26 +1838,7 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 			if (optarg == NULL) {
 				dither = None;
 			} else {
-
-				switch (*optarg) {
-				case '-':
-					dither = None;
-					break;
-
-				case 'r':
-					dither = Rectangular;
-					break;
-
-				case 's':
-					dither = Shaped;
-					break;
-
-				case 't':
-					dither = Triangular;
-					break;
-
-				default:
-					alsa_error("dithering mode", optarg);
+				if (dither_opt (*optarg, &dither)) {
 					return NULL;
 				}
 			}
@@ -1784,7 +1864,7 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 	}
 
 	return alsa_driver_new ("alsa_pcm", pcm_name, client, frames_per_interrupt, 
-				user_nperiods, srate, hw_monitoring, capture,
+				user_nperiods, srate, hw_monitoring, hw_metering, capture,
 			        playback, dither, soft_mode);
 }
 

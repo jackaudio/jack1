@@ -550,8 +550,8 @@ jack_nframes_t jack_frame_time (const jack_client_t *);
 /**
  * This returns the current CPU load estimated by JACK
  * as a percentage. The load is computed by measuring
- * the number of cycles it took to execute all clients
- * as a fraction of the total number of cycles
+ * the amount of time it took to execute all clients
+ * as a fraction of the total amount of time
  * represented by the data that was processed.
  */
 float jack_cpu_load (jack_client_t *client);

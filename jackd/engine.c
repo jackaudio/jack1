@@ -43,7 +43,7 @@
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <jack/driver.h>
-#include <jack/cycles.h>
+#include <jack/time.h>
 #include <jack/version.h>
 
 #ifdef USE_CAPABILITIES
@@ -458,12 +458,10 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
 	JSList *node;
-	char c;
 	int status;
+	char c;
 	float delayed_usecs;
 	unsigned long long now, then;
-
-	c = get_cycles();
 
 	engine->process_errors = 0;
 
@@ -522,7 +520,7 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 			/* external subgraph */
 
 			ctl->state = Triggered; // a race exists if we do this after the write(2) 
-			ctl->signalled_at = get_cycles();
+			ctl->signalled_at = jack_get_microseconds();
 			ctl->awake_at = 0;
 			ctl->finished_at = 0;
 
@@ -536,7 +534,7 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 				break;
 			} 
 
-			then = get_cycles ();
+			then = jack_get_microseconds ();
 
 			if (engine->asio_mode) {
 				engine->driver->wait (engine->driver, client->subgraph_wait_fd, &status, &delayed_usecs);
@@ -569,19 +567,19 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 				}
 			}
 
-			now = get_cycles();
+			now = jack_get_microseconds ();
 
 			if (status != 0) {
 				if (engine->verbose) {
-					fprintf (stderr, "at %Lu client waiting on %d took %.9f usecs, status = %d sig = %Lu awa = %Lu fin = %Lu dur=%.6f\n",
+					fprintf (stderr, "at %Lu client waiting on %d took %Lu usecs, status = %d sig = %Lu awa = %Lu fin = %Lu dur=%Lu\n",
 						now,
 						client->subgraph_wait_fd,
-						(float) (now - then) / engine->cpu_mhz,
+						now - then,
 						status,
 						ctl->signalled_at,
 						ctl->awake_at,
 						ctl->finished_at,
-						((float) (ctl->finished_at - ctl->signalled_at)) / engine->cpu_mhz);
+						ctl->finished_at - ctl->signalled_at);
 				}
 
 				/* we can only consider the timeout a client error if it actually woke up.
@@ -628,7 +626,7 @@ jack_engine_post_process (jack_engine_t *engine)
 	JSList *node;
 	int need_remove = FALSE;
 	
-	engine->control->pending_time.cycles = engine->control->current_time.cycles;
+	engine->control->pending_time.usecs = engine->control->current_time.usecs;
 	engine->control->current_time = engine->control->pending_time;
 
 	/* find any clients that need removal due to timeouts, etc. */
@@ -1590,6 +1588,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	uid_t uid = getuid ();
 	uid_t euid = geteuid ();
 #endif
+	jack_init_time ();
 
 	engine = (jack_engine_t *) malloc (sizeof (jack_engine_t));
 
@@ -1608,7 +1607,6 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine->silent_buffer = 0;
 	engine->verbose = verbose;
 	engine->asio_mode = FALSE;
-	engine->cpu_mhz = jack_get_mhz();
 
 	jack_engine_reset_rolling_usecs (engine);
 
@@ -1843,7 +1841,7 @@ jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
 
 	time->guard1++;
 	time->frames += amount;
-	time->stamp = get_cycles ();
+	time->stamp = jack_get_microseconds ();
 
 	// atomic_inc (&time->guard2, 1);
 	// might need a memory barrier here
@@ -1960,12 +1958,12 @@ jack_main_thread (void *arg)
 			break;
 		}
 
-		cycle_end = get_cycles ();
+		cycle_end = jack_get_microseconds ();
 		
 		/* store the execution time for later averaging */
 		
 		engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = 
-			(float) (cycle_end - engine->control->current_time.cycles) / engine->cpu_mhz;
+			cycle_end - engine->control->current_time.usecs;
 		
 		if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
 			engine->rolling_client_usecs_index = 0;

@@ -33,11 +33,11 @@
 #include <jack/types.h>
 #include <jack/port.h>
 #include <jack/transport.h>
-#include <jack/cycles.h>
+#include <jack/time.h>
 
 #ifdef DEBUG_ENABLED
 #define DEBUG(format,args...) \
-	printf ("jack:%5d:%Lu %s:%s:%d: " format "\n", getpid(), get_cycles(), __FILE__, __FUNCTION__, __LINE__ , ## args)
+	printf ("jack:%5d:%Lu %s:%s:%d: " format "\n", getpid(), jack_get_microseconds(), __FILE__, __FUNCTION__, __LINE__ , ## args)
 #else
 #define DEBUG(format,args...)
 #endif
@@ -69,7 +69,7 @@ typedef struct _time_info
 {
     jack_nframes_t frame;
     jack_nframes_t frame_rate;
-    cycles_t  cycles;
+    jack_time_t    usecs;
     jack_transport_state_t transport_state;
     jack_nframes_t loop_start;
     jack_nframes_t loop_end;
@@ -94,7 +94,7 @@ typedef struct _time_info
 typedef struct {
     volatile unsigned long long guard1;
     volatile jack_nframes_t frames;
-    volatile cycles_t  stamp;
+    volatile jack_time_t    stamp;
     volatile unsigned long long guard2;
 } jack_frame_timer_t;
 
@@ -301,8 +301,6 @@ jack_client_t *jack_client_alloc_internal (jack_client_control_t*, jack_control_
 void handle_internal_client_request (jack_control_t*, jack_request_t*);
 
 extern char *jack_server_dir;
-
-extern int jack_get_mhz (void);
 
 extern void jack_error (const char *fmt, ...);
 

@@ -98,6 +98,7 @@ typedef struct {
 
     char   soft_mode : 1;
     char   hw_monitoring : 1;
+    char   hw_metering : 1;
     char   all_monitor_in : 1;
     char   capture_and_playback_not_synced : 1;
     char   interleaved : 1;
@@ -115,7 +116,7 @@ typedef struct {
     unsigned long next_clock_sync_listener_id;
     char has_clock_sync_reporting : 1;
     char has_hw_monitoring : 1;
-
+    char has_hw_metering : 1;
 } alsa_driver_t;
 
 static __inline__ void alsa_driver_mark_channel_done (alsa_driver_t *driver, channel_t chn) {

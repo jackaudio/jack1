@@ -34,6 +34,13 @@ typedef unsigned long        jack_nframes_t;
 #define JACK_MAX_FRAMES ULONG_MAX;
 
 /**
+ * Type used to represent the value of free running
+ * monotonic clock with units of microseconds.
+ */
+
+typedef unsigned long long jack_time_t;
+
+/**
  *  jack_port_t is an opaque type. You may only access it using the API provided.
  */
 typedef struct _jack_port    jack_port_t;
