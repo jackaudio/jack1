@@ -370,6 +370,8 @@ static int oss_driver_detach (oss_driver_t *driver, jack_engine_t *engine)
 	if (driver->engine == NULL)
 		return -1;
 
+	/*jack_deactivate(driver->client);*/	/* ? */
+
 	node = driver->capture_ports;
 	while (node != NULL)
 	{
@@ -834,6 +836,7 @@ static int oss_driver_bufsize (oss_driver_t *driver, jack_nframes_t nframes)
 	oss_driver_stop(driver);
 
 	set_period_size(driver, nframes);
+	driver->engine->set_buffer_size(driver->engine, driver->period_size);
 	printf("oss_driver: period size update: %u\n", nframes);
 
 	oss_driver_start(driver);
