@@ -1447,12 +1447,13 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 			client = (jack_client_internal_t *) node->data;
 			client->control->active = TRUE;
 
-			/* we call this to make sure the
-			   FIFO is built+ready by the time
-			   the client needs it. we don't
-			   care about the return value at
-			   this point.  
-			*/
+			jack_transport_activate(engine, client);
+
+			/* we call this to make sure the FIFO is
+			 * built+ready by the time the client needs
+			 * it. we don't care about the return value at
+			 * this point.
+			 */
 
 			jack_get_fifo_fd (engine,
 					  ++engine->external_client_cnt);
@@ -1475,6 +1476,8 @@ jack_client_do_deactivate (jack_engine_t *engine,
 	/* caller must hold engine->client_lock and must have checked for and/or
 	 *   cleared all connections held by client. */
 	client->control->active = FALSE;
+
+	jack_transport_client_exit (engine, client);
 
 	if (!jack_client_is_internal (client) &&
 	    engine->external_client_cnt > 0) {	
@@ -1527,16 +1530,13 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 	        	JSList *portnode;
 			jack_port_internal_t *port;
 
-			jack_transport_client_exit (engine, client);
-			
 			for (portnode = client->ports; portnode;
 			     portnode = jack_slist_next (portnode)) {
 				port = (jack_port_internal_t *) portnode->data;
 				jack_port_clear_connections (engine, port);
  			}
 
-			ret = jack_client_do_deactivate (engine, node->data,
-							 TRUE);
+			ret = jack_client_do_deactivate (engine, client, TRUE);
 			break;
 		}
 	}

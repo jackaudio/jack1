@@ -29,7 +29,6 @@ struct _jack_client {
     void *on_shutdown_arg;
     char thread_ok : 1;
     char first_active : 1;
-    char new_timebase : 1;
     pthread_t thread_id;
     
 #if defined(__APPLE__) && defined(__POWERPC__)

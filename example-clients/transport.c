@@ -126,6 +126,20 @@ void signal_handler(int sig)
 
 /* Command functions: see commands[] table following. */
 
+void com_activate(char *arg)
+{
+	if (jack_activate(client)) {
+		fprintf(stderr, "cannot activate client");
+	}
+}
+
+void com_deactivate(char *arg)
+{
+	if (jack_deactivate(client)) {
+		fprintf(stderr, "cannot deactivate client");
+	}
+}
+
 void com_exit(char *arg)
 {
 	done = 1;
@@ -203,7 +217,9 @@ typedef struct {
 
 /* command table must be in alphabetical order */
 command_t commands[] = {
+	{"activate",	com_activate,	"Call jack_activate()"},
 	{"exit",	com_exit,	"Exit transport program"},
+	{"deactivate",	com_deactivate,	"Call jack_deactivate()"},
 	{"help",	com_help,	"Display help text [<command>]"},
 	{"locate",	com_locate,	"Locate to frame <position>"},
 	{"master",	com_master,	"Become timebase master "

@@ -175,8 +175,8 @@ jack_call_timebase_master (jack_client_t *client)
 	 * critical section; timebase_cb is not. */
 	if (control->is_timebase) { 
 
-		if (client->new_timebase) {	/* first callback? */
-			client->new_timebase = 0;
+		if (control->timebase_new) {	/* first callback? */
+			control->timebase_new = 0;
 			new_pos = 1;
 		}
 
@@ -194,7 +194,6 @@ jack_call_timebase_master (jack_client_t *client)
 	} else {
 
 		/* another master took over, so resign */
-		client->new_timebase = 0;
 		control->timebase_cb = NULL;
 		control->timebase_arg = NULL;
 	}
@@ -300,7 +299,6 @@ jack_release_timebase (jack_client_t *client)
 
 	rc = jack_client_deliver_request (client, &req);
 	if (rc == 0) {
-		client->new_timebase = 0;
 		ctl->timebase_cb = NULL;
 		ctl->timebase_arg = NULL;
 	}
@@ -354,7 +352,6 @@ jack_set_timebase_callback (jack_client_t *client, int conditional,
 
 	rc = jack_client_deliver_request (client, &req);
 	if (rc == 0) {
-		client->new_timebase = 1;
 		ctl->timebase_arg = arg;
 		ctl->timebase_cb = timebase_cb;
 	}

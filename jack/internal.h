@@ -96,7 +96,7 @@ typedef struct {
     int8_t		  new_pos;	/* new position this cycle */
     int8_t		  pending_pos;	/* new position request pending */
     jack_nframes_t	  pending_frame; /* pending frame number */
-    uint32_t		  sync_clients;	/* number of is_slowsync clients */
+    uint32_t		  sync_clients;	/* number of active slowsync clients */
     uint32_t		  sync_remain;	/* number of them with sync_poll */
     jack_time_t           sync_timeout;
     jack_time_t           sync_time_left;
@@ -170,6 +170,7 @@ typedef volatile struct {
     volatile int8_t     dead : 1;         /* r/w: engine */
     volatile int8_t	timed_out : 1;    /* r/w: engine */
     volatile int8_t     is_timebase : 1;  /* w: engine, r: engine and client */
+    volatile int8_t     timebase_new : 1; /* w: engine and client, r: engine */
     volatile int8_t     is_slowsync : 1;  /* w: engine, r: engine and client */
     volatile int8_t     sync_poll : 1;    /* w: engine and client, r: engine */
     volatile int8_t     sync_new : 1;     /* w: engine and client, r: engine */

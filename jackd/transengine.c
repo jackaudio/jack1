@@ -68,8 +68,6 @@ jack_sync_poll_exit (jack_engine_t *engine, jack_client_internal_t *client)
 		VERBOSE (engine, "sync poll interrupted for client %"
 			 PRIu32 "\n", client->control->id);
 	}
-	client->control->is_slowsync = 0;
-	engine->control->sync_clients--;
 }
 
 /* stop polling all the slow-sync clients
@@ -85,6 +83,7 @@ jack_sync_poll_stop (jack_engine_t *engine)
 		jack_client_internal_t *client =
 			(jack_client_internal_t *) node->data;
 		if (client->control->is_slowsync &&
+		    client->control->active &&
 		    client->control->sync_poll) {
 			client->control->sync_poll = 0;
 			poll_count++;
@@ -114,7 +113,8 @@ jack_sync_poll_start (jack_engine_t *engine)
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t *client =
 			(jack_client_internal_t *) node->data;
-		if (client->control->is_slowsync) {
+		if (client->control->is_slowsync &&
+		    client->control->active) {
 			client->control->sync_poll = 1;
 			sync_count++;
 		}
@@ -122,7 +122,7 @@ jack_sync_poll_start (jack_engine_t *engine)
 
 	//JOQ: check invariant for debugging...
 	assert (sync_count == engine->control->sync_clients);
-	engine->control->sync_remain = engine->control->sync_clients;
+	engine->control->sync_remain = sync_count;
 	engine->control->sync_time_left = engine->control->sync_timeout;
 	VERBOSE (engine, "transport Starting, sync poll of %" PRIu32
 		 " clients for %8.6f secs\n", engine->control->sync_remain,
@@ -177,6 +177,7 @@ jack_timebase_reset (jack_engine_t *engine, jack_client_id_t client_id)
 	client = jack_client_internal_by_id (engine, client_id);
 	if (client && (client == engine->timebase_client)) {
 		client->control->is_timebase = 0;
+		client->control->timebase_new = 0;
 		engine->timebase_client = NULL;
 		ectl->pending_time.valid = 0;
 		VERBOSE (engine, "%s resigned as timebase master\n",
@@ -223,10 +224,14 @@ jack_timebase_set (jack_engine_t *engine,
 
 	} else {
 
-		if (engine->timebase_client)
+		if (engine->timebase_client) {
 			engine->timebase_client->control->is_timebase = 0;
+			engine->timebase_client->control->timebase_new = 0;
+		}
 		engine->timebase_client = client;
 		client->control->is_timebase = 1;
+		if (client->control->active)
+			client->control->timebase_new = 1;
 		VERBOSE (engine, "new timebase master: %s\n",
 			 client->control->name);
 	}
@@ -234,6 +239,22 @@ jack_timebase_set (jack_engine_t *engine,
 	jack_unlock_graph (engine);
 
 	return ret;
+}
+
+/* for client activation
+ *
+ *   precondition: caller holds the graph lock. */
+void
+jack_transport_activate (jack_engine_t *engine, jack_client_internal_t *client)
+{
+	if (client->control->is_slowsync) {
+		engine->control->sync_clients++;
+		jack_sync_poll_new (engine, client);
+	}
+
+	if (client->control->is_timebase) {
+		client->control->timebase_new = 1;
+	}
 }
 
 /* for engine initialization */
@@ -260,7 +281,7 @@ jack_transport_init (jack_engine_t *engine)
 	ectl->sync_time_left = 0;
 }
 
-/* when any client exits the graph
+/* when any client exits the graph (either dead or not active)
  *
  * precondition: caller holds the graph lock */
 void
@@ -268,15 +289,22 @@ jack_transport_client_exit (jack_engine_t *engine,
 			    jack_client_internal_t *client)
 {
 	if (client == engine->timebase_client) {
-		engine->timebase_client->control->is_timebase = 0;
-		engine->timebase_client = NULL;
+		if (client->control->dead) {
+			engine->timebase_client->control->is_timebase = 0;
+			engine->timebase_client->control->timebase_new = 0;
+			engine->timebase_client = NULL;
+			VERBOSE (engine, "timebase master exit\n");
+		}
 		engine->control->current_time.valid = 0;
 		engine->control->pending_time.valid = 0;
-		VERBOSE (engine, "timebase master exit\n");
 	}
 
-	if (client->control->is_slowsync)
+	if (client->control->is_slowsync) {
 		jack_sync_poll_exit(engine, client);
+		engine->control->sync_clients--;
+		if (client->control->dead)
+			client->control->is_slowsync = 0;
+	}
 }
 
 /* when a new client is being created */
@@ -284,6 +312,7 @@ void
 jack_transport_client_new (jack_client_internal_t *client)
 {
 	client->control->is_timebase = 0;
+	client->control->timebase_new = 0;
 	client->control->is_slowsync = 0;
 	client->control->sync_poll = 0;
 	client->control->sync_new = 0;
@@ -307,6 +336,9 @@ jack_transport_client_reset_sync (jack_engine_t *engine,
 
 	if (client && (client->control->is_slowsync)) {
 		jack_sync_poll_exit(engine, client);
+		client->control->is_slowsync = 0;
+		if (client->control->active)
+			engine->control->sync_clients--;
 		ret = 0;
 	}  else
 		ret = EINVAL;
@@ -332,11 +364,13 @@ jack_transport_client_set_sync (jack_engine_t *engine,
 	if (client) {
 		if (!client->control->is_slowsync) {
 			client->control->is_slowsync = 1;
-			engine->control->sync_clients++;
+			if (client->control->active)
+				engine->control->sync_clients++;
 		}
 
-		/* force poll of the new slow-sync client */
-		jack_sync_poll_new (engine, client);
+		/* force poll of the new slow-sync client, if active */
+		if (client->control->active)
+			jack_sync_poll_new (engine, client);
 		ret = 0;
 	}  else
 		ret = EINVAL;

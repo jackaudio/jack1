@@ -23,6 +23,8 @@ int	jack_timebase_reset (jack_engine_t *engine,
 			     jack_client_id_t client_id);
 int	jack_timebase_set (jack_engine_t *engine,
 			   jack_client_id_t client_id, int conditional);
+void	jack_transport_activate (jack_engine_t *engine,
+				 jack_client_internal_t *client);
 void	jack_transport_init (jack_engine_t *engine);
 void	jack_transport_client_exit (jack_engine_t *engine,
 				    jack_client_internal_t *client);
