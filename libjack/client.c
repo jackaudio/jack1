@@ -160,6 +160,7 @@ jack_client_alloc ()
 	client->graph_wait_fd = -1;
 	client->graph_next_fd = -1;
 	client->ports = NULL;
+	client->ports_ext = NULL;
 	client->engine = NULL;
 	client->control = NULL;
 	client->thread_ok = FALSE;
@@ -229,32 +230,44 @@ jack_client_invalidate_port_buffers (jack_client_t *client)
 
 int
 jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
-
 {
 	jack_port_t *control_port;
 	jack_port_t *other;
 	JSList *node;
+	int need_free = FALSE;
 
 	switch (event->type) {
 	case PortConnected:
-		other = jack_port_new (client, event->y.other_id, client->engine);
-		control_port = jack_port_by_id (client, event->x.self_id);
+		other = jack_port_new (client, event->y.other_id,
+				       client->engine);
+		/* jack_port_by_id_int() always returns an internal
+		 * port that does not need to be deallocated */
+		control_port = jack_port_by_id_int (client, event->x.self_id,
+						    &need_free);
 		pthread_mutex_lock (&control_port->connection_lock);
-		control_port->connections = jack_slist_prepend (control_port->connections, (void*)other);
+		control_port->connections =
+			jack_slist_prepend (control_port->connections,
+					    (void *) other);
 		pthread_mutex_unlock (&control_port->connection_lock);
 		break;
 
 	case PortDisconnected:
-		control_port = jack_port_by_id (client, event->x.self_id);
-
+		/* jack_port_by_id_int() always returns an internal
+		 * port that does not need to be deallocated */
+		control_port = jack_port_by_id_int (client, event->x.self_id,
+						    &need_free);
 		pthread_mutex_lock (&control_port->connection_lock);
 
-		for (node = control_port->connections; node; node = jack_slist_next (node)) {
+		for (node = control_port->connections; node;
+		     node = jack_slist_next (node)) {
 
 			other = (jack_port_t *) node->data;
 
 			if (other->shared->id == event->y.other_id) {
-				control_port->connections = jack_slist_remove_link (control_port->connections, node);
+				control_port->connections =
+					jack_slist_remove_link (
+						control_port->connections,
+						node);
 				jack_slist_free_1 (node);
 				free (other);
 				break;
@@ -439,8 +452,8 @@ _start_server (void)
 			good = 1;
 		}
 	}
-
 	if (!good) {
+#define JACK_LOCATION
 #if defined(USE_CAPABILITIES)
 		command = JACK_LOCATION "/jackstart";
 		strncpy(arguments, JACK_LOCATION "/jackstart -T -R -d "
@@ -1006,11 +1019,13 @@ jack_stop_freewheel (jack_client_t* client)
 
 	if (client->engine->real_time) {
 #if JACK_USE_MACH_THREADS 
-		jack_acquire_real_time_scheduling (client->process_thread,
-						   client->engine->client_priority);
+		jack_acquire_real_time_scheduling (
+			client->process_thread,
+			client->engine->client_priority);
 #else
-		jack_acquire_real_time_scheduling (client->thread,
-						   client->engine->client_priority);
+		jack_acquire_real_time_scheduling (
+			client->thread,
+			client->engine->client_priority);
 #endif
 	}
 }
@@ -1070,7 +1085,8 @@ jack_client_thread (void *arg)
 		 * process() cycle. 
 		 */
 
-		if (client->graph_wait_fd >= 0 && client->pollfd[WAIT_POLL_INDEX].revents & POLLIN) {
+		if (client->graph_wait_fd >= 0
+		    && client->pollfd[WAIT_POLL_INDEX].revents & POLLIN) {
 			control->awake_at = jack_get_microseconds();
 		}
 
@@ -1083,7 +1099,8 @@ jack_client_thread (void *arg)
 		if (client->graph_wait_fd >= 0 &&
 		    (client->pollfd[WAIT_POLL_INDEX].revents & ~POLLIN)) {
 			
-			DEBUG ("\n\n\n\n\n\n\n\nWAITFD ERROR, ZOMBIE\n\n\n\n\n");
+			DEBUG ("\n\n\n\n\n\n\n\nWAITFD ERROR,"
+			       " ZOMBIE\n\n\n\n\n");
 			
 			/* our upstream "wait" connection
 			   closed, which either means that
@@ -1363,7 +1380,7 @@ jack_client_process_thread (void *arg)
    	while (err == 0) {
 	
                 if (jack_client_suspend(client) < 0) {
-                        jack_error ("jack_client_process_thread : resume error");
+                        jack_error ("jack_client_process_thread :resume error");
                         goto zombie;
                 }
                 
@@ -1393,13 +1410,16 @@ jack_client_process_thread (void *arg)
 #ifdef WITH_TIMESTAMPS
                 jack_timestamp ("finished");
 #endif
-                DEBUG ("client finished processing at %Lu (elapsed = %f usecs)", 
-                               control->finished_at, ((float)(control->finished_at - control->awake_at)));
+                DEBUG ("client finished processing at %Lu (elapsed = %f usecs)",
+		       control->finished_at,
+		       ((float)(control->finished_at - control->awake_at)));
                   
-                /* check if we were killed during the process cycle (or whatever) */
+                /* check if we were killed during the process cycle
+		 * (or whatever) */
 
                 if (client->control->dead) {
-                        jack_error ("jack_client_process_thread : client->control->dead");
+                        jack_error ("jack_client_process_thread: "
+				    "client->control->dead");
                         goto zombie;
                 }
 
@@ -1420,7 +1440,9 @@ jack_client_process_thread (void *arg)
 		client->on_shutdown (client->on_shutdown_arg);
 	} else {
 		jack_error ("zombified - exiting from JACK");
-		jack_client_close (client); /* Need a fix : possibly make client crash if zombified without shutdown handler */
+		/* Need a fix : possibly make client crash if
+		 * zombified without shutdown handler */
+		jack_client_close (client); 
 	}
 
 	pthread_exit (0);
@@ -1436,10 +1458,10 @@ jack_start_thread (jack_client_t *client)
  	if (client->engine->real_time) {
 
 #ifdef USE_MLOCK
-		 if (client->engine->do_mlock
-		     && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
-			 jack_error ("cannot lock down memory for RT thread (%s)",
-				     strerror (errno));
+		if (client->engine->do_mlock
+		    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
+			jack_error ("cannot lock down memory for RT thread "
+				    "(%s)", strerror (errno));
 			 
 #ifdef ENSURE_MLOCK
 			 return -1;
@@ -1569,7 +1591,7 @@ jack_activate (jack_client_t *client)
 
 		pthread_cond_wait (&client_ready, &client_lock);
 		pthread_mutex_unlock (&client_lock);
-		
+
 		if (!client->thread_ok) {
 			jack_error ("could not start client thread");
 			return -1;
@@ -1663,6 +1685,10 @@ jack_client_close (jack_client_t *client)
 		free (node->data);
 	}
 	jack_slist_free (client->ports);
+	for (node = client->ports_ext; node; node = jack_slist_next (node)) {
+		free (node->data);
+	}
+	jack_slist_free (client->ports_ext);
 	jack_client_free (client);
 
 	return 0;

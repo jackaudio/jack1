@@ -23,6 +23,7 @@ struct _jack_client {
     jack_shm_info_t*    port_segment;
 
     JSList *ports;
+    JSList *ports_ext;
 
     pthread_t thread;
     char fifo_prefix[PATH_MAX+1];

@@ -98,7 +98,8 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	   are changed.
 	*/
 
-	port->client_segment_base = (void **) &client->port_segment[ptid].attached_at;
+	port->client_segment_base =
+		(void **) &client->port_segment[ptid].attached_at;
 	
 	return port;
 }
@@ -262,7 +263,9 @@ jack_port_get_all_connections (const jack_client_t *client,
 {
 	const char **ret;
 	jack_request_t req;
+	jack_port_t *tmp;
 	unsigned int i;
+	int need_free = FALSE;
 
 	if (port == NULL) {
 		return NULL;
@@ -299,8 +302,12 @@ jack_port_get_all_connections (const jack_client_t *client,
 			jack_error ("cannot read port id from server");
 			return 0;
 		}
-		
-		ret[i] = jack_port_by_id (client, port_id)->shared->name;
+		tmp = jack_port_by_id_int (client, port_id, &need_free);
+		ret[i] = tmp->shared->name;
+		if (need_free) {
+			free (tmp);
+			need_free = FALSE;
+		}
 	}
 
 	ret[i] = NULL;
@@ -309,12 +316,13 @@ jack_port_get_all_connections (const jack_client_t *client,
 }
 
 jack_port_t *
-jack_port_by_id (const jack_client_t *client, jack_port_id_t id)
+jack_port_by_id_int (const jack_client_t *client, jack_port_id_t id, int* free)
 {
 	JSList *node;
 
 	for (node = client->ports; node; node = jack_slist_next (node)) {
 		if (((jack_port_t *) node->data)->shared->id == id) {
+			*free = FALSE;
 			return (jack_port_t *) node->data;
 		}
 	}
@@ -322,14 +330,27 @@ jack_port_by_id (const jack_client_t *client, jack_port_id_t id)
 	if (id >= client->engine->port_max)
 		return NULL;
 
-	if (client->engine->ports[id].in_use)
+	if (client->engine->ports[id].in_use) {
+		*free = TRUE;
 		return jack_port_new (client, id, client->engine);
+	}
 
 	return NULL;
 }
 
 jack_port_t *
-jack_port_by_name (jack_client_t *client, const char *port_name)
+jack_port_by_id (const jack_client_t *client, jack_port_id_t id)
+{
+	int need_free = FALSE;
+	jack_port_t * port = jack_port_by_id_int (client,id,&need_free);
+	if (port != NULL && need_free)
+		client->ports_ext =
+			jack_slist_prepend (client->ports_ext, port);
+	return port;
+}
+
+jack_port_t *
+jack_port_by_name_int (jack_client_t *client, const char *port_name)
 {
 	unsigned long i, limit;
 	jack_port_shared_t *port;
@@ -345,6 +366,16 @@ jack_port_by_name (jack_client_t *client, const char *port_name)
 	}
 
 	return NULL;
+}
+
+jack_port_t *
+jack_port_by_name (jack_client_t *client,  const char *port_name)
+{
+	jack_port_t * port = jack_port_by_name_int (client, port_name);
+	if (port != NULL)
+		client->ports_ext =
+			jack_slist_prepend (client->ports_ext, port);
+	return port;
 }
 
 jack_nframes_t
