@@ -52,16 +52,18 @@ typedef struct _jack_port_type_info {
 */
 
 typedef struct _jack_port_shared {
-    void                      *buffer;      
-    unsigned long              flags; 
-    unsigned long              buffer_size;
-    jack_port_id_t             id;
-    char                       name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
-    jack_port_type_info_t      type_info;
-    jack_client_id_t           client_id;
+    int                   shm_key;
+    size_t                offset;
+    
+    unsigned long         flags; 
+    unsigned long         buffer_size;
+    jack_port_id_t        id;
+    char                  name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
+    jack_port_type_info_t type_info;
+    jack_client_id_t      client_id;
 
-    char                       in_use : 1;
-    char                       locked : 1;
+    char                  in_use : 1;
+    char                  locked : 1;
 } jack_port_shared_t;
 
 /* This is the data structure allocated by the client
@@ -70,11 +72,17 @@ typedef struct _jack_port_shared {
 */
 
 struct _jack_port {
+    char                     *client_segment_base;
     struct _jack_port_shared *shared;
     GSList                   *connections;
     struct _jack_port        *tied;
-    void                     *own_buffer;
 };
+
+/* inline would be cleaner, but it needs to be fast even in non-optimized 
+   code.
+*/
+
+#define jack_port_buffer(p) ((void *) ((p)->client_segment_base + (p)->shared->offset))
 
 /* this is the structure allocated by the engine in local
    memory.

@@ -158,7 +158,6 @@ typedef struct {
     /* XXX need to be able to use more than one port segment key */
 
     key_t port_segment_key;
-    void *port_segment_address;
 
 } jack_client_connect_result_t;
 

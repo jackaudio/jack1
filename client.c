@@ -37,6 +37,8 @@
 #include <jack/pool.h>
 #include <jack/error.h>
 
+static jack_port_t *jack_port_new (jack_client_t *client, jack_port_id_t port_id, jack_control_t *control);
+
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
 static void *jack_zero_filled_buffer = 0;
@@ -106,13 +108,6 @@ jack_client_alloc ()
 	return client;
 }
 
-static jack_port_shared_t *
-jack_port_shared_by_id (jack_client_t *client, jack_port_id_t id)
-
-{
-	return &client->engine->ports[id];
-}
-
 static jack_port_t *
 jack_port_by_id (jack_client_t *client, jack_port_id_t id)
 
@@ -165,7 +160,7 @@ jack_client_invalidate_port_buffers (jack_client_t *client)
 
 		if (port->shared->flags & JackPortIsInput) {
 			/* XXX release buffer */
-			port->shared->buffer = NULL;
+			port->client_segment_base = NULL;
 		}
 	}
 }
@@ -175,28 +170,31 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 
 {
 	jack_port_t *control_port;
-	jack_port_shared_t *shared;
+	jack_port_t *other;
 	GSList *node;
 
 	switch (event->type) {
 	case PortConnected:
-		shared = jack_port_shared_by_id (client, event->y.other_id);
+		other = jack_port_new (client, event->y.other_id, client->engine);
 		control_port = jack_port_by_id (client, event->x.self_id);
-		control_port->connections = g_slist_prepend (control_port->connections, shared);
+		control_port->connections = g_slist_prepend (control_port->connections, other);
 		break;
 
 	case PortDisconnected:
-		shared = jack_port_shared_by_id (client, event->y.other_id);
 		control_port = jack_port_by_id (client, event->x.self_id);
 
 		for (node = control_port->connections; node; node = g_slist_next (node)) {
-			if (((jack_port_shared_t *) node->data) == shared) {
+
+			other = (jack_port_t *) node->data;
+
+			if (other->shared->id == event->y.other_id) {
+				printf ("%s DIS-connecting and %s\n", control_port->shared->name, other->shared->name);
 				control_port->connections = g_slist_remove_link (control_port->connections, node);
 				g_slist_free_1 (node);
+				free (other);
 				break;
 			}
 		}
-		printf ("%s DIS-connected and %s\n", control_port->shared->name, shared->name);
 		break;
 
 	default:
@@ -370,19 +368,19 @@ jack_client_new (const char *client_name)
 	*/
 
 	if ((port_segment_shm_id = shmget (res.port_segment_key, 0, 0)) < 0) {
-		jack_error ("cannot determine shared memory segment for port segment key 0x%x", res.port_segment_key);
+		jack_error ("cannot determine shared memory segment for port segment key 0x%x (%s)", res.port_segment_key, strerror (errno));
 		goto fail;
 	}
 
-	if ((addr = shmat (port_segment_shm_id, res.port_segment_address, 0)) == (void *) -1) {
-		jack_error ("cannot attached port segment shared memory at 0x%", res.port_segment_address);
+	if ((addr = shmat (port_segment_shm_id, 0, 0)) == (void *) -1) {
+		jack_error ("cannot attached port segment shared memory (%s)", strerror (errno));
 		goto fail;
 	}
 
 	si = (jack_port_segment_info_t *) malloc (sizeof (jack_port_segment_info_t));
 	si->shm_key = res.port_segment_key;
 	si->address = addr;
-
+	
 	/* the first chunk of the first port segment is always set by the engine
 	   to be a conveniently-sized, zero-filled lump of memory.
 	*/
@@ -790,13 +788,14 @@ jack_load_client (const char *client_name, const char *path_to_so)
 
 jack_client_t *
 jack_driver_become_client (const char *client_name)
-
-	
 {
 	int fd;
 	jack_client_connect_request_t req;
 	jack_client_connect_result_t res;
 	jack_client_t *client = 0;
+	int port_segment_shm_id;
+	jack_port_segment_info_t *si;
+	void *addr;
 
 	if ((fd = server_connect (0)) < 0) {
 		jack_error ("cannot connect to jack server");
@@ -829,6 +828,34 @@ jack_driver_become_client (const char *client_name)
 	client->control = res.client_control;
 	client->engine = res.engine_control;
 
+	/* Lookup, attach and register the port/buffer segments in use
+	   right now.
+	*/
+
+	if ((port_segment_shm_id = shmget (res.port_segment_key, 0, 0)) < 0) {
+		jack_error ("cannot determine shared memory segment for port segment key 0x%x (%s)", res.port_segment_key, strerror (errno));
+		return NULL;
+	}
+
+	if ((addr = shmat (port_segment_shm_id, 0, 0)) == (void *) -1) {
+		jack_error ("cannot attached port segment shared memory (%s)", strerror (errno));
+		return NULL;
+	}
+
+	si = (jack_port_segment_info_t *) malloc (sizeof (jack_port_segment_info_t));
+	si->shm_key = res.port_segment_key;
+	si->address = addr;
+	
+	/* the first chunk of the first port segment is always set by the engine
+	   to be a conveniently-sized, zero-filled lump of memory.
+	*/
+
+	if (client->port_segments == NULL) {
+		jack_zero_filled_buffer = si->address;
+	}
+
+	client->port_segments = g_slist_prepend (client->port_segments, si);
+
 	/* allow the engine to act on the client's behalf
 	   when dealing with in-process clients.
 	*/
@@ -851,19 +878,40 @@ unsigned long jack_get_sample_rate (jack_client_t *client)
 }
 
 static jack_port_t *
-jack_port_new (jack_port_id_t port_id, jack_control_t *control)
+jack_port_new (jack_client_t *client, jack_port_id_t port_id, jack_control_t *control)
 
 {
 	jack_port_t *port;
 	jack_port_shared_t *shared;
+	jack_port_segment_info_t *si;
+	GSList *node;
 
 	shared = &control->ports[port_id];
 
 	port = (jack_port_t *) malloc (sizeof (jack_port_t));
 
+	port->client_segment_base = NULL;
 	port->shared = shared;
 	port->connections = 0;
 	port->tied = NULL;
+
+	si = NULL;
+
+	for (node = client->port_segments; node; node = g_slist_next (node)) {
+
+		si = (jack_port_segment_info_t *) node->data;
+
+		if (si->shm_key == port->shared->shm_key) {
+			break;
+		}
+	}
+	
+	if (si == NULL) {
+		jack_error ("cannot find port segment to match newly registered port\n");
+		return NULL;
+	}
+
+	port->client_segment_base = si->address;
 
 	return port;
 }
@@ -913,7 +961,8 @@ jack_port_register (jack_client_t *client,
 		return NULL;
 	}
 
-	port = jack_port_new (req.x.port_info.port_id, client->engine);
+	port = jack_port_new (client, req.x.port_info.port_id, client->engine);
+
 	client->ports = g_slist_prepend (client->ports, port);
 
 	return port;
@@ -1043,7 +1092,7 @@ jack_port_get_buffer (jack_port_t *port, nframes_t nframes)
 		if (port->tied) {
 			return jack_port_get_buffer (port->tied, nframes);
 		}
-		return port->shared->buffer;
+		return jack_port_buffer (port);
 	}
 
 	/* Input port. 
@@ -1062,7 +1111,7 @@ jack_port_get_buffer (jack_port_t *port, nframes_t nframes)
 		   the buffer of the connected (output) port.
 		*/
 
-		return ((jack_port_shared_t *) node->data)->buffer;
+		return jack_port_buffer (((jack_port_t *) node->data));
 	}
 
 	/* multiple connections. use a local buffer and mixdown
@@ -1071,14 +1120,14 @@ jack_port_get_buffer (jack_port_t *port, nframes_t nframes)
 	   during the connection process.
 	*/
 
-	if (port->shared->buffer == NULL) {
-		port->shared->buffer = jack_pool_alloc 
-			(port->shared->type_info.buffer_scale_factor * sizeof (sample_t) * nframes);
+	if (port->client_segment_base == NULL) {
+		port->client_segment_base = 0;
+		port->shared->offset = (size_t) jack_pool_alloc (port->shared->type_info.buffer_scale_factor * sizeof (sample_t) * nframes);
 	}
 
 	port->shared->type_info.mixdown (port, nframes);
 
-	return port->shared->buffer;
+	return jack_port_buffer (port);
 }
 
 int
@@ -1095,7 +1144,6 @@ jack_port_tie (jack_port_t *dst, jack_port_t *src)
 		return -1;
 	}
 
-	dst->own_buffer = dst->shared->buffer;
 	dst->tied = src;
 	return 0;
 }
@@ -1108,7 +1156,6 @@ jack_port_untie (jack_port_t *port)
 		jack_error ("port \"%s\" is not tied", port->shared->name);
 		return -1;
 	}
-	port->shared->buffer = port->own_buffer;
 	port->tied = NULL;
 	return 0;
 }

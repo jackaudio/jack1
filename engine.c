@@ -95,34 +95,6 @@ static int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_
 
 static void jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes);
 
-/* This is a disgusting kludge to work around issues with shmat.
-   A more robust solution is needed.
-*/
-
-static char *top_end_of_unmapped_memory = (char *) (1048576 * 1536); /* 1.5GB */
-static char *low_end_of_unmapped_memory = (char *) (1048576 * 1024); /* 1GB */
-
-static char *
-fixed_shmat (int shmid, char *shmaddr, int shmflg, size_t size)
-{
-	char *addr;
-	char *attempt;
-
-	if (shmaddr != 0) {
-		return shmat (shmid, shmaddr, shmflg);
-	}
-
-	attempt = (char *) (top_end_of_unmapped_memory - size);
-
-	while (attempt > low_end_of_unmapped_memory) {
-		if ((addr = (char *) shmat (shmid, attempt, shmflg|SHM_RND)) != (char *) -1) {
-			top_end_of_unmapped_memory = addr;
-			return addr;
-		}
-		attempt -= size;
-	}
-	return (char *) -1;
-}
 
 jack_port_type_info_t builtin_port_types[] = {
 	{ JACK_DEFAULT_AUDIO_TYPE, jack_audio_port_mixdown, 1 },
@@ -290,7 +262,7 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 		return -1;
 	}
 	
-	if ((addr = fixed_shmat (id, 0, 0, size)) == (char *) -1) {
+	if ((addr = shmat (id, 0, 0)) == (char *) -1) {
 		jack_error ("cannot attach new port segment (%s)", strerror (errno));
 		shmctl (id, IPC_RMID, 0);
 		return -1;
@@ -557,7 +529,6 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 	res.client_key = client->shm_key;
 	res.control_key = engine->control_key;
 	res.port_segment_key = engine->port_segment_key;
-	res.port_segment_address = engine->port_segment_address;
 	res.realtime = engine->control->real_time;
 	res.realtime_priority = engine->rtpriority - 1;
 
@@ -1103,7 +1074,7 @@ jack_engine_new (int realtime, int rtpriority)
 		return 0;
 	}
 	
-	if ((addr = fixed_shmat (engine->control_shm_id, 0, 0, control_size)) == (void *) -1) {
+	if ((addr = shmat (engine->control_shm_id, 0, 0)) == (void *) -1) {
 		jack_error ("cannot attach control shared memory segment (%s)", strerror (errno));
 		shmctl (engine->control_shm_id, IPC_RMID, 0);
 		return 0;
@@ -1288,7 +1259,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 			return 0;
 		}
 
-		if ((addr = fixed_shmat (shm_id, 0, 0, sizeof (jack_client_control_t))) == (void *) -1) {
+		if ((addr = shmat (shm_id, 0, 0)) == (void *) -1) {
 			jack_error ("cannot attach new client control block");
 			shmctl (shm_id, IPC_RMID, 0);
 			return 0;
@@ -2207,7 +2178,7 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 	jack_port_segment_info_t *psi;
 	jack_port_buffer_info_t *bi;
 
-	port->shared->buffer = NULL;
+	port->shared->shm_key = -1;
 
 	if (port->shared->flags & JackPortIsInput) {
 		return 0;
@@ -2227,12 +2198,13 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 		psi = (jack_port_segment_info_t *) node->data;
 
 		if (bi->shm_key == psi->shm_key) {
-			port->shared->buffer = psi->address + bi->offset;
+			port->shared->shm_key = psi->shm_key;
+			port->shared->offset = bi->offset;
 			break;
 		}
 	}
 	
-	if (port->shared->buffer) {
+	if (port->shared->shm_key >= 0) {
 		engine->port_buffer_freelist = g_slist_remove (engine->port_buffer_freelist, bi);
 	} else {
 		jack_error ("port segment info for 0x%x:%d not found!", bi->shm_key, bi->offset);
@@ -2241,7 +2213,7 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
   out:
 	pthread_mutex_unlock (&engine->buffer_lock);
 
-	if (port->shared->buffer == NULL) {
+	if (port->shared->shm_key < 0) {
 		return -1;
 	} else {
 		return 0;
@@ -2297,8 +2269,9 @@ static void
 jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 {
 	GSList *node;
-	jack_port_shared_t *input;
+	jack_port_t *input;
 	nframes_t n;
+	sample_t *buffer;
 	sample_t *dst, *src;
 
 	/* by the time we've called this, we've already established
@@ -2306,19 +2279,21 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 	*/
 
 	node = port->connections;
-	input = (jack_port_shared_t *) node->data;
+	input = (jack_port_t *) node->data;
+	buffer = jack_port_buffer (port);
 
-	memcpy (port->shared->buffer, input->buffer, sizeof (sample_t) * nframes);
+	memcpy (buffer, jack_port_buffer (input), sizeof (sample_t) * nframes);
 	
 	for (node = g_slist_next (node); node; node = g_slist_next (node)) {
-		input = (jack_port_shared_t *) node->data;
+
+		input = (jack_port_t *) node->data;
+
 		n = nframes;
-		dst = port->shared->buffer;
-		src = input->buffer;
+		dst = buffer;
+		src = jack_port_buffer (input);
+
 		while (n--) {
 			*dst++ += *src++;
 		}
 	}
 }
-
-

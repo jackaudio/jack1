@@ -951,7 +951,7 @@ alsa_driver_process (nframes_t nframes, void *arg)
 			continue;
 		}
 
-		alsa_driver_read_from_channel (driver, chn, port->shared->buffer, nframes, 0);
+		alsa_driver_read_from_channel (driver, chn, jack_port_buffer (port), nframes, 0);
 	}
 
 	return 0;
@@ -1002,7 +1002,6 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 			break;
 		}
 		driver->capture_ports = g_slist_append (driver->capture_ports, port);
-		printf ("registered %s\n", port->shared->name);
 	}
 
 	for (chn = 0; chn < driver->playback_nchannels; chn++) {
@@ -1015,10 +1014,9 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 			break;
 		}
 		driver->playback_ports = g_slist_append (driver->playback_ports, port);
-		printf ("registered %s\n", port->shared->name);
 	}
 
-	printf ("ports registered, starting client\n");
+	printf ("ALSA: ports registered, starting driver\n");
 
 	jack_activate (driver->client);
 }
