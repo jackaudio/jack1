@@ -15,4 +15,5 @@ noinst_HEADERS = alsa_driver.h \
 		 hammerfall.h \
 		 internal.h \
 		 memops.h \
+		 cycles.h \
 		 pool.h
