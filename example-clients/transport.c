@@ -104,6 +104,8 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
 
 void jack_shutdown(void *arg)
 {
+    rl_cleanup_after_signal();
+    fprintf(stderr, "JACK shut down, exiting ...\n");
     exit(1);
 }
 

@@ -262,8 +262,9 @@ int  jack_transport_locate (jack_client_t *client,
  * current cycle and the state returned is valid for the entire cycle.
  *
  * @param client the JACK client structure.
- * @param pos current position structure, @a pos->valid describes
- * which fields contain valid data.
+ * @param pos NULL; or pointer to structure for returning current
+ * transport position, @a pos->valid will describe which fields
+ * contain valid data.
  *
  * @return Current transport state.
  */

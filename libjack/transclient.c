@@ -335,8 +335,11 @@ jack_transport_query (jack_client_t *client, jack_position_t *pos)
 {
 	jack_control_t *ectl = client->engine;
 
-	/* the guarded copy makes this function work in any thread */
-	jack_transport_copy_position (&ectl->current_time, pos);
+	if (pos)
+		/* the guarded copy makes this function work in any
+		 * thread */
+		jack_transport_copy_position (&ectl->current_time, pos);
+
 	return ectl->transport_state;
 }
 
@@ -444,7 +447,8 @@ jack_set_transport_info (jack_client_t *client,
 	    (info->transport_state != ectl->transport_state)) {
 		if (info->transport_state == JackTransportStopped)
 			ectl->transport_cmd = TransportCommandStop;
-		else if (info->transport_state == JackTransportRolling)
+		else if ((info->transport_state == JackTransportRolling) &&
+			 (ectl->transport_state != JackTransportStarting))
 			ectl->transport_cmd = TransportCommandStart;
 		/* silently ignore anything else */
 	}

@@ -92,8 +92,9 @@ jack_sync_poll_stop (jack_engine_t *engine)
 	//JOQ: check invariant for debugging...
 	assert (poll_count == engine->control->sync_remain);
 	VERBOSE (engine,
-		 "sync poll halted with %ld clients and %llu usecs remaining\n",
-		 engine->control->sync_remain, engine->control->sync_time_left);
+		 "sync poll halted with %ld clients and %8.6f secs remaining\n",
+		 engine->control->sync_remain,
+		 (double) (engine->control->sync_time_left / 1000000.0));
 	engine->control->sync_remain = 0;
 	engine->control->sync_time_left = 0;
 }
@@ -121,8 +122,8 @@ jack_sync_poll_start (jack_engine_t *engine)
 	engine->control->sync_remain = engine->control->sync_clients;
 	engine->control->sync_time_left = engine->control->sync_timeout;
 	VERBOSE (engine, "transport Starting, sync poll of %ld clients "
-		 "for %llu usecs\n", engine->control->sync_remain,
-		 engine->control->sync_time_left);
+		 "for %8.6f secs\n", engine->control->sync_remain,
+		 (double) (engine->control->sync_time_left / 1000000.0));
 }
 
 /* check for sync timeout */
@@ -145,6 +146,7 @@ jack_sync_timeout (jack_engine_t *engine)
 	ectl->sync_time_left = 0;
 	return TRUE;
 }
+
 
 /**************** subroutines used by engine.c ****************/
 
@@ -344,27 +346,18 @@ jack_transport_cycle_end (jack_engine_t *engine)
 			ectl->current_time.frame + ectl->buffer_size;
 	} 
 
-	/* Handle any new transport command from the last cycle. */
-	cmd = ectl->transport_cmd;
-	if (cmd != ectl->previous_cmd) {
-		ectl->previous_cmd = cmd;
-		VERBOSE (engine, "transport command: %s\n",
-		       (cmd == TransportCommandStart? "START": "STOP"));
-	} else
-		cmd = TransportCommandNone;
-
-	/* See if a position request arrived during the last cycle.
-	 * The request_time could change during the guarded copy.  If
-	 * so, we'll handle it now, but mistake it for a new request
-	 * in the following cycle.  That may cause an extra sync poll
-	 * cycle, but should work. */
+	/* See if an asynchronous position request arrived during the
+	 * last cycle.  The request_time could change during the
+	 * guarded copy.  If so, we'll handle it now, but mistake it
+	 * for a new request in the following cycle.  That may cause
+	 * an extra sync poll cycle, but should work. */
 	if (ectl->request_time.unique_1 != ectl->prev_request) {
 		ectl->prev_request = ectl->request_time.unique_1;
 		jack_transport_copy_position(&ectl->request_time,
 					     &ectl->pending_time);
-		ectl->new_pos = 1;
-		VERBOSE (engine, "new transport postition: %lu, id=0x%llx\n",
+		VERBOSE (engine, "new transport position: %lu, id=0x%llx\n",
 		       ectl->pending_time.frame, ectl->pending_time.unique_1);
+		ectl->new_pos = 1;
 	} else
 		ectl->new_pos = 0;
 
@@ -379,10 +372,20 @@ jack_transport_cycle_end (jack_engine_t *engine)
 		if ((ectl->sync_remain == 0) ||
 		    (jack_sync_timeout(engine))) {
 			ectl->transport_state = JackTransportRolling;
-			VERBOSE (engine, "transport Rolling, %lld usec"
-				 " left for poll\n", ectl->sync_time_left);
+			VERBOSE (engine, "transport Rolling, %8.6f sec"
+				 " left for poll\n",
+				 (double) (ectl->sync_time_left / 1000000.0));
 		}
 	}
+
+	/* Handle any new transport command from the last cycle. */
+	cmd = ectl->transport_cmd;
+	if (cmd != ectl->previous_cmd) {
+		ectl->previous_cmd = cmd;
+		VERBOSE (engine, "transport command: %s\n",
+		       (cmd == TransportCommandStart? "START": "STOP"));
+	} else
+		cmd = TransportCommandNone;
 
 	/* state transition switch */
 	switch (ectl->transport_state) {
@@ -450,6 +453,7 @@ jack_transport_set_sync_timeout (jack_engine_t *engine,
 				 jack_time_t usecs)
 {
 	engine->control->sync_timeout = usecs;
-	VERBOSE (engine, "new sync timeout: %llu usecs\n", usecs);
+	VERBOSE (engine, "new sync timeout: %8.6f secs\n",
+		 (double) (usecs / 1000000.0));
 	return 0;
 }
