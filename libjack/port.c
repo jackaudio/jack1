@@ -30,7 +30,6 @@
 #include <jack/engine.h>
 #include <jack/pool.h>
 #include <jack/port.h>
-#include <jack/error.h>
 #include <jack/jslist.h>
 
 #include "local.h"

@@ -47,7 +47,6 @@
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <jack/pool.h>
-#include <jack/error.h>
 #include <jack/time.h>
 #include <jack/jslist.h>
 #include <jack/version.h>

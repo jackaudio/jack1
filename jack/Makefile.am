@@ -4,7 +4,6 @@ libjackincludedir = $(includedir)/jack
 
 libjackinclude_HEADERS = 	\
 	jack.h			\
-	error.h			\
 	timestamps.h	\
 	transport.h 	\
 	types.h	

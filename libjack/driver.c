@@ -28,7 +28,6 @@
 
 #include <jack/driver.h>
 #include <jack/internal.h>
-#include <jack/error.h>
 
 static int dummy_attach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
 static int dummy_detach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }

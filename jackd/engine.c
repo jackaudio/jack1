@@ -2519,23 +2519,28 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 
 	} else {
 
-		DEBUG ("engine writing on event fd");
+		if (client->control->active) {
 
-		if (write (client->event_fd, event, sizeof (*event)) != sizeof (*event)) {
-			jack_error ("cannot send event to client [%s] (%s)", client->control->name, strerror (errno));
-			client->error++;
-		}
+			/* there's a thread waiting for events yet, so its worth telling the client */
 
-		DEBUG ("engine reading from event fd");
-
-		if (!client->error && (read (client->event_fd, &status, sizeof (status)) != sizeof (status))) {
-			jack_error ("cannot read event response from client [%s] (%s)", client->control->name, strerror (errno));
-			client->error++;
-		}
-
-		if (status != 0) {
-			jack_error ("bad status for client event handling (type = %d)", event->type);
-			client->error++;
+			DEBUG ("engine writing on event fd");
+			
+			if (write (client->event_fd, event, sizeof (*event)) != sizeof (*event)) {
+				jack_error ("cannot send event to client [%s] (%s)", client->control->name, strerror (errno));
+				client->error++;
+			}
+			
+			DEBUG ("engine reading from event fd");
+			
+			if (!client->error && (read (client->event_fd, &status, sizeof (status)) != sizeof (status))) {
+				jack_error ("cannot read event response from client [%s] (%s)", client->control->name, strerror (errno));
+				client->error++;
+			}
+			
+			if (status != 0) {
+				jack_error ("bad status for client event handling (type = %d)", event->type);
+				client->error++;
+			}
 		}
 	}
 
@@ -3418,8 +3423,6 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	shared->latency = 0;
 	shared->monitor_requests = 0;
 	shared->locked = 0;
-
-	fprintf (stderr, "port %s has mixdown = %p\n", shared->name, shared->type_info.mixdown);
 
 	port = &engine->internal_ports[port_id];
 

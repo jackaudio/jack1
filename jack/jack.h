@@ -592,6 +592,13 @@ void jack_set_server_dir (const char *path);
  */
 pthread_t jack_client_thread_id (jack_client_t *);
 
+extern void (*jack_error_callback)(const char *desc);
+
+/**
+ * Sets callback to be called to print error messages.
+ */
+void jack_set_error_function (void (*func)(const char *));
+
 #ifdef __cplusplus
 }
 #endif
