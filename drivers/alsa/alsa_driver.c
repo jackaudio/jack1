@@ -253,21 +253,21 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 		switch (driver->dither) {
 			case Rectangular:
 			printf("Rectangular dithering at 16 bits\n");
-			driver->write_via_copy = sample_move_dither_rect_d24u24_sS;
+			driver->write_via_copy = sample_move_dither_rect_d24_sS;
 			break;
 
 			case Triangular:
 			printf("Triangular dithering at 16 bits\n");
-			driver->write_via_copy = sample_move_dither_tri_d24u24_sS;
+			driver->write_via_copy = sample_move_dither_tri_d24_sS;
 			break;
 
 			case Shaped:
 			printf("Noise-shaped dithering at 16 bits\n");
-			driver->write_via_copy = sample_move_dither_shaped_d24u24_sS;
+			driver->write_via_copy = sample_move_dither_shaped_d24_sS;
 			break;
 
 			default:
-			driver->write_via_copy = sample_move_d24u24_sS;
+			driver->write_via_copy = sample_move_d24_sS;
 			break;
 		}
 		break;
@@ -310,7 +310,7 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 		driver->read_via_copy = sample_move_dS_s16;
 		break;
 	case 3:
-		driver->read_via_copy = sample_move_dS_s24u24;
+		driver->read_via_copy = sample_move_dS_s24;
 		break;
 	case 4:
 		driver->read_via_copy = sample_move_dS_s32u24;
