@@ -27,7 +27,8 @@
  Feb 03, 2004: Stephane Letz: some fix in AudioRender.cpp code.
  Feb 03, 2004: Johnny Petrantoni: removed the default device stuff (useless, in jackosx, because JackPilot manages this behavior), the device must be specified. and all parameter must be correct.
  Feb 04, 2004: Johnny Petrantoni: now the driver supports interfaces with multiple interleaved streams (such as the MOTU 828).
- Nov 05, 2004: S. Letz: correct management of -I option for use with JackPilot.
+ Nov 05, 2004: S.Letz: correct management of -I option for use with JackPilot.
+ Nov 15, 2004: S.Letz: Set a default value for deviceID.
  
  TODO:
 	- fix cpu load behavior.
@@ -389,6 +390,7 @@ static jack_driver_t *coreaudio_driver_new(char *name,
 
     char deviceName[60];
     bzero(&deviceName[0], sizeof(char) * 60);
+	get_device_id_from_num(0,&deviceID);
 
     if (!driver_name) {
 		if (GetDeviceNameFromID(deviceID, deviceName) != noErr)
