@@ -25,6 +25,7 @@
 #include <jack/alsa_driver.h>
 #include <jack/ice1712.h>
 #include <jack/error.h>
+#include <jack/internal.h>
 
 static int
 ice1712_hw_monitor_toggle(jack_hardware_t *hw, int idx, int onoff)

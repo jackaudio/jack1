@@ -237,7 +237,7 @@ main (int argc, char *argv[])
 		fprintf (stderr, "invalid duration (tone length = %lu, wave length = %lu\n", tone_length, wave_length);
 		return -1;
 	}
-	if (attack_length + decay_length > tone_length) {
+	if (attack_length + decay_length > (int)tone_length) {
 		fprintf (stderr, "invalid attack/decay\n");
 		return -1;
 	}
@@ -249,16 +249,16 @@ main (int argc, char *argv[])
 	for (i = 0; i < attack_length; i++) {
 		amp[i] = max_amp * i / ((double) attack_length);
 	}
-	for (i = attack_length; i < tone_length - decay_length; i++) {
+	for (i = attack_length; i < (int)tone_length - decay_length; i++) {
 		amp[i] = max_amp;
 	}
-	for (i = tone_length - decay_length; i < tone_length; i++) {
+	for (i = (int)tone_length - decay_length; i < (int)tone_length; i++) {
 		amp[i] = - max_amp * (i - (double) tone_length) / ((double) decay_length);
 	}
-	for (i = 0; i < tone_length; i++) {
+	for (i = 0; i < (int)tone_length; i++) {
 		wave[i] = amp[i] * sin (scale * i);
 	}
-	for (i = tone_length; i < wave_length; i++) {
+	for (i = tone_length; i < (int)wave_length; i++) {
 		wave[i] = 0;
 	}
 

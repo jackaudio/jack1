@@ -29,3 +29,5 @@ rpm: dist
 dist-hook: dist-check-doxygen
 
 EXTRA_DIST = depcomp COPYING COPYING.GPL COPYING.LGPL
+
+AUTOMAKE_OPTIONS = foreign

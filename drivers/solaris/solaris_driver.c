@@ -117,17 +117,17 @@ solaris_driver_delete (solaris_driver_t *driver)
 static void
 solaris_usage ()
 {
-	fprintf (stderr, "\
+	fprintf (stderr, 
 
-solaris PCM driver args: 
-    -r sample-rate (default: 48kHz)
-    -p frames-per-period (default: 1024)
-    -n periods-per-hardware-buffer (default: 2)
-    -D (duplex, default: yes)
-    -C (capture, default: duplex)
-    -P (playback, default: duplex)
-    -z[r|t|s|-] (dither, rect|tri|shaped|off, default: off)
-");
+"solaris PCM driver args:\n"
+"    -r sample-rate (default: 48kHz)\n"
+"    -p frames-per-period (default: 1024)\n"
+"    -n periods-per-hardware-buffer (default: 2)\n"
+"    -D (duplex, default: yes)\n"
+"    -C (capture, default: duplex)\n"
+"    -P (playback, default: duplex)\n"
+"    -z[r|t|s|-] (dither, rect|tri|shaped|off, default: off)\n"
+);
 }
 
 jack_driver_t *

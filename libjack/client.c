@@ -1974,7 +1974,7 @@ jack_port_get_all_connections (const jack_client_t *client, const jack_port_t *p
 {
 	const char **ret;
 	jack_request_t req;
-	int i;
+	unsigned int i;
 
 	req.type = GetPortConnections;
 

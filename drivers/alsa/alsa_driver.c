@@ -554,8 +554,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	}
 
 	driver->clock_sync_data = (ClockSyncStatus *) malloc (sizeof (ClockSyncStatus) * 
-							      driver->capture_nchannels > driver->playback_nchannels ?
-							      driver->capture_nchannels : driver->playback_nchannels);
+							      (driver->capture_nchannels > driver->playback_nchannels ?
+							       driver->capture_nchannels : driver->playback_nchannels));
 
 	driver->period_usecs = (((float) driver->frames_per_cycle) / driver->frame_rate) * 1000000.0f;
 
@@ -811,7 +811,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 	int xrun_detected = FALSE;
 	int need_capture;
 	int need_playback;
-	int i;
+	unsigned int i;
 	unsigned long long poll_enter, poll_ret;
 
 	*status = -1;
@@ -829,9 +829,9 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 	
 	while (need_playback || need_capture) {
 
-		int p_timed_out, c_timed_out;
-		int ci = 0;
-		int nfds;
+		unsigned int p_timed_out, c_timed_out;
+		unsigned int ci = 0;
+		unsigned int nfds;
 
 		nfds = 0;
 
@@ -1107,7 +1107,7 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 				snd_pcm_mmap_commit (driver->capture_handle, capture_offset, contiguous);
 			}
 
-			if (contiguous != driver->frames_per_cycle) {
+			if (contiguous != (snd_pcm_sframes_t) driver->frames_per_cycle) {
 				jack_error ("wierd contiguous size %lu", contiguous);
 			}
 
@@ -1554,7 +1554,7 @@ alsa_driver_listen_for_clock_sync_status (alsa_driver_t *driver,
 }
 
 int
-alsa_driver_stop_listening_to_clock_sync_status (alsa_driver_t *driver, int which)
+alsa_driver_stop_listening_to_clock_sync_status (alsa_driver_t *driver, unsigned int which)
 
 {
 	JSList *node;
@@ -1592,20 +1592,20 @@ alsa_driver_clock_sync_notify (alsa_driver_t *driver, channel_t chn, ClockSyncSt
 static void
 alsa_usage ()
 {
-	fprintf (stderr, "\
+	fprintf (stderr, 
 
-alsa PCM driver args: 
-    -d alsa-pcm-name (default: default)
-    -r sample-rate (default: 48kHz)
-    -p frames-per-period (default: 1024)
-    -n periods-per-hardware-buffer (default: 2)
-    -H (use hardware monitoring if available, default: no)
-    -D (duplex, default: yes)
-    -C (capture, default: duplex)
-    -P (playback, default: duplex)
-    -z[r|t|s|-] (dither, rect|tri|shaped|off, default: off)
-    -s soft-mode, no xrun handling (default: off)
-");
+"alsa PCM driver args:\n"
+"    -d alsa-pcm-name (default: default)\n"
+"    -r sample-rate (default: 48kHz)\n"
+"    -p frames-per-period (default: 1024)\n"
+"    -n periods-per-hardware-buffer (default: 2)\n"
+"    -H (use hardware monitoring if available, default: no)\n"
+"    -D (duplex, default: yes)\n"
+"    -C (capture, default: duplex)\n"
+"    -P (playback, default: duplex)\n"
+"    -z[r|t|s|-] (dither, rect|tri|shaped|off, default: off)\n"
+"    -s soft-mode, no xrun handling (default: off)\n"
+);
 }
 
 jack_driver_t *

@@ -53,7 +53,7 @@
 
 #define MAX_SHM_ID 256 /* likely use is more like 16 */
 
-#define NoPort    -1
+#define NoPort    (jack_port_id_t)-1
 
 /**
  * Time to wait for clients in msecs. Used when jackd is 
@@ -98,7 +98,7 @@ static jack_client_internal_t *jack_client_internal_by_id (jack_engine_t *engine
 
 static void jack_sort_graph (jack_engine_t *engine);
 static int  jack_rechain_graph (jack_engine_t *engine);
-static int  jack_get_fifo_fd (jack_engine_t *engine, int which_fifo);
+static int  jack_get_fifo_fd (jack_engine_t *engine, unsigned int which_fifo);
 static void jack_clear_fifos (jack_engine_t *engine);
 
 static int  jack_port_do_connect (jack_engine_t *engine, const char *source_port, const char *destination_port);
@@ -336,7 +336,7 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 	key_t key;
 	int id;
 	char *addr;
-	int offset;
+	size_t offset;
 	size_t size;
 	size_t step;
 
@@ -757,7 +757,7 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 		}
 
 		if (engine->verbose) {
-			fprintf (stderr, "new client: %s, id = %d type %d @ %p fd = %d\n", 
+			fprintf (stderr, "new client: %s, id = %ld type %d @ %p fd = %d\n", 
 				 client->control->name, client->control->id, 
 				 req.type, client->control, client_fd);
 		}
@@ -1152,7 +1152,7 @@ handle_client_request (jack_engine_t *engine, int fd)
 		return -1;
 	}
 
-	if (read (client->request_fd, &req, sizeof (req)) < sizeof (req)) {
+	if (read (client->request_fd, &req, sizeof (req)) < (ssize_t) sizeof (req)) {
 		jack_error ("cannot read request from client");
 		client->error++;
 		return -1;
@@ -1231,7 +1231,7 @@ handle_client_request (jack_engine_t *engine, int fd)
 
 	if (reply_fd >= 0) {
 		DEBUG ("replying to client");
-		if (write (reply_fd, &req, sizeof (req)) < sizeof (req)) {
+		if (write (reply_fd, &req, sizeof (req)) < (ssize_t) sizeof (req)) {
 			jack_error ("cannot write request result to client");
 			return -1;
 		}
@@ -1360,7 +1360,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	jack_engine_t *engine;
 	size_t control_size;
 	void *addr;
-	int i;
+	unsigned int i;
 #ifdef USE_CAPABILITIES
 	uid_t uid = getuid ();
 	uid_t euid = geteuid ();
@@ -1930,7 +1930,7 @@ static void
 jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
 	JSList *node;
-	int i;
+	unsigned int i;
 
 	if (engine->verbose) {
 		fprintf (stderr, "adios senor %s\n", client->control->name);
@@ -2446,7 +2446,7 @@ static void
 jack_compute_all_port_total_latencies (jack_engine_t *engine)
 {
 	jack_port_shared_t *shared = engine->control->ports;
-	int i;
+	unsigned int i;
 	int toward_port;
 
 	for (i = 0; i < engine->control->port_max; i++) {
@@ -2774,7 +2774,7 @@ jack_port_do_disconnect (jack_engine_t *engine,
 }
 
 static int 
-jack_get_fifo_fd (jack_engine_t *engine, int which_fifo)
+jack_get_fifo_fd (jack_engine_t *engine, unsigned int which_fifo)
 
 {
 	/* caller must hold client_lock */
@@ -2804,7 +2804,7 @@ jack_get_fifo_fd (jack_engine_t *engine, int which_fifo)
 	}
 
 	if (which_fifo >= engine->fifo_size) {
-		int i;
+		unsigned int i;
 
 		engine->fifo = (int *) realloc (engine->fifo, sizeof (int) * engine->fifo_size + 16);
 		for (i = engine->fifo_size; i < engine->fifo_size + 16; i++) {
@@ -2829,7 +2829,7 @@ jack_clear_fifos (jack_engine_t *engine)
 {
 	/* caller must hold client_lock */
 
-	int i;
+	unsigned int i;
 	char buf[16];
 
 	/* this just drains the existing FIFO's of any data left in them
@@ -3043,7 +3043,7 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int re
 
 	req->x.nports = jack_slist_length (port->connections);
 
-	if (write (reply_fd, req, sizeof (*req)) < sizeof (req)) {
+	if (write (reply_fd, req, sizeof (*req)) < (ssize_t) sizeof (req)) {
 		jack_error ("cannot write GetPortConnections result to client");
 		goto out;
 	}
@@ -3062,7 +3062,7 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int re
 				port_id = ((jack_connection_internal_t *) node->data)->source->shared->id;
 			}
 			
-			if (write (reply_fd, &port_id, sizeof (port_id)) < sizeof (port_id)) {
+			if (write (reply_fd, &port_id, sizeof (port_id)) < (ssize_t) sizeof (port_id)) {
 				jack_error ("cannot write port id to client");
 				goto out;
 			}

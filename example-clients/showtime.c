@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <signal.h>
+#include <stdlib.h>
 
 #include <jack/jack.h>
 #include <jack/transport.h>

@@ -22,7 +22,7 @@
 #ifndef __jack_cycles_h__
 #define __jack_cycles_h__
 
-#ifdef __i386__
+#if defined(__i386__) || defined(__x86_64__)
 
 /*
  * Standard way to access the cycle counter on i586+ CPUs.
@@ -53,9 +53,8 @@ static inline cycles_t get_cycles (void)
 	return ret;
 }
 
-#else  /* !i386 */
+#elif defined(__powerpc__)
 
-#ifdef __powerpc__
 #define CPU_FTR_601			0x00000100
 
 typedef unsigned long cycles_t;
@@ -83,9 +82,32 @@ static inline cycles_t get_cycles(void)
 		: "=r" (ret) : "i" (CPU_FTR_601));
 	return ret;
 }
-#else /* PPC */
+
+#elif defined(__ia64__)
+/* ia64 */
+
+typedef unsigned long cycles_t;
+static inline cycles_t
+get_cycles (void)
+{
+	cycles_t ret;
+	__asm__ __volatile__ ("mov %0=ar.itc" : "=r"(ret));
+	return ret;
+}
+
+#elif defined(__alpha__)
+/* alpha */
+
+typedef unsigned int cycles_t;
+static inline cycles_t get_cycles (void)
+{
+	cycles_t ret;
+	__asm__ __volatile__ ("rpcc %0" : "=r"(ret));
+	return ret;
+}
+
+#else
 #error You are compiling JACK on a platform for which jack/cycles.h needs work
-#endif /* PPC */
-#endif /* i386 */
+#endif
 
 #endif /* __jack_cycles_h__ */

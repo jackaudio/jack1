@@ -49,7 +49,7 @@ struct _jack_engine {
     pthread_mutex_t port_lock;
     int process_errors;
     int period_msecs;
-    int port_max;
+    unsigned int port_max;
     int control_shm_id;
     key_t control_key;
     key_t port_segment_key; /* XXX fix me */

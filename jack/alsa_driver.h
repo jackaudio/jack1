@@ -57,10 +57,10 @@ typedef struct {
     unsigned long                 interleave_unit;
     unsigned long                 capture_interleave_skip;
     unsigned long                 playback_interleave_skip;
-    unsigned long                 max_nchannels;
-    unsigned long                 user_nchannels;
-    unsigned long                 playback_nchannels;
-    unsigned long                 capture_nchannels;
+    channel_t                     max_nchannels;
+    channel_t                     user_nchannels;
+    channel_t                     playback_nchannels;
+    channel_t                     capture_nchannels;
     unsigned long                 sample_bytes;
 
     jack_nframes_t                     frame_rate;
@@ -186,7 +186,7 @@ static __inline__ void alsa_driver_copy_channel (alsa_driver_t *driver,
 
 void  alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn, ClockSyncStatus status);
 int   alsa_driver_listen_for_clock_sync_status (alsa_driver_t *, ClockSyncListenerFunction, void *arg);
-int   alsa_driver_stop_listen_for_clock_sync_status (alsa_driver_t *, int);
+int   alsa_driver_stop_listen_for_clock_sync_status (alsa_driver_t *, unsigned int);
 void  alsa_driver_clock_sync_notify (alsa_driver_t *, channel_t chn, ClockSyncStatus);
 
 

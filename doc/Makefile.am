@@ -24,14 +24,14 @@ distclean-local: clean
 	if test -d reference; then rm -rf reference; fi
 
 install-data-local:
-	$(mkinstalldirs) $(DOC_DIR)/reference/html
+	$(mkinstalldirs) $(DESTDIR)$(DOC_DIR)/reference/html
 	(installfiles=`echo reference/html/*.html`; \
 	if test "$$installfiles" = 'reference/html/*.html'; \
 	then echo '-- Nothing to install' ; \
 	else \
 	  for i in $$installfiles reference/html/doxygen.png reference/html/doxygen.css; do \
 	    echo '-- Installing '$$i ; \
-	    $(INSTALL_DATA) $$i $(DOC_DIR)/reference/html; \
+	    $(INSTALL_DATA) $$i $(DESTDIR)$(DOC_DIR)/reference/html; \
 	  done; \
 	fi)
 
@@ -43,7 +43,7 @@ uninstall-local: doxygen-build.stamp
 	else \
 	  for i in $$installfiles reference/html/doxygen.png reference/html/doxygen.css; do \
 	    echo '-- Unstalling '$$i ; \
-	    rm $(DOC_DIR)/$$i; \
+	    rm $(DESTDIR)$(DOC_DIR)/$$i; \
 	  done; \
 	fi)
 

@@ -1,4 +1,3 @@
-#include <stdio.h>
 /*
     Copyright (C) 2002 Jeremy Hall
     
@@ -19,9 +18,11 @@
     $Id$
 */
 
+#include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include <jack/jack.h>
 

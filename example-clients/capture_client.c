@@ -123,7 +123,7 @@ disk_thread (void *arg)
 {
 	sample_buffer_t *buf;
 	thread_info_t *info = (thread_info_t *) arg;
-	int i;
+	unsigned int i;
 	unsigned int chn;
 	jack_nframes_t total_captured = 0;
 	int done = 0;
@@ -281,7 +281,7 @@ run_disk_thread (thread_info_t *info)
 void
 setup_ports (int sources, char *source_names[], thread_info_t *info)
 {
-	int i;
+	unsigned int i;
 
 	nports = sources;
 
