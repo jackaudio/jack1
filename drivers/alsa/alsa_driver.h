@@ -21,6 +21,8 @@
 #ifndef __jack_alsa_driver_h__
 #define __jack_alsa_driver_h__
 
+#define ALSA_PCM_OLD_HW_PARAMS_API
+#define ALSA_PCM_OLD_SW_PARAMS_API
 #include <alsa/asoundlib.h>
 
 #include <jack/types.h>
