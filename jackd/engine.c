@@ -1740,7 +1740,6 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 	jack_register_shm (engine->control_shm_name, addr, shmid);
 	
 	engine->control = (jack_control_t *) addr;
-	engine->control->engine = engine;
 
 	/* setup port type information from builtins. buffer space is allocated
 	   whenever we call jack_set_buffer_size()

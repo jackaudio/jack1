@@ -387,16 +387,9 @@ void jack_get_transport_info (jack_client_t *client,
 /**
  * Set the transport info structure (deprecated).
  *
- * @param client the JACK client structure.
- * @param tinfo used to return a new transport info structure used
- * for the next process cycle.  The "valid" field must say which
- * fields contain valid data.
- *
- * @deprecated This is for compatibility with the earlier transport
- * interface.  Define a ::JackTimebaseCallback, instead.
- *
- * @pre Caller must be the current timebase master.  Must be called
- * from the process thread.
+ * @deprecated This function still exists for compatibility with the
+ * earlier transport interface, but it does nothing.  Instead, define
+ * a ::JackTimebaseCallback.
  */
 void jack_set_transport_info (jack_client_t *client,
 			      jack_transport_info_t *tinfo);

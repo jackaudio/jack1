@@ -234,6 +234,7 @@ jack_transport_init (jack_engine_t *engine)
 	memset (&ectl->pending_time, 0, sizeof(ectl->pending_time));
 	memset (&ectl->request_time, 0, sizeof(ectl->request_time));
 	ectl->prev_request = 0;
+	ectl->seq_number = 1;		/* can't start at 0 */
 	ectl->new_pos = 0;
 	ectl->sync_remain = 0;
 	ectl->sync_clients = 0;
@@ -305,8 +306,7 @@ jack_transport_client_set_sync (jack_engine_t *engine,
 	int ret;
 	jack_client_internal_t *client;
 
-	// JOQ: I am assuming the process cycle is serialized with
-	// respect to this lock...
+	/* The process cycle runs with this lock. */
 	jack_lock_graph (engine);
 
 	client = jack_client_internal_by_id (engine, client_id);

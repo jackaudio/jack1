@@ -373,9 +373,14 @@ jack_transport_stop (jack_client_t *client)
 
 /************* Compatibility with old transport API. *************/
 
+#define OLD_TIMEBASE_BROKEN
+
 int
 jack_engine_takeover_timebase (jack_client_t *client)
 {
+#ifdef OLD_TIMEBASE_BROKEN
+	return ENOSYS;
+#else
 	jack_request_t req;
 
 	req.type = SetTimeBaseClient;
@@ -383,6 +388,7 @@ jack_engine_takeover_timebase (jack_client_t *client)
 	req.x.timebase.conditional = 0;
 
 	return jack_client_deliver_request (client, &req);
+#endif /* OLD_TIMEBASE_BROKEN */
 }	
 
 void
@@ -416,12 +422,20 @@ jack_get_transport_info (jack_client_t *client,
 	}
 }
 
-static int first_error = 1;
-
 void
 jack_set_transport_info (jack_client_t *client,
 			 jack_transport_info_t *info)
 {
+	static int first_error = 1;
+
+#ifdef OLD_TIMEBASE_BROKEN
+
+	if (first_error)
+		jack_error ("jack_set_transport_info() no longer supported.");
+	first_error = 0;
+
+#else
+
 	jack_control_t *ectl = client->engine;
 
 	if (!client->control->is_timebase) { /* not timebase master? */
@@ -470,6 +484,7 @@ jack_set_transport_info (jack_client_t *client,
 		ectl->pending_time.ticks_per_beat = info->ticks_per_beat;
 		ectl->pending_time.beats_per_minute = info->beats_per_minute;
 	}
+#endif /* OLD_TIMEBASE_BROKEN */
 }	
 
 #endif /* OLD_TRANSPORT */

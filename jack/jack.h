@@ -536,16 +536,14 @@ jack_port_t *jack_port_by_name (jack_client_t *, const char *portname);
 jack_port_t *jack_port_by_id (const jack_client_t *client, jack_port_id_t id);
 
 /**
- * If a client is told (by the user) to become the timebase for the
- * entire system, it calls this function. If it returns zero, then the
- * client has the responsibility to call jack_set_transport_info() at
- * the end of its process callback.
+ * Old-style interface to become the timebase for the entire JACK
+ * subsystem.
  *
- * @deprecated This function is only for compatibility with earlier
- * transport implementations.  Instead, see <jack/transport.h> and use
- * jack_set_timebase_callback().
+ * @deprecated This function still exists for compatibility with the
+ * earlier transport interface, but it does nothing.  Instead, see
+ * <jack/transport.h> and use jack_set_timebase_callback().
  *
- * @return 0 on success, otherwise a non-zero error code
+ * @return ENOSYS, function not implemented.
  */
 int  jack_engine_takeover_timebase (jack_client_t *);
 

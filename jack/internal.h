@@ -103,6 +103,7 @@ typedef struct {
     jack_position_t	  pending_time;	/* position for next cycle */
     jack_position_t	  request_time;	/* latest requested position */
     jack_unique_t	  prev_request; /* previous request unique ID */
+    volatile int	  seq_number;	/* unique ID sequence number */
     int			  new_pos;	/* new position this cycle */
     unsigned long	  sync_clients;	/* number of is_slowsync clients */
     unsigned long	  sync_remain;	/* number of them with sync_poll */
@@ -119,7 +120,6 @@ typedef struct {
     float                 cpu_load;
     unsigned long         port_max;
     int                   engine_ok;
-    jack_engine_t        *engine;
     unsigned long         n_port_types;
     jack_port_type_info_t port_types[JACK_MAX_PORT_TYPES];
     jack_port_shared_t    ports[0];

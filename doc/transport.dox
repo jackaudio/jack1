@@ -41,7 +41,7 @@ are in <jack/transport.h>
   - We want a way for clients with heavyweight state to sync up when
   the user presses "play", before the transport starts rolling.
 
-  - We need to provide for ongoing binary compatibility as the
+  - We want to provide for ongoing binary compatibility as the
   transport design evolves.
 
 
@@ -52,7 +52,8 @@ The former transport master role has been divided into two layers:
   - @ref timebase - counting beats, frames, etc. on every cycle.
   - @ref transportcontrol - start, stop and reposition the playback.  
 
-Existing clients continue to work in compatibility mode.
+Existing transport clients continue to work in compatibility mode.
+But, old-style timebase masters will no longer control the transport.
 
 
 @subsection timebase Timebase Master
@@ -171,7 +172,6 @@ will enter the ::JackTransportStarting state and begin invoking their
 
 
 @image html	fsm.png "Transport State Transition Diagram"
-@image latex	fsm.png "Transport State Transition Diagram"
 
 
 @subsection transportclients Transport Clients
@@ -191,27 +191,35 @@ cycle and the state returned is valid for the entire cycle.
 
 @subsection compatibility Compatibility
 
-We want to support the existing functions in compatibility mode as
-deprecated interfaces for a while.  The main reasons are:
+During the transition period we will support the old-style interfaces
+in compatibility mode as deprecated interfaces.  This compatibility is
+not 100%, there are limitations.  
+
+The main reasons for doing this are:
 
   - facilitate testing with clients that already have transport
   support
   - provide a clean migration path, so application developers are
   not discouraged from supporting the transport interface
-  - inter-operate with ardour 0.9 beta.
 
-So, these interfaces continue to be supported (but deprecated):
+These deprecated interfaces continue to work:
 
 @code
   typedef struct jack_transport_info_t;
 
-  void jack_set_transport_info (jack_client_t *client,
-                                jack_transport_info_t *tinfo);
   void jack_get_transport_info (jack_client_t *client,
+                                jack_transport_info_t *tinfo);
+@endcode
+
+Unfortunately, the old-style timebase master interface cannot coexist
+cleanly with such new features as jack_transport_locate() and
+slow-sync clients.  So, these interfaces are only present as stubs:
+
+@code
+  void jack_set_transport_info (jack_client_t *client,
                                 jack_transport_info_t *tinfo);
   int  jack_engine_takeover_timebase (jack_client_t *);
 @endcode
-
 
 For compatibility with future changes, it would be good to avoid
 structures entirely.  Nevertheless, the jack_position_t structure
@@ -238,7 +246,4 @@ will probably not be included in JACK release 1.0.
   are addressed there's no reason to retain those two SMPTE fields in
   the jack_position_t structure.
   - looping -- unless we get feedback that this is really required
-  - internal timebase master or slow-sync clients
-       - probably a good idea
-       - haven't studied it
 */
