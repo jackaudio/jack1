@@ -383,22 +383,11 @@ jack_transport_stop (jack_client_t *client)
 
 /************* Compatibility with old transport API. *************/
 
-#define OLD_TIMEBASE_BROKEN
-
 int
 jack_engine_takeover_timebase (jack_client_t *client)
 {
-#ifdef OLD_TIMEBASE_BROKEN
+	jack_error ("jack_engine_takeover_timebase() is no longer supported.");
 	return ENOSYS;
-#else
-	jack_request_t req;
-
-	req.type = SetTimeBaseClient;
-	req.x.timebase.client_id = client->control->id;
-	req.x.timebase.conditional = 0;
-
-	return jack_client_deliver_request (client, &req);
-#endif /* OLD_TIMEBASE_BROKEN */
 }	
 
 void
@@ -406,6 +395,11 @@ jack_get_transport_info (jack_client_t *client,
 			 jack_transport_info_t *info)
 {
 	jack_control_t *ectl = client->engine;
+	static int first_time = 1;
+
+	if (first_time)
+		jack_error ("jack_get_transport_info() is deprecated.");
+	first_time = 0;
 
 	/* check that this is the process thread */
 	if (!pthread_equal(client->thread_id, pthread_self())) {
@@ -436,65 +430,11 @@ void
 jack_set_transport_info (jack_client_t *client,
 			 jack_transport_info_t *info)
 {
-	static int first_error = 1;
+	static int first_time = 1;
 
-#ifdef OLD_TIMEBASE_BROKEN
-
-	if (first_error)
+	if (first_time)
 		jack_error ("jack_set_transport_info() no longer supported.");
-	first_error = 0;
-
-#else
-
-	jack_control_t *ectl = client->engine;
-
-	if (!client->control->is_timebase) { /* not timebase master? */
-		if (first_error)
-			jack_error ("Called jack_set_transport_info(), "
-				    "but not timebase master.");
-		first_error = 0;
-
-		/* JOQ: I would prefer to ignore this request, but
-		 * that would break ardour 0.9-beta2.  So, let's allow
-		 * it for now. */
-		// return;
-	}
-
-	/* check that this is the process thread */
-	if (!pthread_equal(client->thread_id, pthread_self())) {
-		jack_error ("Invalid thread for jack_set_transport_info().");
-		abort();		/* kill this client */
-	}
-
-	/* is there a new state? */
-	if ((info->valid & JackTransportState) &&
-	    (info->transport_state != ectl->transport_state)) {
-		if (info->transport_state == JackTransportStopped)
-			ectl->transport_cmd = TransportCommandStop;
-		else if ((info->transport_state == JackTransportRolling) &&
-			 (ectl->transport_state != JackTransportStarting))
-			ectl->transport_cmd = TransportCommandStart;
-		/* silently ignore anything else */
-	}
-
-	if (info->valid & JackTransportPosition)
-		ectl->pending_time.frame = info->frame;
-	else
-		ectl->pending_time.frame = ectl->current_time.frame;
-
-	ectl->pending_time.valid = (info->valid & JACK_POSITION_MASK);
-
-	if (info->valid & JackTransportBBT) {
-		ectl->pending_time.bar = info->bar;
-		ectl->pending_time.beat = info->beat;
-		ectl->pending_time.tick = info->tick;
-		ectl->pending_time.bar_start_tick = info->bar_start_tick;
-		ectl->pending_time.beats_per_bar = info->beats_per_bar;
-		ectl->pending_time.beat_type = info->beat_type;
-		ectl->pending_time.ticks_per_beat = info->ticks_per_beat;
-		ectl->pending_time.beats_per_minute = info->beats_per_minute;
-	}
-#endif /* OLD_TIMEBASE_BROKEN */
+	first_time = 0;
 }	
 
 #endif /* OLD_TRANSPORT */
