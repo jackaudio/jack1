@@ -44,8 +44,7 @@ extern "C" {
  * @returns 0, if successful; EPERM, if the calling process lacks
  * required realtime privileges; otherwise some other error number.
  */
-int jack_acquire_real_time_scheduling (pthread_t thread,
-					      int priority);
+int jack_acquire_real_time_scheduling (pthread_t thread, int priority);
 
 /**
  * Create a thread for JACK or one of its clients.  The thread is
