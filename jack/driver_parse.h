@@ -139,7 +139,7 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 			exit (1);
 		}
 
-		for (param_index = 0; desc->nparams; param_index++) {
+		for (param_index = 0; param_index < desc->nparams; param_index++) {
 			if (opt == desc->params[param_index].character) {
 				break;
 			}
@@ -148,6 +148,12 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 		driver_param = calloc (1, sizeof (jack_driver_param_t));
 
 		driver_param->character = desc->params[param_index].character;
+
+		if (!optarg && optind < argc &&
+		    strlen(argv[optind]) &&
+		    argv[optind][0] != '-') {
+			optarg = argv[optind];
+		}
 
 		if (optarg) {
 			switch (desc->params[param_index].type) {
