@@ -20,6 +20,6 @@ AM_CXXFLAGS = $(JACK_CFLAGS)
 libjack_la_CFLAGS = $(AM_CFLAGS)
 
 libjack_la_SOURCES = $(SOURCE_FILES)
-libjack_la_LIBADD  = -lm -lpthread @OS_LDFLAGS@
+libjack_la_LIBADD  = @OS_LDFLAGS@
 libjack_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@
 

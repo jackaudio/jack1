@@ -23,22 +23,27 @@
 
 #include <config.h>
 
-#include <stdio.h>
+/* I don't know why this is needed, and I wish it were not.  Without
+ * it, we get compile errors for things like pthread_barrier_t. */
+#define _XOPEN_SOURCE 600
+#include <unistd.h>
+#undef  _XOPEN_SOURCE
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <math.h>
 #include <float.h>
+#include <stdarg.h>
+#include <getopt.h>
+#include <semaphore.h>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/soundcard.h>
-#include <stdarg.h>
-#include <getopt.h>
-#include <pthread.h>
-#include <semaphore.h>
 
 #include <jack/types.h>
 #include <jack/internal.h>

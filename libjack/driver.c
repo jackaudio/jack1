@@ -31,9 +31,9 @@
 #include <jack/driver.h>
 #include <jack/engine.h>
 
-#ifndef JACK_DO_NOT_MLOCK
+#ifdef USE_MLOCK
 #include <sys/mman.h>
-#endif /* JACK_DO_NOT_MLOCK */
+#endif /* USE_MLOCK */
 
 static int dummy_attach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
 static int dummy_detach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
@@ -107,7 +107,7 @@ jack_driver_nt_become_real_time (jack_driver_nt_t* driver)
                 return -1;
         }
 
-#ifndef JACK_DO_NOT_MLOCK
+#ifdef USE_MLOCK
         if (driver->engine->control->do_mlock
 	    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
 		jack_error ("cannot lock down memory for RT thread (%s)",
@@ -116,7 +116,7 @@ jack_driver_nt_become_real_time (jack_driver_nt_t* driver)
 		return -1;
 #endif /* ENSURE_MLOCK */
         }
-#endif /* JACK_DO_NOT_MLOCK */
+#endif /* USE_MLOCK */
 
         return 0;
 }

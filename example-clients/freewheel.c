@@ -61,8 +61,6 @@ void parse_arguments(int argc, char *argv[])
 int 
 main (int argc, char *argv[])
 {
-	int rc;
-
 	parse_arguments (argc, argv);
 
 	/* become a JACK client */
@@ -84,5 +82,5 @@ main (int argc, char *argv[])
 
 	jack_client_close(client);
 
-	return rc;
+	return 0;
 }

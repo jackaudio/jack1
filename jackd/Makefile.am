@@ -24,8 +24,7 @@ bin_PROGRAMS = jackd $(CAP_PROGS)
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 
 jackd_SOURCES = jackd.c engine.c transengine.c
-jackd_LDADD = ../libjack/libjack.la -lm -ldl -lpthread $(CAP_LIBS) @OS_LDFLAGS@
-
+jackd_LDADD = ../libjack/libjack.la $(CAP_LIBS) @OS_LDFLAGS@
 noinst_HEADERS = jack_md5.h md5.h md5_loc.h transengine.h
 
 BUILT_SOURCES = jack_md5.h

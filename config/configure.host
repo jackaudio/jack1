@@ -69,7 +69,13 @@ case "${host_cpu}" in
   alpha*)
     try_cpu=alpha
     ;;
-  i[3567]86 | x86_64)
+  i[3567]86 | x86_64 | amd64)
+    # Note that this causes us to compile i386 using i486
+    # instructions.  This is done for binary distributions, which
+    # typically compile for i386 as the lowest common denominator.
+    # Since JACK is unlikely to actually be used on a real i386, we
+    # substitute i486 as our common denominator.  That way the atomic
+    # instructions work properly.
     try_cpu=i486
     ;;
   hppa*)
@@ -146,7 +152,7 @@ case "${host_os}" in
     JACK_DO_NOT_MLOCK=1
     JACK_USE_MACH_THREADS=1
     OS_LDFLAGS="-framework CoreAudio"
-    TRY_POSIX_SHM=yes		# POSIX shm works better on darwin
+    TRY_POSIX_SHM=yes			# POSIX shm works better
     ;;
   *)
     os_include_dir="os/generic"

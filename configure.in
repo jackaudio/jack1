@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=97
-JACK_MICRO_VERSION=0
+JACK_MICRO_VERSION=1
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -85,16 +85,11 @@ AC_SUBST(OS_LDFLAGS)
 AC_SUBST(os_include_dir)
 AC_SUBST(cpu_include_dir)
 
-# config.h
+# system-dependent config.h values
 test "x$JACK_THREAD_STACK_TOUCH" = "x" && JACK_THREAD_STACK_TOUCH=1000000
 AC_DEFINE_UNQUOTED(JACK_THREAD_STACK_TOUCH,
 	[$JACK_THREAD_STACK_TOUCH],
 	[Guaranteed size of realtime stack])
-if test "x$JACK_DO_NOT_MLOCK" != "x"; then
-    AC_DEFINE_UNQUOTED(JACK_DO_NOT_MLOCK,
-	[$JACK_DO_NOT_MLOCK],
-	[Don't use mlock() or mlockall() functions])
-fi
 if test "x$JACK_CPP_VARARGS_BROKEN" != "x"; then
     AC_DEFINE_UNQUOTED(JACK_CPP_VARARGS_BROKEN,
 	[$JACK_CPP_VARARGS_BROKEN],
@@ -114,14 +109,24 @@ AC_CHECK_HEADERS(getopt.h, [], [
     done]
 )
 
-# functions
-AC_CHECK_FUNC(getopt_long, ,
+# functions and libraries
+AC_CHECK_FUNC(getopt_long, [],
 	AC_MSG_ERROR([GNU getopt is required to build jack]))
-AC_CHECK_FUNC(gethostent, , AC_CHECK_LIB(nsl, gethostent))
-AC_CHECK_FUNC(setsockopt, , AC_CHECK_LIB(socket, setsockopt))
-AC_CHECK_FUNC(connect, , AC_CHECK_LIB(inet, connect))
+AC_CHECK_FUNC(gethostent, [], AC_CHECK_LIB(nsl, gethostent))
+AC_CHECK_FUNC(setsockopt, [], AC_CHECK_LIB(socket, setsockopt))
+AC_CHECK_FUNC(connect, [], AC_CHECK_LIB(inet, connect))
+AC_CHECK_FUNC(dlopen, [], AC_CHECK_LIB(dl, dlopen))
+AC_CHECK_FUNC(pthread_create, [], AC_CHECK_LIB(pthread, pthread_create))
 AC_CHECK_FUNCS(on_exit atexit)
 AC_CHECK_FUNCS(posix_memalign)
+AC_CHECK_LIB(m, sin)
+
+# should we use mlock() on this platform?
+if test "x$JACK_DO_NOT_MLOCK" = "x"; then
+    AC_CHECK_HEADER(sys/mman.h,
+	AC_CHECK_FUNC(mlockall,
+	    [AC_DEFINE(USE_MLOCK, 1, [Use POSIX memory locking])]))
+fi
 
 # look for system support for POSIX shm API
 AC_ARG_ENABLE(posix-shm,
@@ -129,8 +134,8 @@ AC_ARG_ENABLE(posix-shm,
 	[TRY_POSIX_SHM=$enableval])
 if test "x$TRY_POSIX_SHM" = "xyes"
 then
-	AC_CHECK_FUNC(shm_open, ,
-		AC_CHECK_LIB(rt, shm_open, , [TRY_POSIX_SHM=no]))
+	AC_CHECK_FUNC(shm_open, [],
+		AC_CHECK_LIB(rt, shm_open, [], [TRY_POSIX_SHM=no]))
 fi
 AC_MSG_CHECKING([shared memory support])
 if test "x$TRY_POSIX_SHM" = "xyes"
@@ -324,54 +329,11 @@ then
 		AC_DEFINE(USE_BARRIER, 1, [Use pthread barrier functions]))
 fi
 
-# check which drivers can be built
+# Check which drivers can be built.  The last one successfully
+# configured becomes the default JACK driver; so the order of
+# precedence is: alsa, oss, portaudio, iec61883, dummy.
 
-jack_have_driver="no"
-
-AC_ARG_ENABLE(alsa, [  --disable-alsa          ignore ALSA driver ],
-			TRY_ALSA=$enableval , TRY_ALSA=yes ) 
-HAVE_ALSA="false"
-if test "x$TRY_ALSA" = "xyes"
-then
-	# check for ALSA >= 0.9
-	AC_CHECK_LIB(asound,snd_pcm_drop,
-	     [HAVE_ALSA="true"
-              ALSA_LIBS=-lasound
-              jack_have_driver="yes"
-             ], [], [-lm]
-	)
-	AC_SUBST(ALSA_LIBS)
-fi
-AM_CONDITIONAL(HAVE_ALSA, $HAVE_ALSA)
-
-AC_ARG_ENABLE(portaudio, [  --disable-portaudio     ignore PortAudio driver ],
-			TRY_PORTAUDIO=$enableval , TRY_PORTAUDIO=yes ) 
-HAVE_PA="false"
-if test "x$TRY_PORTAUDIO" = "xyes"
-then
-	# check for portaudio V18
-	AC_CHECK_LIB(portaudio, Pa_Initialize,
-		[ AC_CHECK_HEADERS(portaudio.h,
-			[ HAVE_PA="true"
-			  PA_LIBS=-lportaudio
-			  jack_have_driver="yes"
-			])
-		], [], [-lm -lpthread])
-	AC_SUBST(PA_LIBS)
-fi
-AM_CONDITIONAL(HAVE_PA, $HAVE_PA)
-
-AC_ARG_ENABLE(oss, [  --disable-oss           ignore OSS driver ],
-			TRY_OSS=$enableval , TRY_OSS=yes ) 
-HAVE_OSS="false"
-if test "x$TRY_OSS" = "xyes"
-then
-	# check for Open Sound System
-	AC_CHECK_HEADER([sys/soundcard.h],
-	     [HAVE_OSS="true"
-              jack_have_driver="yes"])
-fi
-AM_CONDITIONAL(HAVE_OSS, $HAVE_OSS)
+JACK_DEFAULT_DRIVER=\"dummy\"
 
 jack_enable_iec61883="no"
 AC_ARG_ENABLE(iec61883,
@@ -387,13 +349,12 @@ AC_ARG_ENABLE(iec61883,
       ;;
   esac
 ])
-
 if test x$jack_enable_iec61883 != xno; then
 	AC_CHECK_LIB(raw1394, raw1394_iso_xmit_init,
 		[ AC_CHECK_HEADER(libraw1394/raw1394.h,
 			[ HAVE_RAW1394="true"
                           RAW1394_LIBS=-lraw1394
-                          jack_have_driver="yes"
+                          JACK_DEFAULT_DRIVER=\"iec61883\"
 			  AC_MSG_WARN([IEC61883 driver is experimental])
 			],
 			HAVE_RAW1394="false")
@@ -401,14 +362,61 @@ if test x$jack_enable_iec61883 != xno; then
 else
   HAVE_RAW1394="false"
 fi
-
 AC_SUBST(RAW1394_LIBS)
 AM_CONDITIONAL(IEC61883, test x$HAVE_RAW1394 = xtrue)
 AM_CONDITIONAL(HAVE_RAW1394, $HAVE_RAW1394)
 
-if test x$jack_have_driver = xno; then
-  AC_ERROR([No drivers can be built])
+AC_ARG_ENABLE(portaudio, [  --disable-portaudio     ignore PortAudio driver ],
+			TRY_PORTAUDIO=$enableval , TRY_PORTAUDIO=yes ) 
+HAVE_PA="false"
+if test "x$TRY_PORTAUDIO" = "xyes"
+then
+	# check for portaudio V18
+	AC_CHECK_LIB(portaudio, Pa_Initialize,
+		[ AC_CHECK_HEADERS(portaudio.h,
+			[ HAVE_PA="true"
+			  PA_LIBS=-lportaudio
+			  JACK_DEFAULT_DRIVER=\"portaudio\"
+			])
+		])
+	AC_SUBST(PA_LIBS)
 fi
+AM_CONDITIONAL(HAVE_PA, $HAVE_PA)
+
+AC_ARG_ENABLE(oss, [  --disable-oss           ignore OSS driver ],
+			TRY_OSS=$enableval , TRY_OSS=yes ) 
+HAVE_OSS="false"
+if test "x$TRY_OSS" = "xyes"
+then
+	# check for Open Sound System
+	AC_CHECK_HEADER([sys/soundcard.h],
+	     [HAVE_OSS="true"
+              JACK_DEFAULT_DRIVER=\"oss\"])
+fi
+AM_CONDITIONAL(HAVE_OSS, $HAVE_OSS)
+
+AC_ARG_ENABLE(alsa, [  --disable-alsa          ignore ALSA driver ],
+			TRY_ALSA=$enableval , TRY_ALSA=yes ) 
+HAVE_ALSA="false"
+if test "x$TRY_ALSA" = "xyes"
+then
+	# check for ALSA >= 0.9
+	AC_CHECK_LIB(asound,snd_pcm_drop,
+	     [HAVE_ALSA="true"
+              ALSA_LIBS=-lasound
+              JACK_DEFAULT_DRIVER=\"alsa\"
+             ], [], [-lm]
+	)
+	AC_SUBST(ALSA_LIBS)
+fi
+AM_CONDITIONAL(HAVE_ALSA, $HAVE_ALSA)
+
+if test "$JACK_DEFAULT_DRIVER" = \"dummy\"; then
+  AC_MSG_WARN([Only the dummy driver can be built])
+fi
+AC_DEFINE_UNQUOTED(JACK_DEFAULT_DRIVER,
+	[$JACK_DEFAULT_DRIVER],
+	[Default JACK driver])
 
 # some example-clients need libsndfile
 HAVE_SNDFILE=false

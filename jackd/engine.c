@@ -45,9 +45,9 @@
 #include <sysdeps/poll.h>
 #include <sysdeps/ipc.h>
 
-#ifndef JACK_DO_NOT_MLOCK
+#ifdef USE_MLOCK
 #include <sys/mman.h>
-#endif /* JACK_DO_NOT_MLOCK */
+#endif /* USE_MLOCK */
 
 #ifdef USE_CAPABILITIES
 /* capgetp and capsetp are linux only extensions, not posix */
@@ -449,7 +449,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 		memset (jack_zero_filled_buffer, 0, one_buffer);
 	}
 
-#ifndef JACK_DO_NOT_MLOCK
+#ifdef USE_MLOCK
 	if (engine->control->real_time) {
 
 		/* Although we've called mlockall(CURRENT|FUTURE), the
@@ -467,7 +467,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 				   "%s", strerror(errno));
 		}
 	}
-#endif /* JACK_DO_NOT_MLOCK */
+#endif /* USE_MLOCK */
 
 	/* Tell everybody about this segment. */
 	event.type = AttachPortSegment;
@@ -2133,7 +2133,7 @@ jack_become_real_time (jack_engine_t *engine, pthread_t thread, int priority)
 		return -1;
 	}
         
-#ifndef JACK_DO_NOT_MLOCK
+#ifdef USE_MLOCK
         if (engine->control->do_mlock
 	    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
 		jack_error ("cannot lock down memory for RT thread (%s)",
@@ -2142,7 +2142,7 @@ jack_become_real_time (jack_engine_t *engine, pthread_t thread, int priority)
 	    return -1;
 #endif /* ENSURE_MLOCK */
 	}
-#endif /* JACK_DO_NOT_MLOCK */
+#endif /* USE_MLOCK */
 	return 0;
 }
 

@@ -26,12 +26,17 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
+#if HAVE_STDINT_H
 #include <stdint.h>
+#endif
 #include <regex.h>
+#include <string.h>
 #include <sys/types.h>
-#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#ifdef USE_MLOCK
+#include <sys/mman.h>
+#endif /* USE_MLOCK */
 
 #include <jack/internal.h>
 #include <jack/jack.h>
@@ -430,16 +435,17 @@ _start_server (void)
 	}
 
 	if (!good) {
-#if 0 /* JOQ: need a good way to select the right default MACOSX driver */
-		command = JACK_LOCATION "/jackd";
-		strncpy(arguments, JACK_LOCATION "/jackd -T -d portaudio -p 512", 255);
-#elif defined(USE_CAPABILITIES)
+
+#if defined(USE_CAPABILITIES)
 		command = JACK_LOCATION "/jackstart";
-		strncpy(arguments, JACK_LOCATION "/jackstart -T -R -d alsa -d hw:0 -p 512", 255);
-#else
+		strncpy(arguments, JACK_LOCATION "/jackstart -T -R -d"
+			JACK_DEFAULT_DRIVER " -p 512", 255);
+#else /* !USE_CAPABILITIES */
 		command = JACK_LOCATION "/jackd";
-		strncpy(arguments, JACK_LOCATION "/jackd -T -d alsa -d hw:0 -p 2048", 255);
-#endif
+		strncpy(arguments, JACK_LOCATION "/jackd -T -d"
+			JACK_DEFAULT_DRIVER, 255);
+#endif /* USE_CAPABILITIES */
+
 	} else {
 		result = strcspn(arguments, " ");
 		command = (char*)malloc(result+1);
@@ -1333,7 +1339,7 @@ jack_start_thread (jack_client_t *client)
 			return -1;
 		}
                 
-#ifndef JACK_DO_NOT_MLOCK
+#ifdef USE_MLOCK
                 if (client->engine->do_mlock
 		    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
                     jack_error ("cannot lock down memory for RT thread (%s)",
@@ -1342,7 +1348,7 @@ jack_start_thread (jack_client_t *client)
                     return -1;
 #endif /* ENSURE_MLOCK */
                 }
-#endif /* JACK_DO_NOT_MLOCK */
+#endif /* USE_MLOCK */
 	}
 
 #ifdef JACK_USE_MACH_THREADS
