@@ -106,12 +106,6 @@ process (jack_nframes_t nframes, void *arg)
 }
 
 int
-buffer_size_change () {
-	printf("Buffer size has changed! Exiting...\n");
-	exit(-1);
-}
-
-int
 sample_rate_change () {
 	printf("Sample rate has changed! Exiting...\n");
 	exit(-1);

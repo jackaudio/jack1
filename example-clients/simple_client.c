@@ -22,14 +22,6 @@ process (jack_nframes_t nframes, void *arg)
 }
 
 int
-bufsize (jack_nframes_t nframes, void *arg)
-
-{
-	printf ("the maximum buffer size is now %lu\n", nframes);
-	return 0;
-}
-
-int
 srate (jack_nframes_t nframes, void *arg)
 
 {
@@ -81,13 +73,6 @@ main (int argc, char *argv[])
 	*/
 
 	jack_set_process_callback (client, process, 0);
-
-	/* tell the JACK server to call `bufsize()' whenever
-	   the maximum number of frames that will be passed
-	   to `process()' changes
-	*/
-
-	jack_set_buffer_size_callback (client, bufsize, 0);
 
 	/* tell the JACK server to call `srate()' whenever
 	   the sample rate of the system changes.
