@@ -224,4 +224,61 @@ enum JackPortFlags {
      JackPortIsTerminal = 0x10
 };	    
 
+/**
+ *  jack_client_open() option bits
+ */
+enum JackOpenOptions {
+
+     /**
+      * Do not automatically start the JACK server if it is not
+      * already running.  This option is selected by default if
+      * $JACK_NO_START_SERVER is defined in the calling process
+      * environment.
+      */
+     JackNoStartServer = 0x01,
+
+     /**
+      * Use the exact client name requested.  Otherwise, JACK
+      * automatically generates a unique one, if needed.
+      */
+     JackUseExactName = 0x02
+};
+
+/**
+ *  jack_client_open() request options are formed by AND-ing together
+ *  @ref JackOpenOptions bits.
+ */
+typedef enum JackOpenOptions jack_options_t;
+
+/**
+ *  jack_client_open() status bits
+ */
+enum JackOpenStatus {
+
+     /**
+      * The JACK server was started as a result of this open.
+      * Otherwise, it was running already.  In either case the caller
+      * is now connected to jackd, so there is no race condition.
+      * When the server shuts down, the client will find out.
+      */
+     JackServerStarted = 0x01,
+
+     /**
+      * The desired client name was not unique.  With the @ref
+      * JackUseExactName option this situation is fatal.  Otherwise,
+      * the name was modified by appending a dash and a two-digit
+      * number in the range "-01" to "-99".  The
+      * jack_get_client_name() function will return the exact string
+      * that was used.  If the specified @a client_name plus these
+      * extra characters would be too long, the open fails instead.
+      */
+     JackNameNotUnique = 0x02
+};
+
+/**
+ *  The status word returned from jack_client_open() is formed by
+ *  AND-ing together the relevant @ref JackOpenStatus bits.
+ */
+typedef enum JackOpenStatus jack_status_t;
+
 #endif /* __jack_types_h__ */

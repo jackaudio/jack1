@@ -35,6 +35,44 @@ extern "C" {
  */
 
 /**
+ * Open an external client session with a JACK server.  This interface
+ * is more complex but more powerful than jack_client_new().  With it,
+ * clients may choose which of several servers to connect, and control
+ * whether and how to start the server automatically, if it was not
+ * already running.  There is also an option for JACK to generate a
+ * unique client name, when necessary.
+ *
+ * @param client_name of at most jack_client_name_size() characters.
+ * The name scope is local to each server.  Unless forbidden by the
+ * @ref JackUseExactName option, the server will modify this name to
+ * create a unique variant, if needed.
+ *
+ * @param options formed by AND-ing together @ref JackOpenOptions
+ * bits.
+ *
+ * @param status (if non-NULL) an address for JACK to return
+ * information from the open operation.  This status word is formed by
+ * AND-ing together the relevant @ref JackOpenStatus bits.
+ *
+ * @param server_name (if non-NULL) selects from among several
+ * possible concurrent server instances.  If unspecified, "default" is
+ * assumed.  Server names are unique to each user.
+ *
+ * @param start_command (if non-NULL) is a command line to use if the
+ * server was not running and must be started.  Defining
+ * $JACK_NO_START_SERVER in the environment disables automatic server
+ * creation.
+ *
+ * @return Opaque client handle if successful.  If this is NULL, the
+ * open operation failed, and the caller is not a JACK client.
+ */
+jack_client_t *jack_client_open (const char *client_name,
+				 jack_options_t options,
+				 jack_status_t *status,
+				 const char *server_name,
+				 const char *start_command);
+
+/**
  * Attempt to become an external client of the Jack server.
  *
  * JACK is evolving a mechanism for automatically starting the server
@@ -50,7 +88,8 @@ extern "C" {
  *
  * @note Failure generally means that the JACK server is not running.
  * If there was some other problem, it will be reported via the @ref
- * jack_error_callback mechanism.
+ * jack_error_callback mechanism.  Use jack_client_open() and check
+ * the @a status parameter if you need more detailed information.
  */
 jack_client_t *jack_client_new (const char *client_name);
 
@@ -65,7 +104,15 @@ int jack_client_close (jack_client_t *client);
  * @return the maximum number of characters in a JACK client name
  * including the final NULL character.  This value is a constant.
  */
-int jack_client_name_size(void);
+int jack_client_name_size (void);
+
+/**
+ * @return pointer to actual client name.  This is useful when @ref
+ * JackUseExactName is not specified on open and @ref
+ * JackNameNotUnique status was returned.  In that case, the actual
+ * name will differ from the @a client_name requested.
+ */
+char *jack_get_client_name (jack_client_t* client);
 
 /**
  * Attempt to load an internal client into the Jack server.
@@ -119,7 +166,8 @@ int jack_is_realtime (jack_client_t *client);
  * to help more complex clients understand what is going
  * on.  It should be called before jack_client_activate().
  */
-void jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg);
+void jack_on_shutdown (jack_client_t *client,
+		       void (*function)(void *arg), void *arg);
 
 /**
  * Tell the Jack server to call @a process_callback whenever there is
@@ -232,8 +280,8 @@ int jack_set_sample_rate_callback (jack_client_t *client,
 				   void *arg);
 
 /**
- * Tell the Jack server to call 'registration_callback' whenever a port is registered
- * or unregistered, passing 'arg' as a second argument.
+ * Tell the JACK server to call @a registration_callback whenever a
+ * port is registered or unregistered, passing @a arg as a parameter.
  *
  * @return 0 on success, otherwise a non-zero error code
  */
@@ -242,20 +290,23 @@ int jack_set_port_registration_callback (jack_client_t *,
 					 registration_callback, void *arg);
 
 /**
- * Tell the Jack server to call 'registration_callback' whenever the processing
- * graph is reordered, passing 'arg' as an argument.
+ * Tell the JACK server to call @a graph_callback whenever the
+ * processing graph is reordered, passing @a arg as a parameter.
  *
  * @return 0 on success, otherwise a non-zero error code
  */
-int jack_set_graph_order_callback (jack_client_t *, JackGraphOrderCallback graph_callback, void *);
+int jack_set_graph_order_callback (jack_client_t *,
+				   JackGraphOrderCallback graph_callback,
+				   void *);
 
 /**
- * Tell the Jack server to call 'xrun_callback' whenever there is a xrun, passing
- * 'arg' as an argument.
+ * Tell the JACK server to call @a xrun_callback whenever there is a
+ * xrun, passing @a arg as a parameter.
  *
  * @return 0 on success, otherwise a non-zero error code
  */
-int jack_set_xrun_callback (jack_client_t *, JackXRunCallback xrun_callback, void *arg);
+int jack_set_xrun_callback (jack_client_t *,
+			    JackXRunCallback xrun_callback, void *arg);
 
 /**
  * Tell the Jack server that the program is ready to start processing

@@ -1099,12 +1099,12 @@ setup_client (jack_engine_t *engine, int client_fd,
 		/* its good to go */
 		break;
 
-	default:
+	default:			/* external client */
 		
 		if (engine->pfd_max >= engine->pfd_size) {
 			engine->pfd = (struct pollfd *)
 				realloc (engine->pfd, sizeof (struct pollfd)
-					 * engine->pfd_size + 16);
+					 * (engine->pfd_size + 16));
 			engine->pfd_size += 16;
 		}
 		
@@ -2812,9 +2812,11 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 	   our check on a client's continued well-being
 	*/
 
-	if (client->control->dead || 
-	    (client->control->type == ClientExternal && kill (client->control->pid, 0))) {
-		DEBUG ("client %s is dead - no event sent", client->control->name);
+	if (client->control->dead
+	    || (client->control->type == ClientExternal
+		&& kill (client->control->pid, 0))) {
+		DEBUG ("client %s is dead - no event sent",
+		       client->control->name);
 		return 0;
 	}
 
@@ -3012,8 +3014,9 @@ jack_rechain_graph (jack_engine_t *engine)
 						 subgraph_client->
 						 subgraph_start_fd, n);
 					
-					/* this external client after this will have
-					   jackd as its upstream connection.
+					/* this external client after
+					   this will have jackd as its
+					   upstream connection.
 					*/
 					
 					upstream_is_jackd = 1;
@@ -3029,8 +3032,10 @@ jack_rechain_graph (jack_engine_t *engine)
 						 control->name, n);
 					subgraph_client->subgraph_wait_fd = -1;
 					
-					/* this external client after this will have
-					   another client as its upstream connection.
+					/* this external client after
+					   this will have another
+					   client as its upstream
+					   connection.
 					*/
 					
 					upstream_is_jackd = 0;
@@ -3718,7 +3723,7 @@ jack_get_fifo_fd (jack_engine_t *engine, unsigned int which_fifo)
 
 		engine->fifo = (int *)
 			realloc (engine->fifo,
-				 sizeof (int) * engine->fifo_size + 16);
+				 sizeof (int) * (engine->fifo_size + 16));
 		for (i = engine->fifo_size; i < engine->fifo_size + 16; i++) {
 			engine->fifo[i] = -1;
 		}
