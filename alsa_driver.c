@@ -565,7 +565,7 @@ alsa_driver_audio_start (alsa_driver_t *driver)
 	if (driver->pfd)
 		free (driver->pfd);
 	driver->pfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 
-		(driver->playback_nfds + driver->capture_nfds + 1));
+		(driver->playback_nfds + driver->capture_nfds + 2));
 
 	return 0;
 }
@@ -648,28 +648,25 @@ alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn, ClockSy
 }
 
 static int under_gdb = FALSE;
-static int waitcnt = 0;
 
-
-static int
-alsa_driver_wait (alsa_driver_t *driver)
-
+static nframes_t 
+alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 {
 	snd_pcm_sframes_t avail = 0;
-	snd_pcm_sframes_t contiguous = 0;
 	snd_pcm_sframes_t capture_avail = 0;
 	snd_pcm_sframes_t playback_avail = 0;
-	snd_pcm_uframes_t capture_offset = 0;
-	snd_pcm_uframes_t playback_offset = 0;
 	int xrun_detected;
-	channel_t chn;
-	GSList *node;
-	int need_capture = 1;
-	int need_playback = 1;
-	jack_engine_t *engine = driver->engine;
+	int need_capture;
+	int need_playback;
 	int i;
-	static unsigned long long last = 0;
-	unsigned long long start;
+
+	*status = -1;
+	need_capture = 1;
+	if (fd >= 0) {
+		need_playback = 0;
+	} else {
+		need_playback = 1;
+	}
 
   again:
 	
@@ -698,6 +695,12 @@ alsa_driver_wait (alsa_driver_t *driver)
 			driver->pfd[nfds].events |= POLLERR;
 		}
 
+		if (fd >= 0) {
+			driver->pfd[nfds].fd = fd;
+			driver->pfd[nfds].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
+			nfds++;
+		}
+
 		if (poll (driver->pfd, nfds, 1000) < 0) {
 			if (errno == EINTR) {
 				printf ("poll interrupt\n");
@@ -706,16 +709,27 @@ alsa_driver_wait (alsa_driver_t *driver)
 				if (under_gdb) {
 					goto again;
 				}
-				return 1;
+				return 0;
 			}
 			
 			jack_error ("ALSA::Device: poll call failed (%s)", strerror (errno));
-			return -1;
+			return 0;
+			
 		}
 
-		rdtscll (start);
-		// fprintf (stderr, "engine cycle %.6f msecs\n", (((float) (start - last))/450000.0f));
-		last = start;
+		/* check to see if it was the extra FD that caused us to return from poll
+		 */
+
+		if (fd >= 0) {
+			if (driver->pfd[nfds-1].revents == 0) {
+				/* we timed out on the extra fd */
+				return -1;
+			} else {
+				/* if POLLIN was the only bit set, we're OK */
+				*status = 0;
+				return (driver->pfd[nfds-1].revents == POLLIN) ? 0 : -1;
+			}
+		}
 
 		if (driver->engine) {
 			struct timeval tv;
@@ -729,7 +743,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 			for (i = 0; i < driver->playback_nfds; i++) {
 				if (driver->pfd[i].revents & POLLERR) {
 					jack_error ("ALSA: poll reports error on playback stream.");
-					return -1;
+					return 0;
 				}
 				
 				if (driver->pfd[i].revents == 0) {
@@ -748,7 +762,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 			for (i = ci; i < nfds; i++) {
 				if (driver->pfd[i].revents & POLLERR) {
 					jack_error ("ALSA: poll reports error on capture stream.");
-					return -1;
+					return 0;
 				}
 				
 				if (driver->pfd[i].revents == 0) {
@@ -763,7 +777,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 		
 		if (p_timed_out == driver->playback_nfds && c_timed_out == driver->capture_nfds) {
 			jack_error ("ALSA: poll time out");
-			return -1;
+			return 0;
 		}		
 
 	}
@@ -787,8 +801,11 @@ alsa_driver_wait (alsa_driver_t *driver)
 	}
 
 	if (xrun_detected) {
-		return alsa_driver_xrun_recovery (driver);
+		*status = alsa_driver_xrun_recovery (driver);
+		return 0;
 	}
+
+	*status = 0;
 
 	avail = capture_avail < playback_avail ? capture_avail : playback_avail;
 	
@@ -796,14 +813,25 @@ alsa_driver_wait (alsa_driver_t *driver)
 	   periods.
 	*/
 
-	avail = avail - (avail % driver->frames_per_cycle);
+	return avail - (avail % driver->frames_per_cycle);
+}
 
-	while (avail) {
+static int
+alsa_driver_process (alsa_driver_t *driver, nframes_t nframes)
+{
+	snd_pcm_sframes_t contiguous = 0;
+	snd_pcm_sframes_t capture_avail = 0;
+	snd_pcm_sframes_t playback_avail = 0;
+	snd_pcm_uframes_t capture_offset = 0;
+	snd_pcm_uframes_t playback_offset = 0;
+	channel_t chn;
+	GSList *node;
+	jack_engine_t *engine = driver->engine;
 
-		waitcnt++;
+	while (nframes) {
 
-		capture_avail = (avail > driver->frames_per_cycle) ? driver->frames_per_cycle : avail;
-		playback_avail = (avail > driver->frames_per_cycle) ? driver->frames_per_cycle : avail;
+		capture_avail = (nframes > driver->frames_per_cycle) ? driver->frames_per_cycle : nframes;
+		playback_avail = (nframes > driver->frames_per_cycle) ? driver->frames_per_cycle : nframes;
 		
 		if (alsa_driver_get_channel_addresses (driver, 
 						       (snd_pcm_uframes_t *) &capture_avail, 
@@ -817,9 +845,25 @@ alsa_driver_wait (alsa_driver_t *driver)
 		driver->channels_not_done = driver->channel_done_bits;
 
 		if (engine->process_lock (engine) == 0) {
-			int ret;
-			GSList *prev;
 
+			channel_t chn;
+			jack_port_t *port;
+			GSList *node;
+			int ret;
+
+			for (chn = 0, node = driver->capture_ports; node; node = g_slist_next (node), chn++) {
+				
+				port = (jack_port_t *) node->data;
+				
+				if (!jack_port_connected (port)) {
+					continue;
+				}
+				
+				alsa_driver_read_from_channel (driver, chn, jack_port_get_buffer (port, nframes), nframes);
+			}
+
+			snd_pcm_mmap_commit (driver->capture_handle, capture_offset, contiguous);
+			
 			if ((ret = engine->process (engine, contiguous)) != 0) {
 				engine->process_unlock (engine);
 				alsa_driver_audio_stop (driver);
@@ -831,7 +875,7 @@ alsa_driver_wait (alsa_driver_t *driver)
 
 			/* now move data from ports to channels */
 			
-			for (chn = 0, prev = 0, node = driver->playback_ports; node; prev = node, node = g_slist_next (node), chn++) {
+			for (chn = 0, node = driver->playback_ports; node; node = g_slist_next (node), chn++) {
 				
 				jack_port_t *port = (jack_port_t *) node->data;
 
@@ -880,36 +924,12 @@ alsa_driver_wait (alsa_driver_t *driver)
 			alsa_driver_silence_untouched_channels (driver, contiguous);
 		}
 
-		snd_pcm_mmap_commit (driver->capture_handle, capture_offset, contiguous);
 		snd_pcm_mmap_commit (driver->playback_handle, playback_offset, contiguous);
 
-		avail -= contiguous;
+		nframes -= contiguous;
 	}
 	
 	engine->post_process (engine);
-	return 0;
-}
-
-static int
-alsa_driver_process (nframes_t nframes, void *arg)
-
-{
-	alsa_driver_t *driver = (alsa_driver_t *) arg;
-	channel_t chn;
-	jack_port_t *port;
-	GSList *node;
-
-	for (chn = 0, node = driver->capture_ports; node; node = g_slist_next (node), chn++) {
-
-		port = (jack_port_t *) node->data;
-		
-		if (!jack_port_connected (port)) {
-			continue;
-		}
-		
-		alsa_driver_read_from_channel (driver, chn, jack_port_get_buffer (port, nframes), nframes);
-	}
-
 	return 0;
 }
 
@@ -932,8 +952,6 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 		jack_error ("ALSA: cannot become client");
 		return;
 	}
-
-	jack_set_process_callback (driver->client, alsa_driver_process, driver);
 
 	for (chn = 0; chn < driver->capture_nchannels; chn++) {
 		snprintf (buf, sizeof(buf) - 1, "in_%lu", chn+1);
@@ -1128,6 +1146,7 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->attach = (JackDriverAttachFunction) alsa_driver_attach;
         driver->detach = (JackDriverDetachFunction) alsa_driver_detach;
 	driver->wait = (JackDriverWaitFunction) alsa_driver_wait;
+	driver->process = (JackDriverProcessFunction) alsa_driver_process;
 	driver->start = (JackDriverStartFunction) alsa_driver_audio_start;
 	driver->stop = (JackDriverStopFunction) alsa_driver_audio_stop;
 

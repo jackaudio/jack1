@@ -368,7 +368,7 @@ jack_add_port_segment (jack_engine_t *engine, unsigned long nports)
 
 	/* convert the first chunk of the segment into a zero-filled area */
 
-	if (engine->silent_buffer == 0) {
+	if (engine->silent_buffer == NULL) {
 		engine->silent_buffer = (jack_port_buffer_info_t *) engine->port_buffer_freelist->data;
 
 		engine->port_buffer_freelist = g_slist_remove_link (engine->port_buffer_freelist, engine->port_buffer_freelist);
@@ -420,12 +420,11 @@ jack_engine_process_unlock (jack_engine_t *engine)
 static int
 jack_process (jack_engine_t *engine, nframes_t nframes)
 {
-	int err = 0;
 	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
 	GSList *node;
-	struct pollfd pollfd[1];
 	char c;
+	int status;
 
 	engine->process_errors = 0;
 
@@ -439,7 +438,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 		engine->control->time.frame = engine->timebase_client->control->frame_time;
 	} 
 
-	for (node = engine->clients; err == 0 && node; ) {
+	for (node = engine->clients; engine->process_errors == 0 && node; ) {
 
 		client = (jack_client_internal_t *) node->data;
 
@@ -454,14 +453,20 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 
 			/* in-process client ("plugin") */
 
-			ctl->state = Running;
+			if (ctl->process) {
 
-			if (ctl->process (nframes, ctl->process_arg) == 0) {
-				ctl->state = Finished;
+				ctl->state = Running;
+
+				if (ctl->process (nframes, ctl->process_arg) == 0) {
+					ctl->state = Finished;
+				} else {
+					jack_error ("in-process client %s failed", client->control->name);
+					engine->process_errors++;
+					break;
+				}
+
 			} else {
-				jack_error ("in-process client %s failed", client->control->name);
-				engine->process_errors++;
-				break;
+				ctl->state = Finished;
 			}
 
 			node = g_slist_next (node);
@@ -478,28 +483,11 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 				break;
 			} 
 
-			/* now wait for the result. use poll instead of read so that we 
-			   can timeout effectively.
-			 */
-
-			pollfd[0].fd = client->subgraph_wait_fd;
-			pollfd[0].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
-
-			if (poll (pollfd, 1, engine->driver->period_interval) < 0) {
-				if (errno == EINTR) {
-					continue;
-				}
-				jack_error ("engine cannot poll for graph completion (%s)", strerror (errno));
-				engine->process_errors++;
-				break;
-			}
-
-			if (pollfd[0].revents == 0) {
-				jack_error ("subgraph starting at %s timed out (state = %d)", client->control->name, client->control->state);
-				engine->process_errors++;
-				break;
-			} else if (pollfd[0].revents & ~POLLIN) {
-				jack_error ("error/hangup on graph wait fd");
+			engine->driver->wait (engine->driver, client->subgraph_wait_fd, &status);
+			
+			if (status != 0) {
+				jack_error ("subgraph starting at %s timed out (status = %d, state = %d)", 
+					    client->control->name, status, client->control->state);
 				engine->process_errors++;
 				break;
 			} else {
@@ -542,7 +530,7 @@ jack_load_client (jack_engine_t *engine, jack_client_internal_t *client, const c
 
 	handle = dlopen (path_to_so, RTLD_NOW|RTLD_GLOBAL);
 	
-	if (handle == 0) {
+	if (handle == NULL) {
 		if ((errstr = dlerror ()) != 0) {
 			jack_error ("can't load \"%s\": %s", path_to_so, errstr);
 		} else {
@@ -844,8 +832,8 @@ handle_client_jack_error (jack_engine_t *engine, int fd)
 		}
 	}
 
-	if (client == 0) {
-		jack_error ("no client found for fd %d\n", fd);
+	if (client == NULL) {
+		/* client removed by driver thread */
 		pthread_mutex_unlock (&engine->graph_lock);
 		return -1;
 	} 
@@ -875,7 +863,7 @@ handle_client_io (jack_engine_t *engine, int fd)
 
 	pthread_mutex_unlock (&engine->graph_lock);
 
-	if (client == 0) {
+	if (client == NULL) {
 		jack_error ("client input on unknown fd %d!", fd);
 		return -1;
 	}
@@ -1214,9 +1202,19 @@ jack_main_thread (void *arg)
 	}
 
 	while (1) {
-		switch (driver->wait (driver)) {
-		case -1:
+		int status;
+		nframes_t nframes;
+
+		nframes = driver->wait (driver, -1, &status);
+
+		if (status != 0) {
 			jack_error ("driver wait function failed, exiting");
+			pthread_exit (0);
+		}
+
+		switch (driver->process (driver, nframes)) {
+		case -1:
+			jack_error ("driver process function failed, exiting");
 			pthread_exit (0);
 			break;
 
@@ -1239,7 +1237,7 @@ int
 jack_run (jack_engine_t *engine)
 
 {
-	if (engine->driver == 0) {
+	if (engine->driver == NULL) {
 		jack_error ("engine driver not set; cannot start");
 		return -1;
 	}
@@ -1626,7 +1624,7 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 				
 			} else {
 				
-				if (subgraph_client == 0) {
+				if (subgraph_client == NULL) {
 					
 				/* start a new subgraph. the engine will start the chain
 				   by writing to the nth FIFO.
@@ -1667,7 +1665,7 @@ jack_trace_terminal (jack_client_internal_t *c1, jack_client_internal_t *rbase)
 	GSList *existing;
 	GSList *node;
 
-	if (c1->fed_by == 0) {
+	if (c1->fed_by == NULL) {
 		return;
 	}
 
@@ -1893,12 +1891,12 @@ jack_port_do_connect (jack_engine_t *engine,
 	jack_port_internal_t *srcport, *dstport;
 	jack_port_id_t src_id, dst_id;
 
-	if ((srcport = jack_get_port_by_name (engine, source_port)) == 0) {
+	if ((srcport = jack_get_port_by_name (engine, source_port)) == NULL) {
 		jack_error ("unknown source port in attempted connection [%s]", source_port);
 		return -1;
 	}
 
-	if ((dstport = jack_get_port_by_name (engine, destination_port)) == 0) {
+	if ((dstport = jack_get_port_by_name (engine, destination_port)) == NULL) {
 		jack_error ("unknown destination port in attempted connection [%s]", destination_port);
 		return -1;
 	}
@@ -2053,12 +2051,12 @@ jack_port_do_disconnect (jack_engine_t *engine,
 	jack_port_internal_t *srcport, *dstport;
 	int ret = -1;
 
-	if ((srcport = jack_get_port_by_name (engine, source_port)) == 0) {
+	if ((srcport = jack_get_port_by_name (engine, source_port)) == NULL) {
 		jack_error ("unknown source port in attempted disconnection [%s]", source_port);
 		return -1;
 	}
 
-	if ((dstport = jack_get_port_by_name (engine, destination_port)) == 0) {
+	if ((dstport = jack_get_port_by_name (engine, destination_port)) == NULL) {
 		jack_error ("unknown destination port in attempted connection [%s]", destination_port);
 		return -1;
 	}
@@ -2281,7 +2279,7 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	jack_client_internal_t *client;
 
 	pthread_mutex_lock (&engine->graph_lock);
-	if ((client = jack_client_internal_by_id (engine, req->x.port_info.client_id)) == 0) {
+	if ((client = jack_client_internal_by_id (engine, req->x.port_info.client_id)) == NULL) {
 		jack_error ("unknown client id in port registration request");
 		return -1;
 	}
@@ -2466,7 +2464,7 @@ jack_send_connection_notification (jack_engine_t *engine, jack_client_id_t clien
 	jack_client_internal_t *client;
 	jack_event_t event;
 
-	if ((client = jack_client_internal_by_id (engine, client_id)) == 0) {
+	if ((client = jack_client_internal_by_id (engine, client_id)) == NULL) {
 		jack_error ("no such client %d during connection notification", client_id);
 		return -1;
 	}
