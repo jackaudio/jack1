@@ -721,7 +721,7 @@ alsa_driver_audio_start (alsa_driver_t *driver)
 		}
 	}
 
-	if (driver->capture_handle && driver->capture_and_playback_not_synced ||
+	if ((driver->capture_handle && driver->capture_and_playback_not_synced) ||
 	    !driver->playback_handle) {
 		if ((err = snd_pcm_start (driver->capture_handle)) < 0) {
 			jack_error ("could not start capture (%s)", snd_strerror (err));
