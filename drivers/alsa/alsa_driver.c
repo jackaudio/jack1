@@ -661,9 +661,11 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	return 0;
 }	
 
-#if 0
-static int  /* UNUSED */
-alsa_driver_reset_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cycle, jack_nframes_t user_nperiods, jack_nframes_t rate)
+static int
+alsa_driver_reset_parameters (alsa_driver_t *driver,
+			      jack_nframes_t frames_per_cycle,
+			      jack_nframes_t user_nperiods,
+			      jack_nframes_t rate)
 {
 	/* XXX unregister old ports ? */
 	alsa_driver_release_channel_dependent_memory (driver);
@@ -671,7 +673,6 @@ alsa_driver_reset_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_c
 					   frames_per_cycle,
 					   user_nperiods, rate);
 }
-#endif
 
 static int
 alsa_driver_get_channel_addresses (alsa_driver_t *driver,
@@ -996,9 +997,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 		}
 
 #ifdef DEBUG_WAKEUP
-		fprintf (stderr, "%Lu: checked %d fds, %Lu usecs since poll"" entered\n", 
-			 poll_ret, 
-			 nfds,
+		fprintf (stderr, "%" PRIu64 ": checked %d fds, %" PRIu64
+			 " usecs since poll entered\n", poll_ret, nfds,
 			 poll_ret - poll_enter);
 #endif
 
@@ -1031,7 +1031,9 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 				if (driver->pfd[i].revents == 0) {
 					p_timed_out++;
 #ifdef DEBUG_WAKEUP
-					fprintf (stderr, "%Lu playback stream timed out\n", poll_ret);
+					fprintf (stderr, "%" PRIu64
+						 " playback stream timed out\n",
+						 poll_ret);
 #endif
 				}
 			}
@@ -1039,7 +1041,9 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 			if (p_timed_out == 0) {
 				need_playback = 0;
 #ifdef DEBUG_WAKEUP
-				fprintf (stderr, "%Lu playback stream ready\n", poll_ret);
+				fprintf (stderr, "%" PRIu64
+					 " playback stream ready\n",
+					 poll_ret);
 #endif
 			}
 		}
@@ -1055,7 +1059,9 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 				if (driver->pfd[i].revents == 0) {
 					c_timed_out++;
 #ifdef DEBUG_WAKEUP
-					fprintf (stderr, "%Lu capture stream timed out\n", poll_ret);
+					fprintf (stderr, "%" PRIu64
+						 " capture stream timed out\n",
+						 poll_ret);
 #endif
 				}
 			}
@@ -1063,14 +1069,18 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 			if (c_timed_out == 0) {
 				need_capture = 0;
 #ifdef DEBUG_WAKEUP
-				fprintf (stderr, "%Lu capture stream ready\n", poll_ret);
+				fprintf (stderr, "%" PRIu64
+					 " capture stream ready\n",
+					 poll_ret);
 #endif
 			}
 		}
 		
 		if ((p_timed_out && (p_timed_out == driver->playback_nfds)) &&
 		    (c_timed_out && (c_timed_out == driver->capture_nfds))){
-			jack_error ("ALSA: poll time out, polled for %Lu usecs", poll_ret - poll_enter);
+			jack_error ("ALSA: poll time out, polled for %" PRIu64
+				    " usecs",
+				    poll_ret - poll_enter);
 			*status = -5;
 			return 0;
 		}		
@@ -1112,7 +1122,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 	avail = capture_avail < playback_avail ? capture_avail : playback_avail;
 
 #ifdef DEBUG_WAKEUP
-	fprintf (stderr, "wakup complete, avail = %lu, pavail = %lu cavail = %lu\n",
+	fprintf (stderr, "wakeup complete, avail = %lu, pavail = %lu "
+		 "cavail = %lu\n",
 		 avail, playback_avail, capture_avail);
 #endif
 
@@ -1181,6 +1192,14 @@ alsa_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 	}
 
 	return 0;
+}
+
+static int
+alsa_driver_bufsize (alsa_driver_t* driver, jack_nframes_t nframes)
+{
+	return alsa_driver_reset_parameters (driver, nframes,
+					     driver->user_nperiods,
+					     driver->frame_rate);
 }
 
 static int
@@ -1557,6 +1576,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 	driver->write = (JackDriverReadFunction) alsa_driver_write;
 	driver->null_cycle =
 		(JackDriverNullCycleFunction) alsa_driver_null_cycle;
+	driver->bufsize = (JackDriverBufSizeFunction) alsa_driver_bufsize;
 	driver->start = (JackDriverStartFunction) alsa_driver_audio_start;
 	driver->stop = (JackDriverStopFunction) alsa_driver_audio_stop;
 

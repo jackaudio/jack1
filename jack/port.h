@@ -28,35 +28,43 @@
 #define JACK_PORT_NAME_SIZE 32
 #define JACK_PORT_TYPE_SIZE 32
 
+/* The relatively low value of this constant reflects the fact that
+ * JACK currently only knows about *1* port type.  (March 2003)
+ */              
+#define JACK_MAX_PORT_TYPES 4
+#define JACK_AUDIO_PORT_TYPE 0
+
 /* these should probably go somewhere else, but not in <jack/types.h> */
 #define JACK_CLIENT_NAME_SIZE 32
 typedef uint32_t jack_client_id_t;
 
+/* JACK shared memory segments are limited to MAX_INT32, they can be
+ * shared between 32-bit and 64-bit clients. */
+#define JACK_SHM_MAX (MAX_INT32)
+typedef int32_t jack_shmsize_t;
+typedef int32_t jack_port_type_id_t;
+
 typedef struct {
-    shm_name_t    shm_name;
-    char         *address;
-    size_t        size;
+    shm_name_t     shm_name;
+    char          *address;		/* JOQ: no longer set globally */
+    jack_shmsize_t size;
 } jack_port_segment_info_t;
 
+/* Port type structure.  Has several uses:
+ *
+ *  (1) One for each port type is part of the engine's jack_control_t
+ *  shared memory structure.
+ *
+ *  (2) One for each port type is appended to the engine's
+ *  jack_client_connect_result_t response.
+ *
+ *  (3) The client reads these into its local memory, and uses them to
+ *  attach the corresponding shared memory segments.
+ */
 typedef struct _jack_port_type_info {
 
-    uint32_t	   type_id;
+    jack_port_type_id_t type_id;
     const char     type_name[JACK_PORT_TYPE_SIZE];      
-
-    /* Function to mixdown multiple inputs to a buffer.  Can be NULL,
-     * indicating that multiple input connections are not legal for
-     * this data type. */
-    void (*mixdown)(jack_port_t *, jack_nframes_t);
-    
-    /* Function to compute a peak value for a buffer.  Can be NULL,
-     * indicating that the computation has no meaning.  The return
-     * value is normalized to a [0..1] range. */
-    double (*peak)(jack_port_t *, jack_nframes_t);
-
-    /* Function to compute a power value for a buffer.  Can be NULL,
-     * indicating that the computation has no meaning.  The return
-     * value is normalized to a [0..1] range. */
-    double (*power)(jack_port_t *, jack_nframes_t);
 
     /* If == 1, then a buffer to handle nframes worth of data has
      * sizeof(jack_default_audio_sample_t) * nframes bytes.  If
@@ -68,12 +76,9 @@ typedef struct _jack_port_type_info {
     int32_t buffer_scale_factor;
 
     /* ignored unless buffer_scale_factor is < 0. see above */
-    size_t buffer_size;
+    jack_shmsize_t buffer_size;
 
-    /* these are all run-time information, controlled by the server */
     jack_port_segment_info_t shm_info;
-    pthread_mutex_t buffer_lock;
-    JSList *buffer_freelist;
 
 } jack_port_type_info_t;
 
@@ -84,10 +89,11 @@ typedef struct _jack_port_shared {
     jack_port_type_info_t    type_info;
     /* location of buffer as an offset from the start of the port's
      * type-specific shared memory region. */
-    size_t	             offset;
+    jack_shmsize_t           offset;
     /* index into engine port array for this port */
     jack_port_id_t           id;
-    uint32_t		     flags;    
+    int8_t		     has_mixdown; /* port has a mixdown function */
+    enum JackPortFlags	     flags;    
     char                     name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
     jack_client_id_t         client_id;	/* who owns me */
 
@@ -97,17 +103,24 @@ typedef struct _jack_port_shared {
 
     char                     in_use     : 1;
     char                     locked     : 1;
-    struct _jack_port       *tied;
 
 } jack_port_shared_t;
 
-/* This is the data structure allocated by the client in local
- * memory. The `shared' pointer points to the corresponding structure
- * in shared memory.
- */
+typedef struct _jack_port_functions {
+
+    /* Function to mixdown multiple inputs to a buffer.  Can be NULL,
+     * indicating that multiple input connections are not legal for
+     * this data type. */
+    void (*mixdown)(jack_port_t *, jack_nframes_t);
+
+} jack_port_functions_t;
+
+/* This port structure is allocated by the client in local memory. */
 struct _jack_port {
     char                     *client_segment_base;
-    struct _jack_port_shared *shared;
+    struct _jack_port_shared *shared;	/* corresponding shm struct */
+    struct _jack_port        *tied;	/* locally tied source port */
+    jack_port_functions_t    fptr;	/* local port functions */
     pthread_mutex_t           connection_lock;
     JSList                   *connections;
 };
@@ -116,13 +129,6 @@ struct _jack_port {
  * non-optimized code. */
 #define jack_port_buffer(p) \
   ((void *) ((p)->client_segment_base + (p)->shared->offset))
-
-/* This is the structure allocated by the engine in local memory. */
-typedef struct _jack_port_internal {
-    struct _jack_port_shared *shared;
-    JSList                   *connections;
-    void                     *buffer_info;
-} jack_port_internal_t;
 
 #endif /* __jack_port_h__ */
 

@@ -50,7 +50,9 @@ jack_sync_poll_new (jack_engine_t *engine, jack_client_internal_t *client)
 		engine->control->transport_state = JackTransportStarting;
 		VERBOSE (engine, "force transport state to Starting\n");
 	}
-	VERBOSE (engine, "polling sync client %" PRIu32 "\n", client->control->id);
+
+	VERBOSE (engine, "polling sync client %" PRIu32 "\n",
+		 client->control->id);
 }
 
 /* stop polling a specific slow-sync client

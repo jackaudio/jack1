@@ -19,14 +19,11 @@
 */
 
 #include <stdlib.h>
-
 #include <config.h>
-
 #include <jack/pool.h>
 
 void *
 jack_pool_alloc (size_t bytes)
-
 {
 	/* XXX need RT-pool based allocator here */
 

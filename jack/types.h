@@ -103,13 +103,16 @@ typedef int  (*JackGraphOrderCallback)(void *arg);
 typedef int  (*JackXRunCallback)(void *arg);
 
 /**
- * Prototype for the client supplied function that is called 
- * when the engine buffersize changes.
+ * Prototype for the @a bufsize_callback that is invoked whenever the
+ * JACK engine buffer size changes.  Although this function is called
+ * in the JACK process thread, the normal process cycle is suspended
+ * during its operation, causing a gap in the audio flow.  So, the @a
+ * bufsize_callback can allocate storage, touch memory not previously
+ * referenced, and perform other operations that are not realtime
+ * safe.
  *
- * Note! Use of this callback function is deprecated!
- *
- * @param nframes new engine buffer size
- * @param arg pointer to a client supplied structure
+ * @param nframes buffer size
+ * @param arg pointer supplied by jack_set_buffer_size_callback().
  *
  * @return zero on success, non-zero on error
  */ 

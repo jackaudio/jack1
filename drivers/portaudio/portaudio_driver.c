@@ -21,6 +21,7 @@
 */
 
 #include <stdio.h>
+#include <errno.h>
 #include <string.h>
 #include <jack/engine.h>
 #include "portaudio_driver.h"
@@ -143,6 +144,12 @@ portaudio_driver_null_cycle (portaudio_driver_t* driver, jack_nframes_t nframes)
 }
 
 static int
+portaudio_driver_bufsize (portaudio_driver_t* driver, jack_nframes_t nframes)
+{
+        return ENOSYS;			/* function not implemented */
+}
+
+static int
 portaudio_driver_read (portaudio_driver_t *driver, jack_nframes_t nframes)
 {
         jack_default_audio_sample_t *buf;
@@ -254,6 +261,7 @@ portaudio_driver_new (char *name,
         driver->read = (JackDriverReadFunction) portaudio_driver_read;
 	driver->write = (JackDriverReadFunction) portaudio_driver_write;
 	driver->null_cycle = (JackDriverNullCycleFunction) portaudio_driver_null_cycle;
+	driver->bufsize = (JackDriverBufSizeFunction) portaudio_driver_bufsize;
         driver->start = (JackDriverStartFunction) portaudio_driver_audio_start;
 	driver->stop = (JackDriverStopFunction) portaudio_driver_audio_stop;
        

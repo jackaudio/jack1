@@ -1,3 +1,12 @@
+2003-09-18  Jack O'Quin  <joq@io.com>
+
+	* new function jack_set_buffer_size().  
+
+	Compatibility issues: programs that rely on the buffer size but do
+	not register a callback will fail.  Cached output buffer addresses
+	are not valid after the buffer size changes.  These rules existed
+	before, but were never enforced.
+
 2003-08-26  Jack O'Quin  <joq@io.com>
 
 	* <jack/types.h> typedefs are now defined using the C99 standard

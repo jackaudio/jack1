@@ -34,81 +34,58 @@
 
 #include "local.h"
 
-static void  jack_audio_port_mixdown (jack_port_t *port,
-				      jack_nframes_t nframes);
+static void    jack_audio_port_mixdown (jack_port_t *port,
+					jack_nframes_t nframes);
+
+/* These function pointers are local to each address space.  For
+ * internal clients they reside within jackd; for external clients in
+ * the application process. */
+jack_port_functions_t jack_builtin_audio_functions = {
+	.mixdown = jack_audio_port_mixdown, 
+};
+
+jack_port_functions_t jack_builtin_NULL_functions = {
+	.mixdown = NULL, 
+};
+
+/* Only the Audio port type is currently built in. */
+jack_port_type_info_t jack_builtin_port_types[] = {
+	{ .type_name = JACK_DEFAULT_AUDIO_TYPE, 
+	  .buffer_scale_factor = 1,
+	},
+	{ .type_name = "", }
+};
 
 jack_port_t *
 jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	       jack_control_t *control)
 {
-	jack_port_t *port;
-	jack_port_shared_t *shared;
-	jack_port_segment_info_t *si;
-	JSList *node;
-
-	shared = &control->ports[port_id];
-
-	port = (jack_port_t *) malloc (sizeof (jack_port_t));
+	jack_port_shared_t *shared = &control->ports[port_id];
+	jack_port_type_id_t ptid = shared->type_info.type_id;
+	jack_port_t *port = (jack_port_t *) malloc (sizeof (jack_port_t));
 
 	port->client_segment_base = 0;
 	port->shared = shared;
 	pthread_mutex_init (&port->connection_lock, NULL);
 	port->connections = 0;
-	port->shared->tied = NULL;
+	port->tied = NULL;
 	
-	/* reset function pointers to be within client address space */
-
-	switch (client->control->type) {
-	case ClientExternal:
-
-		if (client->control->id == port->shared->client_id) {
+	if (client->control->id == port->shared->client_id) {
 			
-			/* its our port, and therefore we need to make
-			   sure that the function pointers in the
-			   shared memory object that refer to
-			   functions called within the client's
-			   address space point to the location of the
-			   correct functions within the
-			   client. without this, they point to those
-			   same functions in the server's address
-			   space, and that's a recipe for disaster.
-			*/
-			
-			port->shared->type_info.mixdown =
-				jack_builtin_port_types[
-					port->shared->type_info.type_id
-					].mixdown;
-			port->shared->type_info.peak =
-				jack_builtin_port_types[
-					port->shared->type_info.type_id].peak;
-			port->shared->type_info.power =
-				jack_builtin_port_types[
-					port->shared->type_info.type_id].power;
+		/* It's our port, so initialize the pointers to port
+		 * functions within this address space.  These builtin
+		 * definitions can be overridden by the client. */
+
+		if (port->shared->type_info.type_id == JACK_AUDIO_PORT_TYPE) {
+
+			port->fptr = jack_builtin_audio_functions;
+			port->shared->has_mixdown = TRUE;
+
+		} else {	/* no other builtin functions */
+
+			port->fptr = jack_builtin_NULL_functions;
+			port->shared->has_mixdown = FALSE;
 		}
-		break;
-
-	default:
-		break;
-	}
-
-	/* now find the shared memory segment that contains the buffer
-	 * for this port */
-	for (node = client->port_segments; node;
-	     node = jack_slist_next (node)) {
-		
-		si = (jack_port_segment_info_t *) node->data;
-
-		if (strcmp (si->shm_name,
-			    port->shared->type_info.shm_info.shm_name) == 0) {
-			break;
-		}
-	}
-
-	if (node == NULL) {
-		jack_error ("cannot find port memory segment [%s] for"
-			    " new port\n",
-			    port->shared->type_info.shm_info.shm_name);
-		return NULL;
 	}
 
 	/* set up a base address so that port->offset can be used to
@@ -117,7 +94,7 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	   port->offset can change if the buffer size or port counts
 	   are changed.
 	*/
-	port->client_segment_base = si->address;
+	port->client_segment_base = client->port_segment[ptid].address;
 	
 	return port;
 }
@@ -387,31 +364,24 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 {
 	JSList *node, *next;
 
-	/* Output port. The buffer was assigned by the engine
+	/* Output port.  The buffer was assigned by the engine
 	   when the port was registered.
 	*/
-
 	if (port->shared->flags & JackPortIsOutput) {
-		if (port->shared->tied) {
-			return jack_port_get_buffer (port->shared->tied,
-						     nframes);
+		if (port->tied) {
+			return jack_port_get_buffer (port->tied, nframes);
 		}
 		return jack_port_buffer (port);
 	}
 
-	/* Input port. 
+	/* Input port.  Since this can only be called from the
+	   process() callback, and since no connections can be
+	   made/broken during this phase (enforced by the jack
+	   server), there is no need to take the connection lock here
 	*/
-
-	/* since this can only be called from the process() callback,
-	   and since no connections can be made/broken during this
-	   phase (enforced by the jack server), there is no need
-	   to take the connection lock here
-	*/
-
 	if ((node = port->connections) == NULL) {
 		
 		/* no connections; return a zero-filled buffer */
-
 		return jack_zero_filled_buffer;
 	}
 
@@ -420,20 +390,19 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 		/* one connection: use zero-copy mode - just pass
 		   the buffer of the connected (output) port.
 		*/
-
 		return jack_port_get_buffer (((jack_port_t *) node->data),
 					     nframes);
 	}
 
-	/* multiple connections. use a local buffer and mixdown
-	   the incoming data to that buffer. we have already
-	   established the existence of a mixdown function
-	   during the connection process.
+	/* Multiple connections.  Use a local buffer and mixdown the
+	   incoming data to that buffer. we have already established
+	   the existence of a mixdown function during the connection
+	   process.
 
-	   no port can have an offset of 0 - that offset refers
-	   to the zero-filled area at the start of a shared port
-	   segment area. so, use the offset to store the location
-	   of a locally allocated buffer, and reset the client_segment_base 
+	   No port can have an offset of 0, that offset refers to the
+	   zero-filled area at the start of a shared port segment
+	   area.  So, use the offset to store the location of a
+	   locally allocated buffer, and reset the client_segment_base
 	   so that the jack_port_buffer() computation works correctly.
 	*/
 
@@ -445,7 +414,7 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 				* nframes);
 		port->client_segment_base = 0;
 	}
-	port->shared->type_info.mixdown (port, nframes);
+	port->fptr.mixdown (port, nframes);
 	return (jack_default_audio_sample_t *) port->shared->offset;
 }
 
@@ -463,7 +432,7 @@ jack_port_tie (jack_port_t *src, jack_port_t *dst)
 		return -1;
 	}
 
-	dst->shared->tied = src;
+	dst->tied = src;
 	return 0;
 }
 
@@ -471,11 +440,11 @@ int
 jack_port_untie (jack_port_t *port)
 
 {
-	if (port->shared->tied == NULL) {
+	if (port->tied == NULL) {
 		jack_error ("port \"%s\" is not tied", port->shared->name);
 		return -1;
 	}
-	port->shared->tied = NULL;
+	port->tied = NULL;
 	return 0;
 }
 
@@ -625,21 +594,6 @@ static inline float f_max(float x, float a)
 	return (x);
 }
 
-static double
-jack_audio_port_peak (jack_port_t *port, jack_nframes_t nframes)
-{
-	jack_nframes_t n;
-	jack_default_audio_sample_t *buf = (jack_default_audio_sample_t *)
-		jack_port_get_buffer (port, nframes);
-	float max = 0;
-
-	for (n = 0; n < nframes; ++n) {
-		max = f_max (buf[n], max);
-	}
-
-	return max;
-}
-
 static void 
 jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 {
@@ -680,15 +634,3 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 		}
 	}
 }
-
-jack_port_type_info_t jack_builtin_port_types[] = {
-	{ .type_name = JACK_DEFAULT_AUDIO_TYPE, 
-	  .mixdown = jack_audio_port_mixdown, 
-	  .peak = jack_audio_port_peak,
-	  .power = NULL,
-	  .buffer_scale_factor = 1,
-	},
-	{ .type_name = "", 
-	}
-};
-

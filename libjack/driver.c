@@ -43,6 +43,8 @@ static int dummy_write (jack_driver_t *drv,
 static int dummy_read (jack_driver_t *drv, jack_nframes_t nframes) { return 0; }
 static int dummy_null_cycle (jack_driver_t *drv,
 			     jack_nframes_t nframes) { return 0; }
+static int dummy_bufsize (jack_driver_t *drv,
+			  jack_nframes_t nframes) {return 0;}
 static int dummy_stop (jack_driver_t *drv) { return 0; }
 static int dummy_start (jack_driver_t *drv) { return 0; }
 
@@ -57,6 +59,7 @@ jack_driver_init (jack_driver_t *driver)
 	driver->write = dummy_write;
 	driver->read = dummy_read;
 	driver->null_cycle = dummy_null_cycle;
+	driver->bufsize = dummy_bufsize;
 	driver->start = dummy_start;
 	driver->stop = dummy_stop;
 }

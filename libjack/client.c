@@ -75,7 +75,7 @@ jack_set_server_dir (const char *path)
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
-void *jack_zero_filled_buffer = 0;
+void *jack_zero_filled_buffer = NULL;
 
 #define event_fd pollfd[0].fd
 #define graph_wait_fd pollfd[1].fd
@@ -138,22 +138,28 @@ jack_client_t *
 jack_client_alloc ()
 {
 	jack_client_t *client;
+	jack_port_type_id_t ptid;
 
 	client = (jack_client_t *) malloc (sizeof (jack_client_t));
 	client->pollfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 2);
 	client->pollmax = 2;
-
 	client->request_fd = -1;
 	client->event_fd = -1;
 	client->graph_wait_fd = -1;
 	client->graph_next_fd = -1;
-	client->port_segments = NULL;
 	client->ports = NULL;
 	client->engine = NULL;
 	client->control = 0;
 	client->thread_ok = FALSE;
 	client->first_active = TRUE;
 	client->on_shutdown = NULL;
+
+	client->n_port_types = 0;
+	for (ptid = 0; ptid < JACK_MAX_PORT_TYPES; ++ptid) {
+		client->port_segment[ptid].shm_name[0] = '\0';
+		client->port_segment[ptid].address = NULL;
+		client->port_segment[ptid].size = 0;
+	}
 
 	return client;
 }
@@ -455,6 +461,30 @@ jack_request_client (ClientType type, const char* client_name, const char* so_na
 	return -1;
 }
 
+void
+jack_attach_port_segment (jack_client_t *client, shm_name_t shm_name,
+			  jack_port_type_id_t ptid, jack_shmsize_t size)
+{
+	int shmid;
+	void *addr;
+
+	/* Lookup, attach and register the port/buffer segments in use
+	 * right now. */
+	if (client->control->type != ClientExternal) {
+		jack_error("Only external clients need attach port segments");
+		abort();
+	}
+
+	if ((addr = jack_get_shm (shm_name, size, O_RDWR, 0,
+				  (PROT_READ|PROT_WRITE),
+				  &shmid)) == MAP_FAILED) {
+		jack_error ("cannot attach port segment shared memory"
+			    " (%s)", strerror (errno));
+	}
+
+	jack_client_set_port_segment (client, shm_name, ptid, size, addr);
+}
+
 jack_client_t *
 jack_client_new (const char *client_name)
 {
@@ -463,9 +493,9 @@ jack_client_new (const char *client_name)
 	jack_client_connect_result_t  res;
 	jack_client_t *client;
 	void *addr;
-	int i;
 	int shmid;
 	jack_port_type_info_t* type_info;
+	jack_port_type_id_t ptid;
 
 	/* external clients need this initialized; internal clients
 	   will use the setup in the server's address space.
@@ -530,10 +560,11 @@ jack_client_new (const char *client_name)
 		goto fail;
 	}
 
-	for (i = 0; i < res.n_port_types; ++i) {
-		jack_client_handle_new_port_type (
-			client, type_info[i].shm_info.shm_name,
-			type_info[i].shm_info.size, 0);
+	client->n_port_types = res.n_port_types;
+	for (ptid = 0; ptid < res.n_port_types; ++ptid) {
+		jack_attach_port_segment (client,
+					  type_info[ptid].shm_info.shm_name,
+					  ptid, type_info[ptid].shm_info.size);
 	}
 
 	free (type_info);
@@ -620,44 +651,22 @@ jack_internal_client_close (const char *client_name)
 }
 
 void
-jack_client_handle_new_port_type (jack_client_t *client, shm_name_t shm_name,
-				  size_t size, void* addr)
+jack_client_set_port_segment (jack_client_t *client, shm_name_t shm_name,
+			      jack_port_type_id_t ptid, jack_shmsize_t size,
+			      void *addr)
 {
-	jack_port_segment_info_t *si;
-	int shmid;
+	client->port_segment[ptid].address = addr;
+	client->port_segment[ptid].size = size;
+	strncpy (client->port_segment[ptid].shm_name,
+		 shm_name, sizeof (shm_name_t));
 
-	/* Lookup, attach and register the port/buffer segments in use
-	 * right now. */
-	if (client->control->type == ClientExternal) {
-		
-		if ((addr = jack_get_shm(shm_name, size, O_RDWR, 0,
-					 (PROT_READ|PROT_WRITE),
-					 &shmid)) == MAP_FAILED) {
-			jack_error ("cannot attached port segment shared memory"
-				    " (%s)", strerror (errno));
-			return;
-		}
-
-	} else {
-
-		/* client is in same address space as server, so just
-		 * use `addr' directly */
+	/* The first chunk of the audio port segment will be set by
+	 * the engine to be a zero-filled buffer.  This hasn't been
+	 * done yet, but it will happen before the process cycle
+	 * (re)starts. */
+	if (ptid == JACK_AUDIO_PORT_TYPE) {
+		jack_zero_filled_buffer = client->port_segment[ptid].address;
 	}
-
-	si = (jack_port_segment_info_t *)
-		malloc (sizeof (jack_port_segment_info_t));
-	strcpy (si->shm_name, shm_name);
-	si->address = addr;
-	si->size = size;
-
-	/* the first chunk of the first port segment is always set by
-	 * the engine to be a conveniently-sized, zero-filled lump of
-	 * memory. */
-	if (client->port_segments == NULL) {
-		jack_zero_filled_buffer = si->address;
-	}
-
-	client->port_segments = jack_slist_prepend (client->port_segments, si);
 }
 
 static void *
@@ -680,6 +689,7 @@ jack_client_thread (void *arg)
 	pthread_mutex_unlock (&client_lock);
 
 	client->control->pid = getpid();
+	client->control->pgrp = getpgrp();
 
 	DEBUG ("client thread is now running");
 
@@ -790,10 +800,11 @@ jack_client_thread (void *arg)
 				}
 				break;
 
-			case NewPortType:
-				jack_client_handle_new_port_type (
-					client, event.x.shm_name,
-					event.z.size, event.y.addr);
+			case AttachPortSegment:
+				jack_attach_port_segment (client,
+							  event.x.shm_name,
+							  event.y.ptid,
+							  event.z.size);
 				break;
 			}
 
@@ -1275,6 +1286,7 @@ jack_client_close (jack_client_t *client)
 {
 	JSList *node;
 	void *status;
+	jack_port_type_id_t ptid;
 	
 	if (client->control->active) {
 		jack_deactivate (client);
@@ -1295,14 +1307,12 @@ jack_client_close (jack_client_t *client)
 		munmap ((char *) client->engine,
 			sizeof (jack_control_t));
 
-		for (node = client->port_segments; node;
-		     node = jack_slist_next (node)) {
-			jack_port_segment_info_t *si =
-				(jack_port_segment_info_t *) node->data;
-			munmap ((char *) si->address, si->size);
-			free (node->data);
+		for (ptid = 0; ptid < client->n_port_types; ++ptid) {
+			if (client->port_segment[ptid].size) {
+				munmap (client->port_segment[ptid].address,
+					client->port_segment[ptid].size);
+			}
 		}
-		jack_slist_free (client->port_segments);
 
 		if (client->graph_wait_fd) {
 			close (client->graph_wait_fd);
@@ -1335,6 +1345,17 @@ jack_nframes_t
 jack_get_buffer_size (jack_client_t *client)
 {
 	return client->engine->buffer_size;
+}
+
+int
+jack_set_buffer_size (jack_client_t *client, jack_nframes_t nframes)
+{
+	jack_request_t req;
+
+	req.type = SetBufferSize;
+	req.x.nframes = nframes;
+
+	return jack_client_deliver_request (client, &req);
 }
 
 int 

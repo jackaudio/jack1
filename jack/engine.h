@@ -31,6 +31,29 @@ struct _jack_driver;
 struct _jack_client_internal;
 struct _jack_port_internal;
 
+/* Structures is allocated by the engine in local memory to keep track
+ * of port buffers and connections. */
+typedef struct {
+    const char *shm_name;
+    jack_shmsize_t offset;
+} jack_port_buffer_info_t;
+
+typedef struct _jack_port_internal {
+    struct _jack_port_shared *shared;
+    JSList                   *connections;
+    jack_port_buffer_info_t  *buffer_info;
+} jack_port_internal_t;
+
+/* The engine's internal port type structure. */
+typedef struct _jack_port_type_internal {
+    pthread_mutex_t  buffer_lock;	/* only lock within server */
+    JSList	     *buffer_freelist;	/* list of free buffers */
+    void	     *buffer_info;	/* jack_buffer_info_t array */
+    void	     *seg_addr;		/* buffer segment address */
+} jack_port_type_internal_t;
+
+
+/* The main engine structure in local memory. */
 struct _jack_engine {
     jack_control_t        *control;
     struct _jack_driver   *driver;
@@ -45,20 +68,27 @@ struct _jack_engine {
 
     /* "private" sections starts here */
 
-    pthread_mutex_t client_lock;
+    /* engine serialization -- use precedence for deadlock avoidance */
     pthread_mutex_t port_lock;
-    pthread_mutex_t request_lock;
+    pthread_mutex_t request_lock;	/* precedes driver_lock */
+    pthread_mutex_t driver_lock;	/* precedes client_lock */
+    pthread_mutex_t client_lock;
     int process_errors;
     int period_msecs;
-    int client_timeout_msecs;  /* Time to wait for clients in msecs. Used when jackd is 
-				* run in non-ASIO mode and without realtime priority enabled.
-				*/
+    int client_timeout_msecs;  /* Time to wait for clients in
+				* msecs. Used when jackd is run in
+				* non-ASIO mode and without realtime
+				* priority enabled. */
+
+    /* internal port type info, indexed by the port type_id */
+    jack_port_type_internal_t port_type[JACK_MAX_PORT_TYPES];
+
     unsigned int port_max;
     shm_name_t control_shm_name;
     size_t     control_size;
-    shm_name_t port_segment_name; /* XXX fix me */
-    size_t port_segment_size; /* XXX fix me */
-    void *port_segment_address; /* XXX fix me */
+    shm_name_t port_segment_name;	/* XXX fix me */
+    size_t port_segment_size;		/* XXX fix me */
+    void *port_segment_address;		/* XXX fix me */
     pthread_t main_thread;
     pthread_t server_thread;
     

@@ -61,6 +61,8 @@ typedef int       (*JackDriverStartFunction)(struct _jack_driver *);
 typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *,
 						 int fd, int *status,
 						 float *delayed_usecs);
+typedef int	  (*JackDriverBufSizeFunction)(struct _jack_driver *,
+					       jack_nframes_t nframes);
 
 /* 
    Call sequence summary:
@@ -80,6 +82,12 @@ typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *,
 
      Note that stop/start may be called multiple times in the event of an
      error return from the `wait' function.
+
+     If a client requests a new buffer size...
+
+     1) engine stops driver
+     2) engine->bufsize()
+     3) engine starts driver again
 */
 
 
@@ -186,6 +194,11 @@ typedef struct _jack_driver {
    
     JackDriverStartFunction start;
 
+   The engine will call this to let the driver know that some client
+   has requested a new buffer size.  The stop function will be called
+   first, and the start function afterwards.
+
+    JackDriverBufSizeFunction bufsize;
 */
 
 /* define the fields here... */	
@@ -201,7 +214,8 @@ typedef struct _jack_driver {
     JackDriverWriteFunction write; \
     JackDriverNullCycleFunction null_cycle; \
     JackDriverStopFunction stop; \
-    JackDriverStartFunction start;
+    JackDriverStartFunction start; \
+    JackDriverBufSizeFunction bufsize;
 
     JACK_DRIVER_DECL			/* expand the macro */
 

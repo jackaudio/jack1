@@ -68,11 +68,6 @@ typedef struct _jack_request jack_request_t;
 
 typedef void * dlhandle;
 
-typedef struct {
-    const char *shm_name;
-    size_t offset;			/* JOQ: 32/64 problem? */
-} jack_port_buffer_info_t;
-
 typedef enum {
     TransportCommandNone = 0,
     TransportCommandStart = 1,
@@ -85,13 +80,6 @@ typedef struct {
     volatile jack_time_t stamp;
     volatile jack_time_t guard2;
 } jack_frame_timer_t;
-
-/* the relatively low value of this constant
- * reflects the fact that JACK currently only
- * knows about *1* port type.  (March 2003)
- */              
-
-#define JACK_MAX_PORT_TYPES 4
 
 /* JACK engine shared memory data structure. */
 typedef struct {
@@ -115,7 +103,7 @@ typedef struct {
     int32_t		  internal;
     jack_nframes_t        frames_at_cycle_start;
     pid_t                 engine_pid;
-    uint32_t		  buffer_size;
+    jack_nframes_t	  buffer_size;
     int8_t		  real_time;
     int32_t		  client_priority;
     int32_t		  has_capabilities;
@@ -131,7 +119,7 @@ typedef struct {
 typedef enum  {
   BufferSizeChange,
   SampleRateChange,
-  NewPortType,
+  AttachPortSegment,
   PortConnected,
   PortDisconnected,
   GraphReordered,
@@ -150,11 +138,11 @@ typedef struct {
     } x;
     union {
 	uint32_t n;
+	jack_port_type_id_t ptid;
 	jack_port_id_t other_id;
-	void* addr;			/* JOQ: 32/64 problem? */
     } y;
     union { 
-	size_t size;			/* JOQ: 32/64 problem? */
+	jack_shmsize_t size;
     } z;
 } jack_event_t;
 
@@ -187,6 +175,7 @@ typedef volatile struct {
     volatile int8_t     sync_poll : 1;    /* w: engine and client, r: engine */
     volatile int8_t     sync_new : 1;     /* w: engine and client, r: engine */
     volatile pid_t      pid;              /* w: client r: engine; client pid */
+    volatile pid_t      pgrp;             /* w: client r: engine; client pgrp */
     volatile uint64_t	signalled_at;
     volatile uint64_t	awake_at;
     volatile uint64_t	finished_at;
@@ -242,23 +231,20 @@ typedef struct {
     shm_name_t	client_shm_name;
     shm_name_t	control_shm_name;
 
-    int8_t	fifo_prefix[PATH_MAX+1];
+    char	fifo_prefix[PATH_MAX+1];
 
     int32_t	realtime;
     int32_t	realtime_priority;
 
     /* these two are valid only if the connect request
-       was for type == ClientDriver.
-    */
+       was for type == ClientDriver. */
+    jack_client_control_t *client_control; /* JOQ: 64/32 problem */
+    jack_control_t        *engine_control; /* JOQ: 64/32 problem */
 
-    jack_client_control_t *client_control;
-    jack_control_t        *engine_control;
-    size_t                 control_size; /* JOQ: 32/64 problem? */
+    jack_shmsize_t         control_size;
 
     /* when we write this response, we deliver n_port_types
-       of jack_port_type_info_t after it.
-    */
-
+       of jack_port_type_info_t after it. */
     uint32_t	n_port_types;
     
 #if defined(__APPLE__) && defined(__POWERPC__) 
@@ -292,6 +278,7 @@ typedef enum {
 	SetSyncClient = 13,
 	ResetSyncClient = 14,
 	SetSyncTimeout = 15,
+	SetBufferSize = 16,
 } RequestType;
 
 struct _jack_request {
@@ -301,9 +288,9 @@ struct _jack_request {
 	struct {
 	    char name[JACK_PORT_NAME_SIZE+1];
 	    char type[JACK_PORT_TYPE_SIZE+1];
-	    uint32_t flags;
-	    uint32_t buffer_size;
-	    jack_port_id_t port_id;
+	    uint32_t         flags;
+	    jack_shmsize_t   buffer_size;
+	    jack_port_id_t   port_id;
 	    jack_client_id_t client_id;
 	} port_info;
 	struct {
@@ -359,9 +346,9 @@ extern void jack_cleanup_files ();
 
 extern int  jack_client_handle_port_connection (jack_client_t *client,
 						jack_event_t *event);
-extern void jack_client_handle_new_port_type (jack_client_t *client,
-					      shm_name_t, size_t, void* addr);
-
+extern void jack_client_set_port_segment (jack_client_t *client, shm_name_t,
+					  jack_port_type_id_t ptid,
+					  jack_shmsize_t, void *addr);
 extern jack_client_t *jack_driver_client_new (jack_engine_t *,
 					      const char *client_name);
 jack_client_t *jack_client_alloc_internal (jack_client_control_t*,
@@ -373,6 +360,8 @@ void handle_internal_client_request (jack_control_t*, jack_request_t*);
 extern char *jack_server_dir;
 
 extern void jack_error (const char *fmt, ...);
+
+extern jack_port_functions_t jack_builtin_audio_functions;
 
 extern jack_port_type_info_t jack_builtin_port_types[];
 

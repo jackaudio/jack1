@@ -81,6 +81,21 @@ dummy_driver_null_cycle (dummy_driver_t* driver, jack_nframes_t nframes)
 }
 
 static int
+dummy_driver_bufsize (dummy_driver_t* driver, jack_nframes_t nframes)
+{
+  /* these are arbitrary size restrictions */
+  if ((nframes < 4) || (nframes > 65536))
+    return EINVAL;
+
+  driver->period_size = nframes;  
+  driver->period_usecs = driver->wait_time =
+    (jack_time_t) floor ((((float) nframes) / driver->sample_rate)
+			 * 1000000.0f);
+  driver->engine->set_buffer_size (driver->engine, nframes);
+  return 0;
+}
+
+static int
 dummy_driver_read (dummy_driver_t *driver, jack_nframes_t nframes)
 {
   return 0;
@@ -199,6 +214,7 @@ dummy_driver_new (jack_client_t * client,
   driver->read       = (JackDriverReadFunction)      dummy_driver_read;
   driver->write      = (JackDriverReadFunction)      dummy_driver_write;
   driver->null_cycle = (JackDriverNullCycleFunction) dummy_driver_null_cycle;
+  driver->bufsize    = (JackDriverBufSizeFunction)   dummy_driver_bufsize;
   driver->start      = (JackDriverStartFunction)     dummy_driver_audio_start;
   driver->stop       = (JackDriverStopFunction)      dummy_driver_audio_stop;
 

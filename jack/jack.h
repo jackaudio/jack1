@@ -87,44 +87,71 @@ int jack_is_realtime (jack_client_t *client);
  *
  * NOTE: clients do not need to call this.  It exists only
  * to help more complex clients understand what is going
- * on.  If called, it should be called before jack_client_activate().
+ * on.  It should be called before jack_client_activate().
  */
 void jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg);
 
 /**
- * Tell the Jack server to call 'process_callback' whenever there is work
- * be done, passing 'arg' as the second argument.
+ * Tell the Jack server to call @a process_callback whenever there is
+ * work be done, passing @a arg as the second argument.
  *
  * The code in the supplied function must be suitable for real-time
- * execution.  That means that it cannot call functions that might block for
- * a long time.  This includes malloc, free, printf, pthread_mutex_lock,
- * sleep, wait, poll, select, pthread_join, pthread_cond_wait, etc, etc. 
- * See
+ * execution.  That means that it cannot call functions that might
+ * block for a long time.  This includes malloc, free, printf,
+ * pthread_mutex_lock, sleep, wait, poll, select, pthread_join,
+ * pthread_cond_wait, etc, etc.  See
  * http://jackit.sourceforge.net/docs/design/design.html#SECTION00411000000000000000
  * for more information.
- * 
  *
  * @return 0 on success, otherwise a non-zero error code, causing JACK
  * to remove that client from the process() graph.
  */
-int jack_set_process_callback (jack_client_t *, JackProcessCallback process_callback, void *arg);
+int jack_set_process_callback (jack_client_t *client,
+			       JackProcessCallback process_callback,
+			       void *arg);
 
 /**
- * Tell the Jack server to call 'bufsize_callback' whenever the size of the
- * the buffer that will be passed to the process callback changes, 
- * passing 'arg' as the second argument.
+ * Change the buffer size passed to the @a process_callback.
+ *
+ * This operation stops the JACK engine process cycle, then calls all
+ * registered @a bufsize_callback functions before restarting the
+ * process cycle.  This will cause a gap in the audio flow, so it
+ * should only be done at appropriate stopping points.
+ *
+ * @see jack_set_buffer_size_callback()
+ *
+ * @param client pointer to JACK client structure.
+ * @param nframes new buffer size.  Must be a power of two.
  *
  * @return 0 on success, otherwise a non-zero error code
  */
-int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback bufsize_callback, void *arg);
+int jack_set_buffer_size (jack_client_t *client, jack_nframes_t nframes);
 
 /**
- * Tell the Jack server to call 'srate_callback' whenever the sample rate of
- * the system changes.
+ * Tell JACK to call @a bufsize_callback whenever the size of the the
+ * buffer that will be passed to the @a process_callback is about to
+ * change.  Clients that depend on knowing the buffer size must supply
+ * a @a bufsize_callback before activating themselves.
+ *
+ * @param client pointer to JACK client structure.
+ * @param bufsize_callback function to call when the buffer size changes.
+ * @param arg argument for @a bufsize_callback.
  *
  * @return 0 on success, otherwise a non-zero error code
  */
-int jack_set_sample_rate_callback (jack_client_t *, JackSampleRateCallback srate_callback, void *arg);
+int jack_set_buffer_size_callback (jack_client_t *client,
+				   JackBufferSizeCallback bufsize_callback,
+				   void *arg);
+
+/**
+ * Tell the Jack server to call @a srate_callback whenever the system
+ * sample rate changes.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+int jack_set_sample_rate_callback (jack_client_t *client,
+				   JackSampleRateCallback srate_callback,
+				   void *arg);
 
 /**
  * Tell the Jack server to call 'registration_callback' whenever a port is registered
@@ -185,16 +212,14 @@ int jack_deactivate (jack_client_t *client);
  * character.
  *
  * A port has a type, which may be any non-NULL and non-zero length
- * string, and is passed as the second argument. For types that are
- * not built into the jack API (currently just
- * JACK_DEFAULT_AUDIO_TYPE) the client MUST supply a non-zero size
- * for the buffer as for 'buffer_size' . For builtin types, 
- * 'buffer_size' is ignored.
+ * string, and is passed as the second argument.  Some port types are
+ * built into the JACK API (currently only JACK_DEFAULT_AUDIO_TYPE).
+ * For other types, the client must supply a non-zero @a buffer_size.
+ * For builtin types, @a buffer_size is ignored.
  *
- * The 'flags' argument is formed from a bitmask of JackPortFlags values.
+ * The @a flags argument is formed from a bitmask of JackPortFlags values.
  *
  * @return a valid jack_port_t* on success, NULL otherwise.
- * returns NULL.
  */
 jack_port_t *jack_port_register (jack_client_t *,
                                  const char *port_name,
@@ -478,11 +503,13 @@ int jack_port_disconnect (jack_client_t *, jack_port_t *);
 jack_nframes_t jack_get_sample_rate (jack_client_t *);
 
 /**
- * This returns the current maximum size that will
- * ever be passed to the "process" callback.  It should only
- * be used *before* the client has been activated.  After activation,
- * the client will be notified of buffer size changes if it
- * registers a buffer_size callback.
+ * This returns the current maximum size that will ever be passed to
+ * the @a process_callback.  It should only be used *before* the
+ * client has been activated.  This size may change, clients that
+ * depend on it must register a @a bufsize_callback so they will be
+ * notified if it does.
+ *
+ * @see jack_set_buffer_size_callback()
  */
 jack_nframes_t jack_get_buffer_size (jack_client_t *);
 

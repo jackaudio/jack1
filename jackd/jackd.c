@@ -179,15 +179,21 @@ jack_main (int argc, char **argv)
 	sigaddset(&signals, SIGHUP);
 	sigaddset(&signals, SIGINT);
 	sigaddset(&signals, SIGQUIT);
+	sigaddset(&signals, SIGPIPE);
+	sigaddset(&signals, SIGTERM);
+	sigaddset(&signals, SIGUSR1);
+
+#if 0				
+	/* POSIX defines these as "synchronous" signals, which must be
+	 * delivered to the offending thread.  I think it's a bad idea
+	 * to block them.  (JOQ) */
 	sigaddset(&signals, SIGILL);
 	sigaddset(&signals, SIGTRAP);
 	sigaddset(&signals, SIGABRT);
 	sigaddset(&signals, SIGIOT);
 	sigaddset(&signals, SIGFPE);
-	sigaddset(&signals, SIGPIPE);
-	sigaddset(&signals, SIGTERM);
-	sigaddset(&signals, SIGUSR1);
 	sigaddset(&signals, SIGSEGV);
+#endif
 
 	/* all child threads will inherit this mask unless they
 	 * explicitly reset it */
