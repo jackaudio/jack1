@@ -111,11 +111,11 @@ main (int argc, char *argv[])
 	   running.
 	*/
 
-	if (jack_connect (client, "alsa_pcm:in_1", jack_port_name (input_port))) {
+	if (jack_connect (client, "alsa_pcm:capture_1", jack_port_name (input_port))) {
 		fprintf (stderr, "cannot connect input ports\n");
 	}
 	
-	if (jack_connect (client, jack_port_name (output_port), "alsa_pcm:out_1")) {
+	if (jack_connect (client, jack_port_name (output_port), "alsa_pcm:playback_1")) {
 		fprintf (stderr, "cannot connect output ports\n");
 	}
 

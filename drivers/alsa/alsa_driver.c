@@ -1195,7 +1195,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 
 	for (chn = 0; chn < driver->capture_nchannels; chn++) {
 
-		snprintf (buf, sizeof(buf) - 1, "in_%lu", chn+1);
+		snprintf (buf, sizeof(buf) - 1, "capture_%lu", chn+1);
 
 		if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
 			jack_error ("ALSA: cannot register port for %s", buf);
@@ -1213,7 +1213,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 	port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
 
 	for (chn = 0; chn < driver->playback_nchannels; chn++) {
-		snprintf (buf, sizeof(buf) - 1, "out_%lu", chn+1);
+		snprintf (buf, sizeof(buf) - 1, "playback_%lu", chn+1);
 
 		if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
 			jack_error ("ALSA: cannot register port for %s", buf);

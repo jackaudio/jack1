@@ -17,12 +17,12 @@ main (int argc, char *argv[])
 		return 1;
 	}
 
-	if (jack_port_request_monitor_by_name (client, "alsa_pcm:in_1", TRUE)) {
-		fprintf (stderr, "could not enable monitoring for in_1\n");
+	if (jack_port_request_monitor_by_name (client, "alsa_pcm:capture_1", TRUE)) {
+		fprintf (stderr, "could not enable monitoring for capture_1\n");
 	}
 	sleep (30);
-	if (jack_port_request_monitor_by_name (client, "alsa_pcm:in_1", FALSE)) {
-		fprintf (stderr, "could not disable monitoring for in_1\n");
+	if (jack_port_request_monitor_by_name (client, "alsa_pcm:capture_1", FALSE)) {
+		fprintf (stderr, "could not disable monitoring for capture_1\n");
 	}
 	jack_client_close (client);
 	exit (0);
