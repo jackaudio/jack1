@@ -250,6 +250,7 @@ typedef volatile struct {
 
 typedef struct {
     
+    uint32_t	protocol_v;		/* protocol version, must go first */
     int32_t    load;
     ClientType type;
     jack_options_t options;
@@ -262,7 +263,6 @@ typedef struct {
 
 typedef struct {
 
-    uint32_t	protocol_v;
     jack_status_t status;
 
     jack_shm_info_t client_shm;

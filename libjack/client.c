@@ -600,6 +600,8 @@ jack_request_client (ClientType type,
 		*status |= JackServerStarted;
 	}
 
+	/* format connection request */
+	req.protocol_v = jack_protocol_version;
 	req.load = TRUE;
 	req.type = type;
 	snprintf (req.name, sizeof (req.name),
@@ -641,15 +643,12 @@ jack_request_client (ClientType type,
 	*status |= res->status;		/* return server status bits */
 
 	if (*status & JackFailure) {
-		jack_error ("could not attach as client");
+		if (*status & JackVersionError) {
+			jack_error ("client linked with incompatible libjack"
+				    " version.");
+		}
+		jack_error ("could not attach to JACK server");
 		*status |= JackServerError;
-		goto fail;
-	}
-
-	if (res->protocol_v != jack_protocol_version){
-		jack_error ("application linked against incompatible libjack"
-			    " version.");
-		*status |= (JackFailure|JackServerError);
 		goto fail;
 	}
 
@@ -788,6 +787,7 @@ jack_client_open (const char *client_name,
 	/* don't access shared memory until server connected */
 	if (jack_initialize_shm ()) {
 		jack_error ("Unable to initialize shared memory.");
+		*status |= (JackFailure|JackShmFailure);
 		return NULL;
 	}
 

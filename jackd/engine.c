@@ -1489,12 +1489,6 @@ jack_server_thread (void *arg)
 	return 0;
 }
 
-
-static void
-jack_engine_reset_frame_timer (jack_engine_t* engine)
-{
-}
-
 jack_engine_t *
 jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 		 const char *server_name, int temporary, int verbose,

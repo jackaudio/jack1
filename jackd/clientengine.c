@@ -650,10 +650,25 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 	jack_client_internal_t *client;
 	jack_client_connect_request_t req;
 	jack_client_connect_result_t res;
+	ssize_t nbytes;
 
 	res.status = 0;
 
-	if (read (client_fd, &req, sizeof (req)) != sizeof (req)) {
+	nbytes = read (client_fd, &req, sizeof (req));
+
+	if ((nbytes < sizeof (req.protocol_v))
+	    || (req.protocol_v != jack_protocol_version)) {
+
+		/* JACK protocol incompatibility */
+		res.status |= (JackFailure|JackVersionError);
+		jack_error ("JACK protocol mismatch");
+		if (write (client_fd, &res, sizeof (res)) != sizeof (res)) {
+			jack_error ("cannot write client connection response");
+		}
+		return -1;
+	}
+
+	if (nbytes != sizeof (req)) {
 		jack_error ("cannot read connection request from client");
 		return -1;
 	}
@@ -680,7 +695,6 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 		res.status |= JackFailure; /* just making sure */
 		return -1;
 	}
-	res.protocol_v = jack_protocol_version;
 	res.client_shm = client->control_shm;
 	res.engine_shm = engine->control_shm;
 	res.realtime = engine->control->real_time;
@@ -699,7 +713,7 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 		strcpy (res.fifo_prefix, engine->fifo_prefix);
 	}
 
-	if (write (client->request_fd, &res, sizeof (res)) != sizeof (res)) {
+	if (write (client_fd, &res, sizeof (res)) != sizeof (res)) {
 		jack_error ("cannot write connection response to client");
 		jack_client_delete (engine, client);
 		return -1;

@@ -351,7 +351,17 @@ enum JackStatus {
      /**
       * Unable to initialize client
       */
-     JackInitFailure = 0x100
+     JackInitFailure = 0x100,
+
+     /**
+      * Unable to access shared memory
+      */
+     JackShmFailure = 0x200,
+
+     /**
+      * Client's protocol version does not match
+      */
+     JackVersionError = 0x400
 };
 
 /**
