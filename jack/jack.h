@@ -709,7 +709,7 @@ jack_port_t *jack_port_by_name (jack_client_t *, const char *port_name);
 /**
  * @return address of the jack_port_t of a @a port_id.
  */
-jack_port_t *jack_port_by_id (const jack_client_t *client,
+jack_port_t *jack_port_by_id (jack_client_t *client,
 			      jack_port_id_t port_id);
 
 /**

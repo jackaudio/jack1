@@ -339,10 +339,10 @@ jack_port_by_id_int (const jack_client_t *client, jack_port_id_t id, int* free)
 }
 
 jack_port_t *
-jack_port_by_id (const jack_client_t *client, jack_port_id_t id)
+jack_port_by_id (jack_client_t *client, jack_port_id_t id)
 {
 	int need_free = FALSE;
-	jack_port_t * port = jack_port_by_id_int (client,id,&need_free);
+	jack_port_t *port = jack_port_by_id_int (client,id,&need_free);
 	if (port != NULL && need_free)
 		client->ports_ext =
 			jack_slist_prepend (client->ports_ext, port);
