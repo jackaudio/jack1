@@ -5,7 +5,7 @@ AC_CONFIG_AUX_DIR(.)
 
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=3
-JACK_MICRO_VERSION=2
+JACK_MICRO_VERSION=3
 
 BETA=
 
@@ -22,8 +22,6 @@ AC_SUBST(JACK_VERSION)
 AC_SUBST(JACK_RELEASE)
 
 AM_INIT_AUTOMAKE(jack,${JACK_VERSION})
-
-AM_PATH_GLIB(1.0.0,,[AC_MSG_ERROR([*** JACK requires glib, but it does not appear to be installed])])
 
 JACK_CFLAGS="-g -Wall -D_REENTRANT"
 JACK_OPT_CFLAGS="-D_REENTRANT -O6 -Wall -fomit-frame-pointer -ffast-math -fstrength-reduce -funroll-loops -fmove-all-movables"
@@ -45,6 +43,13 @@ if test "x$enable_fltk_client" != "xno" ; then
          [ AC_MSG_ERROR([*** you cannot build the FLTK client without the FLTK library])],
          [ -L/usr/X11R6/lib -lX11 -lXext ])
 fi	    
+
+AM_PATH_GLIB(1.0.0,,[AC_MSG_ERROR([*** JACK requires glib, but it does not appear to be installed])])
+
+AC_CHECK_LIB(asound,snd_pcm_drop,
+	     [:],
+             [AC_MSG_ERROR([*** JACK currently requires ALSA (0.9.X) which you don't appear to have])]
+)
 
 AC_CHECK_LIB(sndfile,main,
 	     [ XTRA="$XTRA jackrec" ],
