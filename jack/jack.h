@@ -217,10 +217,6 @@ jack_port_t **jack_get_ports (jack_client_t *,
 int  jack_engine_takeover_timebase (jack_client_t *);
 void jack_update_time (jack_client_t *, nframes_t);
 
-/* useful access functions */
-
-static __inline__ const char * jack_port_name (jack_port_t *port) { return port->shared->name; }
-
 #ifdef __cplusplus
 }
 #endif
