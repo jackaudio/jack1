@@ -77,10 +77,7 @@ typedef struct {
     float                         max_sample_val;
     unsigned long                 user_nperiods;
     unsigned long                 nfragments;
-    int                           max_level;
-    int                           min_level;
     unsigned long                 last_mask;
-    unsigned long                 silence_pending;
     snd_ctl_t                    *ctl_handle;
     snd_pcm_t                    *playback_handle;
     snd_pcm_t                    *capture_handle;
@@ -147,11 +144,10 @@ static __inline__ void alsa_driver_silence_on_channel_no_mark (alsa_driver_t *dr
 
 static __inline__ void alsa_driver_read_from_channel (alsa_driver_t *driver, 
 					   channel_t channel, sample_t *buf, 
-					   nframes_t nsamples,
-					   unsigned long offset) 
+					   nframes_t nsamples)
 {
 	driver->read_via_copy (buf, 
-			       driver->capture_addr[channel] + offset,
+			       driver->capture_addr[channel],
 			       nsamples, 
 			       driver->capture_interleave_skip);
 }
@@ -160,10 +156,9 @@ static __inline__ void alsa_driver_write_to_channel (alsa_driver_t *driver,
 				   channel_t channel, 
 				   sample_t *buf, 
 				   nframes_t nsamples, 
-				   unsigned long offset, 
 				   gain_t gain) 
 {
-	driver->write_via_copy (driver->playback_addr[channel] + offset,
+	driver->write_via_copy (driver->playback_addr[channel],
 				buf, 
 				nsamples, 
 				driver->playback_interleave_skip, 

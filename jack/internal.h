@@ -191,11 +191,10 @@ typedef enum {
 	ConnectPorts = 3,
 	DisconnectPorts = 4, 
 	SetTimeBaseClient = 5,
-	DropClient = 6,
-	ActivateClient = 7,
-	DeactivateClient = 8,
-	GetPortTotalLatency = 9,
-	DisconnectPort = 10
+	ActivateClient = 6,
+	DeactivateClient = 7,
+	GetPortTotalLatency = 8,
+	DisconnectPort = 9
 } AudioEngineRequestType;
 
 typedef struct {

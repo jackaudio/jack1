@@ -95,6 +95,7 @@ struct _jack_port {
 typedef struct _jack_port_internal {
     struct _jack_port_shared *shared;
     GSList                   *connections;
+    void                     *buffer_info;
 } jack_port_internal_t;
 
 #endif /* __jack_port_h__ */

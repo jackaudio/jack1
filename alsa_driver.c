@@ -35,8 +35,8 @@
 #include <jack/hammerfall.h>
 #include <jack/generic.h>
 
-static int  config_max_level = 0;
-static int  config_min_level = 0;
+FILE *alog;
+static sample_t gbuf[4096];
 
 static void
 alsa_driver_release_channel_dependent_memory (alsa_driver_t *driver)
@@ -364,35 +364,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 
 	switch (driver->sample_format) {
 	case SND_PCM_FORMAT_S32_LE:
-
-		/* XXX must handle the n-bits of 24-in-32 problems here */
-
-		if (config_max_level) {
-			driver->max_level = config_max_level;
-		} else {
-			driver->max_level = INT_MAX;
-		}
-
-		if (config_min_level) {
-			driver->min_level = config_min_level;
-		} else {
-			driver->min_level = INT_MIN;
-		}
-		break;
-
 	case SND_PCM_FORMAT_S16_LE:
-
-		if (config_max_level) {
-			driver->max_level = config_max_level;
-		} else {
-			driver->max_level = SHRT_MAX;
-		}
-
-		if (config_min_level) {
-			driver->min_level = config_min_level;
-		} else {
-			driver->min_level = SHRT_MIN;
-		}
 		break;
 
 	default:
@@ -679,6 +651,8 @@ alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn, ClockSy
 }
 
 static int under_gdb = FALSE;
+static int waitcnt = 0;
+
 
 static int
 alsa_driver_wait (alsa_driver_t *driver)
@@ -697,9 +671,11 @@ alsa_driver_wait (alsa_driver_t *driver)
 	int need_playback = 1;
 	jack_engine_t *engine = driver->engine;
 	int i;
+	static unsigned long long last = 0;
+	unsigned long long start;
 
   again:
-
+	
 	while (need_playback || need_capture) {
 
 		int p_timed_out, c_timed_out;
@@ -739,6 +715,10 @@ alsa_driver_wait (alsa_driver_t *driver)
 			jack_error ("ALSA::Device: poll call failed (%s)", strerror (errno));
 			return -1;
 		}
+
+		rdtscll (start);
+		// fprintf (stderr, "engine cycle %.6f msecs\n", (((float) (start - last))/450000.0f));
+		last = start;
 
 		if (driver->engine) {
 			struct timeval tv;
@@ -822,7 +802,9 @@ alsa_driver_wait (alsa_driver_t *driver)
 	avail = avail - (avail % driver->frames_per_cycle);
 
 	while (avail) {
-		
+
+		waitcnt++;
+
 		capture_avail = (avail > driver->frames_per_cycle) ? driver->frames_per_cycle : avail;
 		playback_avail = (avail > driver->frames_per_cycle) ? driver->frames_per_cycle : avail;
 		
@@ -835,45 +817,72 @@ alsa_driver_wait (alsa_driver_t *driver)
 
 		contiguous = capture_avail < playback_avail ? capture_avail : playback_avail;
 
-		/* XXX possible race condition here with silence_pending */
-		
-		/* XXX this design is wrong. cf. ardour/audioengine *** FIX ME *** */
-
-		if (driver->silence_pending) {
-			for (chn = 0; chn < driver->playback_nchannels; chn++) {
-				if (driver->silence_pending & (1<<chn)) {
-					alsa_driver_silence_on_channel (driver, chn, contiguous);
-				}
-			}
-			driver->silence_pending = 0;
-		}
-
 		driver->channels_not_done = driver->channel_done_bits;
 
 		if (engine->process_lock (engine) == 0) {
-			
-			if (engine->process (engine, contiguous)) {
-				jack_error ("alsa_pcm: engine processing error - stopping.");
-				return -1;
+			int ret;
+			GSList *prev;
+
+			if ((ret = engine->process (engine, contiguous)) != 0) {
+				engine->process_unlock (engine);
+				alsa_driver_audio_stop (driver);
+				if (ret > 0) {
+					engine->post_process (engine);
+				}
+				return ret;
 			}
-			
+
 			/* now move data from ports to channels */
 			
-			for (chn = 0, node = driver->playback_ports; node; node = g_slist_next (node), chn++) {
+			for (chn = 0, prev = 0, node = driver->playback_ports; node; prev = node, node = g_slist_next (node), chn++) {
 				
 				jack_port_t *port = (jack_port_t *) node->data;
-				
+				sample_t *buf;
+
 				/* optimize needless data copying away */
 				
-				if (!jack_port_connected (port)) {
+				if (chn == 1) {
+					nframes_t nn;
+					sample_t *prevbuf;
+
+					/* 1 read the actual data from channel 0 */
+					
+					alsa_driver_read_from_channel (driver, 0, gbuf, contiguous);
+					buf = gbuf;
+
+					if (jack_port_connected ((jack_port_t *) prev->data)) {
+						prevbuf = jack_port_get_buffer (((jack_port_t *) prev->data), contiguous);
+						printf ("compare with %p\n", prevbuf);
+						
+						for (nn = 0; nn < contiguous; nn++) {
+							if (gbuf[nn] != prevbuf[nn]) {
+								printf ("%d different at %lu (chn=%d, gbuf=%f, prevbuf=%f\n",
+									waitcnt, nn, driver->capture_addr[0][nn],
+									gbuf[nn], prevbuf[nn]);
+								break;
+							}
+						}
+					}
+
+				} else if (chn == 0) {
+
+					if (jack_port_connected (port)) {
+						buf = jack_port_get_buffer (port, contiguous);
+						printf ("%d buffer = %p\n", waitcnt, buf);
+					} else {
+						continue;
+					}
+
+				} else {
 					continue;
 				}
-				
-				alsa_driver_write_to_channel (driver, chn, jack_port_get_buffer (port, contiguous), contiguous, 0, 1.0);
+
+				alsa_driver_write_to_channel (driver, chn, buf, contiguous, 1.0);
+
 			}
 			
 			engine->process_unlock (engine);
-		}
+		} 
 
 		/* Now handle input monitoring */
 		
@@ -917,10 +926,6 @@ alsa_driver_wait (alsa_driver_t *driver)
 	}
 	
 	engine->post_process (engine);
-	
-//	rdtscl (now);
-//	fprintf (stderr, "engine cycle took %.6f usecs\n", (((float) (now - start))/450.0f));
-
 	return 0;
 }
 
@@ -932,6 +937,7 @@ alsa_driver_process (nframes_t nframes, void *arg)
 	channel_t chn;
 	jack_port_t *port;
 	GSList *node;
+	sample_t *buf;
 
 	for (chn = 0, node = driver->capture_ports; node; node = g_slist_next (node), chn++) {
 
@@ -940,8 +946,11 @@ alsa_driver_process (nframes_t nframes, void *arg)
 		if (!jack_port_connected (port)) {
 			continue;
 		}
-
-		alsa_driver_read_from_channel (driver, chn, jack_port_get_buffer (port, nframes), nframes, 0);
+		
+		buf = jack_port_get_buffer (port, nframes);
+		
+		alsa_driver_read_from_channel (driver, chn, buf, nframes);
+		printf ("%d: read into %p with %d => %f\n", waitcnt, buf, driver->capture_addr[0][0], buf[0]);
 	}
 
 	return 0;
@@ -1042,12 +1051,6 @@ alsa_driver_change_sample_clock (alsa_driver_t *driver, SampleClockMode mode)
 
 {
 	return driver->hw->change_sample_clock (driver->hw, mode);
-}
-
-static void
-alsa_driver_mark_channel_silent (alsa_driver_t *driver, unsigned long chn)
-{
-	driver->silence_pending |= (1<<chn);
 }
 
 static void
@@ -1181,7 +1184,6 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->capture_nchannels = 0;
 	driver->playback_addr = 0;
 	driver->capture_addr = 0;
-	driver->silence_pending = 0;
 	driver->silent = 0;
 	driver->all_monitor_in = FALSE;
 
@@ -1207,12 +1209,15 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->alsa_name = strdup (alsa_device);
 
 	if ((err = snd_pcm_open (&driver->capture_handle, alsa_device, SND_PCM_STREAM_CAPTURE, 0)) < 0) {
+		snd_pcm_close (driver->playback_handle);
 		jack_error ("ALSA: Cannot open PCM device %s", name);
 		free (driver);
 		return 0;
 	}
 
 	if (alsa_driver_check_card_type (driver)) {
+		snd_pcm_close (driver->capture_handle);
+		snd_pcm_close (driver->playback_handle);
 		free (driver);
 		return 0;
 	}
@@ -1324,6 +1329,8 @@ driver_initialize (va_list ap)
 	unsigned long user_nperiods;
 	char *pcm_name;
 	int hw_monitoring;
+
+	alog = fopen ("/dev/null", "w");
 
 	pcm_name = va_arg (ap, char *);
 	frames_per_interrupt = va_arg (ap, nframes_t);

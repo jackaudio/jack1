@@ -565,7 +565,6 @@ jack_client_thread (void *arg)
 				err++;
 				break;
 			}
-
 		}
 
 		if (client->pollfd[1].revents & POLLIN) {
@@ -583,12 +582,10 @@ jack_client_thread (void *arg)
 			control->state = Running;
 
 			if (control->process) {
-				status = control->process (control->nframes, control->process_arg);
+				if (control->process (control->nframes, control->process_arg) == 0) {
+					control->state = Finished;
+				}
 			} else {
-				status = 0;
-			}
-					
-			if (!status) {
 				control->state = Finished;
 			}
 
@@ -725,11 +722,7 @@ jack_client_close (jack_client_t *client)
 
 {
 	GSList *node;
-	jack_request_t req;
 	void *status;
-
-	req.type = DropClient;
-	req.x.client_id = client->control->id;
 
 	/* stop the thread that communicates with the jack server */
 
@@ -758,18 +751,13 @@ jack_client_close (jack_client_t *client)
 		close (client->graph_next_fd);
 	}
 
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send drop client request to server");
-		req.status = -1;
-	} 
-
 	close (client->event_fd);
 	close (client->request_fd);
 
 	free (client->pollfd);
 	free (client);
 
-	return req.status;
+	return 0;
 }	
 
 int
@@ -1221,8 +1209,7 @@ jack_port_get_buffer (jack_port_t *port, nframes_t nframes)
 	}
 
 	port->shared->type_info.mixdown (port, nframes);
-
-	return jack_port_buffer (port);
+	return (sample_t *) port->shared->offset;
 }
 
 int
@@ -1393,6 +1380,8 @@ jack_port_request_monitor (jack_port_t *port, int onoff)
 int
 jack_ensure_port_monitor_input (jack_port_t *port, int yn)
 {
+	printf ("ENSURE PORT monitor, req = %d, status = %d\n", yn, port->shared->monitor_requests);
+	
 	if (yn) {
 		if (port->shared->monitor_requests == 0) {
 			port->shared->monitor_requests++;
@@ -1569,6 +1558,8 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 	nframes_t n;
 	sample_t *buffer;
 	sample_t *dst, *src;
+
+	printf ("audio mixdown on %s\n", port->shared->name);
 
 	/* by the time we've called this, we've already established
 	   the existence of more than 1 connection to this input port.

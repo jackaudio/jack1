@@ -3,6 +3,8 @@
 #include <unistd.h>
 
 #include <jack/jack.h>
+#include <glib.h>
+#include <jack/port.h>
 
 jack_port_t *input_port;
 jack_port_t *output_port;
@@ -15,7 +17,6 @@ process (nframes_t nframes, void *arg)
 	sample_t *in = (sample_t *) jack_port_get_buffer (input_port, nframes);
 
 	memcpy (out, in, sizeof (sample_t) * nframes);
-
 	return 0;      
 }
 
@@ -119,7 +120,7 @@ main (int argc, char *argv[])
 
 	/* Since this is just a toy, run for 5 seconds, then finish */
 
-	sleep (5);
+	sleep (2);
 	jack_client_close (client);
 	exit (0);
 }

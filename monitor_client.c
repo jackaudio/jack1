@@ -20,7 +20,7 @@ main (int argc, char *argv[])
 	if (jack_port_request_monitor_by_name (client, "alsa_pcm:in_1", TRUE)) {
 		fprintf (stderr, "could not enable monitoring for in_1\n");
 	}
-	sleep (10);
+	sleep (30);
 	if (jack_port_request_monitor_by_name (client, "alsa_pcm:in_1", FALSE)) {
 		fprintf (stderr, "could not disable monitoring for in_1\n");
 	}
