@@ -762,7 +762,7 @@ jack_load_client (jack_engine_t *engine, jack_client_internal_t *client, const c
 		return -1;
 	}
 
-	client->finish = (void (*)(void)) dlsym (client->handle, "jack_finish");
+	client->finish = (void (*)(void *)) dlsym (client->handle, "jack_finish");
 	
 	if ((errstr = dlerror ()) != 0) {
 		jack_error ("no finish function in in shared object %s", so_name);
