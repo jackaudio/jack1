@@ -78,7 +78,8 @@ Provide only capture ports.  Optionally set device name.
 .TP
 \fB\-d, \-\-device \fIname\fR
 .br
-The ALSA pcm device \fIname\fR to use ("hw:0" if none specified).
+The ALSA pcm device \fIname\fR to use.  If none is specified, JACK will
+use "hw:0", the first hardware card defined in \fB/etc/modules.conf\fR.
 .TP
 \fB\-z, --dither [rectangular,triangular,shaped,none]
 Set dithering mode.  If \fBnone\fR or unspecified, dithering is off.
@@ -171,15 +172,16 @@ a kernel with capabilities enabled.
 .IP 
 \fBjackstart \-\-realtime \-\-driver=alsa\fR
 .PP
-Run the JACK daemon with low latency.  A reasonably well-tuned
-current-generation system with a decent sound card and a low-latency
-kernel with capabilities enabled can handle these values reliably.
-Some can do better.  If you get xrun messages, try a larger buffer.
-Tuning a system for low latency is challenging.  The JACK FAQ,
-<\fBhttp://jackit.sourceforge.net/docs/faq.php\fR> has some useful
-suggestions.
+Run the JACK daemon with low latency giving verbose output, which can
+be helpful for trouble-shooting system latency problems.  A reasonably
+well-tuned current-generation system with a decent sound card and a
+low-latency kernel with capabilities enabled can handle these values
+reliably.  Some can do better.  If you get xrun messages, try a larger
+buffer.  Tuning a system for low latency is challenging.  The JACK
+FAQ, <\fBhttp://jackit.sourceforge.net/docs/faq.php\fR> has some
+useful suggestions.
 .IP 
-\fBjackstart \-R \-d alsa \-p 128 \-n 3 \-r 44100\fR
+\fBjackstart \-Rv \-d alsa \-p 128 \-n 3 \-r 44100\fR
 .PP
 Run \fBjackd\fR with realtime priority using the "sblive" ALSA device
 defined in ~/.asoundrc.  Apply shaped dithering to playback audio.

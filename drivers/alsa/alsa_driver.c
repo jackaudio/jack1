@@ -1007,7 +1007,6 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver)
 	}
 
 	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_XRUN
-	    && driver->xrun_count == 0
 	    && driver->process_count > XRUN_REPORT_DELAY) {
 		struct timeval now, diff, tstamp;
 		driver->xrun_count++;
