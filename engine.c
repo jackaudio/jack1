@@ -41,7 +41,6 @@
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <jack/driver.h>
-#include <jack/util.h>
 
 #define MAX_SHM_ID 256 /* likely use is more like 16 */
 

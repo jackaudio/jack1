@@ -35,7 +35,6 @@
 #include <jack/engine.h>
 #include <jack/hammerfall.h>
 #include <jack/generic.h>
-#include <jack/util.h>
 
 extern void store_work_time (int);
 extern void store_wait_time (int);
