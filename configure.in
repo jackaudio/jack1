@@ -209,14 +209,13 @@ dnl
 
 CFLAGS=$JACK_CFLAGS
 
+# allow buffer resizing unless --disable-resize specified
 AC_ARG_ENABLE(resize,
 	AC_HELP_STRING([--enable-resize], [enable buffer resizing]),
-        [ 
-	  if test x$enable_resize != xno ; then
-	  	AC_DEFINE(DO_BUFFER_RESIZE,,[Enable buffer resizing])
-	  fi
-        ]
-)		
+        [], enable_resize=yes)
+if test x$enable_resize != xno ; then
+  	AC_DEFINE(DO_BUFFER_RESIZE,,[Enable buffer resizing])
+fi
 
 AC_ARG_ENABLE(ensure-mlock,
 	AC_HELP_STRING([--enable-ensure-mlock],
