@@ -31,6 +31,7 @@
 	22-03-04 : Remove jack_init_time, rename input and ouput ports using "capture" and "playback" 
     10-11-04 : S. Letz: Add management of -I option for use with JackPilot.
 	17-11-04 : S. Letz: Better debug code.
+	03-02-05 : S. Letz: fix several driver detection bugs on OSX.
 
 */
 
@@ -47,10 +48,10 @@
 
 #include <CoreAudio/CoreAudio.h>
 
-static OSStatus GetDeviceNameFromID(AudioDeviceID id, char name[60])
+static OSStatus get_device_name_from_id(AudioDeviceID id, char name[60])
 {
     UInt32 size = sizeof(char) * 60;
-    OSStatus stat = AudioDeviceGetProperty(id, 0, false,
+	OSStatus stat = AudioDeviceGetProperty(id, 0, false,
 					   kAudioDevicePropertyDeviceName,
 					   &size,
 					   &name[0]);
@@ -250,8 +251,6 @@ portaudio_driver_write (portaudio_driver_t *driver, jack_nframes_t nframes)
 					float* out = driver->outPortAudio;
 					buf = jack_port_get_buffer (port, nframes);
 					for (i = 0; i< nframes; i++) out[channels*i+chn] = buf[i];
-					/* clear to avoid playing dirty buffers when the client does not produce output anymore */
-					memset(buf, 0, bytes);
 			}
 	}
 	
@@ -445,9 +444,8 @@ static int portaudio_load_driver (portaudio_driver_t *driver,
         pdi = Pa_GetDeviceInfo(i);
         PALog("---------------------------------------------- #%d\n", i);
         
-        //if (strcmp(driver_name,pdi->name) == 0) {
-	// compare the first character
-	if (strncmp (driver_name, pdi->name,
+		// compare the first character
+		if (strncmp (driver_name, pdi->name,
 		     JACK_DRIVER_PARAM_STRING_MAX) == 0) {
 		if (pdi->maxInputChannels > 0) {
 			*inputDeviceID = i;
@@ -548,25 +546,21 @@ portaudio_driver_new (char *name,
 	driver->stream = NULL;
 
 #ifdef JACK_USE_MACH_THREADS	
-	char deviceName[60];
-    bzero(&deviceName[0], sizeof(char) * 60);
-
     if (!driver_name) {
-		if (GetDeviceNameFromID(deviceID, deviceName) != noErr)
+		if (get_device_name_from_id(deviceID, driver->driver_name) != noErr)
 			goto error;
     } else {
-		strcpy(&deviceName[0], driver_name);
+		strcpy(driver->driver_name, driver_name);
     }
 #endif
        
 	err = Pa_Initialize();
 	PALog("Pa_Initialize OK \n");
 	
-	PALog("Driver name required %s\n",driver_name);
+	PALog("Driver name required %s\n",driver->driver_name);
 	numDevices = Pa_CountDevices();
 	
-	if( numDevices < 0 )
-	{
+	if( numDevices < 0 ){
 		PALog("ERROR: Pa_CountDevices returned 0x%x\n", numDevices);
 		err = numDevices;
 		goto error;
@@ -574,7 +568,7 @@ portaudio_driver_new (char *name,
 	
 	PALog("Number of devices = %d\n", numDevices);
 
-	if (strcmp(driver_name,"") == 0) {
+	if (strcmp(driver->driver_name,"") == 0) {
 		found = portaudio_load_default(driver,numDevices,capturing,playing,&inputDeviceID,&outputDeviceID);
 		if (!found) {
 			PALog("ERROR : default driver has not been found\n");
@@ -582,9 +576,9 @@ portaudio_driver_new (char *name,
 			goto error;
 		}
 	}else{
-		found = portaudio_load_driver(driver,numDevices,capturing,playing,&inputDeviceID,&outputDeviceID,driver_name);
+		found = portaudio_load_driver(driver,numDevices,capturing,playing,&inputDeviceID,&outputDeviceID,driver->driver_name);
 		if (!found) {
-			 PALog("ERROR : driver %s has not been found \n",driver_name);
+			 PALog("ERROR : driver %s has not been found \n",driver->driver_name);
 			 err = paHostError;
 			 goto error;
 		}
@@ -783,7 +777,11 @@ driver_initialize (jack_client_t *client, const JSList * params)
 	DitherAlgorithm dither = None;
 	const JSList * node;
 	const jack_driver_param_t * param;
-	char *name = "";
+	char *name = NULL;
+
+#ifdef JACK_USE_MACH_THREADS	
+	get_device_id_from_num(0,&deviceID); // takes a default value (first device)
+#endif
 	
 	for (node = params; node; node = jack_slist_next (node)) {
 		param = (const jack_driver_param_t *) node->data;
