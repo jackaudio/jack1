@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <dirent.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <config.h>
@@ -105,11 +106,45 @@ jack_initialize_shm ()
 void
 jack_cleanup_shm ()
 {
+#if ! USE_POSIX_SHM
+	char path[PATH_MAX+1];
+	DIR *dir;
+	struct dirent *dirent;
+#endif
 	int i;
 
 	for (i = 0; i < jack_shm_id_cnt; i++) {
 		jack_destroy_shm (jack_shm_registry[i].name);
 	}
+#if ! USE_POSIX_SHM
+
+	snprintf (path, sizeof(path), "%s/jack/shm", jack_server_dir);
+	if ((dir = opendir (path)) == NULL) {
+		if (errno != ENOENT) {
+		        jack_error ("cannot open jack shm directory (%s)", strerror (errno));
+		}
+	} else {
+		while ((dirent = readdir (dir)) != NULL) {
+			char fullpath[PATH_MAX+1];
+			snprintf (fullpath, sizeof (fullpath), "%s/jack/shm/%s", jack_server_dir, dirent->d_name);
+			unlink (fullpath);
+		}
+	}
+	closedir (dir);
+
+	snprintf (path, sizeof(path), "%s/jack/shm", jack_server_dir);
+	if (rmdir (path)) {
+		if (errno != ENOENT) {
+		        jack_error ("cannot remove JACK shm directory (%s)", strerror (errno));
+		}
+	}
+	snprintf (path, sizeof(path), "%s/jack", jack_server_dir);
+	if (rmdir (path)) {
+		if (errno != ENOENT) {
+			jack_error ("cannot remove JACK directory (%s)", strerror (errno));
+		}
+	}
+#endif
 }
 
 #if USE_POSIX_SHM
