@@ -17,9 +17,9 @@ main (int argc, char *argv[])
 		return 1;
 	}
 
-	jack_port_request_monitor (client, "ALSA I/O:Input 1", TRUE);
+	jack_port_request_monitor (client, "alsa_pcm:in_1", TRUE);
 	sleep (10);
-	jack_port_request_monitor (client, "ALSA I/O:Input 1", FALSE);
+	jack_port_request_monitor (client, "alsa_pcm:in_1", FALSE);
 	jack_client_close (client);
 	exit (0);
 }

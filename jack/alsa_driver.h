@@ -21,7 +21,7 @@
 #ifndef __jack_alsa_driver_h__
 #define __jack_alsa_driver_h__
 
-#include <sys/asoundlib.h>
+#include <alsa/asoundlib.h>
 
 #include <jack/types.h>
 #include <jack/hardware.h>

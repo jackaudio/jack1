@@ -219,7 +219,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 		}
 	}
 
-	if ((err = snd_pcm_hw_params_set_rate (handle, hw_params, driver->frame_rate, 0)) < 0) {
+	if ((err = snd_pcm_hw_params_set_rate_near (handle, hw_params, driver->frame_rate, 0)) < 0) {
 		jack_error ("ALSA: cannot set sample/frame rate to %u for %s", driver->frame_rate, stream_name);
 		return -1;
 	}
@@ -984,7 +984,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 
 	/* Now become a client of the engine */
 
-	if ((driver->client = jack_driver_become_client ("ALSA I/O")) == NULL) {
+	if ((driver->client = jack_driver_become_client ("alsa_pcm")) == NULL) {
 		jack_error ("ALSA: cannot become client");
 		return;
 	}
@@ -993,7 +993,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 	jack_set_port_monitor_callback (driver->client, alsa_driver_port_monitor_handler, driver);
 
 	for (chn = 0; chn < driver->capture_nchannels; chn++) {
-		snprintf (buf, sizeof(buf) - 1, "Input %lu", chn+1);
+		snprintf (buf, sizeof(buf) - 1, "in_%lu", chn+1);
 		port = jack_port_register (driver->client, buf, 
 					   JACK_DEFAULT_AUDIO_TYPE,
 					   JackPortIsOutput|JackPortIsPhysical|JackPortCanMonitor, 0);
@@ -1005,7 +1005,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 	}
 
 	for (chn = 0; chn < driver->playback_nchannels; chn++) {
-		snprintf (buf, sizeof(buf) - 1, "Output %lu", chn+1);
+		snprintf (buf, sizeof(buf) - 1, "out_%lu", chn+1);
 		port = jack_port_register (driver->client, buf, 
 					    JACK_DEFAULT_AUDIO_TYPE,
 					    JackPortIsInput|JackPortIsPhysical, 0);
@@ -1328,7 +1328,7 @@ driver_initialize (va_list ap)
 	frames_per_interrupt = va_arg (ap, nframes_t);
 	srate = va_arg (ap, nframes_t);
 
-	return alsa_driver_new ("ALSA I/O", pcm_name, frames_per_interrupt, srate);
+	return alsa_driver_new ("alsa_pcm", pcm_name, frames_per_interrupt, srate);
 }
 
 void
