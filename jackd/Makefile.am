@@ -1,4 +1,4 @@
-MAINTAINERCLEANFILES = Makefile.in
+MAINTAINERCLEANFILES = Makefile.in jack_md5.h
 
 if USE_CAPABILITIES
 CAP_PROGS = jackstart

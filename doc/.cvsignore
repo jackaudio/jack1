@@ -1,1 +1,5 @@
-*.stamp\nreference.doxygen\nreference
+Makefile
+Makefile.in
+doxygen-build.stamp
+reference
+reference.doxygen

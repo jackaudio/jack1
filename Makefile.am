@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure config.h.in \
-                          stamp-h.in \
-			  config.guess mkinstalldirs \
+                          stamp-h.in config.log config.cache \
+			  				config.guess mkinstalldirs config.status \
                           missing install-sh config.sub ltconfig \
                           ltmain.sh acinclude.m4
 
