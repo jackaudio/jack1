@@ -113,17 +113,30 @@ void (*jack_error_callback)(const char *desc) = &default_jack_error_callback;
 static int
 oop_client_deliver_request (void *ptr, jack_request_t *req)
 {
+	int wok, rok;
 	jack_client_t *client = (jack_client_t*) ptr;
 
-	if (write (client->request_fd, req, sizeof (*req)) != sizeof (*req)) {
-		jack_error ("cannot send request type %d to server", req->type);
-		req->status = -1;
-	}
-	if (read (client->request_fd, req, sizeof (*req)) != sizeof (*req)) {
-		jack_error ("cannot read result for request type %d from server (%s)", req->type, strerror (errno));
-		req->status = -1;
-	}
+	wok = (write (client->request_fd, req, sizeof (*req))
+	       == sizeof (*req));
+	rok = (read (client->request_fd, req, sizeof (*req))
+	       == sizeof (*req));
 
+	if (wok && rok)			/* everything OK? */
+		return req->status;
+
+	req->status = -1;		/* request failed */
+
+	/* check for server shutdown */
+	if (client->engine->engine_ok == 0)
+		return req->status;
+
+	/* otherwise report errors */
+	if (!wok)
+		jack_error ("cannot send request type %d to server",
+				    req->type);
+	if (!rok)
+		jack_error ("cannot read result for request type %d from"
+			    " server (%s)", req->type, strerror (errno));
 	return req->status;
 }
 
@@ -779,14 +792,14 @@ jack_client_thread (void *arg)
 	DEBUG ("client thread is now running");
 
 	while (err == 0) {
-	        if (client->engine->engine_ok == 0) {
-		     jack_error ("engine unexpectedly shutdown; "
-				 "thread exiting\n");
-		     if (client->on_shutdown) {
-			     client->on_shutdown (client->on_shutdown_arg);
-		     }
-		     pthread_exit (0);
 
+	        if (client->engine->engine_ok == 0) {
+		     if (client->on_shutdown)
+			     client->on_shutdown (client->on_shutdown_arg);
+		     else
+			     jack_error ("engine unexpectedly shutdown; "
+					 "thread exiting\n");
+		     pthread_exit (0);
 		}
 
 		DEBUG ("client polling on event_fd and graph_wait_fd...");

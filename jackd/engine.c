@@ -2434,6 +2434,8 @@ jack_engine_delete (jack_engine_t *engine)
 {
 	int i;
 
+	engine->control->engine_ok = 0;	/* tell clients we're going away */
+
 	if (engine && engine->driver) {
 		jack_driver_t* driver = engine->driver;
 
