@@ -341,18 +341,18 @@ void sample_move_dither_shaped_d24_sS (char *dst,  jack_default_audio_sample_t *
 void sample_move_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 	
 {
-	jack_default_audio_sample_t val;
+	int tmp;
 
 	/* ALERT: signed sign-extension portability !!! */
 
 	while (nsamples--) {
-		val = *src;
-		if (val > 1.0f) {
+		tmp = f_round(*src * SAMPLE_MAX_16BIT);
+		if (tmp > SHRT_MAX) {
 			*((short *)dst) = SHRT_MAX;
-		} else if (val < -1.0f) {
+		} else if (tmp < SHRT_MIN) {
 			*((short *)dst) = SHRT_MIN;
 		} else {
-			*((short *) dst) = (short) f_round(val * SAMPLE_MAX_16BIT);
+			*((short *) dst) = (short) tmp;
 		}
 		dst += dst_skip;
 		src++;
