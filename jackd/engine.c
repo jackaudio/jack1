@@ -2680,13 +2680,12 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 		jack_zombify_client (engine, client);
 	}
 
-	/* try to force the server thread to return from poll */
-	/* JOQ: why do this for internal clients? */
-	
-	close (client->event_fd);
-	close (client->request_fd);
-
 	if (client->control->type == ClientExternal) {
+
+		/* try to force the server thread to return from poll */
+	
+		close (client->event_fd);
+		close (client->request_fd);
 
 		/* rearrange the pollfd array so that things work right the 
 		   next time we go into poll(2).
