@@ -1,5 +1,14 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
+if USE_POSIX_SHM
+install-exec-hook:
+	@echo "Nothing to make for $@."
+else
+install-exec-hook:
+	@echo "Removing JACK shared memory registry."
+	-ipcrm -M @JACK_SHM_REGISTRY_KEY@
+endif
+
 SOURCE_FILES = \
 	     client.c \
 	     driver.c \

@@ -15,10 +15,12 @@ showtime ()
 {
 	jack_position_t current;
 	jack_transport_state_t transport_state;
+	jack_nframes_t frame_time;
 
 	transport_state = jack_transport_query (client, &current);
-
-	printf ("frame: %7" PRIu32 "\t", current.frame);
+	frame_time = jack_frame_time (client);
+	
+	printf ("frame: %7" PRIu32 " @ %" PRIu32 "\t", current.frame, frame_time);
 
 	switch (transport_state) {
 	case JackTransportStopped:
@@ -89,7 +91,7 @@ main (int argc, char *argv[])
 	}
 	
 	while (1) {
-		usleep (100000);
+		usleep (20);
 		showtime ();
 	}
 

@@ -234,32 +234,30 @@ jack_frames_since_cycle_start (const jack_client_t *client)
 jack_nframes_t
 jack_frame_time (const jack_client_t *client)
 {
-	jack_frame_timer_t current;
-	float elapsed_usecs;
-	jack_nframes_t elapsed_frames;
+	jack_frame_timer_t time;
 	jack_control_t *ectl = client->engine;
-	jack_time_t now;
 
-	jack_read_frame_time (client, &current);
-	
-	now = jack_get_microseconds ();
+	jack_read_frame_time (client, &time);
 
-	elapsed_usecs = now - current.stamp;
-	
-	elapsed_frames = (jack_nframes_t)
-		floor ((((float) ectl->current_time.frame_rate)
-			/ 1000000.0f) * elapsed_usecs);
+	if (time.initialized) {
+		jack_time_t now = jack_get_microseconds();
 
-	/* clamp to prevent race conditions when other threads
-	   call this in the window between the driver wakeup
-	   and the frame timer being updated.
-	*/
+#if 0
+		fprintf (stderr, "now = %Lu current wakeup = %Lu next = %Lu frames = %lu + %f => %lu\n", 
+			 now, time.current_wakeup, time.next_wakeup, time.frames,
+			 (double) (now - time.current_wakeup)/ 
+			 (time.next_wakeup - time.current_wakeup),
+			 time.frames + 
+			 (long) rint (((double) (now - time.current_wakeup)/ 
+						 (time.next_wakeup - time.current_wakeup)) * ectl->buffer_size));
+#endif		
 
-	if (elapsed_frames > ectl->buffer_size) {
-		elapsed_frames = ectl->buffer_size;
+		return time.frames + 
+			(long) rint (((double) ((long long) (now - time.current_wakeup))/ 
+						((long long) (time.next_wakeup - time.current_wakeup))) * ectl->buffer_size);
 	} 
 
-	return current.frames + elapsed_frames;
+	return 0;
 }
 
 jack_nframes_t

@@ -114,7 +114,7 @@ struct _jack_engine {
     char	    temporary;
     int		    reordered;
     int		    watchdog_check;
-	int			feedbackcount;
+    int		    feedbackcount;
     pid_t           wait_pid;
     pthread_t       freewheel_thread;
 
@@ -136,7 +136,8 @@ struct _jack_engine {
     int		    rolling_interval;
     float	    max_usecs;
     float	    spare_usecs;
-    float	    usecs_per_cycle;
+
+    int first_wakeup;
     
 #ifdef JACK_USE_MACH_THREADS
     /* specific resources for server/client real-time thread communication */

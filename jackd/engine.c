@@ -111,8 +111,8 @@ static void jack_engine_post_process (jack_engine_t *);
 static int  jack_use_driver (jack_engine_t *engine, jack_driver_t *driver);
 static int  jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 			    float delayed_usecs);
-static void jack_engine_notify_clients_about_delay (jack_engine_t *engine,
-						    float delayed_usecs);
+static void jack_engine_delay (jack_engine_t *engine,
+			       float delayed_usecs);
 static void jack_engine_driver_exit (jack_engine_t* engine);
 static int  jack_start_freewheeling (jack_engine_t* engine);
 static int  jack_stop_freewheeling (jack_engine_t* engine);
@@ -1453,7 +1453,8 @@ jack_server_thread (void *arg)
 		/* Possibly, jack_client_create() may have
 		 * realloced engine->pfd.  We depend on that being
 		 * done within this thread.  That is currently true,
-		 * since external clients are only created here. */
+		 * since external clients are only created here. 
+		 */
 		pfd = engine->pfd;
 		max = engine->pfd_max;
 
@@ -1488,6 +1489,12 @@ jack_server_thread (void *arg)
 	return 0;
 }
 
+
+static void
+jack_engine_reset_frame_timer (jack_engine_t* engine)
+{
+}
+
 jack_engine_t *
 jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 		 const char *server_name, int temporary, int verbose,
@@ -1517,7 +1524,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->set_sample_rate = jack_set_sample_rate;
 	engine->set_buffer_size = jack_driver_buffer_size;
 	engine->run_cycle = jack_run_cycle;
-	engine->delay = jack_engine_notify_clients_about_delay;
+	engine->delay = jack_engine_delay;
 	engine->driver_exit = jack_engine_driver_exit;
 	engine->transport_cycle_start = jack_transport_cycle_start;
 	engine->client_timeout_msecs = client_timeout;
@@ -1636,7 +1643,17 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->control->do_munlock = do_unlock;
 	engine->control->cpu_load = 0;
 	engine->control->xrun_delayed_usecs = 0;
- 
+
+	engine->control->frame_timer.frames = 0;
+	engine->control->frame_timer.reset_pending = 0;
+	engine->control->frame_timer.current_wakeup = 0;
+	engine->control->frame_timer.next_wakeup = 0;
+	engine->control->frame_timer.initialized = 0;
+	engine->control->frame_timer.filter_coefficient = 0.01;
+	engine->control->frame_timer.second_order_integrator = 0;
+
+	engine->first_wakeup = 1;
+
 	engine->control->buffer_size = 0;
 	jack_transport_init (engine);
 	jack_set_sample_rate (engine, 0);
@@ -1751,11 +1768,12 @@ jack_start_watchdog (jack_engine_t *engine)
 }
 
 static void
-jack_engine_notify_clients_about_delay (jack_engine_t *engine,
-					float delayed_usecs)
+jack_engine_delay (jack_engine_t *engine, float delayed_usecs)
 {
 	JSList *node;
 	jack_event_t event;
+	
+	engine->control->frame_timer.reset_pending = 1;
 
 	engine->control->xrun_delayed_usecs = delayed_usecs;
 
@@ -1771,20 +1789,31 @@ jack_engine_notify_clients_about_delay (jack_engine_t *engine,
 }
 
 static inline void
-jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
+jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t nframes)
 {
-	jack_frame_timer_t *time = &engine->control->frame_timer;
-	
-	// atomic_inc (&time->guard1, 1);
+	jack_frame_timer_t *timer = &engine->control->frame_timer;
+	jack_time_t now = engine->driver->last_wait_ust; // effective time
+	long long delta; // must be signed
+
 	// really need a memory barrier here
+	timer->guard1++;
 
-	time->guard1++;
-	time->frames += amount;
-	time->stamp = engine->driver->last_wait_ust;
+	delta = now - timer->next_wakeup;
 
-	// atomic_inc (&time->guard2, 1);
+	timer->current_wakeup = timer->next_wakeup;
+	timer->frames += nframes;
+
+	timer->second_order_integrator += 0.5 * 
+		timer->filter_coefficient * delta;	
+	timer->next_wakeup = timer->current_wakeup + 
+		engine->driver->period_usecs + 
+		(jack_time_t) floor ((timer->filter_coefficient * 
+				      (delta + timer->second_order_integrator)));
+
+	timer->initialized = 1;
+
 	// might need a memory barrier here
-	time->guard2++;
+	timer->guard2++;
 }
 
 static void*
@@ -1920,15 +1949,13 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 			return -1;	/* will exit the thread loop */
 		}
 
-		jack_engine_notify_clients_about_delay (engine, delayed_usecs);
+		jack_engine_delay (engine, delayed_usecs);
 		
 		return 0;
 
 	} else {
 		consecutive_excessive_delays = 0;
 	}
-
-	jack_inc_frame_time (engine, nframes);
 
 	if (jack_try_lock_graph (engine)) {
 		/* engine can't run. just throw away an entire cycle */
@@ -2004,6 +2031,43 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 {
 	jack_nframes_t left;
 	jack_nframes_t b_size = engine->control->buffer_size;
+	jack_frame_timer_t* timer = &engine->control->frame_timer;
+
+	if (timer->reset_pending) {
+
+		/* post xrun-handling */
+		
+		jack_nframes_t period_size_guess = 
+			engine->control->current_time.frame_rate * 
+			   ((timer->next_wakeup - timer->current_wakeup) / 1000000.0);
+
+		timer->frames += 
+			((engine->driver->last_wait_ust - 
+			 engine->control->frame_timer.next_wakeup) / 
+			period_size_guess) * 
+			period_size_guess;
+
+		timer->current_wakeup = engine->driver->last_wait_ust;
+		timer->next_wakeup = engine->driver->last_wait_ust +
+			engine->driver->period_usecs;
+
+		timer->reset_pending = 0;
+
+	} else if (engine->first_wakeup) {
+
+		/* the first wakeup */
+
+		timer->next_wakeup = 
+			engine->driver->last_wait_ust +
+			engine->driver->period_usecs;
+		engine->first_wakeup = 0;
+
+	} else {
+		
+		/* normal condition */
+		
+		jack_inc_frame_time (engine, nframes);
+	}
 
 	if (engine->verbose) {
 		if (nframes != b_size) { 
@@ -2037,7 +2101,14 @@ jack_engine_delete (jack_engine_t *engine)
 	engine->control->engine_ok = 0;	/* tell clients we're going away */
 
 	/* shutdown master socket to prevent new clients arriving */
+	shutdown (engine->fds[0], SHUT_RDWR);
 	// close (engine->fds[0]);
+
+	/* now really tell them we're going away */
+
+	for (i = 0; i < engine->pfd_max; ++i) {
+		shutdown (engine->pfd[i].fd, SHUT_RDWR);
+	}
 
 	if (engine->driver) {
 		jack_driver_t* driver = engine->driver;

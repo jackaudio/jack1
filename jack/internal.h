@@ -94,10 +94,20 @@ typedef enum {
 } transport_command_t;
 
 typedef struct {
-    volatile jack_time_t guard1;
-    volatile jack_nframes_t frames;
-    volatile jack_time_t stamp;
-    volatile jack_time_t guard2;
+
+	volatile uint32_t       guard1;
+	volatile jack_nframes_t frames;  
+	volatile jack_time_t    current_wakeup;
+	volatile jack_time_t    next_wakeup;
+	volatile float          second_order_integrator;
+	volatile int32_t        initialized;
+	volatile uint32_t       guard2;
+	
+	/* not accessed by clients */
+
+	int32_t  reset_pending;      /* xrun happened, deal with it */
+	float    filter_coefficient; /* set once, never altered */
+
 } jack_frame_timer_t;
 
 /* JACK engine shared memory data structure. */
@@ -120,7 +130,6 @@ typedef struct {
     jack_time_t           sync_time_left;
     jack_frame_timer_t    frame_timer;
     int32_t		  internal;
-    jack_nframes_t        frames_at_cycle_start;
     pid_t                 engine_pid;
     jack_nframes_t	  buffer_size;
     int8_t		  real_time;

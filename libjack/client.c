@@ -1632,7 +1632,7 @@ jack_client_close (jack_client_t *client)
 	JSList *node;
 	void *status;
 	
-	if (client->control->active) {
+ 	if (client->control->active) {
 		jack_deactivate (client);
 	}
 
@@ -1684,7 +1684,13 @@ jack_client_close (jack_client_t *client)
 		}
 		
 		close (client->event_fd);
+
+		if (shutdown (client->request_fd, SHUT_RDWR)) {
+			jack_error ("could not shutdown client request socket");
+		}
+
 		close (client->request_fd);
+
 	}
 
 	for (node = client->ports; node; node = jack_slist_next (node)) {

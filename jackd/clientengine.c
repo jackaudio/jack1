@@ -151,7 +151,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 			break;
 		}
 	}
-	
+
 	jack_client_delete (engine, client);
 
 	/* ignore the driver, which counts as a client. */
