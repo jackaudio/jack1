@@ -799,6 +799,15 @@ static int oss_driver_bufsize (oss_driver_t *driver, jack_nframes_t nframes)
 
 /* internal driver thread */
 
+static inline void start_process_cycle (oss_driver_t *driver)
+{
+	driver->last_wait_ust = jack_get_microseconds();
+	driver->engine->transport_cycle_start(driver->engine, 
+					      driver->last_wait_ust);
+	/* what is the actual delay value? (not zero) */
+	driver->engine->run_cycle(driver->engine,
+				  driver->period_size, 0);
+}
 
 #ifdef USE_BARRIER
 static inline void synchronize (oss_driver_t *driver)
@@ -808,16 +817,12 @@ static inline void synchronize (oss_driver_t *driver)
 		if (pthread_barrier_wait(&driver->barrier) ==
 			PTHREAD_BARRIER_SERIAL_THREAD)
 		{
-			driver->last_wait_ust = jack_get_microseconds();
-			driver->engine->run_cycle(driver->engine, 
-				driver->period_size, 0);
+			start_process_cycle(driver);
 		}
 	}
 	else
 	{
-		driver->last_wait_ust = jack_get_microseconds();
-		driver->engine->run_cycle(driver->engine,
-			driver->period_size, 0);
+		start_process_cycle(driver);
 	}
 }
 #endif
@@ -955,9 +960,7 @@ static void *io_thread (void *param)
 			pthread_mutex_unlock(&driver->mutex_in);
 		}
 
-		driver->last_wait_ust = jack_get_microseconds();
-		driver->engine->run_cycle(driver->engine, 
-			driver->period_size, 0);
+		start_process_cycle(driver);
 	}
 
 	free(localbuf);

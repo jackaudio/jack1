@@ -315,7 +315,7 @@ portaudio_driver_new (char *name,
 		 DitherAlgorithm dither)
 {
 	portaudio_driver_t *driver;
-        PaError err;
+        PaError	 err = paNoError;
         const    PaDeviceInfo *pdi;
         int      numDevices;
         int      i,j;

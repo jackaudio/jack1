@@ -329,7 +329,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 	unsigned int capture_ports = 2;
 	unsigned int playback_ports = 2;
 	int wait_time_set = 0;
-	unsigned long wait_time;
+	unsigned long wait_time = 0;
 	const JSList * node;
 	const jack_driver_param_t * param;
 
