@@ -451,10 +451,6 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 		ctl->nframes = nframes;
 	}
 
-	if (engine->timebase_client) {
-		engine->control->time.frame = engine->timebase_client->control->frame_time;
-	} 
-
 	for (node = engine->clients; engine->process_errors == 0 && node; ) {
 
 		client = (jack_client_internal_t *) node->data;
@@ -1069,7 +1065,6 @@ jack_set_timebase (jack_engine_t *engine, jack_client_id_t client)
 	jack_lock_graph (engine);
 
 	if ((engine->timebase_client = jack_client_internal_by_id (engine, client)) != 0) {
-		engine->control->time.frame = engine->timebase_client->control->frame_time;
 		ret = 0;
 	}
 
