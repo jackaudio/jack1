@@ -29,6 +29,8 @@
  Feb 04, 2004: Johnny Petrantoni: now the driver supports interfaces with multiple interleaved streams (such as the MOTU 828).
  Nov 05, 2004: S.Letz: correct management of -I option for use with JackPilot.
  Nov 15, 2004: S.Letz: Set a default value for deviceID.
+ Nov 30, 2004: S.Letz: In coreaudio_driver_write : clear to avoid playing dirty buffers when the client does not produce output anymore. 
+ 
  
  TODO:
 	- fix cpu load behavior.
@@ -262,7 +264,7 @@ coreaudio_driver_write(coreaudio_driver_t * driver, jack_nframes_t nframes)
     channel_t chn;
     jack_port_t *port;
     JSList *node;
-    int i;
+    int i,bytes = nframes*sizeof(float);
 
     int b = 0;
 
@@ -277,6 +279,8 @@ coreaudio_driver_write(coreaudio_driver_t * driver, jack_nframes_t nframes)
 				float *out = driver->outcoreaudio[chn];
 				buf = jack_port_get_buffer(port, nframes);
 				memcpy(out, buf, sizeof(float) * nframes);
+				/* clear to avoid playing dirty buffers when the client does not produce output anymore */
+				memset(buf, 0, bytes);
 			}
 		} else {
 			if (jack_port_connected(port)
@@ -296,6 +300,8 @@ coreaudio_driver_write(coreaudio_driver_t * driver, jack_nframes_t nframes)
 					buf = jack_port_get_buffer(port, nframes);
 					for (i = 0; i < nframes; i++)
 					out[channels * i + chn] = buf[i];
+					/* clear to avoid playing dirty buffers when the client does not produce output anymore */
+					memset(buf, 0, bytes);
 				}
 			}
 		}

@@ -236,10 +236,10 @@ portaudio_driver_write (portaudio_driver_t *driver, jack_nframes_t nframes)
 	channel_t chn;
 	jack_port_t *port;
 	JSList *node;
-	int i;
+	int i,bytes = nframes*sizeof(float);
 	
 	/* Clear in case of nothing is connected */
-	memset(driver->outPortAudio, 0, (driver->playback_nchannels * nframes * sizeof(float)));
+	memset(driver->outPortAudio, 0, driver->playback_nchannels*bytes);
 			
 	for (chn = 0, node = driver->playback_ports; node; node = jack_slist_next (node), chn++) {
 			
@@ -250,6 +250,8 @@ portaudio_driver_write (portaudio_driver_t *driver, jack_nframes_t nframes)
 					float* out = driver->outPortAudio;
 					buf = jack_port_get_buffer (port, nframes);
 					for (i = 0; i< nframes; i++) out[channels*i+chn] = buf[i];
+					/* clear to avoid playing dirty buffers when the client does not produce output anymore */
+					memset(buf, 0, bytes);
 			}
 	}
 	
