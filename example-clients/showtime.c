@@ -39,23 +39,36 @@ showtime ()
 	} while (current.guard1 != current.guard2);
 
 	if (current.info.valid & JackTransportPosition)
-		printf ("frame: %lu ", current.info.frame);
+		printf ("frame: %7lu\t", current.info.frame);
 	else
-		printf ("frame: [-] ");
+		printf ("frame: [-]\t");
 
-	if (current.info.valid & JackTransportState)
-		printf ("state: %d ", current.info.transport_state);
+	if (current.info.valid & JackTransportState) {
+		switch (current.info.transport_state) {
+		case JackTransportStopped:
+			printf ("state: Stopped\t");
+			break;
+		case JackTransportRolling:
+			printf ("state: Rolling\t");
+			break;
+		case JackTransportLooping:
+			printf ("state: Looping\t");
+			break;
+		default:
+			printf ("state: [unknown]\t");
+		}
+	}
 	else
-		printf ("state: [-] ");
+		printf ("state: [-]\t");
 
 	if (current.info.valid & JackTransportLoop)
-		printf ("loop: %lu-%lu ", current.info.loop_start,
+		printf ("loop: %lu-%lu\t", current.info.loop_start,
 			current.info.loop_end);
 	else
-		printf ("loop: [-] ");
+		printf ("loop: [-]\t");
 
 	if (current.info.valid & JackTransportBBT)
-		printf ("BBT: %d|%d|%d\n", current.info.bar,
+		printf ("BBT: %3d|%d|%04d\n", current.info.bar,
 			current.info.beat, current.info.tick);
 	else
 		printf ("BBT: [-]\n");
@@ -68,7 +81,7 @@ process (jack_nframes_t nframes, void *arg)
 	 * high resolution, that showtime() can detect whether the
 	 * last update is complete. */
 	now.guard1 = jack_frame_time(client);
-	jack_get_transport_info (client, &now.info);
+	jack_get_transport_info (client, (jack_transport_info_t *) &now.info);
 	now.guard2 = now.guard1;
 
 	return 0;      

@@ -18,10 +18,6 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/* To compile:
- *    cc -o transport transport.c -lhistory -lreadline `pkg-config --libs jack`
- */
-
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -48,8 +44,18 @@ int process(jack_nframes_t nframes, void *arg)
     jack_set_transport_info(client, &tinfo);
 
     /* frame number for next cycle */
-    if (tinfo.transport_state == JackTransportRolling)
-	tinfo.frame += nframes;
+    if (tinfo.transport_state != JackTransportStopped) {
+ 	tinfo.frame += nframes;
+
+	/* When looping, adjust the frame number periodically.  Make
+	 * sure improper loop limits don't lock up the system in an
+	 * infinite while(). */
+        if ((tinfo.transport_state == JackTransportLooping) &&
+	    (tinfo.loop_end > tinfo.loop_start)) {
+            while (tinfo.frame >= tinfo.loop_end)
+                tinfo.frame -= (tinfo.loop_end - tinfo.loop_start);
+        }
+    }
 
     return 0;      
 }
@@ -75,6 +81,11 @@ void com_exit(char *arg)
 }
 
 void com_help(char *);			/* forward declaration */
+
+void com_loop(char *arg)
+{
+    tinfo.transport_state = JackTransportLooping;
+}
 
 void com_play(char *arg)
 {
@@ -103,10 +114,12 @@ typedef struct {
     cmd_function_t *func;	/* Function to call to do the job. */
     char *doc;			/* Documentation for this function.  */
 } command_t;
-     
+
+/* command list, must be in order */
 command_t commands[] = {
     { "exit",	com_exit,	"Exit transport program" },
     { "help",	com_help,	"Display help text" },
+    { "loop",	com_loop,	"Start transport looping" },
     { "play",	com_play,	"Start transport rolling" },
     { "quit",	com_exit,	"Synonym for `exit'"},
     { "rewind",	com_rewind,	"Reset transport position to beginning" },
@@ -118,10 +131,22 @@ command_t commands[] = {
 command_t *find_command(char *name)
 {
     register int i;
-     
+    size_t namelen;
+
+    if ((name == NULL) || (*name == '\0'))
+	return ((command_t *)NULL);
+
+    namelen = strlen(name);
     for (i = 0; commands[i].name; i++)
-	if (strcmp (name, commands[i].name) == 0)
-	    return (&commands[i]);
+	if (strncmp(name, commands[i].name, namelen) == 0) {
+
+	    /* make sure the match is unique */
+	    if ((commands[i+1].name) &&
+		(strncmp(name, commands[i+1].name, namelen) == 0))
+		return ((command_t *)NULL);
+	    else
+		return (&commands[i]);
+	}
      
     return ((command_t *)NULL);
 }
@@ -129,17 +154,19 @@ command_t *find_command(char *name)
 void com_help(char *arg)
 {
     register int i;
-    int printed = 0;
+    command_t *cmd;
 
-    /* print help for command arg */
-    for (i = 0; commands[i].name; i++) {
-	if (!*arg || (strcmp (arg, commands[i].name) == 0)) {
+    if (!*arg) {
+	/* print help for all commands */
+	for (i = 0; commands[i].name; i++) {
 	    printf("%s\t\t%s.\n", commands[i].name, commands[i].doc);
-	    printed++;
 	}
-    }
 
-    if (!printed) {
+    } else if ((cmd = find_command(arg))) {
+	printf("%s\t\t%s.\n", cmd->name, cmd->doc);
+
+    } else {
+	int printed = 0;
 
 	printf("No `%s' command.  Valid command names are:\n", arg);
 
@@ -154,7 +181,7 @@ void com_help(char *arg)
 	    printed++;
 	}
 
-	printf("\n\nType `help [command]\' for more information.\n");
+	printf("\n\nTry `help [command]\' for more information.\n");
     }
 }
 
@@ -237,7 +264,7 @@ char *command_generator (const char *text, int state)
      
     /* Return the next name which partially matches from the
        command list. */
-    while (name = commands[list_index].name) {
+    while ((name = commands[list_index].name)) {
 	list_index++;
      
 	if (strncmp(name, text, len) == 0)
@@ -288,7 +315,9 @@ void command_loop()
 void initialize_transport()
 {
     /* must run before jack_activate */
-    tinfo.valid = JackTransportState | JackTransportPosition;
+    tinfo.loop_start = 0;		/* default loop is one second */
+    tinfo.loop_end = jack_get_sample_rate(client);
+    tinfo.valid = JackTransportState|JackTransportPosition|JackTransportLoop;
     com_rewind(NULL);
 }
 
