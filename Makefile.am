@@ -16,7 +16,7 @@ dist-check-doxygen:
 	@false
 endif
 
-DIST_SUBDIRS = jack jackd drivers libjack example-clients doc
+DIST_SUBDIRS = jack libjack jackd drivers example-clients doc
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = jack.pc
