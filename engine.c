@@ -484,7 +484,6 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 
 			pollfd[0].fd = client->subgraph_wait_fd;
 			pollfd[0].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
-			pollfd[0].revents = 0;
 
 			if (poll (pollfd, 1, engine->driver->period_interval) < 0) {
 				if (errno == EINTR) {
@@ -2181,11 +2180,10 @@ jack_clear_fifos (jack_engine_t *engine)
 	for (i = 0; i < engine->fifo_size; i++) {
 		if (engine->fifo[i] >= 0) {
 			int nread = read (engine->fifo[i], buf, sizeof (buf));
+
 			if (nread < 0 && errno != EAGAIN) {
-				printf ("clear fifo[%d]: %s\n", i, strerror (errno));
-			} else if (nread > 0) {
-				printf ("clear fifo[%d]: %d bytes\n", i, nread);
-			}
+				jack_error ("clear fifo[%d] error: %s", i, strerror (errno));
+			} 
 		}
 	}
 }
@@ -2331,8 +2329,6 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 
 int
 jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
-
-
 {
 	jack_client_internal_t *client;
 	jack_port_shared_t *shared;
