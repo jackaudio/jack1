@@ -70,4 +70,21 @@ typedef	enum  {
 	NoSync = 0x8
 } ClockSyncStatus;
 
+typedef	enum  {
+	None,
+	Rectangular,
+	Triangular,
+	Shaped
+} DitherAlgorithm;
+
+#define DITHER_BUF_SIZE 8
+#define DITHER_BUF_MASK 7
+
+typedef struct {
+    unsigned int depth;
+    float rm1;
+    unsigned int idx;
+    float e[DITHER_BUF_SIZE];
+} dither_state_t;
+
 #endif /* __jack_engine_types_h__ */

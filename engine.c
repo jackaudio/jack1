@@ -520,48 +520,6 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 	return engine->process_errors > 0;
 }
 
-static void *
-jack_cleanup_clients (void *arg)
-{
-	jack_engine_t *engine = (jack_engine_t *) arg;
-	jack_client_internal_t *client;
-	GSList *node, *tmp;
-	int need_sort = FALSE;
-
-	jack_lock_graph (engine);
-
-	/* remove all dead clients */
-
-	for (node = engine->clients; node; ) {
-
-		tmp = g_slist_next (node);
-
-		client = (jack_client_internal_t *) node->data;
-		
-		if (client->error) {
-			
-			if (engine->verbose) {
-				fprintf (stderr, "removing failed client %s (errors: %d)\n", 
-					 client->control->name, client->error);
-			}
-			
-			jack_remove_client (engine, (jack_client_internal_t *) node->data);
-			need_sort = TRUE;
-		}
-
-		node = tmp;
-	}
-
-	if (need_sort) {
-		jack_sort_graph (engine);
-	}
-
-	jack_unlock_graph (engine);
-	pthread_mutex_unlock (&engine->cleanup_lock);
-
-	return NULL;
-}
-
 static int
 jack_engine_post_process (jack_engine_t *engine)
 {
@@ -579,10 +537,6 @@ jack_engine_post_process (jack_engine_t *engine)
 		client = (jack_client_internal_t *) node->data;
 		ctl = client->control;
 		
-		if (engine->verbose) {
-			fprintf (stderr, "client %s state = %s\n", ctl->name, client_state_names[ctl->state]);
-		}
-
 		if (ctl->timed_out || (ctl->state > NotTriggered && ctl->state != Finished)) {
 			client->error++;
 		}
@@ -592,19 +546,39 @@ jack_engine_post_process (jack_engine_t *engine)
 		}
 	}
 
-	jack_unlock_graph (engine);
-
 	if (need_remove) {
 		
-		/* only one thread is allowed to run cleanup at a time. if
-		   one is already underway, don't bother starting another.
-		*/
+		GSList *tmp;
+		int need_sort = FALSE;
 		
-		if (pthread_mutex_trylock (&engine->cleanup_lock) == 0) {
-			pthread_t cleanup_thread;
-			pthread_create (&cleanup_thread, NULL, jack_cleanup_clients, engine);
+		/* remove all dead clients */
+		
+		for (node = engine->clients; node; ) {
+			
+			tmp = g_slist_next (node);
+			
+			client = (jack_client_internal_t *) node->data;
+			
+			if (client->error) {
+				
+				if (engine->verbose) {
+					fprintf (stderr, "removing failed client %s state = %s\n", 
+						 client->control->name, client_state_names[client->control->state]);
+				}
+				
+				jack_remove_client (engine, (jack_client_internal_t *) node->data);
+				need_sort = TRUE;
+			}
+			
+			node = tmp;
+		}
+			
+		if (need_sort) {
+			jack_sort_graph (engine);
 		}
 	}
+
+	jack_unlock_graph (engine);
 
 	return 0;
 }
@@ -1152,7 +1126,6 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 	engine->asio_mode = FALSE;
 
 	pthread_mutex_init (&engine->client_lock, 0);
-	pthread_mutex_init (&engine->cleanup_lock, 0);
 	pthread_mutex_init (&engine->buffer_lock, 0);
 	pthread_mutex_init (&engine->port_lock, 0);
 
@@ -2562,6 +2535,13 @@ jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 			port->buffer_info = bi;
 			break;
 		}
+	}
+
+	if (engine->verbose) {
+		fprintf (stderr, "port %s assigned buffer in shm key 0x%x at offset %d\n", 
+			 port->shared->name,
+			 port->shared->shm_key,
+			 port->shared->offset);
 	}
 	
 	if (port->shared->shm_key >= 0) {

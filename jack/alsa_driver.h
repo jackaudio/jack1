@@ -34,7 +34,8 @@ typedef void (*ReadCopyFunction)  (sample_t *dst, char *src,
 				   unsigned long src_skip_bytes);
 typedef void (*WriteCopyFunction) (char *dst, sample_t *src,
 				   unsigned long src_bytes,
-				   unsigned long dst_skip_bytes);
+				   unsigned long dst_skip_bytes,
+				   dither_state_t *state);
 typedef void (*CopyCopyFunction)  (char *dst, char *src,
 				   unsigned long src_bytes,
 				   unsigned long dst_skip_bytes,
@@ -102,7 +103,8 @@ typedef struct {
     WriteCopyFunction write_via_copy;
     CopyCopyFunction channel_copy;
 
-    int dither;
+    int             dither;
+    dither_state_t *dither_state;
 
     SampleClockMode clock_mode;
     GSList *clock_sync_listeners;
@@ -161,7 +163,8 @@ static __inline__ void alsa_driver_write_to_channel (alsa_driver_t *driver,
 	driver->write_via_copy (driver->playback_addr[channel],
 				buf, 
 				nsamples, 
-				driver->playback_interleave_skip);
+				driver->playback_interleave_skip,
+				driver->dither_state+channel);
 	alsa_driver_mark_channel_done (driver, channel);
 }
 

@@ -54,6 +54,11 @@ alsa_driver_release_channel_dependent_memory (alsa_driver_t *driver)
 		free (driver->silent);
 		driver->silent = 0;
 	}
+
+	if (driver->dither_state) {
+		free (driver->dither_state);
+		driver->dither_state = 0;
+	}
 }
 
 static int
@@ -150,12 +155,27 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 			driver->channel_copy = memcpy_fake;
 		}
 
-		if (driver->dither) {		
+		switch (driver->dither) {
+			case Rectangular:
 			printf("Rectangular dithering at 16 bits\n");
 			driver->write_via_copy = sample_move_dither_rect_d16_sS;
-		} else {
+			break;
+
+			case Triangular:
+			printf("Triangular dithering at 16 bits\n");
+			driver->write_via_copy = sample_move_dither_tri_d16_sS;
+			break;
+
+			case Shaped:
+			printf("Noise-shaped dithering at 16 bits\n");
+			driver->write_via_copy = sample_move_dither_shaped_d16_sS;
+			break;
+
+			default:
 			driver->write_via_copy = sample_move_d16_sS;
+			break;
 		}
+
 		driver->read_via_copy = sample_move_dS_s16;
 		break;
 
@@ -463,6 +483,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 		for (chn = 0; chn < driver->playback_nchannels; chn++) {
 			driver->channel_done_bits |= (1<<chn);
 		}
+
+		driver->dither_state = (dither_state_t *) calloc ( driver->playback_nchannels, sizeof (dither_state_t));
 	}
 
 	if (driver->capture_handle) {
@@ -995,14 +1017,17 @@ alsa_driver_process (alsa_driver_t *driver, nframes_t nframes)
 				/* now move data from ports to channels */
 				
 				for (chn = 0, node = driver->playback_ports; node; node = g_slist_next (node), chn++) {
-					
+					sample_t *buf;
+
 					jack_port_t *port = (jack_port_t *) node->data;
 					
 					if (!jack_port_connected (port)) {
 						continue;
 					}
+
+					buf = jack_port_get_buffer (port, contiguous);
 					
-					alsa_driver_write_to_channel (driver, chn, jack_port_get_buffer (port, contiguous), contiguous);
+					alsa_driver_write_to_channel (driver, chn, buf, contiguous);
 				}
 			}
 
@@ -1256,7 +1281,7 @@ alsa_driver_new (char *name, char *alsa_device,
 		 int hw_monitoring,
 		 int capturing,
 		 int playing,
-		 int dither)
+		 DitherAlgorithm dither)
 {
 	int err;
 
@@ -1456,6 +1481,7 @@ alsa PCM driver args:
     -D (duplex, default: yes)
     -C (capture, default: duplex)
     -P (playback, default: duplex)
+    -z[r|t|s|-] (dither, rect|tri|shaped|off, default: off)
 ");
 }
 
@@ -1469,7 +1495,7 @@ driver_initialize (int argc, char **argv)
 	int hw_monitoring = FALSE;
 	int capture = FALSE;
 	int playback = FALSE;
-	int dither = FALSE;
+	DitherAlgorithm dither = None;
 	int i;
 
 	/* grrrr ... getopt() cannot be called in more than one "loop"
@@ -1518,7 +1544,24 @@ driver_initialize (int argc, char **argv)
 				break;
 
 			case 'z':
-				dither = TRUE;
+				switch (argv[i][2]) {
+					case '-':
+					dither = None;
+					break;
+
+					case 'r':
+					dither = Rectangular;
+					break;
+
+					case 's':
+					dither = Shaped;
+					break;
+
+					case 't':
+					default:
+					dither = Triangular;
+					break;
+				}
 				break;
 				
 			default:

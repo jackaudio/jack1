@@ -23,17 +23,18 @@
 
 #include <jack/types.h>
 
-void sample_move_d32u24_sS           (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip);
-void sample_move_d16_sS              (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip);
+void sample_move_d32u24_sS           (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_d16_sS              (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 
-void sample_move_dither_rect_d16_sS  (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip);
+void sample_move_dither_rect_d16_sS  (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_dither_tri_d16_sS  (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_move_dither_shaped_d16_sS  (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 
 void sample_move_dS_s32u24           (sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
 void sample_move_dS_s16              (sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
 
-
-void sample_merge_d16_sS             (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip);
-void sample_merge_d32u24_sS          (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip);
+void sample_merge_d16_sS             (char *dst,  sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+void sample_merge_d32u24_sS          (char *dst, sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 
 static __inline__ void
 sample_merge (sample_t *dst, sample_t *src, unsigned long cnt)

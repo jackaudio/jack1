@@ -1203,6 +1203,9 @@ jack_port_get_buffer (jack_port_t *port, nframes_t nframes)
 		   the buffer of the connected (output) port.
 		*/
 
+		printf ("get buffer for port %s is at offset %d\n", port->shared->name,  
+			((jack_port_t *) node->data)->shared->offset);
+
 		return jack_port_buffer (((jack_port_t *) node->data));
 	}
 
@@ -1597,7 +1600,7 @@ jack_audio_port_mixdown (jack_port_t *port, nframes_t nframes)
 	node = port->connections;
 	input = (jack_port_t *) node->data;
 	buffer = jack_port_buffer (port);
-	
+
 	memcpy (buffer, jack_port_buffer (input), sizeof (sample_t) * nframes);
 
 	for (node = g_slist_next (node); node; node = g_slist_next (node)) {

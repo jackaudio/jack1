@@ -4,7 +4,7 @@ AC_INIT(client.c)
 AC_CONFIG_AUX_DIR(.)
 
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=19
+JACK_MINOR_VERSION=20
 JACK_MICRO_VERSION=0
 
 BETA=
@@ -31,7 +31,7 @@ JACK_OPT_CFLAGS="-D_REENTRANT -O6 -Wall -fomit-frame-pointer -ffast-math -fstren
 
 AC_ARG_ENABLE(optimize,
      [  --enable-optimize       ask the compiler for its best optimizations.],
-     [ if test "x$enable_optimize" != "xno" ; then JACK_CFLAGS="$JACK_OPT_CFLAGS" ; fi ])
+     [ if test "x$enable_optimize" != "xno" ; then CFLAGS="$JACK_OPT_CFLAGS" ; fi ])
 
 AC_SUBST(JACK_CFLAGS)
 

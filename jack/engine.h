@@ -38,7 +38,6 @@ struct _jack_engine {
     void (*process_unlock)(struct _jack_engine *);
     int  (*post_process)(struct _jack_engine *);
     pthread_mutex_t client_lock;
-    pthread_mutex_t cleanup_lock;
     pthread_mutex_t buffer_lock;
     pthread_mutex_t port_lock;
     int process_errors;
