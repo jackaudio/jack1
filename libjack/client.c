@@ -700,7 +700,7 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 	if ((x = pthread_setschedparam (thread, SCHED_FIFO, &rtparam)) != 0) {
 		jack_error ("cannot use real-time scheduling (FIFO/%d) "
 			    "(%d: %s)", rtparam.sched_priority, x,
-			    strerror (errno));
+			    strerror (x));
 		return -1;
 	}
         return 0;
