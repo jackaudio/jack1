@@ -1,4 +1,4 @@
-.TH JACKD "1" @VERSION@ "March 2003"
+.TH JACKD "1" @VERSION@ "May 2003"
 .SH NAME
 jackd, jackstart \- JACK Audio Connection Kit sound server
 .SH SYNOPSYS
@@ -43,7 +43,13 @@ to have timed out on receipt of the next interrupt from the audio
 interface.  This only makes sense when used with an ASIO-style
 configuration where there are 2 periods per buffer (see
 \fB\-\-nperiods\fR).  It is safe to omit this parameter, if you don't
-need to enforce strict realtime limits.
+need to enforce strict realtime limits.  It can be useful for testing
+the realtime behavior of a new JACK clients.
+.TP
+\fB\-t, \-\-timeout \fIint\fR
+.br
+Set client timeout limit in microseconds.  The default is 500 msec
+when not in realtime mode (see: \-R).
 .TP
 \fB\-R, \-\-realtime\fR 
 .br
@@ -128,6 +134,11 @@ Without \fB\-\-hwmon\fR, port monitoring requires JACK to read audio
 into system memory, then copy it back out to the hardware again,
 imposing the basic JACK system latency determined by the
 \fB\-\-period\fR and \fB\-\-nperiods\fR options.
+.TP
+\fB\-M, \-\-hwmeter\fR
+.br
+Enable hardware metering for devices that support it.  Otherwise, use
+software metering.
 .TP
 \fB\-s, \-\-softmode\fR 
 .br
