@@ -22,6 +22,7 @@
 #ifndef __jack_portaudio_driver_h__
 #define __jack_portaudio_driver_h__
 
+
 #include <jack/types.h>
 #include <jack/hardware.h>
 #include <jack/driver.h>
