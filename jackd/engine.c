@@ -52,6 +52,12 @@
 
 #define NoPort    -1
 
+/**
+ * Time to wait for clients in msecs. Used when jackd is 
+ * run in non-ASIO mode and without realtime priority enabled.
+ */
+#define JACKD_SOFT_MODE_TIMEOUT 5000
+
 typedef struct {
 
     jack_port_internal_t *source;
@@ -501,11 +507,12 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 				engine->driver->wait (engine->driver, client->subgraph_wait_fd, &status, &delayed_usecs);
 			} else {
 				struct pollfd pfd[1];
+				int poll_timeout = (engine->control->real_time == 0 ? JACKD_SOFT_MODE_TIMEOUT : engine->driver->period_usecs/1000);
 
 				pfd[0].fd = client->subgraph_wait_fd;
 				pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
-				
-				if (poll (pfd, 1, engine->driver->period_usecs/1000) < 0) {
+
+				if (poll (pfd, 1, poll_timeout) < 0) {
 					jack_error ("poll on subgraph processing failed (%s)", strerror (errno));
 					status = -1; 
 				}
