@@ -34,13 +34,17 @@ AudioRender *AudioRender::theRender = NULL;
 bool AudioRender::isProcessing = false;
 const AudioTimeStamp *AudioRender::gTime;
 
+#define PRINTDEBUG 1
+
 extern "C" void JCALog(char *fmt, ...)
 {
+#ifdef PRINTDEBUG
     va_list ap;
     va_start(ap, fmt);
     fprintf(stderr, "JCA: ");
     vfprintf(stderr, fmt, ap);
     va_end(ap);
+#endif
 }
 
 static OSStatus GetTotalChannels(AudioDeviceID device, UInt32  *channelCount, Boolean isInput) 

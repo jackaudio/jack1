@@ -29,13 +29,15 @@
 	12-01-04 : Connect port names (inverse "in" and "out")    	
 	13-01-04 : Correct the length of jack port : use JACK_PORT_NAME_SIZE
 	22-03-04 : Remove jack_init_time, rename input and ouput ports using "capture" and "playback" 
-    10-03-04 : S. Letz: Add management of -I option for use with JackPilot.
+    10-11-04 : S. Letz: Add management of -I option for use with JackPilot.
+	17-11-04 : S. Letz: Better debug code.
 
 */
 
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include <jack/engine.h>
 
@@ -80,179 +82,192 @@ static OSStatus get_device_id_from_num(int i, AudioDeviceID * id)
 typedef unsigned int AudioDeviceID;
 #endif
 
+#define PRINTDEBUG 1
+
+void PALog(char *fmt, ...)
+{
+#ifdef PRINTDEBUG
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "JCA: ");
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+#endif
+}
+
 static int
 paCallback(void *inputBuffer, void *outputBuffer,
                              unsigned long framesPerBuffer,
                              PaTimestamp outTime, void *userData)
 {
 	portaudio_driver_t * driver = (portaudio_driver_t*)userData;
-    
-        driver->inPortAudio = (float*)inputBuffer;
-		driver->outPortAudio = (float*)outputBuffer;
-		driver->last_wait_ust = jack_get_microseconds();
-        return driver->engine->run_cycle(driver->engine, framesPerBuffer, 0);
+
+	driver->inPortAudio = (float*)inputBuffer;
+	driver->outPortAudio = (float*)outputBuffer;
+	driver->last_wait_ust = jack_get_microseconds();
+	return driver->engine->run_cycle(driver->engine, framesPerBuffer, 0);
 }
 
 static int
 portaudio_driver_attach (portaudio_driver_t *driver, jack_engine_t *engine)
 {
-        jack_port_t *port;
-        int port_flags;
-        channel_t chn;
-        char buf[JACK_PORT_NAME_SIZE];
-            
-        driver->engine = engine;
-        
-        driver->engine->set_buffer_size (engine, driver->frames_per_cycle);
-        driver->engine->set_sample_rate (engine, driver->frame_rate);
-        
-        port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
-    
-        /*
-        if (driver->has_hw_monitoring) {
-                port_flags |= JackPortCanMonitor;
-        }
-        */
-    
-        for (chn = 0; chn < driver->capture_nchannels; chn++) {
-                //snprintf (buf, sizeof(buf) - 1, "%s:capture%lu", driver->driver_name, chn+1);
-				snprintf (buf, sizeof(buf) - 1, "%s:out%lu", driver->driver_name, chn+1);
-    
-                if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
-                        jack_error ("portaudio: cannot register port for %s", buf);
-                        break;
-                }
-    
-                /* XXX fix this so that it can handle: systemic (external) latency
-                */
-    
-                jack_port_set_latency (port, driver->frames_per_cycle);
-				driver->capture_ports = jack_slist_append (driver->capture_ports, port);
-        }
-        
-        port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
-    
-        for (chn = 0; chn < driver->playback_nchannels; chn++) {
-                //snprintf (buf, sizeof(buf) - 1, "%s:playback%lu", driver->driver_name, chn+1);
-				snprintf (buf, sizeof(buf) - 1, "%s:in%lu", driver->driver_name, chn+1);
-    
-                if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
-                        jack_error ("portaudio: cannot register port for %s", buf);
-                        break;
-                }
-                
-                /* XXX fix this so that it can handle: systemic (external) latency
-                */
-        
-                jack_port_set_latency (port, driver->frames_per_cycle);
-                driver->playback_ports = jack_slist_append (driver->playback_ports, port);
-        }
-    
-        jack_activate (driver->client);
-        return 0; 
+	jack_port_t *port;
+	int port_flags;
+	channel_t chn;
+	char buf[JACK_PORT_NAME_SIZE];
+		
+	driver->engine = engine;
+	
+	driver->engine->set_buffer_size (engine, driver->frames_per_cycle);
+	driver->engine->set_sample_rate (engine, driver->frame_rate);
+	
+	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
+
+	/*
+	if (driver->has_hw_monitoring) {
+			port_flags |= JackPortCanMonitor;
+	}
+	*/
+
+	for (chn = 0; chn < driver->capture_nchannels; chn++) {
+			//snprintf (buf, sizeof(buf) - 1, "%s:capture%lu", driver->driver_name, chn+1);
+			snprintf (buf, sizeof(buf) - 1, "%s:out%lu", driver->driver_name, chn+1);
+
+			if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
+					jack_error ("portaudio: cannot register port for %s", buf);
+					break;
+			}
+
+			/* XXX fix this so that it can handle: systemic (external) latency
+			*/
+
+			jack_port_set_latency (port, driver->frames_per_cycle);
+			driver->capture_ports = jack_slist_append (driver->capture_ports, port);
+	}
+	
+	port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
+
+	for (chn = 0; chn < driver->playback_nchannels; chn++) {
+			//snprintf (buf, sizeof(buf) - 1, "%s:playback%lu", driver->driver_name, chn+1);
+			snprintf (buf, sizeof(buf) - 1, "%s:in%lu", driver->driver_name, chn+1);
+
+			if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
+					jack_error ("portaudio: cannot register port for %s", buf);
+					break;
+			}
+			
+			/* XXX fix this so that it can handle: systemic (external) latency
+			*/
+	
+			jack_port_set_latency (port, driver->frames_per_cycle);
+			driver->playback_ports = jack_slist_append (driver->playback_ports, port);
+	}
+
+	jack_activate (driver->client);
+	return 0; 
 }
 
 static int
 portaudio_driver_detach (portaudio_driver_t *driver, jack_engine_t *engine)
 {
-        JSList *node;
-    
-        if (driver->engine == 0) {
-                return -1;
-        }
-    
-        for (node = driver->capture_ports; node; node = jack_slist_next (node)) {
-                jack_port_unregister (driver->client, ((jack_port_t *) node->data));
-        }
-    
-        jack_slist_free (driver->capture_ports);
-        driver->capture_ports = 0;
-                
-        for (node = driver->playback_ports; node; node = jack_slist_next (node)) {
-                jack_port_unregister (driver->client, ((jack_port_t *) node->data));
-        }
-    
-        jack_slist_free (driver->playback_ports);
-        driver->playback_ports = 0;
-        
-        driver->engine = 0;
-        return 0; 
+	JSList *node;
+
+	if (driver->engine == 0) {
+			return -1;
+	}
+
+	for (node = driver->capture_ports; node; node = jack_slist_next (node)) {
+			jack_port_unregister (driver->client, ((jack_port_t *) node->data));
+	}
+
+	jack_slist_free (driver->capture_ports);
+	driver->capture_ports = 0;
+			
+	for (node = driver->playback_ports; node; node = jack_slist_next (node)) {
+			jack_port_unregister (driver->client, ((jack_port_t *) node->data));
+	}
+
+	jack_slist_free (driver->playback_ports);
+	driver->playback_ports = 0;
+	
+	driver->engine = 0;
+	return 0; 
 }
 
 static int
 portaudio_driver_null_cycle (portaudio_driver_t* driver, jack_nframes_t nframes)
 {
-        memset(driver->outPortAudio, 0, (driver->playback_nchannels * nframes * sizeof(float)));
-        return 0;
+	memset(driver->outPortAudio, 0, (driver->playback_nchannels * nframes * sizeof(float)));
+	return 0;
 }
 
 static int
 portaudio_driver_read (portaudio_driver_t *driver, jack_nframes_t nframes)
 {
-        jack_default_audio_sample_t *buf;
-        channel_t chn;
-        jack_port_t *port;
-        JSList *node;
-        int i;
+	jack_default_audio_sample_t *buf;
+	channel_t chn;
+	jack_port_t *port;
+	JSList *node;
+	int i;
 
-        for (chn = 0, node = driver->capture_ports; node; node = jack_slist_next (node), chn++) {
-                
-                port = (jack_port_t *)node->data;
-                
-                if (jack_port_connected (port) && (driver->inPortAudio != NULL)) {
-                    int channels = driver->capture_nchannels;
-                    float* in = driver->inPortAudio;
-                    buf = jack_port_get_buffer (port, nframes); 
-                    for (i = 0; i< nframes; i++) buf[i] = in[channels*i+chn];
-                }
-    
-        }
-       
-        driver->engine->transport_cycle_start (driver->engine,
-					       jack_get_microseconds ());
-        return 0;
+	for (chn = 0, node = driver->capture_ports; node; node = jack_slist_next (node), chn++) {
+			
+			port = (jack_port_t *)node->data;
+			
+			if (jack_port_connected (port) && (driver->inPortAudio != NULL)) {
+				int channels = driver->capture_nchannels;
+				float* in = driver->inPortAudio;
+				buf = jack_port_get_buffer (port, nframes); 
+				for (i = 0; i< nframes; i++) buf[i] = in[channels*i+chn];
+			}
+
+	}
+   
+	driver->engine->transport_cycle_start (driver->engine,
+					   jack_get_microseconds ());
+	return 0;
 }          
 
 
 static int
 portaudio_driver_write (portaudio_driver_t *driver, jack_nframes_t nframes)
 {
-        jack_default_audio_sample_t *buf;
-        channel_t chn;
-        jack_port_t *port;
-        JSList *node;
-        int i;
-        
-        /* Clear in case of nothing is connected */
-        memset(driver->outPortAudio, 0, (driver->playback_nchannels * nframes * sizeof(float)));
-                
-        for (chn = 0, node = driver->playback_ports; node; node = jack_slist_next (node), chn++) {
-                
-                port = (jack_port_t *)node->data;
-                
-                if (jack_port_connected (port) && (driver->outPortAudio != NULL)) {
-                        int channels = driver->playback_nchannels;
-                        float* out = driver->outPortAudio;
-                        buf = jack_port_get_buffer (port, nframes);
-                        for (i = 0; i< nframes; i++) out[channels*i+chn] = buf[i];
-                }
-        }
-        
-        return 0;
+	jack_default_audio_sample_t *buf;
+	channel_t chn;
+	jack_port_t *port;
+	JSList *node;
+	int i;
+	
+	/* Clear in case of nothing is connected */
+	memset(driver->outPortAudio, 0, (driver->playback_nchannels * nframes * sizeof(float)));
+			
+	for (chn = 0, node = driver->playback_ports; node; node = jack_slist_next (node), chn++) {
+			
+			port = (jack_port_t *)node->data;
+			
+			if (jack_port_connected (port) && (driver->outPortAudio != NULL)) {
+					int channels = driver->playback_nchannels;
+					float* out = driver->outPortAudio;
+					buf = jack_port_get_buffer (port, nframes);
+					for (i = 0; i< nframes; i++) out[channels*i+chn] = buf[i];
+			}
+	}
+	
+	return 0;
 }
 
 static int
 portaudio_driver_audio_start (portaudio_driver_t *driver)
 {
-        PaError err = Pa_StartStream(driver->stream);
-        return (err != paNoError) ? -1 : 0;
+	PaError err = Pa_StartStream(driver->stream);
+	return (err != paNoError) ? -1 : 0;
 }
 
 static int
 portaudio_driver_audio_stop (portaudio_driver_t *driver)
 {
-        PaError err = Pa_StopStream(driver->stream);
-        return (err != paNoError) ? -1 : 0;
+	PaError err = Pa_StopStream(driver->stream);
+	return (err != paNoError) ? -1 : 0;
 }
 
 static int
@@ -275,7 +290,7 @@ portaudio_driver_set_parameters (portaudio_driver_t* driver,
 		NULL,
 		rate,			/* sample rate */
 		nframes,		/* frames per buffer */
-		0,			/* number of buffers = default min */
+		0,				/* number of buffers = default min */
 		paClipOff,		/* we won't output out of
 						* range samples so don't
 						* bother clipping them */
@@ -319,7 +334,6 @@ portaudio_driver_reset_parameters (portaudio_driver_t* driver,
 	}
 
 	Pa_CloseStream(driver->stream);
-
 	return portaudio_driver_set_parameters (driver, nframes, rate);
 }
 
@@ -361,7 +375,7 @@ static int portaudio_load_default (portaudio_driver_t *driver,
     int i,j;
     int found = 0;
     
-    printf("Look for default driver\n");
+    PALog("Look for default driver\n");
     
     *inputDeviceID = Pa_GetDefaultInputDeviceID();
     *outputDeviceID = Pa_GetDefaultOutputDeviceID();
@@ -369,7 +383,7 @@ static int portaudio_load_default (portaudio_driver_t *driver,
     for(i=0; i<numDevices; i++)
     {
         pdi = Pa_GetDeviceInfo(i);
-        printf("---------------------------------------------- #%d\n", i);
+        PALog("---------------------------------------------- #%d\n", i);
         
         if (i == Pa_GetDefaultInputDeviceID()) {
             driver->capture_nchannels = (capturing) ? pdi->maxInputChannels : 0;
@@ -383,28 +397,28 @@ static int portaudio_load_default (portaudio_driver_t *driver,
             found = 1;
         }
         
-        printf("\nName         = %s\n", pdi->name);
-        printf("Max Inputs = %d ", pdi->maxInputChannels);
-        printf("Max Outputs = %d\n", pdi->maxOutputChannels);
+        PALog("\nName         = %s\n", pdi->name);
+        PALog("Max Inputs = %d ", pdi->maxInputChannels);
+        PALog("Max Outputs = %d\n", pdi->maxOutputChannels);
         if( pdi->numSampleRates == -1 ){
-            printf("Sample Rate Range = %f to %f\n", pdi->sampleRates[0], pdi->sampleRates[1]);
+            PALog("Sample Rate Range = %f to %f\n", pdi->sampleRates[0], pdi->sampleRates[1]);
         }else{
-            printf("Sample Rates =");
+            PALog("Sample Rates =");
             for(j=0; j<pdi->numSampleRates; j++){
-                printf(" %8.2f,", pdi->sampleRates[j]);
+                PALog(" %8.2f,", pdi->sampleRates[j]);
             }
-            printf("\n");
+            PALog("\n");
         }
         
-        printf("Native Sample Formats = ");
-        if( pdi->nativeSampleFormats & paInt8 )        printf("paInt8, ");
-        if( pdi->nativeSampleFormats & paUInt8 )       printf("paUInt8, ");
-        if( pdi->nativeSampleFormats & paInt16 )       printf("paInt16, ");
-        if( pdi->nativeSampleFormats & paInt32 )       printf("paInt32, ");
-        if( pdi->nativeSampleFormats & paFloat32 )     printf("paFloat32, ");
-        if( pdi->nativeSampleFormats & paInt24 )       printf("paInt24, ");
-        if( pdi->nativeSampleFormats & paPackedInt24 ) printf("paPackedInt24, ");
-        printf("\n");
+        PALog("Native Sample Formats = ");
+        if (pdi->nativeSampleFormats & paInt8)        PALog("paInt8, ");
+        if (pdi->nativeSampleFormats & paUInt8)       PALog("paUInt8, ");
+        if (pdi->nativeSampleFormats & paInt16)       PALog("paInt16, ");
+        if (pdi->nativeSampleFormats & paInt32)       PALog("paInt32, ");
+        if (pdi->nativeSampleFormats & paFloat32)     PALog("paFloat32, ");
+        if (pdi->nativeSampleFormats & paInt24)       PALog("paInt24, ");
+        if (pdi->nativeSampleFormats & paPackedInt24) PALog("paPackedInt24, ");
+        PALog("\n");
     }
     
     return found;
@@ -422,61 +436,61 @@ static int portaudio_load_driver (portaudio_driver_t *driver,
     int found = 0;
     int i,j;
     
-    printf("Look for %s driver\n",driver_name);
+    PALog("Look for %s driver\n",driver_name);
       
     for(i=0; i<numDevices; i++)
     {
         pdi = Pa_GetDeviceInfo(i);
-        printf("---------------------------------------------- #%d\n", i);
+        PALog("---------------------------------------------- #%d\n", i);
         
         //if (strcmp(driver_name,pdi->name) == 0) {
 	// compare the first character
 	if (strncmp (driver_name, pdi->name,
 		     JACK_DRIVER_PARAM_STRING_MAX) == 0) {
-            if (pdi->maxInputChannels > 0) {
-                *inputDeviceID = i;
-                driver->capture_nchannels =
+		if (pdi->maxInputChannels > 0) {
+			*inputDeviceID = i;
+			driver->capture_nchannels =
 			(capturing) ? pdi->maxInputChannels : 0;
-                strcpy(driver->driver_name,pdi->name);
-                printf("Found input driver = %s\n", driver_name);
-                found = 1;
-            }
+			strcpy(driver->driver_name,pdi->name);
+			PALog("Found input driver = %s\n", driver_name);
+			found = 1;
+		}
 	    if (pdi->maxOutputChannels > 0) {
-                *outputDeviceID = i;
-                driver->playback_nchannels =
+			*outputDeviceID = i;
+			driver->playback_nchannels =
 			(playing) ? pdi->maxOutputChannels : 0;
-                strcpy (driver->driver_name,pdi->name);
-                printf("Found output driver = %s\n", driver_name);
-                found = 1;
-            } else {
-                printf("Found driver without input or ouput = %s\n",
+			strcpy (driver->driver_name,pdi->name);
+			PALog("Found output driver = %s\n", driver_name);
+			found = 1;
+		} else {
+			PALog("Found driver without input or ouput = %s\n",
 		       driver_name);
             }
         }
                         
-        printf("\nName         = %s\n", pdi->name);
-        printf("Max Inputs = %d ", pdi->maxInputChannels);
-        printf("Max Outputs = %d\n", pdi->maxOutputChannels);
+        PALog("\nName         = %s\n", pdi->name);
+        PALog("Max Inputs = %d ", pdi->maxInputChannels);
+        PALog("Max Outputs = %d\n", pdi->maxOutputChannels);
         if( pdi->numSampleRates == -1 ){
-            printf("Sample Rate Range = %f to %f\n", pdi->sampleRates[0],
-		   pdi->sampleRates[1]);
+            PALog("Sample Rate Range = %f to %f\n", pdi->sampleRates[0],
+			pdi->sampleRates[1]);
         }else{
-            printf("Sample Rates =");
+            PALog("Sample Rates =");
             for(j=0; j<pdi->numSampleRates; j++){
-                printf(" %8.2f,", pdi->sampleRates[j]);
+                PALog(" %8.2f,", pdi->sampleRates[j]);
             }
-            printf("\n");
+            PALog("\n");
         }
         
-        printf("Native Sample Formats = ");
-        if( pdi->nativeSampleFormats & paInt8 )        printf("paInt8, ");
-        if( pdi->nativeSampleFormats & paUInt8 )       printf("paUInt8, ");
-        if( pdi->nativeSampleFormats & paInt16 )       printf("paInt16, ");
-        if( pdi->nativeSampleFormats & paInt32 )       printf("paInt32, ");
-        if( pdi->nativeSampleFormats & paFloat32 )     printf("paFloat32, ");
-        if( pdi->nativeSampleFormats & paInt24 )       printf("paInt24, ");
-        if( pdi->nativeSampleFormats & paPackedInt24 ) printf("paPackedInt24, ");
-        printf("\n");
+        PALog("Native Sample Formats = ");
+        if (pdi->nativeSampleFormats & paInt8)        PALog("paInt8, ");
+        if (pdi->nativeSampleFormats & paUInt8)       PALog("paUInt8, ");
+        if (pdi->nativeSampleFormats & paInt16)       PALog("paInt16, ");
+        if (pdi->nativeSampleFormats & paInt32)       PALog("paInt32, ");
+        if (pdi->nativeSampleFormats & paFloat32)     PALog("paFloat32, ");
+        if (pdi->nativeSampleFormats & paInt24)       PALog("paInt24, ");
+        if (pdi->nativeSampleFormats & paPackedInt24) PALog("paPackedInt24, ");
+        PALog("\n");
     }
     
     return found;
@@ -503,8 +517,8 @@ portaudio_driver_new (char *name,
 	int inputDeviceID,outputDeviceID;
 	int found;
 	
-	printf ("portaudio driver version : %d\n", kVersion);
-	printf ("creating portaudio driver ... %" PRIu32 "|%" PRIu32 "\n",
+	PALog("portaudio driver version : %d\n", kVersion);
+	PALog("creating portaudio driver ... %" PRIu32 "|%" PRIu32 "\n",
 		frames_per_cycle, rate);
 
 	driver = (portaudio_driver_t *) calloc (1, sizeof (portaudio_driver_t));
@@ -544,31 +558,31 @@ portaudio_driver_new (char *name,
 #endif
        
 	err = Pa_Initialize();
-	printf("Pa_Initialize OK \n");
+	PALog("Pa_Initialize OK \n");
 	
-	printf("Driver name required %s\n",driver_name);
+	PALog("Driver name required %s\n",driver_name);
 	numDevices = Pa_CountDevices();
 	
 	if( numDevices < 0 )
 	{
-		printf("ERROR: Pa_CountDevices returned 0x%x\n", numDevices);
+		PALog("ERROR: Pa_CountDevices returned 0x%x\n", numDevices);
 		err = numDevices;
 		goto error;
 	}
 	
-	printf("Number of devices = %d\n", numDevices);
+	PALog("Number of devices = %d\n", numDevices);
 
 	if (strcmp(driver_name,"") == 0) {
 		found = portaudio_load_default(driver,numDevices,capturing,playing,&inputDeviceID,&outputDeviceID);
 		if (!found) {
-			printf("ERROR : default driver has not been found\n");
+			PALog("ERROR : default driver has not been found\n");
 			err = paHostError;
 			goto error;
 		}
 	}else{
 		found = portaudio_load_driver(driver,numDevices,capturing,playing,&inputDeviceID,&outputDeviceID,driver_name);
 		if (!found) {
-			 printf("ERROR : driver %s has not been found \n",driver_name);
+			 PALog("ERROR : driver %s has not been found \n",driver_name);
 			 err = paHostError;
 			 goto error;
 		}
@@ -576,17 +590,17 @@ portaudio_driver_new (char *name,
 
 	if (err != paNoError) goto error;
 	
-	printf("Pa_GetDefaultOutputDeviceID() %ld\n", (long)Pa_GetDefaultOutputDeviceID());
-	printf("Pa_GetDefaultInputDeviceID() %ld\n",  (long)Pa_GetDefaultInputDeviceID());
+	PALog("Pa_GetDefaultOutputDeviceID() %ld\n", (long)Pa_GetDefaultOutputDeviceID());
+	PALog("Pa_GetDefaultInputDeviceID() %ld\n",  (long)Pa_GetDefaultInputDeviceID());
 	
-	printf("--------------------------------------------------\n");
-	printf("CoreAudio driver %s will be loaded\n", driver->driver_name);
-	printf("inputDeviceID %ld\n",  (long)inputDeviceID);
-	printf("outputDeviceID %ld\n",  (long)outputDeviceID);
-	printf("driver->capture_nchannels %ld\n", driver->capture_nchannels);
-	printf("driver->playback_nchannels %ld\n", driver->playback_nchannels);
+	PALog("--------------------------------------------------\n");
+	PALog("CoreAudio driver %s will be loaded\n", driver->driver_name);
+	PALog("inputDeviceID %ld\n",  (long)inputDeviceID);
+	PALog("outputDeviceID %ld\n",  (long)outputDeviceID);
+	PALog("driver->capture_nchannels %ld\n", driver->capture_nchannels);
+	PALog("driver->playback_nchannels %ld\n", driver->playback_nchannels);
 	
-	printf("chan_in, chan_out %ld %ld\n",  (long)chan_in,  (long)chan_out);
+	PALog("chan_in, chan_out %ld %ld\n",  (long)chan_in,  (long)chan_out);
         
 	if (chan_in > 0) 
 		driver->capture_nchannels = (driver->capture_nchannels < chan_in) ? driver->capture_nchannels : chan_in;
@@ -594,8 +608,8 @@ portaudio_driver_new (char *name,
 	if (chan_out > 0) 
 		driver->playback_nchannels = (driver->playback_nchannels < chan_out) ? driver->playback_nchannels : chan_out;
 		
-	printf("driver->capture_nchannels %ld\n", driver->capture_nchannels);
-	printf("driver->playback_nchannels %ld\n", driver->playback_nchannels);
+	PALog("driver->capture_nchannels %ld\n", driver->capture_nchannels);
+	PALog("driver->playback_nchannels %ld\n", driver->playback_nchannels);
 	
 	err = Pa_OpenStream(&driver->stream,
 						((capturing && (driver->capture_nchannels > 0)) ? inputDeviceID : paNoDevice),
@@ -617,7 +631,6 @@ portaudio_driver_new (char *name,
 	
 	driver->client = client; 
 	driver->period_usecs = (((float) driver->frames_per_cycle) / driver->frame_rate) * 1000000.0f;
-	
 	return((jack_driver_t *) driver);
 
 error:
@@ -777,7 +790,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
                 
 		case 'n':
 			name = (char *) param->value.str;
-			printf("Driver name found %s\n",name);
+			PALog("Driver name found %s\n",name);
 			break;
                         
 		case 'D':
