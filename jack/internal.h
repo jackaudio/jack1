@@ -170,7 +170,7 @@ typedef volatile struct {
     volatile jack_client_id_t id;         /* w: engine r: engine and client */
     volatile jack_nframes_t  nframes;     /* w: engine r: client */
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
-    volatile int8_t     name[JACK_CLIENT_NAME_SIZE];
+    volatile char	name[JACK_CLIENT_NAME_SIZE];
     volatile ClientType type;             /* w: engine r: engine and client */
     volatile int8_t     active;           /* w: engine r: engine and client */
     volatile int8_t     dead;             /* r/w: engine */
@@ -228,6 +228,7 @@ typedef struct {
     
     int32_t    load;
     ClientType type;
+    jack_options_t options;
 
     char name[JACK_CLIENT_NAME_SIZE];
     char object_path[PATH_MAX+1];
@@ -237,10 +238,10 @@ typedef struct {
 
 typedef struct {
 
-    int32_t	status;
-
+    int32_t	status;			/* messy name overloading */
     uint32_t	protocol_v;
 
+    jack_status_t open_status;		/* used for open() */
     jack_shm_info_t client_shm;
     jack_shm_info_t engine_shm;
 
@@ -248,6 +249,8 @@ typedef struct {
 
     int32_t	realtime;
     int32_t	realtime_priority;
+
+    char name[JACK_CLIENT_NAME_SIZE];	/* unique name, if assigned */
 
     /* these two are valid only if the connect request
        was for type == ClientDriver. 
@@ -323,8 +326,8 @@ struct _jack_request {
     int32_t status;
 };
 
-/* per-client structure allocated in the server's address space
- * its here because its not part of the engine structure.
+/* Per-client structure allocated in the server's address space.
+ * It's here because its not part of the engine structure.
  */
 
 typedef struct _jack_client_internal {

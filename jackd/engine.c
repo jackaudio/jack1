@@ -1002,28 +1002,95 @@ jack_client_unload (jack_client_internal_t *client)
 }
 
 static jack_client_internal_t *
+jack_client_lookup_name (jack_engine_t *engine, char *name)
+{
+	JSList *node;
+
+	jack_lock_graph (engine);
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+	        jack_client_internal_t *client = node->data;
+
+		if (strncmp(name, (char *) client->control->name,
+			    JACK_CLIENT_NAME_SIZE) == 0) {
+			jack_unlock_graph (engine);
+			return client;	/* name exists */
+		}
+	}
+	jack_unlock_graph (engine);
+	return NULL;			/* not found */
+}
+
+/* generate a unique client name
+ *
+ * returns 0 if successful, updates name in place
+ */
+static inline int
+jack_generate_unique_name (jack_engine_t *engine, char *name)
+{
+	int tens, ones;
+	int length = strlen (name);
+
+	if (length > JACK_CLIENT_NAME_SIZE - 4) {
+		jack_error ("%s exists and is too long to make unique", name);
+		return 1;		/* failure */
+	}
+
+	/*  generate a unique name by appending "-01".."-99" */
+	name[length++] = '-';
+	tens = length++;
+	ones = length++;
+	name[tens] = '0';
+	name[ones] = '1';
+	name[length] = '\0';
+	while (jack_client_lookup_name (engine, name)) {
+		if (name[ones] == '9') {
+			if (name[tens] == '9') {
+				jack_error ("client %s has 99 extra"
+					    " instances already", name);
+				return 1; /* give up */
+			}
+			name[tens]++;
+			name[ones] = '0';
+		} else {
+			name[ones]++;
+		}
+	}
+	return 0;
+}
+
+static jack_client_internal_t *
 setup_client (jack_engine_t *engine, int client_fd,
 	      jack_client_connect_request_t *req,
 	      jack_client_connect_result_t *res)
 {
-	JSList *node;
-	jack_client_internal_t *client = NULL;
+	jack_client_internal_t *client;
 
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-	        client = (jack_client_internal_t *) node->data;
+	/* Since this thread already holds the request_lock, no other
+	 * new client will be created at the same time.  So, testing a
+	 * name for uniqueness is valid here. */
 
-		if (strncmp(req->name, (char*)client->control->name,
-			    sizeof(req->name)) == 0) {
-		        jack_error ("cannot create new client; %s already"
-				    " exists", client->control->name);
+	//JOQ: watch out for internal clients, they come here too
+
+	if (jack_client_lookup_name (engine, req->name)) {
+
+		res->open_status |= JackNameNotUnique;
+
+		if (req->options & JackUseExactName) {
+			jack_error ("cannot create new client; %s already"
+				    " exists", req->name);
 			return NULL;
+		}
+
+		if (jack_generate_unique_name(engine, req->name)) {
+			return NULL;	/* failure */
 		}
 	}
 
-	if ((client = jack_setup_client_control (engine, client_fd, req))
-	    == NULL) {
+	/* create a client struct for this client name */
+	client = jack_setup_client_control (engine, client_fd, req);
+	if (client == NULL) {
 		jack_error ("cannot create new client object");
-		return 0;
+		return NULL;
 	}
 	
 	VERBOSE (engine, "new client: %s, id = %" PRIu32
@@ -1036,6 +1103,7 @@ setup_client (jack_engine_t *engine, int client_fd,
 	res->engine_shm = engine->control_shm;
 	res->realtime = engine->control->real_time;
 	res->realtime_priority = engine->rtpriority - 1;
+	strncpy (res->name, req->name, sizeof(res->name));
 
 #ifdef JACK_USE_MACH_THREADS
 	/* specific resources for server/client real-time thread
@@ -1271,8 +1339,10 @@ handle_new_client (jack_engine_t *engine, int client_fd)
 	jack_client_internal_t *client;
 	jack_client_connect_request_t req;
 	jack_client_connect_result_t res;
-	
+
+	//JOQ: fix messy overloading of `status'
 	res.status = 0;
+	res.open_status = 0;
 
 	if (read (client_fd, &req, sizeof (req)) != sizeof (req)) {
 		jack_error ("cannot read connection request from client");

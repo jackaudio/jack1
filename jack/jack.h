@@ -58,10 +58,10 @@ extern "C" {
  * possible concurrent server instances.  If unspecified, "default" is
  * assumed.  Server names are unique to each user.
  *
- * @param start_command (if non-NULL) is a command line to use if the
- * server was not running and must be started.  Defining
- * $JACK_NO_START_SERVER in the environment disables automatic server
- * creation.
+ * @param server_command (if non-NULL) is a command line to start the
+ * server if it was not running.  The @ref JackNoStartServer option
+ * disables automatic server creation, as does defining
+ * $JACK_NO_START_SERVER in the environment.
  *
  * @return Opaque client handle if successful.  If this is NULL, the
  * open operation failed, and the caller is not a JACK client.
@@ -70,7 +70,7 @@ jack_client_t *jack_client_open (const char *client_name,
 				 jack_options_t options,
 				 jack_status_t *status,
 				 const char *server_name,
-				 const char *start_command);
+				 const char *server_command);
 
 /**
  * Attempt to become an external client of the Jack server.

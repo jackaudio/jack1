@@ -16,30 +16,52 @@ jack_port_t *input_port;
 jack_port_t *output_port;
 jack_client_t *client;
 
+/* a simple state machine for this client */
+volatile enum {
+	Init,
+	Run,
+	Exit
+} client_state = Init;
+
 /**
- * The process callback for this JACK application.
- * It is called by JACK at the appropriate times.
+ * The process callback for this JACK application is called in a
+ * special realtime thread once for each audio cycle.
+ *
+ * This client follows a simple rule: when the JACK transport is
+ * running, copy the input port to the output.  When it stops, exit.
  */
 int
 process (jack_nframes_t nframes, void *arg)
 {
-	jack_default_audio_sample_t *out = (jack_default_audio_sample_t *) jack_port_get_buffer (output_port, nframes);
-	jack_default_audio_sample_t *in = (jack_default_audio_sample_t *) jack_port_get_buffer (input_port, nframes);
+	jack_default_audio_sample_t *in, *out;
+	jack_transport_state_t ts = jack_transport_query(client, NULL);
 
-	memcpy (out, in, sizeof (jack_default_audio_sample_t) * nframes);
+	if (ts == JackTransportRolling) {
+
+		if (client_state == Init)
+			client_state = Run;
+
+		in = jack_port_get_buffer (input_port, nframes);
+		out = jack_port_get_buffer (output_port, nframes);
+		memcpy (out, in,
+			sizeof (jack_default_audio_sample_t) * nframes);
+
+	} else if (ts == JackTransportStopped) {
+
+		if (client_state == Run)
+			client_state = Exit;
+	}
 
 	return 0;      
 }
 
 /**
- * This is the shutdown callback for this JACK application.
- * It is called by JACK if the server ever shuts down or
+ * JACK calls this shutdown_callback if the server ever shuts down or
  * decides to disconnect the client.
  */
 void
 jack_shutdown (void *arg)
 {
-
 	exit (1);
 }
 
@@ -47,17 +69,34 @@ int
 main (int argc, char *argv[])
 {
 	const char **ports;
+	const char *client_name;
+	jack_status_t status;
 
-	if (argc < 2) {
-		fprintf (stderr, "usage: jack_simple_client <name>\n");
-		return 1;
+	if (argc >= 2) {		/* session name specified? */
+		client_name = argv[1];
+	} else {			/* use basename of argv[0] */
+		client_name = strrchr(argv[0], '/');
+		if (client_name == 0) {
+			client_name = argv[0];
+		} else {
+			client_name++;
+		}
 	}
 
-	/* try to become a client of the JACK server */
+	/* open a client connection to the JACK server */
 
-	if ((client = jack_client_new (argv[1])) == 0) {
-		fprintf (stderr, "jack server not running?\n");
-		return 1;
+	client = jack_client_open (client_name, 0, &status, NULL, NULL);
+	if (client == NULL) {
+		fprintf (stderr, "jack_client_open() failed, status = %d\n",
+			 status);
+		exit (1);
+	}
+	if (status & JackServerStarted) {
+		fprintf (stderr, "JACK server started\n");
+	}
+	if (status & JackNameNotUnique) {
+		client_name = jack_get_client_name(client);
+		fprintf (stderr, "unique name `%s' assigned\n", client_name);
 	}
 
 	/* tell the JACK server to call `process()' whenever
@@ -81,25 +120,31 @@ main (int argc, char *argv[])
 
 	/* create two ports */
 
-	input_port = jack_port_register (client, "input", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
-	output_port = jack_port_register (client, "output", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
+	input_port = jack_port_register (client, "input",
+					 JACK_DEFAULT_AUDIO_TYPE,
+					 JackPortIsInput, 0);
+	output_port = jack_port_register (client, "output",
+					  JACK_DEFAULT_AUDIO_TYPE,
+					  JackPortIsOutput, 0);
 
-	/* tell the JACK server that we are ready to roll */
+	/* Tell the JACK server that we are ready to roll.  Our
+	 * process() callback will start running now. */
 
 	if (jack_activate (client)) {
 		fprintf (stderr, "cannot activate client");
-		return 1;
+		exit (1);
 	}
 
-	/* connect the ports. Note: you can't do this before
-	   the client is activated, because we can't allow
-	   connections to be made to clients that aren't
-	   running.
+	/* connect the ports. Note: you can't do this before the
+	   client is activated, because we can't allow connections to
+	   be made to clients that aren't running.
 	*/
 
-	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsOutput)) == NULL) {
-		fprintf(stderr, "Cannot find any physical capture ports\n");
-		exit(1);
+	ports = jack_get_ports (client, NULL, NULL,
+				JackPortIsPhysical|JackPortIsOutput);
+	if (ports == NULL) {
+		fprintf(stderr, "no physical capture ports\n");
+		exit (1);
 	}
 
 	if (jack_connect (client, ports[0], jack_port_name (input_port))) {
@@ -108,9 +153,11 @@ main (int argc, char *argv[])
 
 	free (ports);
 	
-	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsInput)) == NULL) {
-		fprintf(stderr, "Cannot find any physical playback ports\n");
-		exit(1);
+	ports = jack_get_ports (client, NULL, NULL,
+				JackPortIsPhysical|JackPortIsInput);
+	if (ports == NULL) {
+		fprintf(stderr, "no physical playback ports\n");
+		exit (1);
 	}
 
 	if (jack_connect (client, jack_port_name (output_port), ports[0])) {
@@ -119,10 +166,12 @@ main (int argc, char *argv[])
 
 	free (ports);
 
-	/* Since this is just a toy, run for a few seconds, then finish */
+	/* keep running until the transport stops */
 
-	sleep (10);
+	while (client_state != Exit) {
+		sleep (1);
+	}
+
 	jack_client_close (client);
 	exit (0);
 }
-

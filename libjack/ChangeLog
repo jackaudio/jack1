@@ -1,3 +1,7 @@
+2004-10-08  Jack O'Quin  <joq@io.com>
+
+	* new API functions: jack_client_open(), jack_get_client_name()
+
 2004-09-15  Jack O'Quin  <joq@io.com>
 
 	* new API functions from <jack/thread.h>
