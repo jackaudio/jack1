@@ -139,11 +139,13 @@ jack_port_register (jack_client_t *client,
 	req.x.port_info.client_id = client->control->id;
 
 	if (jack_client_deliver_request (client, &req)) {
+		jack_error ("cannot deliver port registration request");
 		return NULL;
 	}
 
 	if ((port = jack_port_new (client, req.x.port_info.port_id,
 				   client->engine)) == NULL) {
+		jack_error ("cannot allocate client side port structure");
 		return NULL;
 	}
 

@@ -123,8 +123,9 @@ oop_client_deliver_request (void *ptr, jack_request_t *req)
 	rok = (read (client->request_fd, req, sizeof (*req))
 	       == sizeof (*req));
 
-	if (wok && rok)			/* everything OK? */
+	if (wok && rok) {		/* everything OK? */
 		return req->status;
+	}
 
 	req->status = -1;		/* request failed */
 
@@ -606,8 +607,13 @@ jack_request_client (ClientType type, const char* client_name,
 				    "(duplicate client name?)");
 			goto fail;
 		}
-
-		jack_error ("cannot read response from jack server (%s)",
+		
+		if (errno == ECONNRESET) {
+			jack_error ("could not attach as jack client (server has exited)");
+			goto fail;
+		}
+		
+		jack_error ("cannot read regsponse from jack server (%s)",
 			    strerror (errno));
 		goto fail;
 	}

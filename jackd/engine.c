@@ -1958,8 +1958,7 @@ jack_server_thread (void *arg)
 			break;
 		}
 	
-
-		if (pfd[0].revents & POLLIN) {
+		if (engine->control->engine_ok && pfd[0].revents & POLLIN) {
 			DEBUG ("pfd[0].revents & POLLIN");
 
 			memset (&client_addr, 0, sizeof (client_addr));
@@ -1986,7 +1985,7 @@ jack_server_thread (void *arg)
 			break;
 		}
 
-		if (pfd[1].revents & POLLIN) {
+		if (engine->control->engine_ok && pfd[1].revents & POLLIN) {
 			DEBUG ("pfd[1].revents & POLLIN");
 
 			memset (&client_addr, 0, sizeof (client_addr));
@@ -2005,8 +2004,6 @@ jack_server_thread (void *arg)
 				close (client_socket);
 			}
 		}
-
-		
 	}
 
 	return 0;
@@ -2554,13 +2551,16 @@ jack_engine_delete (jack_engine_t *engine)
 
 	engine->control->engine_ok = 0;	/* tell clients we're going away */
 
+	/* shutdown master socket to prevent new clients arriving */
+	// close (engine->fds[0]);
+
 	if (engine->driver) {
 		jack_driver_t* driver = engine->driver;
 
 		VERBOSE (engine, "stopping driver\n");
 		driver->stop (driver);
-		VERBOSE (engine, "detaching driver\n");
-		driver->detach (driver, engine);
+		// VERBOSE (engine, "detaching driver\n");
+		// driver->detach (driver, engine);
 		VERBOSE (engine, "unloading driver\n");
 		jack_driver_unload (driver);
 		engine->driver = NULL;

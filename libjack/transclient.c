@@ -226,6 +226,7 @@ jack_frame_time (const jack_client_t *client)
 	jack_read_frame_time (client, &current);
 	
 	usecs = jack_get_microseconds() - current.stamp;
+
 	elapsed = (jack_nframes_t)
 		floor ((((float) ectl->current_time.frame_rate)
 			/ 1000000.0f) * usecs);

@@ -50,7 +50,7 @@ extern void show_work_times ();
 #undef DEBUG_WAKEUP
 
 /* Delay (in process calls) before jackd will report an xrun */
-#define XRUN_REPORT_DELAY 64
+#define XRUN_REPORT_DELAY 0
 
 
 static void
@@ -923,9 +923,40 @@ alsa_driver_start (alsa_driver_t *driver)
 	}
 
 	if (driver->hw_monitoring) {
-		driver->hw->set_input_monitor_mask (driver->hw,
-						    driver->input_monitor_mask);
+		if (driver->input_monitor_mask || driver->all_monitor_in) {
+			if (driver->all_monitor_in) {
+				driver->hw->set_input_monitor_mask (driver->hw, ~0U);
+			} else {
+				driver->hw->set_input_monitor_mask (
+					driver->hw, driver->input_monitor_mask);
+			}
+		} else {
+			driver->hw->set_input_monitor_mask (driver->hw,
+							    driver->input_monitor_mask);
+		}
 	}
+
+	if (driver->playback_handle) {
+		driver->playback_nfds =
+			snd_pcm_poll_descriptors_count (driver->playback_handle);
+	} else {
+		driver->playback_nfds = 0;
+	}
+
+	if (driver->capture_handle) {
+		driver->capture_nfds =
+			snd_pcm_poll_descriptors_count (driver->capture_handle);
+	} else {
+		driver->capture_nfds = 0;
+	}
+
+	if (driver->pfd) {
+		free (driver->pfd);
+	}
+
+	driver->pfd = (struct pollfd *)
+		malloc (sizeof (struct pollfd) * 
+			(driver->playback_nfds + driver->capture_nfds + 2));
 
 	if (driver->playback_handle) {
 		/* fill playback buffer with zeroes, and mark 
@@ -977,38 +1008,6 @@ alsa_driver_start (alsa_driver_t *driver)
 		}
 	}
 			
-	if (driver->hw_monitoring &&
-	    (driver->input_monitor_mask || driver->all_monitor_in)) {
-		if (driver->all_monitor_in) {
-			driver->hw->set_input_monitor_mask (driver->hw, ~0U);
-		} else {
-			driver->hw->set_input_monitor_mask (
-				driver->hw, driver->input_monitor_mask);
-		}
-	}
-
-	if (driver->playback_handle) {
-		driver->playback_nfds =
-			snd_pcm_poll_descriptors_count (driver->playback_handle);
-	} else {
-		driver->playback_nfds = 0;
-	}
-
-	if (driver->capture_handle) {
-		driver->capture_nfds =
-			snd_pcm_poll_descriptors_count (driver->capture_handle);
-	} else {
-		driver->capture_nfds = 0;
-	}
-
-	if (driver->pfd) {
-		free (driver->pfd);
-	}
-
-	driver->pfd = (struct pollfd *)
-		malloc (sizeof (struct pollfd) * 
-			(driver->playback_nfds + driver->capture_nfds + 2));
-
 	return 0;
 }
 

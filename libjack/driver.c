@@ -116,11 +116,10 @@ jack_driver_nt_thread (void * arg)
 
 	pthread_mutex_lock (&driver->nt_run_lock);
 
-	while ( (run = driver->nt_run) == DRIVER_NT_RUN) {
+	while ((run = driver->nt_run) == DRIVER_NT_RUN) {
 		pthread_mutex_unlock (&driver->nt_run_lock);
 
-		rc = driver->nt_run_cycle (driver);
-		if (rc) {
+		if ((rc = driver->nt_run_cycle (driver)) != 0) {
 			jack_error ("DRIVER NT: could not run driver cycle");
 			goto out;
 		}
@@ -142,23 +141,30 @@ jack_driver_nt_start (jack_driver_nt_t * driver)
 {
 	int err;
 
-	err = driver->nt_start (driver);
-	if (err) {
-		jack_error ("DRIVER NT: could not start driver");
-		return err;
-	}
-
+	/* stop the new thread from really starting until the driver has
+	   been started.
+	*/
+ 
+	pthread_mutex_lock (&driver->nt_run_lock);
 	driver->nt_run = DRIVER_NT_RUN;
 
-	err = jack_create_thread (&driver->nt_thread, 
-				  driver->engine->rtpriority,
-				  driver->engine->control->real_time,
-				  jack_driver_nt_thread, driver);
-	if (err) {
+	if ((err = jack_create_thread (&driver->nt_thread, 
+				       driver->engine->rtpriority,
+				       driver->engine->control->real_time,
+				       jack_driver_nt_thread, driver)) != 0) {
 		jack_error ("DRIVER NT: could not start driver thread!");
 		driver->nt_stop (driver);
 		return err;
 	}
+	    
+	if ((err = driver->nt_start (driver)) != 0) {
+		jack_error ("DRIVER NT: could not start driver");
+		return err;
+	}
+
+	/* let the thread run, since the underlying "device" has now been started */
+
+	pthread_mutex_unlock (&driver->nt_run_lock);
 
 	return 0;
 }
@@ -172,15 +178,13 @@ jack_driver_nt_do_stop (jack_driver_nt_t * driver, int run)
 	driver->nt_run = run;
 	pthread_mutex_unlock (&driver->nt_run_lock);
 
-	err = pthread_join (driver->nt_thread, NULL);
-	if (err) {
+	if ((err = pthread_join (driver->nt_thread, NULL)) != 0) {
 		jack_error ("DRIVER NT: error waiting for driver thread: %s",
                             strerror (err));
 		return err;
 	}
 
-	err = driver->nt_stop (driver);
-	if (err) {
+	if ((err = driver->nt_stop (driver)) != 0) {
 		jack_error ("DRIVER NT: error stopping driver");
 		return err;
 	}
