@@ -29,7 +29,7 @@ install-data-local:
 	if test "$$installfiles" = 'reference/html/*.html'; \
 	then echo '-- Nothing to install' ; \
 	else \
-	  for i in $$installfiles reference/html/doxygen.gif reference/html/doxygen.css; do \
+	  for i in $$installfiles reference/html/doxygen.png reference/html/doxygen.css; do \
 	    echo '-- Installing '$$i ; \
 	    $(INSTALL_DATA) $$i $(DOC_DIR)/reference/html; \
 	  done; \
@@ -41,7 +41,7 @@ uninstall-local: doxygen-build.stamp
 	if test "$$installfiles" = 'reference/html/*.html'; \
 	then echo '-- Nothing to uninstall' ; \
 	else \
-	  for i in $$installfiles reference/html/doxygen.gif reference/html/doxygen.css; do \
+	  for i in $$installfiles reference/html/doxygen.png reference/html/doxygen.css; do \
 	    echo '-- Unstalling '$$i ; \
 	    rm $(DOC_DIR)/$$i; \
 	  done; \
@@ -51,6 +51,6 @@ dist-hook: dist-hook-local
 	mkdir $(distdir)/reference
 	mkdir $(distdir)/reference/html
 	-cp reference/html/*.html reference/html/*.css \
-	    reference/html/*.gif  $(distdir)/reference/html
+	    reference/html/*.png  $(distdir)/reference/html
 
 .PHONY : dist-hook-local
