@@ -1242,10 +1242,8 @@ jack_start_thread (jack_client_t *client)
 
 {
 	pthread_attr_t *attributes = 0;
-#ifdef USE_CAPABILITIES
 	int policy = SCHED_OTHER;
 	struct sched_param client_param, temp_param;
-#endif
 
 	if (client->engine->real_time) {
 		
@@ -1298,14 +1296,12 @@ jack_start_thread (jack_client_t *client)
 
 	if (pthread_create (&client->thread, attributes,
 			    jack_client_thread, client)) {
-#ifdef USE_CAPABILITIES
 		if (client->engine->real_time) {
 			/* we are probably dealing with a broken glibc so try
 			   to work around the bug, see below for more details
 			*/
-			goto capabilities_workaround;
+			goto realtime_workaround;
 		}
-#endif
 		return -1;
 	}
         
@@ -1329,11 +1325,9 @@ jack_start_thread (jack_client_t *client)
             
 	return 0;
 
-#ifdef USE_CAPABILITIES
+	/* we get here only with engine running realtime */
 
-	/* we get here only with engine running realtime and capabilities */
-
- capabilities_workaround:
+ realtime_workaround:
 
 	/* the version of glibc I've played with has a bug that makes
 	   that code fail when running under a non-root user but with the
@@ -1424,7 +1418,6 @@ jack_start_thread (jack_client_t *client)
 		}
 	}
 	return 0;
-#endif
 }
 
 int 
@@ -1494,7 +1487,7 @@ jack_activate (jack_client_t *client)
 			*/
 		}
 	}
-#endif
+#endif /* USE_CAPABILITIES */
 
 	if (client->first_active) {
 

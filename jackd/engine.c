@@ -1427,7 +1427,7 @@ jack_set_client_capabilities (jack_engine_t *engine, jack_client_id_t id)
 	return ret;
 }	
 
-#endif
+#endif /* USE_CAPABILITIES */
 
 
 static int
@@ -1680,7 +1680,7 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		req->status = jack_set_client_capabilities (engine,
 							    req->x.client_id);
 		break;
-#endif
+#endif /* USE_CAPABILITIES */
 		
 	case GetPortConnections:
 	case GetPortNConnections:
@@ -1926,7 +1926,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
 #ifdef USE_CAPABILITIES
 	uid_t uid = getuid ();
 	uid_t euid = geteuid ();
-#endif
+#endif /* USE_CAPABILITIES */
 	jack_init_time ();
 
 	engine = (jack_engine_t *) malloc (sizeof (jack_engine_t));
@@ -2095,7 +2095,8 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
 				 cap_to_text(cap, &size));
 		}
 	}
-#endif
+#endif /* USE_CAPABILITIES */
+
 	engine->control->engine_ok = 1;
 	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix),
 		  "%s/jack-ack-fifo-%d", jack_server_dir, getpid());
@@ -2162,6 +2163,7 @@ jack_watchdog_thread (void *arg)
 
 	while (1) {
 		usleep (5000000);
+		pthread_testcancel();
 		if ( engine->watchdog_check == 0) {
 
 			jack_error ("jackd watchdog: timeout - killing jackd");
@@ -2176,11 +2178,6 @@ jack_watchdog_thread (void *arg)
 			kill (-getpgrp(), SIGABRT);
 			/*NOTREACHED*/
 			exit (1);
-
-#if 0  /* suppress watchdog message */
-		} else {
-			VERBOSE(engine, "jackd watchdog: all is well.\n");
-#endif
 		}
 		engine->watchdog_check = 0;
 	}
@@ -2454,20 +2451,33 @@ jack_engine_delete (jack_engine_t *engine)
 		engine->driver = NULL;
 	}
 
+	VERBOSE (engine, "freeing shared port segments\n");
 	for (i = 0; i < engine->control->n_port_types; ++i) {
 		jack_release_shm (&engine->port_segment[i]);
 		jack_destroy_shm (&engine->port_segment[i]);
 	}
 
 	/* stop the other engine threads */
+	VERBOSE (engine, "stopping server thread\n");
 	pthread_cancel (engine->server_thread);
+	pthread_join (engine->server_thread, NULL);
+
+	/* JOQ: We need to cancel the watchdog thread and wait for it
+	 * to terminate.  For some reason, with the 2.6 kernel this
+	 * causes a segfault in pthread_cancel().  I don't know why,
+	 * but 2.4 works OK.
+	 */
+	VERBOSE (engine, "stopping watchdog thread\n");
 	pthread_cancel (engine->watchdog_thread);
+	pthread_join (engine->watchdog_thread, NULL);
 
 	/* free engine control shm segment */
 	engine->control = NULL;
+	VERBOSE (engine, "freeing engine shared memory\n");
 	jack_release_shm (&engine->control_shm);
 	jack_destroy_shm (&engine->control_shm);
 
+	VERBOSE (engine, "engine deleted\n");
 	free (engine);
 	return 0;
 }

@@ -49,7 +49,7 @@
 
 static struct stat pipe_stat;
 
-#endif
+#endif /* USE_CAPABILITIES */
 
 static JSList * drivers = NULL;
 static sigset_t signals;
@@ -440,7 +440,7 @@ main (int argc, char *argv[])
 			}
 		}
 	}
-#endif
+#endif /* USE_CAPABILITIES */
 
 	opterr = 0;
 	while (!seen_driver &&
