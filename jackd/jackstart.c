@@ -32,13 +32,13 @@
 #include <errno.h>
 #include <string.h>
 
-#include <openssl/evp.h>
 
 #undef _POSIX_SOURCE
 #include <sys/capability.h>
 
 #include "jack/start.h"
 #include "md5.h"
+#include "jack_md5.h"
 
 #define READ_BLOCKSIZE 4096
 
@@ -152,13 +152,13 @@ static int check_binary (const char *binpath)
 	} else {
 		/* md5sum the executable file, check man evp for more details */
 		size_t sum;
-		EVP_MD_CTX ctx;
+		md5_t ctx;
 		char buffer[READ_BLOCKSIZE + 72];
-		unsigned char md_value[EVP_MAX_MD_SIZE];
+		unsigned char md_value[MD5_SIZE];
 		char md_string[3];
-		int md_len, i, j;
+		int i, j;
 
-		EVP_DigestInit(&ctx, EVP_md5());
+		md5_init(&ctx);
 		while (1) {
 			size_t n;
 			sum = 0;
@@ -173,15 +173,15 @@ static int check_binary (const char *binpath)
 			if (n == 0) {
 				break;
 			}
-			EVP_DigestUpdate(&ctx, buffer, READ_BLOCKSIZE);
+			md5_process(&ctx, buffer, READ_BLOCKSIZE);
 		}
 		if (sum > 0)
-			EVP_DigestUpdate(&ctx, buffer, sum);
+			md5_process(&ctx, buffer, sum);
 		if (fclose (binstream)) {
 			fprintf (stderr, "jackstart: could not close %s after reading: %s\n", binpath, strerror(errno));
 		}
-		EVP_DigestFinal(&ctx, md_value, &md_len);
-		for(i = 0, j = 0; i < md_len; i++, j+=2) {
+		md5_finish(&ctx, md_value);
+		for(i = 0, j = 0; i < sizeof(md_value); i++, j+=2) {
 			sprintf(md_string, "%02x", md_value[i]);
 			if (md_string[0] != jackd_md5_sum[j] ||
 			    md_string[1] != jackd_md5_sum[j+1]) {

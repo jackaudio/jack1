@@ -307,10 +307,10 @@ jack_main (int argc, char **argv)
 	return;
 }
 
-static void usage () 
+static void usage (FILE *file) 
 
 {
-	fprintf (stderr, "\
+	fprintf (file, "\
 usage: jackd [ --asio OR -a ]
 	     [ --realtime OR -R [ --realtime-priority OR -P priority ] ]
              [ --verbose OR -v ]
@@ -403,13 +403,13 @@ main (int argc, char *argv[])
 			fprintf (stderr, "unknown option character %c\n", optopt);
 			/*fallthru*/
 		case 'h':
-			usage();
+			usage (stdout);
 			return -1;
 		}
 	}
 
 	if (!seen_driver) {
-		usage ();
+		usage (stderr);
 		exit (1);
 	}
 

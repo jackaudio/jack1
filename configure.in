@@ -5,7 +5,7 @@ AC_CONFIG_AUX_DIR(.)
 
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=33
-JACK_MICRO_VERSION=0
+JACK_MICRO_VERSION=1
 
 BETA=
 
@@ -54,16 +54,6 @@ AC_ARG_ENABLE(capabilities,
                     fi
                     if test "x$HAVE_CAPABILITIES" = "xfalse"; then
                         AC_MSG_WARN([*** required program md5sum not found])
-                    else
-                        AC_CHECK_LIB(ssl, EVP_DigestInit,
-                                     [AC_CHECK_HEADER(openssl/evp.h,
-                                                      [HAVE_CAPABILITIES=true],
-                                                      [AC_MSG_WARN([*** openssl headers not found])
-                                                       HAVE_CAPABILITIES=false]
-                                      )],
-                                     [AC_MSG_WARN([*** openssl library not found])
-                                      HAVE_CAPABILITIES=false]
-                        )
                     fi
                     if test "x$HAVE_CAPABILITIES" = "xfalse"; then
                         AC_MSG_ERROR([*** Capabilities support not present. Run configure again without --enable-capabilities.])

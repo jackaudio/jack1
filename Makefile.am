@@ -26,4 +26,4 @@ rpm: dist
 
 dist-hook: dist-check-doxygen
 
-EXTRA_DIST = depcomp
+EXTRA_DIST = depcomp COPYING COPYING.GPL COPYING.LGPL

@@ -15,19 +15,17 @@ AM_CFLAGS = $(JACK_CFLAGS) -DJACKD_LOCATION=\"$(bindir)/jackd\" $(GLIB_CFLAGS)
 jackd_SOURCES = jackd.c engine.c
 jackd_LDADD = ../libjack/libjack.la -lm -ldl -lpthread $(GLIB_LIBS) $(CAP_LIBS)
 
-jackdincludedir = $(includedir)/jack
+noinst_HEADERS = jack_md5.h md5.h
 
-jackdinclude_HEADERS = md5.h
+BUILT_SOURCES = jack_md5.h
 
-BUILT_SOURCES = md5.h
+jack_md5.h: jackd
+	echo "#define JACKD_MD5_SUM \"`md5sum .libs/jackd | awk '{print $$1}'`\"" > jack_md5.h
 
-md5.h: jackd
-	echo "#define JACKD_MD5_SUM \"`md5sum .libs/jackd | awk '{print $$1}'`\"" > md5.h
-
-jackstart_SOURCES = jackstart.c
-jackstart_LDFLAGS = -lcap -lssl
+jackstart_SOURCES = jackstart.c md5.c
+jackstart_LDFLAGS = -lcap
 
 dist-hook:
-	rm -f $(distdir)/md5.h
+	rm -f $(distdir)/jack_md5.h
 distclean-local:
-	rm -f $(top_builddir)/jackd/md5.h
+	rm -f $(top_builddir)/jackd/jack_md5.h
