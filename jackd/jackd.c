@@ -226,7 +226,7 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 
 
 	if (verbose) {
-		fprintf (stderr, "getting driver descriptor from %s", filename);
+		fprintf (stderr, "getting driver descriptor from %s\n", filename);
 	}
 
 	if ((dlhandle = dlopen (filename, RTLD_NOW|RTLD_GLOBAL)) == NULL) {
@@ -235,12 +235,11 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 		return NULL;
 	}
 
-	dlerror ();
-
 	so_get_descriptor = (JackDriverDescFunction)
 		dlsym (dlhandle, "driver_get_descriptor");
 
 	if ((dlerr = dlerror ()) != NULL) {
+		printf("%s\n", dlerr);
 		dlclose (dlhandle);
 		free (filename);
 		return NULL;
