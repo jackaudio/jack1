@@ -1435,6 +1435,12 @@ jack_port_short_name (const jack_port_t *port)
 	return strchr (port->shared->name, ':') + 1;
 }
 
+int 
+jack_port_is_mine (const jack_client_t *client, const jack_port_t *port)
+{
+	return port->shared->client_id == client->control->id;
+}
+
 int
 jack_port_flags (const jack_port_t *port)
 {

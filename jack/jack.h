@@ -128,10 +128,10 @@ enum JackPortFlags {
 
 jack_port_t *
 jack_port_register (jack_client_t *,
-		     const char *port_name,
-		     const char *port_type,
-		     unsigned long flags,
-		     unsigned long buffer_size);
+		    const char *port_name,
+		    const char *port_type,
+		    unsigned long flags,
+		    unsigned long buffer_size);
 
 /* this removes the port from the client, disconnecting
    any existing connections at the same time.
@@ -145,6 +145,7 @@ const char * jack_port_name (const jack_port_t *port);
 const char * jack_port_short_name (const jack_port_t *port);
 int          jack_port_flags (const jack_port_t *port);
 const char * jack_port_type (const jack_port_t *port);
+int          jack_port_is_mine (const jack_client_t *, const jack_port_t *port);
 
 /* this returns TRUE or FALSE to indicate if there are
    any connections to/from the port argument.
