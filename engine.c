@@ -1743,11 +1743,9 @@ jack_trace_terminal (jack_client_internal_t *c1, jack_client_internal_t *rbase)
 		   once.
 		*/
 
-		if (g_slist_find (rbase->fed_by, c2) != NULL) {
-			continue;
+		if (g_slist_find (rbase->fed_by, c2) == NULL) {
+			rbase->fed_by = g_slist_prepend (rbase->fed_by, c2);
 		}
-
-		rbase->fed_by = g_slist_prepend (rbase->fed_by, c2);
 
 		if (c2 != rbase && c2 != c1) {
 
@@ -1911,11 +1909,12 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 	        client = (jack_client_internal_t *) clientnode->data;
 		ctl = client->control;
 
-		fprintf (stderr, "client #%d: %s (type: %d, process? %s)\n",
+		fprintf (stderr, "client #%d: %s (type: %d, process? %s, fed by %d clients)\n",
 			 ++n,
 			 ctl->name,
 			 ctl->type,
-			 ctl->process ? "yes" : "no");
+			 ctl->process ? "yes" : "no",
+			 g_slist_length(client->fed_by));
 		
 		for(m = 0, portnode = client->ports; portnode; portnode = g_slist_next (portnode)) {
 		        port = (jack_port_internal_t *) portnode->data;
