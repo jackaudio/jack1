@@ -107,8 +107,8 @@ portaudio_driver_attach (portaudio_driver_t *driver, jack_engine_t *engine)
         */
     
         for (chn = 0; chn < driver->capture_nchannels; chn++) {
-    
-                snprintf (buf, sizeof(buf) - 1, "%s:capture%lu", driver->driver_name, chn+1);
+                //snprintf (buf, sizeof(buf) - 1, "%s:capture%lu", driver->driver_name, chn+1);
+				snprintf (buf, sizeof(buf) - 1, "%s:out%lu", driver->driver_name, chn+1);
     
                 if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
                         jack_error ("portaudio: cannot register port for %s", buf);
@@ -119,14 +119,14 @@ portaudio_driver_attach (portaudio_driver_t *driver, jack_engine_t *engine)
                 */
     
                 jack_port_set_latency (port, driver->frames_per_cycle);
-    
-                driver->capture_ports = jack_slist_append (driver->capture_ports, port);
+				driver->capture_ports = jack_slist_append (driver->capture_ports, port);
         }
         
         port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
     
         for (chn = 0; chn < driver->playback_nchannels; chn++) {
-                snprintf (buf, sizeof(buf) - 1, "%s:playback%lu", driver->driver_name, chn+1);
+                //snprintf (buf, sizeof(buf) - 1, "%s:playback%lu", driver->driver_name, chn+1);
+				snprintf (buf, sizeof(buf) - 1, "%s:in%lu", driver->driver_name, chn+1);
     
                 if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
                         jack_error ("portaudio: cannot register port for %s", buf);
@@ -141,7 +141,6 @@ portaudio_driver_attach (portaudio_driver_t *driver, jack_engine_t *engine)
         }
     
         jack_activate (driver->client);
-        
         return 0; 
 }
 
@@ -169,7 +168,6 @@ portaudio_driver_detach (portaudio_driver_t *driver, jack_engine_t *engine)
         driver->playback_ports = 0;
         
         driver->engine = 0;
-        
         return 0; 
 }
 
