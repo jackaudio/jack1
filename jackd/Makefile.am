@@ -10,7 +10,7 @@ endif
 
 bin_PROGRAMS = jackd $(CAP_PROGS)
 
-AM_CFLAGS = $(JACK_CFLAGS) $(GLIB_CFLAGS)
+AM_CFLAGS = $(JACK_CFLAGS) -DJACKD_LOCATION=\"$(bindir)/jackd\" $(GLIB_CFLAGS)
 
 jackd_SOURCES = jackd.c engine.c
 jackd_LDADD = ../libjack/libjack.la -lm -ldl -lpthread $(GLIB_LIBS) $(CAP_LIBS)
@@ -22,7 +22,7 @@ jackdinclude_HEADERS = md5.h
 BUILT_SOURCES = md5.h
 
 md5.h: jackd
-	echo "#define JACKD_MD5_SUM \"`md5sum jackd | awk '{print $1}'`\"" > md5.h
+	echo "#define JACKD_MD5_SUM \"`md5sum .libs/jackd | awk '{print $$1}'`\"" > md5.h
 
 jackstart_SOURCES = jackstart.c
 jackstart_LDFLAGS = -lcap -lssl

@@ -38,14 +38,12 @@
 #include <sys/capability.h>
 
 #include "jack/start.h"
-#include "jack/md5.h"
+#include "md5.h"
 
 #define READ_BLOCKSIZE 4096
 
-/* FIXME this should be coupled to the --prefix that was specified
-   in configure so that this is the real full path to jackd
-*/
-static char *jackd_bin_path = "/usr/bin/jackd";
+/* JACKD_LOCATION must be passed on the gcc command line */
+static char *jackd_bin_path = JACKD_LOCATION;
 
 static char *jackd_md5_sum = JACKD_MD5_SUM;
 
