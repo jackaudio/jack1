@@ -243,7 +243,7 @@ main (int argc, char *argv[])
 		{ "device", 1, 0, 'd' },
 		{ "srate", 1, 0, 'r' },
 		{ "frames-per-interrupt", 1, 0, 'p' },
-		{ "number-of-fragments", 1, 0, 'n' },
+		{ "periods", 1, 0, 'n' },
 		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
 		{ "realtime", 0, 0, 'R' },
