@@ -103,8 +103,10 @@ typedef struct {
     jack_position_t	  pending_time;	/* position for next cycle */
     jack_position_t	  request_time;	/* latest requested position */
     jack_unique_t	  prev_request; /* previous request unique ID */
-    volatile int	  seq_number;	/* unique ID sequence number */
-    int			  new_pos;	/* new position this cycle */
+    volatile long	  seq_number;	/* unique ID sequence number */
+    char		  new_pos;	/* new position this cycle */
+    char		  pending_pos;	/* new position request pending */
+    jack_nframes_t	  pending_frame; /* pending frame number */
     unsigned long	  sync_clients;	/* number of is_slowsync clients */
     unsigned long	  sync_remain;	/* number of them with sync_poll */
     jack_time_t           sync_timeout;

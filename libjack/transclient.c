@@ -161,10 +161,10 @@ jack_call_timebase_master (jack_client_t *client)
 {
 	jack_client_control_t *control = client->control;
 	jack_control_t *ectl = client->engine;
-	int new_pos = ectl->new_pos;
+	int new_pos = (int) ectl->pending_pos;
 
-	/* Make sure we're still the master.  Test is_timebase, which
-	 * is set in a critical section; timebase_cb is not. */
+	/* Make sure this is still the master; is_timebase is set in a
+	 * critical section; timebase_cb is not. */
 	if (control->is_timebase) { 
 
 		if (client->new_timebase) {	/* first callback? */

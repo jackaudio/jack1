@@ -236,8 +236,10 @@ jack_transport_init (jack_engine_t *engine)
 	ectl->prev_request = 0;
 	ectl->seq_number = 1;		/* can't start at 0 */
 	ectl->new_pos = 0;
-	ectl->sync_remain = 0;
+	ectl->pending_pos = 0;
+	ectl->pending_frame = 0;
 	ectl->sync_clients = 0;
+	ectl->sync_remain = 0;
 	ectl->sync_timeout = 2000000;	/* 2 second default */
 	ectl->sync_time_left = 0;
 }
@@ -328,9 +330,8 @@ jack_transport_client_set_sync (jack_engine_t *engine,
 	return ret;
 }
 
-/* at the end of every process cycle
+/* at process cycle end, set transport parameters for the next cycle
  *
- * Determines the transport parameters for the following cycle.
  * precondition: caller holds the graph lock.
  */
 void
@@ -339,31 +340,13 @@ jack_transport_cycle_end (jack_engine_t *engine)
 	jack_control_t *ectl = engine->control;
 	transport_command_t cmd;	/* latest transport command */
 
-	/* update timebase, if needed */
-	if ((engine->timebase_client == NULL) &&
-	    (ectl->transport_state == JackTransportRolling)) {
-		ectl->pending_time.frame =
-			ectl->current_time.frame + ectl->buffer_size;
-	} 
-
-	/* See if an asynchronous position request arrived during the
-	 * last cycle.  The request_time could change during the
-	 * guarded copy.  If so, we'll use that new request. */
-	if (ectl->request_time.unique_1 != ectl->prev_request) {
-		jack_transport_copy_position(&ectl->request_time,
-					     &ectl->pending_time);
-		VERBOSE (engine, "new transport position: %lu, id=0x%llx\n",
-		       ectl->pending_time.frame, ectl->pending_time.unique_1);
-		ectl->prev_request = ectl->pending_time.unique_1;
-		ectl->new_pos = 1;
-	} else
-		ectl->new_pos = 0;
-
-	/* Promote pending_time to current_time.  Maintain the usecs
-	 * and frame_rate values, clients may not set them. */
+	/* Promote pending_time to current_time.  Maintain the usecs,
+	 * frame_rate and frame values, clients may not set them. */
 	ectl->pending_time.usecs = ectl->current_time.usecs;
 	ectl->pending_time.frame_rate = ectl->current_time.frame_rate;
+	ectl->pending_time.frame = ectl->pending_frame;
 	ectl->current_time = ectl->pending_time;
+	ectl->new_pos = ectl->pending_pos;
 
 	/* check sync results from previous cycle */
 	if (ectl->transport_state == JackTransportStarting) {
@@ -435,7 +418,28 @@ jack_transport_cycle_end (jack_engine_t *engine)
 		jack_error ("invalid JACK transport state: %d",
 			    ectl->transport_state);
 	}
-	return;
+
+	/* update timebase, if needed */
+	if (ectl->transport_state == JackTransportRolling) {
+		ectl->pending_time.frame =
+			ectl->current_time.frame + ectl->buffer_size;
+	} 
+
+	/* See if an asynchronous position request arrived during the
+	 * last cycle.  The request_time could change during the
+	 * guarded copy.  If so, we use the newest request. */
+	ectl->pending_pos = 0;
+	if (ectl->request_time.unique_1 != ectl->prev_request) {
+		jack_transport_copy_position(&ectl->request_time,
+					     &ectl->pending_time);
+		VERBOSE (engine, "new transport position: %lu, id=0x%llx\n",
+		       ectl->pending_time.frame, ectl->pending_time.unique_1);
+		ectl->prev_request = ectl->pending_time.unique_1;
+		ectl->pending_pos = 1;
+	}
+
+	/* clients can't set pending frame number, so save it here */
+	ectl->pending_frame = ectl->pending_time.frame;
 }
 
 /* driver callback at start of cycle */

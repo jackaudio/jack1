@@ -13,8 +13,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=78
-JACK_MICRO_VERSION=4
+JACK_MINOR_VERSION=79
+JACK_MICRO_VERSION=0
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -24,7 +24,7 @@ dnl made to the way libjack communicates with jackd
 dnl that would break applications linked with an older
 dnl version of libjack.
 dnl ---
-JACK_PROTOCOL_VERSION=8
+JACK_PROTOCOL_VERSION=9
 
 dnl ---
 dnl HOWTO: updating the libjack interface version

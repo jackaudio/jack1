@@ -54,9 +54,6 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
     long abs_tick;			/* ticks since frame 0 */
     long abs_beat;			/* beats since frame 0 */
 
-    if (state == JackTransportRolling)
-	pos->frame += nframes;
-
     if (new_pos || time_reset) {
 
 	pos->valid |= JackPositionBBT;
@@ -85,7 +82,7 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
 
     } else {
 
-	/* Compute BBT info from previous period. */
+	/* Compute BBT info based on previous period. */
 	pos->tick +=
 	    nframes * pos->ticks_per_beat * pos->beats_per_minute
 	    / (pos->frame_rate * 60);

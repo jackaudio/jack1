@@ -59,20 +59,18 @@ But, old-style timebase masters will no longer control the transport.
 @subsection timebase Timebase Master
 
 The timebase master continuously updates extended position
-information, counting beats, SMPTE frames, etc.  Without this extended
+information, counting beats, timecode, etc.  Without this extended
 information, there is no need for this function.  There is at most one
 master active at a time.  If no client is registered as timebase
-master, the JACK engine will provide simple frame counting whenever
-the transport is rolling.
+master, frame numbers will be the only position information available.
 
 The timebase master registers a callback that updates position
 information while the transport is rolling.  This function is called
 immediately after the process callback in the same thread whenever the
 transport is rolling, or when any client has set a new position in the
 previous cycle.  The first cycle after jack_set_timebase_callback() is
-also treated as a new position.  Its output affects all of the
-following process cycle, unless a new position request arrives during
-the current cycle.
+also treated as a new position.  Its output affects the following
+process cycle.
 
 @code
   typedef int  (*JackTimebaseCallback)(jack_transport_state_t state,
@@ -165,10 +163,10 @@ an opportunity to catch up.
 
 These request a new transport position.  They can be called at any
 time by any client.  Even the timebase master must use them.  If the
-request is valid, it goes into effect on the next process cycle.  If
-there are slow-sync clients and the transport is already rolling, it
-will enter the ::JackTransportStarting state and begin invoking their
-@a sync_callback until they find the new position.
+request is valid, it goes into effect in two process cycles.  If there
+are slow-sync clients and the transport is already rolling, it will
+enter the ::JackTransportStarting state and begin invoking their @a
+sync_callbacks until ready.
 
 
 @image html	fsm.png "Transport State Transition Diagram"
@@ -238,12 +236,7 @@ to remain constant.
 This design currently does not address several issues. This means they
 will probably not be included in JACK release 1.0.
 
-  - variable speed -- does the frame_rate field in the transport
-  info structure have anything to do with this?
+  - variable speed
   - reverse play
-  - SMPTE -- slave mode depends on variable speed and interacts
-  badly with slow-sync clients.  These are deep issues.  Until they
-  are addressed there's no reason to retain those two SMPTE fields in
-  the jack_position_t structure.
-  - looping -- unless we get feedback that this is really required
+  - looping
 */
