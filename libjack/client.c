@@ -436,17 +436,15 @@ _start_server (void)
 	}
 
 	if (!good) {
-
 #if defined(USE_CAPABILITIES)
 		command = JACK_LOCATION "/jackstart";
-		strncpy(arguments, JACK_LOCATION "/jackstart -T -R -d"
+		strncpy(arguments, JACK_LOCATION "/jackstart -T -R -d "
 			JACK_DEFAULT_DRIVER " -p 512", 255);
 #else /* !USE_CAPABILITIES */
 		command = JACK_LOCATION "/jackd";
-		strncpy(arguments, JACK_LOCATION "/jackd -T -d"
+		strncpy(arguments, JACK_LOCATION "/jackd -T -d "
 			JACK_DEFAULT_DRIVER, 255);
 #endif /* USE_CAPABILITIES */
-
 	} else {
 		result = strcspn(arguments, " ");
 		command = (char*)malloc(result+1);
@@ -455,7 +453,16 @@ _start_server (void)
 	}
 
 	argv = (char**)malloc(255);
+  
 	while(1) {
+		/* insert -T into arguments */
+		if (i == 1) {
+			argv[i] = (char*)malloc(3);
+			strncpy(argv[i], "-T", 2); 
+			argv[i][2] = '\0';
+			++i;
+		}
+
 		result = strcspn(arguments+pos, " ");
 		if (result == 0) {
 			break;
