@@ -80,6 +80,7 @@ struct _jack_engine {
     char verbose;
     char asio_mode;
     int reordered;
+    int watchdog_check;
 };
 
 /* public functions */

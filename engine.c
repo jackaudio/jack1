@@ -1241,6 +1241,42 @@ cancel_cleanup (int status, void *arg)
 }
 
 static void *
+watchdog_thread (void *arg)
+{
+	jack_engine_t *engine = (jack_engine_t *) arg;
+
+	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
+	if (jack_become_real_time (pthread_self(), engine->rtpriority + 10)) {
+		return 0;
+	}
+
+	engine->watchdog_check = 0;
+
+	while (1) {
+		usleep (5000000);
+		if (engine->watchdog_check == 0) {
+			jack_error ("jackd watchdog: timeout - killing jackd");
+			exit (1);
+		}
+		engine->watchdog_check = 0;
+	}
+}
+
+static int
+jack_start_watchdog (jack_engine_t *engine)
+{
+	pthread_t watchdog;
+
+	if (pthread_create (&watchdog, 0, watchdog_thread, engine)) {
+		jack_error ("cannot start watchdog thread");
+		return -1;
+	}
+	pthread_detach (watchdog);
+	return 0;
+}
+
+static void *
 jack_main_thread (void *arg)
 
 {
@@ -1248,6 +1284,11 @@ jack_main_thread (void *arg)
 	jack_driver_t *driver = engine->driver;
 
 	if (engine->control->real_time) {
+
+		if (jack_start_watchdog (engine)) {
+			pthread_exit (0);
+		}
+
 		if (jack_become_real_time (pthread_self(), engine->rtpriority)) {
 			engine->control->real_time = 0;
 		}
@@ -1264,6 +1305,8 @@ jack_main_thread (void *arg)
 	while (1) {
 		int status;
 		nframes_t nframes;
+
+		engine->watchdog_check = 1;
 
 		nframes = driver->wait (driver, -1, &status);
 
