@@ -66,7 +66,6 @@ static void
 signal_handler (int sig)
 {
 	/* this is used by the parent (waiter) process */
-
 	fprintf (stderr, "jackd: signal %d received\n", sig);
 	kill (jackd_pid, SIGTERM);
 }
@@ -74,13 +73,13 @@ signal_handler (int sig)
 static void 
 do_nothing_handler (int sig)
 {
-	/* this is used by the child (active) process, but it never 
-	   gets called unless we are already shutting down
-	   after another signal.
+	/* this is used by the child (active) process, but it never
+	   gets called unless we are already shutting down after
+	   another signal.
 	*/
-
 	char buf[64];
-	snprintf (buf, sizeof(buf), "received signal %d during shutdown (ignored)\n", sig);
+	snprintf (buf, sizeof(buf),
+		  "received signal %d during shutdown (ignored)\n", sig);
 	write (1, buf, strlen (buf));
 }
 
@@ -91,7 +90,8 @@ jack_engine_waiter_thread (void *arg)
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
-	if ((engine = jack_engine_new (realtime, realtime_priority, verbose, client_timeout)) == 0) {
+	if ((engine = jack_engine_new (realtime, realtime_priority,
+				       verbose, client_timeout)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
 		kill (warg->pid, SIGTERM);
 		return 0;
@@ -102,14 +102,16 @@ jack_engine_waiter_thread (void *arg)
 		fprintf (stderr, "loading driver ..\n");
 		
 		if (jack_engine_load_driver (engine, warg->argc, warg->argv)) {
-			fprintf (stderr, "cannot load driver module %s\n", warg->argv[0]);
+			fprintf (stderr, "cannot load driver module %s\n",
+				 warg->argv[0]);
 			kill (warg->pid, SIGTERM);
 			return 0;
 		}
 
 	} else {
 
-		fprintf (stderr, "No driver specified ... hmm. JACK won't do anything when run like this.\n");
+		fprintf (stderr, "No driver specified ... hmm. JACK won't do"
+			 " anything when run like this.\n");
 	}
 
 	if (asio_mode) {
@@ -143,7 +145,6 @@ jack_main (int argc, char **argv)
 	struct sigaction action;
 
 	/* remove any existing files from a previous instance */
-	
 	jack_cleanup_files ();
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
@@ -157,23 +158,20 @@ jack_main (int argc, char **argv)
            * of all threads not blocking the signal, pick
 	       one at random, and deliver the signal.
 
-           this means that a simple-minded multi-threaded
-	   program can expect to get POSIX signals delivered
-	   randomly to any one of its threads, 
+           this means that a simple-minded multi-threaded program can
+           expect to get POSIX signals delivered randomly to any one
+           of its threads,
 
-	   here, we block all signals that we think we
-	   might receive and want to catch. all "child"
-	   threads will inherit this setting. if we
-	   create a thread that calls sigwait() on the
-	   same set of signals, implicitly unblocking
-	   all those signals. any of those signals that
-	   are delivered to the process will be delivered
-	   to that thread, and that thread alone. this
-	   makes cleanup for a signal-driven exit much
-	   easier, since we know which thread is doing
-	   it and more importantly, we are free to
-	   call async-unsafe functions, because the
-	   code is executing in normal thread context
+	   here, we block all signals that we think we might receive
+	   and want to catch. all "child" threads will inherit this
+	   setting. if we create a thread that calls sigwait() on the
+	   same set of signals, implicitly unblocking all those
+	   signals. any of those signals that are delivered to the
+	   process will be delivered to that thread, and that thread
+	   alone. this makes cleanup for a signal-driven exit much
+	   easier, since we know which thread is doing it and more
+	   importantly, we are free to call async-unsafe functions,
+	   because the code is executing in normal thread context
 	   after a return from sigwait().
 	*/
 
@@ -191,41 +189,40 @@ jack_main (int argc, char **argv)
 	sigaddset(&signals, SIGUSR1);
 	sigaddset(&signals, SIGSEGV);
 
-	/* all child threads will inherit this mask unless they explicitly reset it */
-
+	/* all child threads will inherit this mask unless they
+	 * explicitly reset it */
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
 	
-	/* what we'd really like to do here is to be able to 
-	   wait for either the engine to stop or a POSIX signal,
-	   whichever arrives sooner. but there is no mechanism
-	   to do that, so instead we create a thread to wait
-	   for the engine to finish, and here we stop and wait
-	   for any (reasonably likely) POSIX signal.
+	/* what we'd really like to do here is to be able to wait for
+	   either the engine to stop or a POSIX signal, whichever
+	   arrives sooner. but there is no mechanism to do that, so
+	   instead we create a thread to wait for the engine to
+	   finish, and here we stop and wait for any (reasonably
+	   likely) POSIX signal.
 
-	   if the engine finishes first, the waiter thread will
-	   tell us about it via a signal.
+	   if the engine finishes first, the waiter thread will tell
+	   us about it via a signal.
 
-	   if a signal arrives, we'll stop the engine and then
-	   exit. 
+	   if a signal arrives, we'll stop the engine and then exit.
 
-	   in normal operation, our parent process will be waiting
-	   for us and will cleanup.
+	   in normal operation, our parent process will be waiting for
+	   us and will cleanup.
 	*/
 
 	warg.pid = getpid();
 	warg.argc = argc;
 	warg.argv = argv;
 
-	if (pthread_create (&waiter_thread, 0, jack_engine_waiter_thread, &warg)) {
-		fprintf (stderr, "jackd: cannot create engine waiting thread\n");
+	if (pthread_create (&waiter_thread, 0, jack_engine_waiter_thread,
+			    &warg)) {
+		fprintf (stderr,
+			 "jackd: cannot create engine waiting thread\n");
 		return;
 	}
 
-	/* install a do-nothing handler because otherwise
-	   pthreads behaviour is undefined when we enter
-	   sigwait.
+	/* install a do-nothing handler because otherwise pthreads
+	   behaviour is undefined when we enter sigwait.
 	*/
-	
 	sigfillset (&allsignals);
 
 	action.sa_handler = do_nothing_handler;
@@ -258,10 +255,9 @@ jack_main (int argc, char **argv)
 	if (sig != SIGSEGV) {
 
 		/* unblock signals so we can see them during shutdown.
-		   this will help prod developers not to lose sight
-		   of bugs that cause segfaults etc. during shutdown.
+		   this will help prod developers not to lose sight of
+		   bugs that cause segfaults etc. during shutdown.
 		*/
-
 		sigprocmask (SIG_UNBLOCK, &signals, 0);
 	}
 
@@ -274,23 +270,23 @@ jack_main (int argc, char **argv)
 static void copyright (FILE* file)
 {
 	fprintf (file, "jackd " VERSION "\n"
-		 "Copyright 2001-2003 Paul Davis and others.\n"
-		 "jackd comes with ABSOLUTELY NO WARRANTY\n"
-		 "This is free software, and you are welcome to redistribute it\n"
-		 "under certain conditions; see the file COPYING for details\n\n");
+"Copyright 2001-2003 Paul Davis and others.\n"
+"jackd comes with ABSOLUTELY NO WARRANTY\n"
+"This is free software, and you are welcome to redistribute it\n"
+"under certain conditions; see the file COPYING for details\n\n");
 }
 
 static void usage (FILE *file) 
 {
 	copyright (file);
 	fprintf (file, "\n"
-		 "usage: jackd [ --asio OR -a ]\n"
-		 "             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
-		 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
-		 "             [ --verbose OR -v ]\n"
-		 "             [ --tmpdir OR -D directory-for-temporary-files ]\n"
-		 "             [ --version OR -V ]\n"
-		 "         -d driver [ ... driver args ... ]\n");
+"usage: jackd [ --asio OR -a ]\n"
+"             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
+"             [ --timeout OR -t client-timeout-in-msecs ]\n"
+"             [ --verbose OR -v ]\n"
+"             [ --tmpdir OR -D directory-for-temporary-files ]\n"
+"             [ --version OR -V ]\n"
+"         -d driver [ ... driver args ... ]\n");
 }	
 
 int	       
@@ -327,24 +323,31 @@ main (int argc, char *argv[])
 #ifdef USE_CAPABILITIES
 
 	/* check to see if there is a pipe in the right descriptor */
-	if ((status = fstat (PIPE_WRITE_FD, &pipe_stat)) == 0 && S_ISFIFO(pipe_stat.st_mode)) {
-		/* tell jackstart we are up and running */
+	if ((status = fstat (PIPE_WRITE_FD, &pipe_stat)) == 0 &&
+	    S_ISFIFO(pipe_stat.st_mode)) {
 
+		/* tell jackstart we are up and running */
   	        char c = 1;
 
 	        if (write (PIPE_WRITE_FD, &c, 1) != 1) {
-		        fprintf (stderr, "cannot write to jackstart sync pipe %d (%s)\n", PIPE_WRITE_FD, strerror (errno));
+		        fprintf (stderr, "cannot write to jackstart sync "
+				 "pipe %d (%s)\n", PIPE_WRITE_FD,
+				 strerror (errno));
 	        }
 
 		if (close(PIPE_WRITE_FD) != 0) {
-			fprintf(stderr, "jackd: error on startup pipe close: %s\n", strerror (errno));
+			fprintf(stderr,
+				"jackd: error on startup pipe close: %s\n",
+				strerror (errno));
 		} else {
 			/* wait for jackstart process to set our capabilities */
 			if (wait (&status) == -1) {
-				fprintf (stderr, "jackd: wait for startup process exit failed\n");
+				fprintf (stderr, "jackd: wait for startup "
+					 "process exit failed\n");
 			}
 			if (!WIFEXITED (status) || WEXITSTATUS (status)) {
-				fprintf(stderr, "jackd: jackstart did not exit cleanly\n");
+				fprintf(stderr, "jackd: jackstart did not "
+					"exit cleanly\n");
 				exit (1);
 			}
 		}
@@ -352,7 +355,9 @@ main (int argc, char *argv[])
 #endif
 
 	opterr = 0;
-	while (!seen_driver && (opt = getopt_long (argc, argv, options, long_options, &option_index)) != EOF) {
+	while (!seen_driver && (opt = getopt_long (argc, argv, options,
+						   long_options,
+						   &option_index)) != EOF) {
 		switch (opt) {
 		case 'a':
 			asio_mode = TRUE;
@@ -392,7 +397,8 @@ main (int argc, char *argv[])
 			break;
 
 		default:
-			fprintf (stderr, "unknown option character %c\n", optopt);
+			fprintf (stderr, "unknown option character %c\n",
+				 optopt);
 			/*fallthru*/
 		case 'h':
 			usage (stdout);
@@ -433,7 +439,6 @@ main (int argc, char *argv[])
 	if (!with_fork) {
 
 		/* This is really here so that we can run gdb easily */
-
 		jack_main (driver_nargs, driver_args);
 
 	} else {
@@ -442,7 +447,8 @@ main (int argc, char *argv[])
 		
 		if (pid < 0) {
 
-			fprintf (stderr, "could not fork jack server (%s)", strerror (errno));
+			fprintf (stderr, "could not fork jack server (%s)",
+				 strerror (errno));
 			exit (1);
 
 		} else if (pid == 0) {
