@@ -1,6 +1,6 @@
 /* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
-    Copyright (C) 2001-2003 Paul Davis
+    Copyright (C) 2001-2005 Paul Davis
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -346,7 +346,7 @@ jack_drivers_load ()
 static void copyright (FILE* file)
 {
 	fprintf (file, "jackd " VERSION "\n"
-"Copyright 2001-2003 Paul Davis and others.\n"
+"Copyright 2001-2005 Paul Davis and others.\n"
 "jackd comes with ABSOLUTELY NO WARRANTY\n"
 "This is free software, and you are welcome to redistribute it\n"
 "under certain conditions; see the file COPYING for details\n\n");

@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=99
-JACK_MICRO_VERSION=45
+JACK_MICRO_VERSION=46
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -285,10 +285,10 @@ dnl
 
 CFLAGS=$JACK_CFLAGS
 
-# allow buffer resizing unless --disable-resize specified
-enable_resize=yes
+# allow buffer resizing unless --enable-resize specified
+enable_resize=no
 AC_ARG_ENABLE(resize,
-	AC_HELP_STRING([--disable-resize], [disable buffer resizing]),
+	AC_HELP_STRING([--enable-resize], [enable buffer resizing feature]),
         [ 
 	  if test x$enable_resize != xno ; then
 	  	AC_DEFINE(DO_BUFFER_RESIZE,,[Enable buffer resizing])

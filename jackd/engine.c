@@ -905,9 +905,9 @@ jack_watchdog_thread (void *arg)
 
 			jack_error ("jackd watchdog: timeout - killing jackd");
 
-			/* Kill the current client's process group. */
+			/* Kill the current client (guilt by association). */
 			if (engine->current_client) {
-					kill (-engine->current_client->
+					kill (engine->current_client->
 					      control->pgrp, SIGKILL);
 			}
 
