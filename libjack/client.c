@@ -1356,7 +1356,6 @@ jack_client_close (jack_client_t *client)
 {
 	JSList *node;
 	void *status;
-	jack_port_type_id_t ptid;
 	
 	if (client->control->active) {
 		jack_deactivate (client);
@@ -1373,10 +1372,6 @@ jack_client_close (jack_client_t *client)
 			pthread_join (client->thread, &status);
 		}
 
-		if (client->port_segment) {
-			free (client->port_segment);
-		}
-
 		if (client->control) {
 			jack_release_shm (&client->control_shm);
 			client->control = NULL;
@@ -1386,8 +1381,13 @@ jack_client_close (jack_client_t *client)
 			client->engine = NULL;
 		}
 
-		for (ptid = 0; ptid < client->n_port_types; ++ptid) {
-			jack_release_shm (&client->port_segment[ptid]);
+		if (client->port_segment) {
+			jack_port_type_id_t ptid;
+			for (ptid = 0; ptid < client->n_port_types; ++ptid) {
+				jack_release_shm (&client->port_segment[ptid]);
+			}
+			free (client->port_segment);
+			client->port_segment = NULL;
 		}
 
 		if (client->graph_wait_fd) {
