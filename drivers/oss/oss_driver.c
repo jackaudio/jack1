@@ -243,8 +243,10 @@ static void copy_and_convert_out (void *dst, jack_sample_t *src,
 			scale = 0x7fff;
 			for (srcidx = 0; srcidx < nframes; srcidx++)
 			{
-				s16dst[dstidx] = (signed short) 
-					(src[srcidx] * scale + 0.5f);
+				s16dst[dstidx] = (signed short)
+					(src[srcidx] >= 0.0f) ?
+					(src[srcidx] * scale + 0.5f) :
+					(src[srcidx] * scale - 0.5f);
 				dstidx += chcount;
 			}
 			break;
@@ -253,7 +255,9 @@ static void copy_and_convert_out (void *dst, jack_sample_t *src,
 			for (srcidx = 0; srcidx < nframes; srcidx++)
 			{
 				s32dst[dstidx] = (signed int)
-					(src[srcidx] * scale + 0.5f);
+					(src[srcidx] >= 0.0f) ?
+					(src[srcidx] * scale + 0.5f) :
+					(src[srcidx] * scale - 0.5f);
 				dstidx += chcount;
 			}
 			break;
@@ -262,7 +266,9 @@ static void copy_and_convert_out (void *dst, jack_sample_t *src,
 			for (srcidx = 0; srcidx < nframes; srcidx++)
 			{
 				s32dst[dstidx] = (signed int)
-					(src[srcidx] * scale + 0.5f);
+					(src[srcidx] >= 0.0f) ?
+					(src[srcidx] * scale + 0.5f) :
+					(src[srcidx] * scale - 0.5f);
 				dstidx += chcount;
 			}
 			break;
@@ -286,8 +292,8 @@ static void set_fragment (int fd, size_t fragsize, unsigned int fragcount)
 	fragments = ((fragcount << 16) | (fragsize_2p & 0xffff));
 	if (ioctl(fd, SNDCTL_DSP_SETFRAGMENT, &fragments) < 0)
 	{
-		jack_error("OSS: failed to set fragment size: %s@%i",
-			__FILE__, __LINE__);
+		jack_error("OSS: failed to set fragment size: %s@%i, errno=%d",
+			__FILE__, __LINE__, errno);
 	}
 }
 
@@ -298,8 +304,8 @@ static int get_fragment (int fd)
 
 	if (ioctl(fd, SNDCTL_DSP_GETBLKSIZE, &fragsize) < 0)
 	{
-		jack_error("OSS: failed to get fragment size: %s@%i",
-			__FILE__, __LINE__);
+		jack_error("OSS: failed to get fragment size: %s@%i, errno=%d",
+			__FILE__, __LINE__, errno);
 		return 0;
 	}
 	return fragsize;
@@ -434,8 +440,8 @@ static int oss_driver_start (oss_driver_t *driver)
 			if (infd < 0)
 			{
 				jack_error(
-					"OSS: failed to open input device %s: %s@%i",
-					indev, __FILE__, __LINE__);
+					"OSS: failed to open input device %s: %s@%i, errno=%d",
+					indev, __FILE__, __LINE__, errno);
 			}
 			fragsize = driver->period_size * 
 				driver->capture_channels * samplesize;
@@ -449,8 +455,8 @@ static int oss_driver_start (oss_driver_t *driver)
 			if (outfd < 0)
 			{
 				jack_error(
-					"OSS: failed to open output device %s: %s@%i",
-					outdev, __FILE__, __LINE__);
+					"OSS: failed to open output device %s: %s@%i, errno=%d",
+					outdev, __FILE__, __LINE__, errno);
 			}
 			fragsize = driver->period_size * 
 				driver->playback_channels * samplesize;
@@ -468,8 +474,8 @@ static int oss_driver_start (oss_driver_t *driver)
 			if (infd < 0)
 			{
 				jack_error(
-					"OSS: failed to open device %s: %s@%i",
-					indev, __FILE__, __LINE__);
+					"OSS: failed to open device %s: %s@%i, errno=%d",
+					indev, __FILE__, __LINE__, errno);
 				return -1;
 			}
 		}
@@ -481,8 +487,8 @@ static int oss_driver_start (oss_driver_t *driver)
 			if (outfd < 0)
 			{
 				jack_error(
-					"OSS: failed to open device %s: %s@%i",
-					outdev, __FILE__, __LINE__);
+					"OSS: failed to open device %s: %s@%i, errno=%d",
+					outdev, __FILE__, __LINE__, errno);
 				return -1;
 			}
 		}
@@ -492,8 +498,8 @@ static int oss_driver_start (oss_driver_t *driver)
 			if (infd < 0)
 			{
 				jack_error(
-					"OSS: failed to open device %s: %s@%i",
-					indev, __FILE__, __LINE__);
+					"OSS: failed to open device %s: %s@%i, errno=%d",
+					indev, __FILE__, __LINE__, errno);
 				return -1;
 			}
 		}
@@ -501,9 +507,11 @@ static int oss_driver_start (oss_driver_t *driver)
 		{
 			if (ioctl(infd, SNDCTL_DSP_SETDUPLEX, 0) < 0)
 			{
-				jack_error(
-					"OSS: failed to enable full duplex for %s: %s@%i",
-					indev, __FILE__, __LINE__);
+				if (errno != EINVAL) /* Dont care */
+					jack_error(
+						"OSS: failed to enable full duplex for %s: %s@%i, errno=%d",
+						indev, __FILE__, __LINE__,
+						errno);
 			}
 		}
 		if (infd >= 0)
@@ -527,18 +535,18 @@ static int oss_driver_start (oss_driver_t *driver)
 		format = driver->format;
 		if (ioctl(infd, SNDCTL_DSP_SETFMT, &format) < 0)
 			jack_error(
-				"OSS: failed to set format for %s: %s@%i", 
-				indev, __FILE__, __LINE__);
+				"OSS: failed to set format for %s: %s@%i, errno=%d", 
+				indev, __FILE__, __LINE__, errno);
 		channels = driver->capture_channels;
 		if (ioctl(infd, SNDCTL_DSP_CHANNELS, &channels) < 0)
 			jack_error(
-				"OSS: failed to set channels for %s: %s@%i", 
-				indev, __FILE__, __LINE__);
+				"OSS: failed to set channels for %s: %s@%i, errno=%d", 
+				indev, __FILE__, __LINE__, errno);
 		samplerate = driver->sample_rate;
 		if (ioctl(infd, SNDCTL_DSP_SPEED, &samplerate) < 0)
 			jack_error(
-				"OSS: failed to set samplerate for %s: %s@%i", 
-				indev, __FILE__, __LINE__);
+				"OSS: failed to set samplerate for %s: %s@%i, errno=%d", 
+				indev, __FILE__, __LINE__, errno);
 		printf("oss_driver: %s : 0x%x/%i/%i (%i)\n", indev, 
 			format, channels, samplerate, get_fragment(infd));
 		
@@ -562,18 +570,18 @@ static int oss_driver_start (oss_driver_t *driver)
 		format = driver->format;
 		if (ioctl(outfd, SNDCTL_DSP_SETFMT, &format) < 0)
 			jack_error(
-				"OSS: failed to set format for %s: %s@%i", 
-				outdev, __FILE__, __LINE__);
+				"OSS: failed to set format for %s: %s@%i, errno=%d", 
+				outdev, __FILE__, __LINE__, errno);
 		channels = driver->playback_channels;
 		if (ioctl(outfd, SNDCTL_DSP_CHANNELS, &channels) < 0)
 			jack_error(
-				"OSS: failed to set channels for %s: %s@%i", 
-				outdev, __FILE__, __LINE__);
+				"OSS: failed to set channels for %s: %s@%i, errno=%d", 
+				outdev, __FILE__, __LINE__, errno);
 		samplerate = driver->sample_rate;
 		if (ioctl(outfd, SNDCTL_DSP_SPEED, &samplerate) < 0)
 			jack_error(
-				"OSS: failed to set samplerate for %s: %s@%i", 
-				outdev, __FILE__, __LINE__);
+				"OSS: failed to set samplerate for %s: %s@%i, errno=%d", 
+				outdev, __FILE__, __LINE__, errno);
 		printf("oss_driver: %s : 0x%x/%i/%i (%i)\n", outdev, 
 			format, channels, samplerate, 
 			get_fragment(outfd));
@@ -877,6 +885,7 @@ static inline void synchronize (oss_driver_t *driver)
 static void *io_thread (void *param)
 {
 	size_t localsize;
+	ssize_t io_res;
 	void *localbuf;
 	oss_driver_t *driver = (oss_driver_t *) param;
 
@@ -896,11 +905,13 @@ static void *io_thread (void *param)
 
 		while (driver->run)
 		{
-			if (read(driver->infd, localbuf, localsize) <
-				(ssize_t) localsize)
+			io_res = read(driver->infd, localbuf, localsize);
+			if (io_res < (ssize_t) localsize)
 			{
-				jack_error("OSS: read() failed: %s@%i", 
-					__FILE__, __LINE__);
+				jack_error(
+					"OSS: read() failed: %s@%i, count=%d/%d, errno=%d",
+					__FILE__, __LINE__, io_res, localsize,
+					errno);
 				break;
 			}
 
@@ -930,11 +941,13 @@ static void *io_thread (void *param)
 			memcpy(localbuf, driver->outdevbuf, localsize);
 			pthread_mutex_unlock(&driver->mutex_out);
 
-			if (write(driver->outfd, localbuf, localsize) < 
-				(ssize_t) localsize)
+			io_res = write(driver->outfd, localbuf, localsize);
+			if (io_res < (ssize_t) localsize)
 			{
-				jack_error("OSS: write() failed: %s@%i", 
-					__FILE__, __LINE__);
+				jack_error(
+					"OSS: write() failed: %s@%i, count=%d/%d, errno=%d",
+					__FILE__, __LINE__, io_res, localsize,
+					errno);
 				break;
 			}
 
@@ -962,24 +975,28 @@ static void *io_thread (void *param)
 				driver->outdevbufsize);
 			pthread_mutex_unlock(&driver->mutex_out);
 
-			if (write(driver->outfd, localbuf, 
-				driver->outdevbufsize) <
-				(ssize_t) driver->outdevbufsize)
+			io_res = write(driver->outfd, localbuf, 
+				driver->outdevbufsize);
+			if (io_res < (ssize_t) driver->outdevbufsize)
 			{
-				jack_error("OSS: write() failed: %s@%i",
-					__FILE__, __LINE__);
+				jack_error(
+					"OSS: write() failed: %s@%i, count=%d/%d, errno=%d",
+					__FILE__, __LINE__, io_res,
+					driver->outdevbufsize, errno);
 				break;
 			}
 		}
 
 		if (driver->capture_channels > 0)
 		{
-			if (read(driver->infd, localbuf, 
-				driver->indevbufsize) <
-				(ssize_t) driver->indevbufsize)
+			io_res = read(driver->infd, localbuf, 
+				driver->indevbufsize);
+			if (io_res < (ssize_t) driver->indevbufsize)
 			{
-				jack_error("OSS: read() failed: %s@%i",
-					__FILE__, __LINE__);
+				jack_error(
+					"OSS: read() failed: %s@%i, count=%d/%d, errno=%d",
+					__FILE__, __LINE__, io_res,
+					driver->indevbufsize, errno);
 				break;
 			}
 
