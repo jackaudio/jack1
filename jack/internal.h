@@ -29,12 +29,12 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <glib.h>
-#include <asm/timex.h>
 
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/port.h>
 #include <jack/transport.h>
+#include <jack/cycles.h>
 
 typedef void * dlhandle;
 

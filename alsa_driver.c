@@ -27,7 +27,6 @@
 #include <glib.h>
 #include <stdarg.h>
 #include <getopt.h>
-#include <asm/timex.h>
 
 #include <jack/alsa_driver.h>
 #include <jack/types.h>
@@ -35,6 +34,7 @@
 #include <jack/engine.h>
 #include <jack/hammerfall.h>
 #include <jack/generic.h>
+#include <jack/cycles.h>
 
 extern void store_work_time (int);
 extern void store_wait_time (int);
@@ -246,8 +246,8 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 		}
 	}
 	
-	if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S32_LE)) < 0) {
-		if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S16_LE)) < 0) {
+	if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S32)) < 0) {
+		if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S16)) < 0) {
 			jack_error ("Sorry. The audio interface \"%s\""
 				    "doesn't support either of the two hardware sample formats that ardour can use.",
 				    driver->alsa_name);

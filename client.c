@@ -32,13 +32,13 @@
 #include <stdio.h>
 #include <regex.h>
 #include <math.h>
-#include <asm/msr.h>
 
 #include <jack/jack.h>
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <jack/pool.h>
 #include <jack/error.h>
+#include <jack/cycles.h>
 
 char *jack_temp_dir = "/tmp";
 
@@ -593,7 +593,7 @@ jack_client_thread (void *arg)
 
 		if (client->pollfd[1].revents & POLLIN) {
 
-			rdtscll (control->signalled_at);
+			control->signalled_at = get_cycles();
 
 			control->state = Running;
 
@@ -605,7 +605,7 @@ jack_client_thread (void *arg)
 				control->state = Finished;
 			}
 			
-			rdtscll (control->finished_at);
+			control->finished_at = get_cycles();
 
 			/* pass the execution token along */
 

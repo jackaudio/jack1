@@ -3,8 +3,6 @@
 #include <unistd.h>
 
 #include <jack/jack.h>
-#include <glib.h>
-#include <jack/port.h>
 
 jack_port_t *input_port;
 jack_port_t *output_port;

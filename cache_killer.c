@@ -6,7 +6,7 @@
 #include <jack/jack.h>
 #include <glib.h>
 #include <jack/port.h>
-#include <asm/msr.h>
+#include <jack/cycles.h>
 
 jack_port_t *input_port;
 jack_port_t *output_port;
@@ -27,9 +27,9 @@ process (nframes_t nframes, void *arg)
 	sample_t *out = (sample_t *) jack_port_get_buffer (output_port, nframes);
 	sample_t *in = (sample_t *) jack_port_get_buffer (input_port, nframes);
 
-	rdtscll (now);
+	now = get_cycles ();
 	if (pthread_mutex_trylock (&foolock) == 0) {
-		rdtscll (then);
+		then = get_cycles ();
 		if (do_stomp) {
 			for (i = 0; i < stompsize; ++i) {
 				buf[i]++;
@@ -39,7 +39,7 @@ process (nframes_t nframes, void *arg)
 				buf[0]++;
 			}
 		}
-		rdtscll (then);
+		then = get_cycles ();
 		pthread_mutex_unlock (&foolock);
 	} 
 

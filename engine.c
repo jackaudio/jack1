@@ -36,11 +36,11 @@
 #include <string.h>
 #include <limits.h>
 #include <sys/mman.h>
-#include <asm/timex.h>
 
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <jack/driver.h>
+#include <jack/cycles.h>
 
 #define MAX_SHM_ID 256 /* likely use is more like 16 */
 
