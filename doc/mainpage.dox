@@ -72,9 +72,11 @@ of just:
        data.
 
 There is a lot more that you can do with JACK's interfaces, but for
-many applications, this is all that is needed. This <simple_client.c>
-demonstrates a complete (simple!) JACK application that just copies
-the signal arriving at its input port to its output port.
+many applications, this is all that is needed.  The @ref
+simple_client.c example demonstrates a complete (simple!) JACK
+application that just copies the signal arriving at its input port to
+its output port.  Similarly, @ref inprocess.c shows how to write an
+internal client "plugin" that runs within the JACK server process.
 
 @section reference Reference
 
@@ -90,7 +92,7 @@ The JACK programming interfaces are described in several header files:
   media software. It is critical for use in applications that do disk
   I/O such as audio file players and recording software.
 
-In addition, the example_clients directory provides numerous examples
+In addition, the example-clients directory provides numerous examples
 of simple JACK clients that nevertheless use the API to do something
 useful. It includes
 

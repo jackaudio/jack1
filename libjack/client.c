@@ -176,6 +176,9 @@ jack_client_alloc ()
 	return client;
 }
 
+/*
+ * Build the jack_client_t structure for an internal client.
+ */
 jack_client_t *
 jack_client_alloc_internal (jack_client_control_t *cc, jack_engine_t* engine)
 {

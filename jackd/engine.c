@@ -88,8 +88,8 @@ static void jack_remove_client (jack_engine_t *engine,
 				jack_client_internal_t *client);
 static void jack_client_delete (jack_engine_t *, jack_client_internal_t *);
 static jack_client_internal_t
-*jack_client_internal_new (jack_engine_t *engine, int fd,
-			   jack_client_connect_request_t *);
+*jack_setup_client_control (jack_engine_t *engine, int fd,
+			    jack_client_connect_request_t *);
 static void jack_sort_graph (jack_engine_t *engine);
 static int  jack_rechain_graph (jack_engine_t *engine);
 static int  jack_get_fifo_fd (jack_engine_t *engine, unsigned int which_fifo);
@@ -1006,7 +1006,7 @@ setup_client (jack_engine_t *engine, int client_fd,
 		}
 	}
 
-	if ((client = jack_client_internal_new (engine, client_fd, req))
+	if ((client = jack_setup_client_control (engine, client_fd, req))
 	    == NULL) {
 		jack_error ("cannot create new client object");
 		return 0;
@@ -1030,16 +1030,15 @@ setup_client (jack_engine_t *engine, int client_fd,
 #endif
   	
 	if (jack_client_is_internal(client)) {
-		
-		/* set up the pointers necessary for the request system
-		   to work.
-		*/
-		
+
+		/* set up the pointers necessary for the request
+		 * system to work. */
+
 		client->control->deliver_request = internal_client_request;
 		client->control->deliver_arg = engine;
-		
+
 		/* the client is in the same address space */
-		
+
 		res->client_control = client->control;
 		res->engine_control = engine->control;
 
@@ -1047,10 +1046,9 @@ setup_client (jack_engine_t *engine, int client_fd,
 		strcpy (res->fifo_prefix, engine->fifo_prefix);
 	}
 
+	/* add new client to the clients list */
 	jack_lock_graph (engine);
-
-	engine->clients = jack_slist_prepend (engine->clients, client);
-
+ 	engine->clients = jack_slist_prepend (engine->clients, client);
 	jack_engine_reset_rolling_usecs (engine);
 	
 	switch (client->control->type) {
@@ -1072,8 +1070,15 @@ setup_client (jack_engine_t *engine, int client_fd,
 
 			if (client->initialize (client->control->private_client,
 						req->object_data)) {
-				jack_client_delete (engine, client);
-				return 0;
+
+				/* failed: clean up client data */
+				VERBOSE (engine,
+					 "%s jack_initialize() failed!\n",
+					 client->control->name);
+				jack_lock_graph (engine);
+				jack_remove_client (engine, client);
+				jack_unlock_graph (engine);
+				return NULL;
 			}
 		}
 
@@ -2482,9 +2487,11 @@ jack_engine_delete (jack_engine_t *engine)
 	return 0;
 }
 
+/* Set up the engine's client internal and control structures for both
+ * internal and external clients. */
 static jack_client_internal_t *
-jack_client_internal_new (jack_engine_t *engine, int fd,
-			  jack_client_connect_request_t *req)
+jack_setup_client_control (jack_engine_t *engine, int fd,
+			   jack_client_connect_request_t *req)
 {
 	jack_client_internal_t *client;
 
@@ -2522,14 +2529,15 @@ jack_client_internal_new (jack_engine_t *engine, int fd,
                 }
 
 		if (jack_attach_shm (&client->control_shm)) {
-			jack_error ("cannot attach to client control block for %s (%s)",
-				    req->name, strerror (errno));
+			jack_error ("cannot attach to client control block "
+				    "for %s (%s)", req->name, strerror (errno));
 			jack_destroy_shm (&client->control_shm);
 			free (client);
 			return 0;
 		}
 
-		client->control = (jack_client_control_t *) jack_shm_addr (&client->control_shm);
+		client->control = (jack_client_control_t *)
+			jack_shm_addr (&client->control_shm);
 	}
 
 	client->control->type = req->type;
@@ -2567,7 +2575,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd,
 			jack_error ("cannot dynamically load client from"
 				    " \"%s\"", req->object_path);
 			jack_client_delete (engine, client);
-			return 0;
+			return NULL;
 		}
 	}
 
@@ -2628,6 +2636,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	}
 
 	/* try to force the server thread to return from poll */
+	/* JOQ: why do this for internal clients? */
 	
 	close (client->event_fd);
 	close (client->request_fd);
@@ -2677,7 +2686,8 @@ jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 	if (jack_client_is_internal (client)) {
 
 		jack_client_unload (client);
-		free ((char *) client->control);
+		free (client->control->private_client);
+		free ((void *) client->control);
 
 	} else {
 		

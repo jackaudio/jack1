@@ -64,11 +64,17 @@ int jack_client_name_size(void);
 /**
  * Attempt to load an internal client into the Jack server.
  *
+ * Internal clients run within the JACK server process.  They can use
+ * of the same functions as external clients.  Each internal client
+ * must declare jack_initialize() and jack_finish() entry points,
+ * called at load and unload times.  See inprocess.c for an example of
+ * how to write an internal client.
+ *
  * @param client_name of at most jack_client_name_size() characters.
  * @param so_name A path to a shared object file containing the code
- * for the new client
+ * for the new client.
  * @param so_data An arbitary string containing information to be
- * passed to the init() routine of the new client
+ * passed to the jack_initialize() routine of the new client.
  */
 int jack_internal_client_new (const char *client_name, const char *so_name,
 			      const char *so_data);

@@ -368,7 +368,8 @@ INPUT                  = @top_srcdir@/doc/mainpage.dox \
                          @top_srcdir@/jack/types.h \
                          @top_srcdir@/jack/transport.h \
                          @top_srcdir@/jack/ringbuffer.h \
-			 @top_srcdir@/example-clients/simple_client.c
+			 @top_srcdir@/example-clients/simple_client.c \
+			 @top_srcdir@/example-clients/inprocess.c
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 

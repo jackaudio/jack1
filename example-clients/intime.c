@@ -142,17 +142,17 @@ jack_initialize (jack_client_t *client, const char *arg)
 
 	if (jack_set_timebase_callback(client, 0, callback, NULL) != 0) {
 		fprintf (stderr, "Unable to take over timebase.\n");
-		return 1;
+		return 1;		/* terminate */
 	}
 
 	fprintf (stderr, "Internal timebase master defined.\n");
 	jack_activate (client);
-	return 0;
+	return 0;			/* success */
 }
 
 /* before unloading */
 void
-jack_finish (void)
+jack_finish (void *arg)
 {
 	fprintf (stderr, "Internal timebase client exiting.\n");
 }

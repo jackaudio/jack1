@@ -1,7 +1,7 @@
 /** @file simple_client.c
  *
- * @brief This is very simple client that demonstrates the basic
- * features of JACK as they would be used by many applications.
+ * @brief This simple client demonstrates the basic features of JACK
+ * as they would be used by many applications.
  */
 
 #include <stdio.h>
