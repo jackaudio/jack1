@@ -1561,7 +1561,8 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 		}
 
 		if (client_err || status != 0) {
-			jack_remove_client (engine, client);
+			/* jack_remove_client (engine, client); */
+			client->control->active = FALSE;
 		}
 	}
 
