@@ -40,6 +40,9 @@ static nframes_t srate = 48000;
 static int realtime = 0;
 static int realtime_priority = 10;
 static int with_fork = 1;
+static int need_cleanup = 1;
+
+#define JACK_TEMP_DIR "/tmp"
 
 static void
 cleanup ()
@@ -47,19 +50,32 @@ cleanup ()
 	DIR *dir;
 	struct dirent *dirent;
 
+	/* this doesn't have to truly atomic. in fact, its not even strictly
+	   necessary. it just potentially saves us from thrashing through
+	   the temp dir several times over.
+	*/
+
+	if (!need_cleanup) {
+		return;
+	}
+
+	need_cleanup = 0;
+
 	/* its important that we remove all files that jackd creates
 	   because otherwise subsequent attempts to start jackd will
 	   believe that an instance is already running.
 	*/
 
-	if ((dir = opendir ("/tmp")) == NULL) {
-		fprintf (stderr, "jackd(%li): cleanup - cannot open scratch directory (%s)\n", (long)getpid(), strerror (errno));
+	if ((dir = opendir (JACK_TEMP_DIR)) == NULL) {
+		fprintf (stderr, "jackd(%d): cleanup - cannot open scratch directory (%s)\n", getpid(), strerror (errno));
 		return;
 	}
 
 	while ((dirent = readdir (dir)) != NULL) {
-		if (strncmp (dirent->d_name, "jack-", 5) == 0) {
-			unlink (dirent->d_name);
+		if (strncmp (dirent->d_name, "jack-", 5) == 0 || strncmp (dirent->d_name, "jack_", 5) == 0) {
+			char fullpath[PATH_MAX+1];
+			sprintf (fullpath, JACK_TEMP_DIR "/%s", dirent->d_name);
+			unlink (fullpath);
 		}
 	}
 
@@ -69,7 +85,7 @@ cleanup ()
 static void
 signal_handler (int sig)
 {
-	fprintf (stderr, "killing jackd at %d\n", jackd_pid);
+	fprintf (stderr, "parent (%d): killing jackd at %d\n", getpid(), jackd_pid);
 	kill (jackd_pid, SIGTERM);
 	cleanup ();
 	exit (1);
@@ -100,14 +116,23 @@ signal_thread (void *arg)
 	int err;
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+	
+	/* Note: normal operation has with_form == 1 */
+
+	if (with_fork) {
+		/* let the parent handle SIGINT */
+		sigdelset (&signals, SIGINT);
+	}
 
 	err = sigwait (&signals, &sig);
-	fprintf (stderr, "exiting due to signal %d\n", sig);
+	fprintf (stderr, "child (%d): exiting due to signal %d\n", getpid(), sig);
 	jack_engine_delete (engine);
+
 	if (!with_fork) {
-		/* parent cleans up if we forked */
+		/* no parent - take care of this ourselves */
 		cleanup ();
 	}
+
 	exit (err);
 
 	/*NOTREACHED*/
@@ -206,7 +231,12 @@ jack_main ()
 	}
 
 	jack_use_driver (engine, driver);
-	jack_run (engine);
+
+	if (jack_run (engine)) {
+		fprintf (stderr, "cannot start main JACK thread\n");
+		return;
+	}
+
 	jack_wait (engine);
 }
 
@@ -276,7 +306,7 @@ main (int argc, char *argv[])
 		}
 	}
 
-	if (with_fork) {
+	if (!with_fork) {
 		jack_main ();
 		cleanup ();
 

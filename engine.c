@@ -78,7 +78,6 @@ static jack_client_internal_t *jack_client_internal_by_id (jack_engine_t *engine
 static void jack_sort_graph (jack_engine_t *engine, int take_lock);
 static int  jack_rechain_graph (jack_engine_t *engine, int take_lock);
 static int  jack_get_fifo_fd (jack_engine_t *engine, int which_fifo);
-static int  jack_create_fifo (jack_engine_t *engine, int which_fifo);
 static int  jack_port_do_connect (jack_engine_t *engine, const char *source_port, const char *destination_port);
 static int  jack_port_do_disconnect (jack_engine_t *engine, const char *source_port, const char *destination_port);
 
@@ -115,14 +114,6 @@ void shm_destroy (int status, void *arg)
 	shmctl (shm_id, IPC_RMID, 0);
 }
 
-static 
-void unlink_path (int status, void *arg)
-{
-	char *path = (char *) arg;
-	unlink (path);
-	free (arg);
-}
-
 static int
 make_sockets (int fd[2])
 {
@@ -149,8 +140,6 @@ make_sockets (int fd[2])
 		close (fd[0]);
 		return -1;
 	}
-
-	on_exit (unlink_path, (void *) strdup (addr.sun_path));
 
 	if (bind (fd[0], (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot bind server to socket (%s)", strerror (errno));
@@ -186,8 +175,6 @@ make_sockets (int fd[2])
 		close (fd[1]);
 		return -1;
 	}
-
-	on_exit (unlink_path, (void *) strdup (addr.sun_path));
 
 	if (bind (fd[1], (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot bind server to socket (%s)", strerror (errno));
@@ -651,12 +638,13 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 		if (((jack_client_internal_t *) node->data)->control->id == id) {
 		       
 			client = (jack_client_internal_t *) node->data;
-
-			if (!jack_client_is_inprocess (client)) {
-				jack_create_fifo (engine, ++engine->external_client_cnt);
-			} 
-
 			client->control->active = TRUE;
+
+			/* we call thus to make sure the FIFO is built by the time
+			   the client needs it. we don't care about the return
+			   value at this point.
+			*/
+			jack_get_fifo_fd (engine, ++engine->external_client_cnt);
 
 			jack_rechain_graph (engine, FALSE);
 
@@ -1123,7 +1111,7 @@ jack_engine_new (int realtime, int rtpriority)
 
 	sprintf (engine->fifo_prefix, "/tmp/jack_fifo_%d", getpid());
 
-	jack_create_fifo (engine, 0);
+	(void) jack_get_fifo_fd (engine, 0);
 	jack_start_server (engine);
 
 	return engine;
@@ -1169,7 +1157,7 @@ cancel_cleanup2 (int status, void *arg)
 }
 
 static void *
-jack_audio_thread (void *arg)
+jack_main_thread (void *arg)
 
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
@@ -1208,7 +1196,7 @@ jack_run (jack_engine_t *engine)
 		jack_error ("engine driver not set; cannot start");
 		return -1;
 	}
-	return pthread_create (&engine->audio_thread, 0, jack_audio_thread, engine);
+	return pthread_create (&engine->main_thread, 0, jack_main_thread, engine);
 }
 int
 jack_wait (jack_engine_t *engine)
@@ -1217,7 +1205,7 @@ jack_wait (jack_engine_t *engine)
 	void *ret = 0;
 	int err;
 
-	if ((err = pthread_join (engine->audio_thread, &ret)) != 0)  {
+	if ((err = pthread_join (engine->main_thread, &ret)) != 0)  {
 		switch (err) {
 		case EINVAL:
 			jack_error ("cannot join with audio thread (thread detached, or another thread is waiting)");
@@ -1239,7 +1227,7 @@ int
 jack_engine_delete (jack_engine_t *engine)
 
 {
-	pthread_cancel (engine->audio_thread);
+	pthread_cancel (engine->main_thread);
 	return 0;
 }
 
@@ -1532,7 +1520,7 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 	GSList *node, *next;
 	unsigned long n;
 	int err = 0;
-	int set;
+	int need_to_reset_fifo;
 	jack_client_internal_t *client, *subgraph_client, *next_client;
 
 	if (take_lock) {
@@ -1545,80 +1533,78 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 	*/
 
 	subgraph_client = 0;
-
-	if ((node = engine->clients) == 0) {
-		goto done;
-	}
-
-	client = (jack_client_internal_t *) node->data;
-	if ((next = g_slist_next (node)) == NULL) {
-		next_client = 0;
-	} else {
-		next_client = (jack_client_internal_t *) next->data;
-	}
 	n = 0;
 
-	do {
-		if (client->rank != n || client->next_client != next_client) {
-			client->rank = n;
-			client->next_client = next_client;
-			set = TRUE;
-		} else {
-			set = FALSE;
-		}
+	for (n = 0, node = engine->clients, next = NULL; node; node = next) {
 
-		if (jack_client_is_inprocess (client)) {
+		next = g_slist_next (node);
 
-			/* break the chain for the current subgraph. the server
-			   will wait for chain on the nth FIFO, and will
-			   then execute this in-process client.
-			*/
+		if (((jack_client_internal_t *) node->data)->control->active) {
 
-			if (subgraph_client) {
-				subgraph_client->subgraph_wait_fd = jack_get_fifo_fd (engine, n);
-			}
+			client = (jack_client_internal_t *) node->data;
 
-			subgraph_client = 0;
+			/* find the next active client. its ok for this to be NULL */
 			
-		} else {
+			while (next) {
+				if (((jack_client_internal_t *) next->data)->control->active) {
+					break;
+				}
+				next = g_slist_next (next);
+			};
 
-			if (subgraph_client == 0) {
-
+			if (next == NULL) {
+				next_client = NULL;
+			} else {
+				next_client = (jack_client_internal_t *) next->data;
+			}
+			
+			if (client->rank != n || client->next_client != next_client) {
+				client->rank = n;
+				client->next_client = next_client;
+				need_to_reset_fifo = TRUE;
+			} else {
+				need_to_reset_fifo = FALSE;
+			}
+			
+			if (jack_client_is_inprocess (client)) {
+				
+				/* break the chain for the current subgraph. the server
+				   will wait for chain on the nth FIFO, and will
+				   then execute this in-process client.
+				*/
+				
+				if (subgraph_client) {
+					subgraph_client->subgraph_wait_fd = jack_get_fifo_fd (engine, n);
+				}
+				
+				subgraph_client = 0;
+				
+			} else {
+				
+				if (subgraph_client == 0) {
+					
 				/* start a new subgraph. the engine will start the chain
 				   by writing to the nth FIFO.
 				*/
-
-				subgraph_client = client;
-				subgraph_client->subgraph_start_fd = jack_get_fifo_fd (engine, n);
-			} 
-
-			if (set) {
-				jack_client_set_order (engine, client);
+					
+					subgraph_client = client;
+					subgraph_client->subgraph_start_fd = jack_get_fifo_fd (engine, n);
+				} 
+				
+				if (need_to_reset_fifo) {
+					jack_client_set_order (engine, client);
+				}
+				
+				n++;
 			}
-			
-			n++;
 		}
 
-		if (next == 0) {
-			break;
-		}
+	};
 
-		node = next;
-		client = (jack_client_internal_t *) node->data;
-
-		if ((next = g_slist_next (node)) == 0) {
-			next_client = 0;
-		} else {
-			next_client = (jack_client_internal_t *) next->data;
-		}
-
-	} while (1);
-	
 	if (subgraph_client) {
 		subgraph_client->subgraph_wait_fd = jack_get_fifo_fd (engine, n);
 	}
 
-  done:
 	if (take_lock) {
 		pthread_mutex_unlock (&engine->graph_lock);
 	}
@@ -1651,8 +1637,13 @@ jack_trace_terminal (jack_client_internal_t *c1, jack_client_internal_t *rbase)
 		c2 = (jack_client_internal_t *) node->data;
 
 		/* c2 is a route that feeds c1 which somehow feeds base. mark
-		   base as being fed by c2
+		   base as being fed by c2, but don't do it more than
+		   once.
 		*/
+
+		if (g_slist_find (rbase->fed_by, c2) != NULL) {
+			continue;
+		}
 
 		rbase->fed_by = g_slist_prepend (rbase->fed_by, c2);
 
@@ -1905,36 +1896,31 @@ jack_port_do_disconnect (jack_engine_t *engine,
 	return ret;
 }
 
-static int
-jack_create_fifo (jack_engine_t *engine, int which_fifo)
-
-{
-	char path[FIFO_NAME_SIZE+1];
-
-	sprintf (path, "%s-%d", engine->fifo_prefix, which_fifo);
-
-	if (mknod (path, 0666|S_IFIFO, 0) < 0) {
-		if (errno != EEXIST) {
-			jack_error ("cannot create inter-client FIFO [%s] (%s)", path, strerror (errno));
-			return -1;
-		}
-
-	} else {
-		on_exit (unlink_path, strdup (path));
-	}
-
-	jack_get_fifo_fd (engine, which_fifo);
-
-	return 0;
-}
-
 static int 
 jack_get_fifo_fd (jack_engine_t *engine, int which_fifo)
 
 {
 	char path[FIFO_NAME_SIZE+1];
+	struct stat statbuf;
 
 	sprintf (path, "%s-%d", engine->fifo_prefix, which_fifo);
+
+	if (stat (path, &statbuf)) {
+		if (errno == ENOENT) {
+			if (mknod (path, 0666|S_IFIFO, 0) < 0) {
+				jack_error ("cannot create inter-client FIFO [%s] (%s)\n", path, strerror (errno));
+				return -1;
+			}
+		} else {
+			jack_error ("cannot check on FIFO %d\n", which_fifo);
+			return -1;
+		}
+	} else {
+		if (!S_ISFIFO(statbuf.st_mode)) {
+			jack_error ("FIFO %d (%s) already exists, but is not a FIFO!\n", which_fifo, path);
+			return -1;
+		}
+	}
 
 	if (which_fifo >= engine->fifo_size) {
 		int i;

@@ -43,7 +43,7 @@ struct _jack_engine {
     key_t control_key;
     key_t port_segment_key; /* XXX fix me */
     void *port_segment_address; /* XXX fix me */
-    pthread_t audio_thread;
+    pthread_t main_thread;
     pthread_t server_thread;
     
     /* these lists are protected by `buffer_lock' */
