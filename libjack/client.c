@@ -435,6 +435,8 @@ _start_server (void)
 		}
 	}
 
+// steph 
+#define JACK_LOCATION
 	if (!good) {
 #if defined(USE_CAPABILITIES)
 		command = JACK_LOCATION "/jackstart";
@@ -978,8 +980,10 @@ jack_client_thread (void *arg)
 	}
 
 	while (err == 0) {
+	
+		pthread_testcancel();
 
-	        if (client->engine->engine_ok == 0) {
+		if (client->engine->engine_ok == 0) {
 		     if (client->on_shutdown)
 			     client->on_shutdown (client->on_shutdown_arg);
 		     else
@@ -1011,8 +1015,6 @@ jack_client_thread (void *arg)
 		DEBUG ("pfd[0].revents = 0x%x pfd[1].revents = 0x%x",
 		       client->pollfd[0].revents,
 		       client->pollfd[1].revents);
-
-		pthread_testcancel();
 
 		if ((client->pollfd[0].revents & ~POLLIN) ||
 		    client->control->dead) {

@@ -1213,10 +1213,15 @@ jack_engine_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc
 	engine->driver_params = driver_params;
 
 	if (engine->control->real_time) {
+	/* Stephane Letz : letz@grame.fr
+	Watch dog thread is not needed on MacOSX since CoreAudio drivers already contains a similar mechanism.
+	*/
+	#ifndef JACK_USE_MACH_THREADS
 		if (jack_start_watchdog (engine)) {
 			return -1;
 		}
 		engine->watchdog_check = 1;
+	#endif
 	}
 	return 0;
 }
@@ -1813,6 +1818,8 @@ jack_server_thread (void *arg)
 
 	while (!done) {
 		DEBUG ("start while");
+		
+		pthread_testcancel();
 
 		/* XXX race here with new external clients
 		   causing engine->pfd to be reallocated.
@@ -2170,6 +2177,7 @@ jack_watchdog_thread (void *arg)
 	engine->watchdog_check = 0;
 
 	while (1) {
+		pthread_testcancel();
 		usleep (5000000);
 		if ( engine->watchdog_check == 0) {
 
@@ -2480,8 +2488,14 @@ jack_engine_delete (jack_engine_t *engine)
 	 * but 2.4 works OK.
 	 */
 	VERBOSE (engine, "stopping watchdog thread\n");
+
+	/* Stephane Letz : letz@grame.fr
+	Watch dog thread is not needed on MacOSX since CoreAudio drivers already contains a similar mechanism.
+	*/	
+#ifndef JACK_USE_MACH_THREADS 
 	pthread_cancel (engine->watchdog_thread);
 	pthread_join (engine->watchdog_thread, NULL);
+#endif
 
 	/* free engine control shm segment */
 	engine->control = NULL;
