@@ -150,12 +150,12 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	if (jack_engine_load_driver (engine, driver_desc, driver_params)) {
 		fprintf (stderr, "cannot load driver module %s\n",
 			 driver_desc->name);
-		return -1;
+		goto error;
 	}
 
-        if (engine->driver->start (engine->driver) != 0) {
-                jack_error ("cannot start driver");
-		return -1;
+	if (engine->driver->start (engine->driver) != 0) {
+		jack_error ("cannot start driver");
+		goto error;
 	}
 
 	/* install a do-nothing handler because otherwise pthreads
@@ -197,7 +197,7 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 			break;
 		}
 	} 
-
+	
 	if (sig != SIGSEGV) {
 
 		/* unblock signals so we can see them during shutdown.
@@ -206,9 +206,13 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 		*/
 		sigprocmask (SIG_UNBLOCK, &signals, 0);
 	}
-
+	
 	jack_engine_delete (engine);
 	return 1;
+	
+error:
+	jack_engine_delete (engine);
+	return -1;
 }
 
 static jack_driver_desc_t *
@@ -228,7 +232,6 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 	}
 	filename = malloc (strlen (driver_dir) + 1 + strlen (sofile) + 1);
 	sprintf (filename, "%s/%s", driver_dir, sofile);
-
 
 	if (verbose) {
 		fprintf (stderr, "getting driver descriptor from %s\n", filename);
@@ -278,7 +281,6 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 	free (filename);
 
 	return descriptor;
-  
 }
 
 static JSList *
@@ -323,7 +325,6 @@ jack_drivers_load ()
 		if (desc) {
 			driver_list = jack_slist_append (driver_list, desc);
 		}
-
 	}
 
 	err = closedir (dir_stream);
