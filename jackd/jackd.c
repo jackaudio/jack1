@@ -312,13 +312,12 @@ jack_main (int argc, char **argv)
 static void usage (FILE *file) 
 
 {
-	fprintf (file, "\
-usage: jackd [ --asio OR -a ]
-	     [ --realtime OR -R [ --realtime-priority OR -P priority ] ]
-             [ --verbose OR -v ]
-             [ --tmpdir OR -D directory-for-temporary-files ]
-         -d driver [ ... driver args ... ]
-");
+	fprintf (file, "\n"
+		 "usage: jackd [ --asio OR -a ]\n"
+		 "             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
+		 "             [ --verbose OR -v ]\n"
+		 "             [ --tmpdir OR -D directory-for-temporary-files ]\n"
+		 "         -d driver [ ... driver args ... ]\n");
 }	
 
 int	       
