@@ -13,7 +13,7 @@ TO BE DECIDED (owner)
 
 - dropping the use of CAP_RESOURCE (nando)
 - support for on-the-fly sampling rate change
-- whether to default to triangular dithering the at 16bit. (swh)
+- whether to default to triangular dithering for 16bit output. (swh)
 
 TODO for 1.0 (owner)
 
@@ -22,6 +22,8 @@ TODO for 1.0 (owner)
 TODO post-1.0
 
 - jack session handling (taybin)
+- get portaudio driver working under Linux (joq)
+- handle mixed-mode 64bit and 32bit clients (joq)
 - TBD
 
 TODO general (owner)
