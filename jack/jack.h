@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2001 Paul Davis
+    Copyright (C) 2004 Jack O'Quin
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -315,13 +316,6 @@ int jack_set_graph_order_callback (jack_client_t *,
  */
 int jack_set_xrun_callback (jack_client_t *,
 			    JackXRunCallback xrun_callback, void *arg);
-
-/**
- * @return the delay in microseconds due to the most recent XRUN
- * occurrence.  This probably only makes sense when called from a @ref
- * JackXRunCallback defined using jack_set_xrun_callback().
- */
-float jack_get_xrun_delayed_usecs (jack_client_t *client);
 
 /**
  * Tell the Jack server that the program is ready to start processing
@@ -746,7 +740,6 @@ jack_nframes_t jack_frame_time (const jack_client_t *);
  */
 jack_nframes_t jack_last_frame_time (const jack_client_t *client);
 
-
 /**
  * @return the current CPU load estimated by JACK.  This is a running
  * average of the time it takes to execute a full process cycle for
@@ -754,21 +747,6 @@ jack_nframes_t jack_last_frame_time (const jack_client_t *client);
  * determined by the buffer size and sample rate.
  */
 float jack_cpu_load (jack_client_t *client);
-
-/**
- * @return the maximum delay reported by the backend since
- * startup or reset.  When compared to the period size in usecs, this
- * can be used to estimate the ideal period size for a given setup.
- */
-float jack_get_max_delayed_usecs (jack_client_t *client);
-
-/**
- * Reset the maximum delay counter.  This would be useful
- * to estimate the effect that a change to the configuration of a running
- * system (e.g. toggling kernel preemption) has on the delay
- * experienced by JACK, without having to restart the JACK engine.
- */
-void jack_reset_max_delayed_usecs (jack_client_t *client);
 	
 /**
  * @return the pthread ID of the thread running the JACK client side

@@ -370,6 +370,7 @@ INPUT                  = @top_srcdir@/doc/mainpage.dox \
                          @top_srcdir@/jack/intclient.h \
                          @top_srcdir@/jack/jack.h \
                          @top_srcdir@/jack/ringbuffer.h \
+                         @top_srcdir@/jack/statistics.h \
                          @top_srcdir@/jack/thread.h \
                          @top_srcdir@/jack/transport.h \
                          @top_srcdir@/jack/types.h

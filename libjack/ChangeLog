@@ -1,3 +1,7 @@
+2004-12-31  Jack O'Quin  <joq@io.com>
+
+	* new header file: <jack/statistics.h>
+
 2004-12-27  Jack O'Quin  <joq@io.com>
 
 	* new API functions jack_get_max_delayed_usecs() and

@@ -6,6 +6,7 @@ libjackinclude_HEADERS = 	\
 	intclient.h		\
 	jack.h			\
 	ringbuffer.h		\
+	statistics.h            \
 	thread.h                \
 	timestamps.h		\
 	transport.h		\

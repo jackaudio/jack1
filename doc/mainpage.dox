@@ -82,9 +82,11 @@ internal client "plugin" that runs within the JACK server process.
 
 The JACK programming interfaces are described in several header files:
 
-  - @ref jack.h "<jack/jack.h>" defines most of the JACK interfaces.
-  - @ref intclient.h "<jack/intclient.h>" defines interfaces for
-  loading and unloading JACK internal clients.
+  - @ref jack.h "<jack/jack.h>" is the main JACK interface.
+  - @ref statistics.h "<jack/statistics.h>" provides interfaces for
+  monitoring the performance of a running JACK server.
+  - @ref intclient.h "<jack/intclient.h>" allows loading and unloading
+  JACK internal clients.
   - @ref ringbuffer.h "<jack/ringbuffer.h>" defines a simple API for
   using lock-free ringbuffers.  These are a good way to pass data
   between threads, when streaming realtime data to slower media, like
@@ -92,29 +94,29 @@ The JACK programming interfaces are described in several header files:
   - @ref transport.h "<jack/transport.h>" defines a simple transport
   control mechanism for starting, stopping and repositioning clients.
   This is described in the @ref transport-design document.
-  - @ref types.h "<jack/types.h>" defines most of the JACK data types.
+  - @ref types.h "<jack/types.h>" defines the main JACK data types.
   - @ref thread.h "<jack/thread.h>" functions standardize thread
   creation for JACK and its clients.
 
 In addition, the example-clients directory provides numerous examples
 of simple JACK clients that nevertheless use the API to do something
-useful. It includes
+useful.  It includes
 
   - a metronome.
   - a recording client that can capture any number of channels
       from any JACK sources and store them as an audio file.
   - command line clients to control the transport mechanism,
        change the buffer size and more.      
-  - simple examples of wrapping a GUI around a JACK application.
+  - commands to load and unload JACK internal clients.
   - tools for checking the status of a running JACK system.
 
 @section porting Porting
 
 JACK is designed to be portable to any system supporting the relevant
-POSIX and ANSI C standards.  It currently runs under GNU/Linux and Mac
-OS X on several different processor architectures.  If you want to
-port JACK to another platform, please read the @ref porting-guide
-document.
+POSIX and ANSI C standards.  It currently runs under GNU/Linux, Mac OS
+X and Berkeley Unix on several different processor architectures.  If
+you want to port JACK to another platform, please read the @ref
+porting-guide document.
 
 @section license License
 
