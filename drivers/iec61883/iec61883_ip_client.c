@@ -27,6 +27,7 @@
 #include <poll.h>
 
 #include <jack/internal.h>
+#include <jack/thread.h>
 
 #include "iec61883_ip_client.h"
 #include "iec61883_common.h"
@@ -38,15 +39,6 @@ iec61883_ip_client_run (void *arg)
 {
 	iec61883_client_t * client = arg;
 	int err;
-
-/*
-	err = jack_acquire_real_time_scheduling (pthread_self (),
-						 client->jack_client->engine->engine_priority + 1);
-	if (err) {
-		jack_error ("IEC61883IP: failed to acquire real time scheduling for "
-			    "client thread; things probably won't work");
-	}
-*/
 
 	err = iec61883_client_main (client, pthread_self ());
 	if (err) {
@@ -64,8 +56,10 @@ iec61883_ip_client_start (iec61883_client_t * client)
 	int err;
 	pthread_t thread;
 
-	err = pthread_create (&thread, NULL,
-			      iec61883_ip_client_run, (void *) client);
+	/* XXX we need a priority value here */
+
+	err = jack_create_thread (&thread, 20, client->engine->realtime,
+				  iec61883_ip_client_run, (void *) client);
 
 	if (err) {
 		jack_error ("IEC61883IP: could not start iec61883 client thread: "

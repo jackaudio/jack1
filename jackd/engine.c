@@ -44,6 +44,7 @@
 #include <jack/driver.h>
 #include <jack/version.h>
 #include <jack/shm.h>
+#include <jack/thread.h>
 #include <sysdeps/poll.h>
 #include <sysdeps/ipc.h>
 
@@ -459,7 +460,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 #ifdef USE_MLOCK
 	if (engine->control->real_time) {
 
-		/* Although we've called mlockall(CURRENT|FUTURE), the
+	/* Although we've called mlockall(CURRENT|FUTURE), the
 		 * Linux VM manager still allows newly allocated pages
 		 * to fault on first reference.  This mlock() ensures
 		 * that any new pages are present before restarting
@@ -1127,7 +1128,6 @@ jack_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc)
 
 	info = (jack_driver_info_t *) calloc (1, sizeof (*info));
 
-
 	info->handle = dlopen (driver_desc->file, RTLD_NOW|RTLD_GLOBAL);
 	
 	if (info->handle == NULL) {
@@ -1224,15 +1224,16 @@ jack_engine_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc
 	engine->driver_params = driver_params;
 
 	if (engine->control->real_time) {
-	/* Stephane Letz : letz@grame.fr
-	Watch dog thread is not needed on MacOSX since CoreAudio drivers already contains a similar mechanism.
-	*/
-	#ifndef JACK_USE_MACH_THREADS
+		/* Stephane Letz : letz@grame.fr
+		   Watch dog thread is not needed on MacOSX since CoreAudio drivers 
+		   already contains a similar mechanism.
+		*/
+#ifndef JACK_USE_MACH_THREADS
 		if (jack_start_watchdog (engine)) {
 			return -1;
 		}
 		engine->watchdog_check = 1;
-	#endif
+#endif
 	}
 	return 0;
 }
@@ -1818,8 +1819,6 @@ jack_server_thread (void *arg)
 	int i;
 	int max;
 	
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
 	engine->pfd[0].fd = engine->fds[0];
 	engine->pfd[0].events = POLLIN|POLLERR;
 	engine->pfd[1].fd = engine->fds[1];
@@ -1830,8 +1829,6 @@ jack_server_thread (void *arg)
 	while (!done) {
 		DEBUG ("start while");
 		
-		pthread_testcancel();
-
 		/* XXX race here with new external clients
 		   causing engine->pfd to be reallocated.
 		   I don't know how to solve this
@@ -1867,18 +1864,17 @@ jack_server_thread (void *arg)
 						    " client request");
 #ifdef JACK_USE_MACH_THREADS
                                     /* poll is implemented using
-                                    select (see the macosx/fakepoll
-                                    code). When the socket is closed
-                                    select does not return any error,
-                                    POLLIN is true and the next read
-                                    will return 0 bytes. This
-                                    behaviour is diffrent from the
-                                    Linux poll behaviour. Thus we use
-                                    this condition as a socket error
-                                    and remove the client.
+				       select (see the macosx/fakepoll
+				       code). When the socket is closed
+				       select does not return any error,
+				       POLLIN is true and the next read
+				       will return 0 bytes. This
+				       behaviour is diffrent from the
+				       Linux poll behaviour. Thus we use
+				       this condition as a socket error
+				       and remove the client.
                                     */
-                                    handle_client_socket_error(engine,
-							       pfd[i].fd);
+                                    handle_client_socket_error(engine, pfd[i].fd);
 #endif /* JACK_USE_MACH_THREADS */
                                                 }
 			}
@@ -2085,7 +2081,9 @@ jack_engine_new (int realtime, int rtpriority,
 
 	engine->control->port_max = engine->port_max;
 	engine->control->real_time = realtime;
-	engine->control->client_priority = engine->rtpriority - 1;
+	engine->control->client_priority = (realtime
+					    ? engine->rtpriority - 1
+					    : 0);
 	engine->control->do_mlock = do_mlock;
 	engine->control->do_munlock = do_unlock;
 	engine->control->cpu_load = 0;
@@ -2131,70 +2129,38 @@ jack_engine_new (int realtime, int rtpriority,
 	}
 #endif /* USE_CAPABILITIES */
 
+#ifdef USE_MLOCK
+
+        if (realtime && do_mlock && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
+		jack_error ("cannot lock down memory for jackd (%s)",
+			    strerror (errno));
+#ifdef ENSURE_MLOCK
+		return NULL;
+#endif /* ENSURE_MLOCK */
+        }
+#endif /* USE_MLOCK */
+
 	engine->control->engine_ok = 1;
 	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix),
 		  "%s/jack-%d-ack-fifo-%d", jack_server_dir, getuid (), getpid());
 
 	(void) jack_get_fifo_fd (engine, 0);
 
-	pthread_create (&engine->server_thread, 0, &jack_server_thread, engine);
+	jack_create_thread (&engine->server_thread, 0, FALSE, &jack_server_thread,
+			    engine);
 
 	return engine;
-}
-
-static int
-jack_become_real_time (jack_engine_t *engine, pthread_t thread, int priority)
-
-{
-	struct sched_param rtparam;
-	int x;
-
-	memset (&rtparam, 0, sizeof (rtparam));
-	rtparam.sched_priority = priority;
-
-	if ((x = pthread_setschedparam (thread, SCHED_FIFO, &rtparam)) != 0) {
-		jack_error ("cannot set thread to real-time priority (FIFO/%d)"
-			    " (%d: %s)", rtparam.sched_priority, x,
-			    strerror (errno));
-		return -1;
-	}
-        
-#ifdef USE_MLOCK
-        if (engine->control->do_mlock
-	    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
-		jack_error ("cannot lock down memory for RT thread (%s)",
-			    strerror (errno));
-#ifdef ENSURE_MLOCK
-	    return -1;
-#endif /* ENSURE_MLOCK */
-	}
-#endif /* USE_MLOCK */
-	return 0;
 }
 
 static void *
 jack_watchdog_thread (void *arg)
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
-	int watchdog_priority = engine->rtpriority + 10;
-	int max_priority = sched_get_priority_max(SCHED_FIFO);
-
-	if ((max_priority != -1) &&
-	    (max_priority < watchdog_priority))
-		watchdog_priority = max_priority;
-
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-	if (jack_become_real_time (engine, pthread_self(), watchdog_priority)) {
-		VERBOSE(engine, "no realtime watchdog thread\n");
-		return 0;
-	}
 
 	engine->watchdog_check = 0;
 
 	while (1) {
-		pthread_testcancel();
-		usleep (5000000);
+		sleep (5);
 		if ( engine->watchdog_check == 0) {
 
 			jack_error ("jackd watchdog: timeout - killing jackd");
@@ -2222,11 +2188,19 @@ jack_watchdog_thread (void *arg)
 static int
 jack_start_watchdog (jack_engine_t *engine)
 {
-	if (pthread_create (&engine->watchdog_thread, 0,
-			    jack_watchdog_thread, engine)) {
+	int watchdog_priority = engine->rtpriority + 10;
+	int max_priority = sched_get_priority_max (SCHED_FIFO);
+
+	if ((max_priority != -1) &&
+	    (max_priority < watchdog_priority))
+		watchdog_priority = max_priority;
+	
+	if (jack_create_thread (&engine->watchdog_thread, watchdog_priority, TRUE,
+				jack_watchdog_thread, engine)) {
 		jack_error ("cannot start watchdog thread");
 		return -1;
 	}
+
 	return 0;
 }
 
@@ -2321,7 +2295,7 @@ jack_start_freewheeling (jack_engine_t* engine)
 	event.type = StartFreewheel;
 	jack_deliver_event_to_all (engine, &event);
 	
-	if (pthread_create (&engine->freewheel_thread, NULL,
+	if (jack_create_thread (&engine->freewheel_thread, 0, FALSE,
 			    jack_engine_freewheel, engine)) {
 		jack_error ("could not start create freewheel thread");
 		return -1;

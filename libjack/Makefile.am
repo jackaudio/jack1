@@ -8,6 +8,7 @@ SOURCE_FILES = \
 	     pool.c \
 	     port.c \
 	     ringbuffer.c \
+	     thread.c \
 	     timestamps.c \
 	     transclient.c
 

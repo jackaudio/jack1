@@ -383,9 +383,6 @@ extern void jack_call_sync_client (jack_client_t *client);
 
 extern void jack_call_timebase_master (jack_client_t *client);
 
-extern int jack_acquire_real_time_scheduling (pthread_t, int priority);
-extern int jack_drop_real_time_scheduling (pthread_t);
-
 void silent_jack_error_callback (const char *desc);
 
 #endif /* __jack_internal_h__ */

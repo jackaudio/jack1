@@ -46,6 +46,7 @@
 #include <jack/version.h>
 #include <jack/shm.h>
 #include <jack/unlock.h>
+#include <jack/thread.h>
 
 #include <sysdeps/time.h>
 JACK_TIME_GLOBAL_DECL;			/* One instance per process. */
@@ -856,59 +857,6 @@ jack_internal_client_close (const char *client_name)
 	return;
 }
 
-#if JACK_USE_MACH_THREADS 
-
-int
-jack_drop_real_time_scheduling (pthread_t thread)
-{
-	setThreadToPriority(thread, 31, false, 10000000);
-	return 0;       
-}
-
-int
-jack_acquire_real_time_scheduling (pthread_t thread, int priority) //priority is unused
-{
-	setThreadToPriority(thread, 96, true, 10000000);
-	return 0;
-}
-
-#else
-
-int
-jack_drop_real_time_scheduling (pthread_t thread)
-{
-	struct sched_param rtparam;
-	int x;
-	
-	memset (&rtparam, 0, sizeof (rtparam));
-	rtparam.sched_priority = 0;
-	
-	if ((x = pthread_setschedparam (thread, SCHED_OTHER, &rtparam)) != 0) {
-		jack_error ("cannot switch to normal scheduling priority(%s)\n", strerror (errno));
-		return -1;
-	}
-        return 0;
-}
-
-int
-jack_acquire_real_time_scheduling (pthread_t thread, int priority)
-{
-	struct sched_param rtparam;
-	int x;
-	
-	memset (&rtparam, 0, sizeof (rtparam));
-	rtparam.sched_priority = priority;
-	
-	if ((x = pthread_setschedparam (thread, SCHED_FIFO, &rtparam)) != 0) {
-		jack_error ("cannot use real-time scheduling (FIFO/%d) "
-			    "(%d: %s)", rtparam.sched_priority, x,
-			    strerror (x));
-		return -1;
-	}
-        return 0;
-}
-
-#endif
 
 int
 jack_set_freewheel (jack_client_t* client, int onoff)
@@ -966,8 +914,6 @@ jack_client_thread (void *arg)
 	char c;
 	int err = 0;
 
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
 	pthread_mutex_lock (&client_lock);
 	client->thread_ok = TRUE;
 	client->thread_id = pthread_self();
@@ -986,8 +932,6 @@ jack_client_thread (void *arg)
 
 	while (err == 0) {
 	
-		pthread_testcancel();
-
 		if (client->engine->engine_ok == 0) {
 		     if (client->on_shutdown)
 			     client->on_shutdown (client->on_shutdown_arg);
@@ -1290,8 +1234,6 @@ jack_client_process_thread (void *arg)
 	client->control->pid = getpid();
 	DEBUG ("client process thread is now running");
         
-	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-        
 	client->rt_thread_ok = TRUE;
             
    	while (err == 0) {
@@ -1366,197 +1308,50 @@ jack_client_process_thread (void *arg)
 static int
 jack_start_thread (jack_client_t *client)
 {
-#ifndef JACK_USE_MACH_THREADS
-	int policy = SCHED_OTHER;
-	struct sched_param client_param, temp_param;
-#endif
-	pthread_attr_t *attributes = 0;
 
-	if (client->engine->real_time) {
-		
-		/* Get the client thread to run as an RT-FIFO
-		   scheduled thread of appropriate priority.
-		*/
+ 	if (client->engine->real_time) {
 
-		struct sched_param rt_param;
-
-		attributes = (pthread_attr_t *)
-			malloc (sizeof (pthread_attr_t));
-
-		pthread_attr_init (attributes);
-
-		if (pthread_attr_setdetachstate (attributes,
-						 PTHREAD_CREATE_JOINABLE)) {
-			jack_error ("cannot set JOINABLE scheduling for RT "
-				    "thread");
-			return -1;
-		}
-
-		if (pthread_attr_setinheritsched (attributes,
-						  PTHREAD_EXPLICIT_SCHED)) {
-			jack_error ("cannot set EXPLICIT scheduling for RT "
-				    "thread");
-			return -1;
-		}
-
-		if (pthread_attr_setschedpolicy (attributes, SCHED_FIFO)) {
-			jack_error ("cannot set FIFO scheduling class for RT "
-				    "thread");
-			return -1;
-		}
-
-		if (pthread_attr_setscope (attributes, PTHREAD_SCOPE_SYSTEM)) {
-			jack_error ("Cannot set scheduling scope for RT "
-				    "thread");
-			return -1;
-		}
-
-		memset (&rt_param, 0, sizeof (rt_param));
-		rt_param.sched_priority = client->engine->client_priority;
-
-		if (pthread_attr_setschedparam (attributes, &rt_param)) {
-			jack_error ("Cannot set scheduling priority for RT "
-				    "thread (%s)", strerror (errno));
-			return -1;
-		}
-                
 #ifdef USE_MLOCK
-                if (client->engine->do_mlock) {
-			if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
-				jack_error ("cannot lock down memory for RT thread (%s)",
-					    strerror (errno));
+		 if (client->engine->do_mlock
+		     && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
+			 jack_error ("cannot lock down memory for RT thread (%s)",
+				     strerror (errno));
+			 
 #ifdef ENSURE_MLOCK
-				return -1;
+			 return -1;
 #endif /* ENSURE_MLOCK */
-			}
-			if (client->engine->do_munlock) {
-				cleanup_mlock ();
-			}
-		}
+		 }
+		 
+		 if (client->engine->do_munlock) {
+			 cleanup_mlock ();
+		 }
 #endif /* USE_MLOCK */
 	}
 
+	if (jack_create_thread (&client->thread,
+				client->engine->client_priority,
+				client->engine->real_time,
+				jack_client_thread, client)) {
+		return -1;
+	}
+	
 #ifdef JACK_USE_MACH_THREADS
 
-	if (pthread_create (&client->thread, attributes,
-			    jack_client_thread, client)) {
-		return -1;
-	}
+	/* a secondary thread that runs the process callback and uses
+	   ultra-fast Mach primitives for inter-thread signalling.
 
-        /* a special real-time thread to call the "process"
-	 * callback. It will communicate with the server using fast
-	 * mach RPC mechanism */
-        if (pthread_create (&client->process_thread, attributes,
-			    jack_client_process_thread, client)) {
-                jack_error("pthread_create failed for process_thread \n");
-                return -1;
-        }
-        if (client->engine->real_time){
-            /* time constraint thread */
-            setThreadToPriority(client->process_thread, 96, TRUE, 10000000);
-        }else{
-            /* fixed priority thread */
-            setThreadToPriority(client->process_thread, 63, TRUE, 10000000);
-        }
+	   XXX in a properly structured JACK, there would be no
+	   need for this, because we would have client wake up
+	   methods that encapsulated the underlying mechanism
+	   used.
 
-#else /* !JACK_USE_MACH_THREADS */
-
-	if (pthread_create (&client->thread, attributes,
-			    jack_client_thread, client) == 0) {
-		return 0;
-	}
-
-	if (!client->engine->real_time) {
-		return -1;
-	}
-
-	/* the version of glibc I've played with has a bug that makes
-	   that code fail when running under a non-root user but with the
-	   proper realtime capabilities (in short,  pthread_attr_setschedpolicy 
-	   does not check for capabilities, only for the uid being
-	   zero). Newer versions apparently have this fixed. This
-	   workaround temporarily switches the client thread to the
-	   proper scheduler and priority, then starts the realtime
-	   thread so that it can inherit them and finally switches the
-	   client thread back to what it was before. Sigh. For ardour
-	   I have to check again and switch the thread explicitly to
-	   realtime, don't know why or how to debug - nando
 	*/
 
-	/* get current scheduler and parameters of the client process */
-	if ((policy = sched_getscheduler (0)) < 0) {
-		jack_error ("Cannot get current client scheduler: %s",
-			    strerror(errno));
+	if (jack_create_thread (&client->process_thread,
+				client->engine->client_priority,
+				client->engine->real_time,
+				jack_client_thread, client)) {
 		return -1;
-	}
-	memset (&client_param, 0, sizeof (client_param));
-	if (sched_getparam (0, &client_param)) {
-		jack_error ("Cannot get current client scheduler "
-			    "parameters: %s", strerror(errno));
-		return -1;
-	}
-
-	/* temporarily change the client process to SCHED_FIFO so that
-	   the realtime thread can inherit the scheduler and priority
-	*/
-	memset (&temp_param, 0, sizeof (temp_param));
-	temp_param.sched_priority = client->engine->client_priority;
-	if (sched_setscheduler(0, SCHED_FIFO, &temp_param)) {
-		jack_error ("Cannot temporarily set client to RT scheduler:"
-			    " %s", strerror(errno));
-		return -1;
-	}
-
-	/* prepare the attributes for the realtime thread */
-	attributes = (pthread_attr_t *) malloc (sizeof (pthread_attr_t));
-	pthread_attr_init (attributes);
-	if (pthread_attr_setscope (attributes, PTHREAD_SCOPE_SYSTEM)) {
-		sched_setscheduler (0, policy, &client_param);
-		jack_error ("Cannot set scheduling scope for RT thread");
-		return -1;
-	}
-	if (pthread_attr_setinheritsched (attributes, PTHREAD_INHERIT_SCHED)) {
-		sched_setscheduler (0, policy, &client_param);
-		jack_error ("Cannot set scheduler inherit policy for RT "
-			    "thread");
-		return -1;
-	}
-
-	/* create the RT thread */
-	if (pthread_create (&client->thread, attributes,
-			    jack_client_thread, client)) {
-		sched_setscheduler (0, policy, &client_param);
-		return -1;
-	}
-
-	/* return the client process to the scheduler it was in before */
-	if (sched_setscheduler (0, policy, &client_param)) {
-		jack_error ("Cannot reset original client scheduler: %s",
-			    strerror(errno));
-		return -1;
-	}
-
-	/* check again... inheritance of policy and priority works in
-	   jack_simple_client but not in ardour! So I check again and
-	   force the policy if it is not set correctly. This does not
-	   really really work either, the manager thread of the
-	   linuxthreads implementation is left running with
-	   SCHED_OTHER, that is presumably very bad.
-	*/
-	memset (&client_param, 0, sizeof (client_param));
-	if (pthread_getschedparam(client->thread, &policy,
-				  &client_param) == 0) {
-		if (policy != SCHED_FIFO) {
-			memset (&client_param, 0, sizeof (client_param));
-			client_param.sched_priority =
-				client->engine->client_priority;
-			if (pthread_setschedparam (client->thread, SCHED_FIFO,
-						   &client_param)) {
-				jack_error ("Cannot set (again) FIFO scheduling"
-					    " class for RT thread\n");
-				return -1;
-			}
-		}
 	}
 #endif /* JACK_USE_MACH_THREADS */
 

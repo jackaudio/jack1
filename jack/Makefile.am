@@ -13,7 +13,7 @@ noinst_HEADERS =	\
 	atomicity.h		\
 	driver.h 		\
 	driver_interface.h	\
-	driver_parse.h	\
+	driver_parse.h	        \
 	engine.h		\
 	hardware.h 		\
 	internal.h 		\
@@ -21,8 +21,9 @@ noinst_HEADERS =	\
 	memops.h		\
 	pool.h			\
 	port.h			\
-	ringbuffer.h	\
+	ringbuffer.h	        \
 	shm.h			\
 	start.h			\
+	thread.h                \
 	unlock.h		\
 	version.h

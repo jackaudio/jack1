@@ -54,6 +54,7 @@
 #include <jack/types.h>
 #include <jack/internal.h>
 #include <jack/engine.h>
+#include <jack/thread.h>
 #include <sysdeps/time.h>
 
 #include "oss_driver.h"
@@ -643,8 +644,9 @@ static int oss_driver_start (oss_driver_t *driver)
 	driver->threads = 0;
 	if (infd >= 0)
 	{
-		if (pthread_create(&driver->thread_in, NULL, io_thread, 
-			driver) < 0)
+		if (jack_create_thread(&driver->thread_in, 
+				       driver->engine->rtpriority, driver->engine->control->real_time, 
+				       io_thread, driver) < 0)
 		{
 			jack_error("OSS: pthread_create() failed: %s@%i",
 				__FILE__, __LINE__);
@@ -655,8 +657,9 @@ static int oss_driver_start (oss_driver_t *driver)
 #	ifdef USE_BARRIER
 	if (outfd >= 0)
 	{
-		if (pthread_create(&driver->thread_out, NULL, io_thread,
-			driver) < 0)
+		if (jack_create_thread(&driver->thread_out, 
+				       driver->engine->rtpriority, driver->engine->control->real_time, 
+				       io_thread, driver) < 0)
 		{
 			jack_error("OSS: pthread_create() failed: %s@%i",
 				__FILE__, __LINE__);
@@ -875,30 +878,6 @@ static void *io_thread (void *param)
 	size_t localsize;
 	void *localbuf;
 	oss_driver_t *driver = (oss_driver_t *) param;
-	struct sched_param schedp;
-
-	if (pthread_getschedparam(pthread_self(), &schedpol, &schedp) == 0)
-	{
-		if (schedpol != SCHED_FIFO)
-		{
-			schedpol = SCHED_FIFO;
-			schedp.sched_priority = 
-				sched_get_priority_max(SCHED_FIFO) - 1;
-			if (pthread_setschedparam(pthread_self(), schedpol, 
-				&schedp) != 0)
-			{
-				puts("oss_driver: pthread_setschedparam() failed\n");
-			}
-		}
-		else
-		{
-			puts("oss_driver: already running SCHED_FIFO; no changes\n");
-		}
-	}
-	else
-	{
-		puts("oss_driver: pthread_getschedparam() failed\n");
-	}
 
 	sem_wait(&driver->sem_start);
 

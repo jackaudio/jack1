@@ -37,7 +37,7 @@ struct _jack_client {
     mach_port_t clienttask, bp, serverport, replyport;
     trivial_message  message;
     pthread_t process_thread;
-	char rt_thread_ok : 1;
+    char rt_thread_ok : 1;
 #endif
 
 };

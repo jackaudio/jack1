@@ -30,6 +30,7 @@
 #include <jack/internal.h>
 #include <jack/driver.h>
 #include <jack/engine.h>
+#include <jack/thread.h>
 
 #ifdef USE_MLOCK
 #include <sys/mman.h>
@@ -99,29 +100,6 @@ jack_driver_nt_detach (jack_driver_nt_t * driver, jack_engine_t * engine)
 	return ret;
 }
 
-static int
-jack_driver_nt_become_real_time (jack_driver_nt_t* driver)
-{
-        if (jack_acquire_real_time_scheduling (driver->nt_thread,
-                                               driver->engine->rtpriority)) {
-                return -1;
-        }
-
-#ifdef USE_MLOCK
-        if (driver->engine->control->do_mlock
-	    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
-		jack_error ("cannot lock down memory for RT thread (%s)",
-			    strerror (errno));
-#ifdef ENSURE_MLOCK
-		return -1;
-#endif /* ENSURE_MLOCK */
-        }
-#endif /* USE_MLOCK */
-
-        return 0;
-}
-
-
 static void *
 jack_driver_nt_thread (void * arg)
 {
@@ -131,11 +109,10 @@ jack_driver_nt_thread (void * arg)
 
 	/* This thread may start running before pthread_create()
 	 * actually stores the driver->nt_thread value.  It's safer to
-	 * store it here as well. */
-	driver->nt_thread = pthread_self();
+	 * store it here as well. 
+	 */
 
-	if (driver->engine->control->real_time)
-		jack_driver_nt_become_real_time (driver);
+	driver->nt_thread = pthread_self();
 
 	pthread_mutex_lock (&driver->nt_run_lock);
 
@@ -173,8 +150,10 @@ jack_driver_nt_start (jack_driver_nt_t * driver)
 
 	driver->nt_run = DRIVER_NT_RUN;
 
-	err = pthread_create (&driver->nt_thread, NULL,
-			      jack_driver_nt_thread, driver);
+	err = jack_create_thread (&driver->nt_thread, 
+				  driver->engine->rtpriority,
+				  driver->engine->control->real_time,
+				  jack_driver_nt_thread, driver);
 	if (err) {
 		jack_error ("DRIVER NT: could not start driver thread!");
 		driver->nt_stop (driver);
