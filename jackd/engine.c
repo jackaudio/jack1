@@ -2079,9 +2079,17 @@ jack_main_thread (void *arg)
 		}
 
 		if (wait_status == 0) {
-			if (jack_run_cycle (engine, nframes, delayed_usecs)) {
-				jack_error ("cycle execution failure, exiting");
-				break;
+			jack_nframes_t left, b_size = engine->control->buffer_size;
+			if (engine->verbose) {
+				if (nframes != b_size) { 
+					fprintf(stderr, "late driver wakeup: nframes to process = %lu.\n", (unsigned long int)nframes);
+				}
+			}
+			for(left = nframes; left >= b_size; left -= b_size) {
+				if (jack_run_cycle (engine, b_size, delayed_usecs)) {
+					jack_error ("cycle execution failure, exiting");
+					break;
+				}
 			}
 		} else if (wait_status < 0) {
 			break;
