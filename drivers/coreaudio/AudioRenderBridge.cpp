@@ -120,18 +120,18 @@ void setParameter(void *instance, int id, void *data)
 				inst->isInterleaved = (int *) data;
 				break;
 			case 'nstr':
-				inst->numberOfStreams = (int *) data;
-				*inst->numberOfStreams = inst->n_in_streams;
+				inst->numberOfInputStreams = (int *) data;
+				*inst->numberOfInputStreams = inst->n_in_streams;
 				break;
 			case 'cstr':
-				inst->channelsPerStream = (int *) data;
+				inst->channelsPerInputStream = (int *) data;
 				break;
 			case 'nstO':
-				inst->out_numberOfStreams = (int *) data;
-				*inst->out_numberOfStreams = inst->n_out_streams;
+				inst->numberOfOuputStreams = (int *) data;
+				*inst->numberOfOuputStreams = inst->n_out_streams;
 				break;
 			case 'cstO':
-				inst->out_channelsPerStream = (int *) data;
+				inst->channelsPerOutputStream = (int *) data;
 				break;
 		}
     }

@@ -461,12 +461,12 @@ OSStatus AudioRender::process(AudioDeviceID inDevice,
 		}
 	} else {
 		for (unsigned int b = 0; b < inInputData->mNumberBuffers; b++) {
-			classe->channelsPerStream[b] =
+			classe->channelsPerInputStream[b] =
 				(int) inInputData->mBuffers[b].mNumberChannels;
 			classe->inBuffers[b] = (float *) inInputData->mBuffers[b].mData;	// but jack will read only the inBuffers[0], anyway that should not be a problem.
 		}
 		for (unsigned int b = 0; b < outOutputData->mNumberBuffers; b++) {
-			classe->out_channelsPerStream[b] =
+			classe->channelsPerOutputStream[b] =
 				(int) outOutputData->mBuffers[b].mNumberChannels;
 			classe->outBuffers[b] = (float *) outOutputData->mBuffers[b].mData;	// but jack will read only the outBuffers[0], anyway that should not be a problem.
 		}
