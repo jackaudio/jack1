@@ -1792,23 +1792,21 @@ jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t nframes)
 {
 	jack_frame_timer_t *timer = &engine->control->frame_timer;
 	jack_time_t now = engine->driver->last_wait_ust; // effective time
-	long long delta; // must be signed
+	float delta;
 
 	// really need a memory barrier here
 	timer->guard1++;
 
-	delta = now - timer->next_wakeup;
+	delta = (int64_t) now - (int64_t) timer->next_wakeup;
 
 	timer->current_wakeup = timer->next_wakeup;
 	timer->frames += nframes;
-
-	timer->second_order_integrator += 0.5 * 
+	timer->second_order_integrator += 0.5f * 
 		timer->filter_coefficient * delta;	
 	timer->next_wakeup = timer->current_wakeup + 
 		engine->driver->period_usecs + 
-		(jack_time_t) floor ((timer->filter_coefficient * 
-				      (delta + timer->second_order_integrator)));
-
+		(int64_t) floorf ((timer->filter_coefficient * 
+				   (delta + timer->second_order_integrator)));
 	timer->initialized = 1;
 
 	// might need a memory barrier here
