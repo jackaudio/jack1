@@ -325,13 +325,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 	}
 
 	size = nports * one_buffer;
-    
-#if defined(__APPLE__) && defined(__POWERPC__) 
-        /* using O_TRUNC option does not work on Darwin */
         perm = O_RDWR|O_CREAT;
-#else
-        perm = O_RDWR|O_CREAT|O_TRUNC;
-#endif
 
 	if (port_type->shm_info.size == 0) {
         
@@ -441,6 +435,10 @@ jack_driver_buffer_size (jack_engine_t *engine, jack_nframes_t nframes)
 
 	engine->control->buffer_size = nframes;
 
+	if (engine->driver)
+		engine->rolling_interval =
+			jack_rolling_interval (engine->driver->period_usecs);
+
 	for (i = 0; i < engine->control->n_port_types; ++i) {
 		jack_resize_port_segment (engine,
 					  &engine->control->port_types[i],
@@ -497,26 +495,10 @@ jack_set_buffer_size_request (jack_engine_t *engine, jack_nframes_t nframes)
 	 * driver's parameters */
 	pthread_mutex_lock (&engine->driver_lock);
 
-	if (driver->stop (driver)) {
-		jack_error ("cannot stop driver to set buffer size");
-		pthread_mutex_unlock (&engine->driver_lock);
-		return EIO;
-	}
-
 	rc = driver->bufsize(driver, nframes);
-	if (rc == 0)
-		engine->rolling_interval =
-			jack_rolling_interval (driver->period_usecs);
-	else
+	if (rc)
 		jack_error("driver does not support %" PRIu32
 			   "-frame buffers", nframes);
-
-	if (driver->start (driver)) {
-		jack_error ("cannot restart driver after setting buffer size");
-		pthread_mutex_unlock (&engine->driver_lock);
-		exit(1);
-	}
-
 	pthread_mutex_unlock (&engine->driver_lock);
 
 	return rc;
@@ -2013,12 +1995,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 		return 0;
 	}
         
-#if defined(__APPLE__) && defined(__POWERPC__) 
-        /* using O_TRUNC option does not work on Darwin */
         perm = O_RDWR|O_CREAT;
-#else
-        perm = O_RDWR|O_CREAT|O_TRUNC;
-#endif
 
 	if ((addr = jack_get_shm (engine->control_shm_name,
 				  engine->control_size, 
@@ -2562,12 +2539,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd,
 
 	case ClientExternal:
                 
-#if defined(__APPLE__) && defined(__POWERPC__) 
-                /* using O_TRUNC option does not work on Darwin */
                 perm = O_RDWR|O_CREAT;
-#else
-                perm = O_RDWR|O_CREAT|O_TRUNC;
-#endif
                 snprintf (shm_name, sizeof (shm_name), "/jack-c-%s", req->name);
                 
                 if ((addr = jack_get_shm (shm_name,
@@ -3715,12 +3687,8 @@ jack_get_fifo_fd (jack_engine_t *engine, unsigned int which_fifo)
 
 	if (stat (path, &statbuf)) {
 		if (errno == ENOENT) {
-       
-#if defined(__APPLE__) && defined(__POWERPC__) 
-                        if (mkfifo(path,0666) < 0){
-#else
-                        if (mknod (path, 0666|S_IFIFO, 0) < 0) {
-#endif
+
+			if (mkfifo(path, 0666) < 0){
 				jack_error ("cannot create inter-client FIFO"
 					    " [%s] (%s)\n", path,
 					    strerror (errno));

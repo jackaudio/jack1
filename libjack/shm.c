@@ -76,7 +76,6 @@ jack_initialize_shm ()
 {
 	void *addr;
 	int id;
-        int perm;
 
 #ifdef USE_POSIX_SHM
 	fprintf (stderr, "JACK compiled with POSIX SHM support\n");
@@ -93,18 +92,10 @@ jack_initialize_shm ()
 	   if we exit. otherwise, they can get lost in crash
 	   or debugger driven exits.
 	*/
-        
-#if defined(__APPLE__) && defined(__POWERPC__)
-        /* using O_TRUNC option does not work on Darwin */
-        perm = O_RDWR|O_CREAT;
-#else
-        perm = O_RDWR|O_CREAT|O_TRUNC;
-#endif
-	
 	if ((addr = jack_get_shm ("/jack-shm-registry",
-				  (sizeof (jack_shm_registry_entry_t) *
-				   MAX_SHM_ID), 
-				  perm, 0600, PROT_READ|PROT_WRITE, &id))
+				  (sizeof (jack_shm_registry_entry_t)
+				   * MAX_SHM_ID), O_RDWR|O_CREAT, 0600,
+				  PROT_READ|PROT_WRITE, &id))
 	    == MAP_FAILED) {
 		return -1;
 	}

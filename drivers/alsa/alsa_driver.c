@@ -1197,9 +1197,23 @@ alsa_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 static int
 alsa_driver_bufsize (alsa_driver_t* driver, jack_nframes_t nframes)
 {
-	return alsa_driver_reset_parameters (driver, nframes,
-					     driver->user_nperiods,
-					     driver->frame_rate);
+	int rc;
+
+	if (alsa_driver_audio_stop (driver)) {
+		jack_error ("ALSA: cannot stop to set buffer size");
+		return EIO;
+	}
+
+	rc = alsa_driver_reset_parameters (driver, nframes,
+					   driver->user_nperiods,
+					   driver->frame_rate);
+
+	if (alsa_driver_audio_start (driver)) {
+		jack_error ("ALSA: cannot restart after setting buffer size");
+		rc = rc? rc: EIO;
+	}
+
+	return rc;
 }
 
 static int

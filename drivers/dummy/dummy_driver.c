@@ -83,16 +83,22 @@ dummy_driver_null_cycle (dummy_driver_t* driver, jack_nframes_t nframes)
 static int
 dummy_driver_bufsize (dummy_driver_t* driver, jack_nframes_t nframes)
 {
+  int rc;
+
   /* these are arbitrary size restrictions */
   if ((nframes < 4) || (nframes > 65536))
     return EINVAL;
 
+  /* no need to stop and start the dummy driver */
   driver->period_size = nframes;  
   driver->period_usecs = driver->wait_time =
     (jack_time_t) floor ((((float) nframes) / driver->sample_rate)
 			 * 1000000.0f);
+
+  /* ask the engine to change its buffer size */
   driver->engine->set_buffer_size (driver->engine, nframes);
-  return 0;
+
+  return rc;
 }
 
 static int

@@ -82,12 +82,6 @@ typedef int	  (*JackDriverBufSizeFunction)(struct _jack_driver *,
 
      Note that stop/start may be called multiple times in the event of an
      error return from the `wait' function.
-
-     If a client requests a new buffer size...
-
-     1) engine stops driver
-     2) engine->bufsize()
-     3) engine starts driver again
 */
 
 
