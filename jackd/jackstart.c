@@ -143,8 +143,10 @@ static int check_binary (const char *binpath)
 		fprintf (stderr, "jackstart: %s group is not root\n", binpath);
 		return -1;
 	}
-	if ((status.st_mode & 0777) != 0755) {
-		fprintf (stderr, "jackstart: %s's mode is %o, should be %o\n", binpath, (status.st_mode & 0777), 0755);
+	if ((status.st_mode & 022) != 0) {
+			fprintf (stderr,
+					"jackstart: %s mode %o writeable by non-root users\n",
+					binpath, status.st_mode & 07777);
 		return -1;
 	}
 	if ((binstream = fopen (binpath, "r")) == NULL) {

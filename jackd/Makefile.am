@@ -3,9 +3,20 @@ MAINTAINERCLEANFILES = Makefile.in jack_md5.h
 if USE_CAPABILITIES
 CAP_PROGS = jackstart
 CAP_LIBS = -lcap
+install-exec-hook:
+	if [ "`id -u`" = "0" ]; \
+	then	chown root.root $(DESTDIR)$(bindir)/jackd; \
+			chmod 555 $(DESTDIR)$(bindir)/jackd; \
+			chown root.root $(DESTDIR)$(bindir)/jackstart; \
+			chmod 4555 $(DESTDIR)$(bindir)/jackstart; \
+	else    echo "You must be root to set ownership and permissions"; \
+			echo " for jackd and jackstart."; \
+	fi
 else
 CAP_PROGS =
 CAP_LIBS =
+install-exec-hook:
+	@echo "Nothing to make for $@."
 endif
 
 bin_PROGRAMS = jackd $(CAP_PROGS)
