@@ -64,6 +64,14 @@ char *jack_server_dir = DEFAULT_TMP_DIR;
 char *jack_server_dir = "/tmp";
 #endif
 
+void
+jack_set_server_dir (const char *path)
+{
+	fprintf (stderr, "jack_set_server_dir() is deprecated.\n  Please contact the program's author\n");
+	jack_server_dir = strdup (path);
+}
+
+
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
 void *jack_zero_filled_buffer = NULL;

@@ -604,6 +604,19 @@ jack_nframes_t jack_frame_time (const jack_client_t *);
 float jack_cpu_load (jack_client_t *client);
 
 /**
+ * Set the directory in which the server is expected
+ * to have put its communication FIFOs. A client
+ * will need to call this before calling
+ * jack_client_new() if the server was started
+ * with arguments telling it to use a non-standard
+ * directory.
+ * 
+ * @deprecated This function is deprecated.  Don't use in new programs
+ * and remove it in old programs.
+ */
+void jack_set_server_dir (const char *path);
+
+/**
  * Return the pthread ID of the thread running the JACK client
  * side code.
  */
