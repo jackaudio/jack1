@@ -88,4 +88,12 @@ standard POSIX and ANSI-C services. Other components like
 example clients and drivers, may rely on other packages, but 
 these dependencies should not affect the main build process.
 
+---------------------------------------------------------------------
+ Decision Process
+-----------------------------------------------------------------------
+
+All non-trivial changes should be discussed on the jackit-devel 
+mailing list. It has been agreed that Paul Davis will make 
+the final decisions based on these discussions.
+
 =======================================================================
