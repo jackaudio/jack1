@@ -24,6 +24,8 @@ else
 JACKREC =
 endif
 
+EXTRA_DIST = jack.spec.in
+
 bin_PROGRAMS = jackd jack_simple_client jack_monitor_client \
 	jack_impulse_grabber jack_cache_killer jack_connect jack_disconnect $(FLTK_CLIENT) $(JACKREC)
 
@@ -85,3 +87,6 @@ jack_alsa_la_LIBADD = -lasound $(GLIB_LIBS) -lm
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = jack.pc
+
+rpm: dist
+	rpm -ta $(distdir).tar.gz

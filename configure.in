@@ -4,8 +4,8 @@ AC_INIT(client.c)
 AC_CONFIG_AUX_DIR(.)
 
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=28
-JACK_MICRO_VERSION=2
+JACK_MINOR_VERSION=29
+JACK_MICRO_VERSION=0
 
 BETA=
 
@@ -101,4 +101,4 @@ fi
 AM_CONDITIONAL(HAVE_FLTK, $HAVE_FLTK)
 AM_CONDITIONAL(HAVE_SNDFILE, $HAVE_SNDFILE)
 AM_CONDITIONAL(HAVE_DOXYGEN, $HAVE_DOXYGEN)
-AC_OUTPUT(Makefile jack.pc jack/Makefile doc/Makefile doc/reference.doxygen)
+AC_OUTPUT(Makefile jack.pc jack.spec jack/Makefile doc/Makefile doc/reference.doxygen)
