@@ -37,14 +37,20 @@ extern "C" {
 /**
  * Attempt to become an external client of the Jack server.
  *
+ * JACK is evolving a mechanism for automatically starting the server
+ * when needed.  As a transition, jack_client_new() only does this
+ * when $JACK_START_SERVER is defined in the environment of the
+ * calling process.  In the future this will become normal behavior.
+ * In either case, defining $JACK_NO_START_SERVER disables this
+ * feature.
+ *
  * @param client_name of at most jack_client_name_size() characters.
  *
- * @param client_name The name for the new client
- * @return opaque client handle if successful, otherwise NULL.
+ * @return Opaque client handle if successful, otherwise NULL.
  *
  * @note Failure generally means that the JACK server is not running.
- * If there was some other problem, it will be reported via the
- * @ref jack_error_callback mechanism.
+ * If there was some other problem, it will be reported via the @ref
+ * jack_error_callback mechanism.
  */
 jack_client_t *jack_client_new (const char *client_name);
 

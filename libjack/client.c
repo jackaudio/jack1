@@ -398,6 +398,7 @@ server_event_connect (jack_client_t *client)
 	return fd;
 }
 
+/* Exec the JACK server in this process.  Does not return. */
 static void
 _start_server (void)
 {
@@ -479,26 +480,40 @@ _start_server (void)
 int
 start_server (void)
 {
-	pid_t pid1, pid2;
-	
-	if (getenv("JACK_NO_START_SERVER")) {
+	/* Only fork() a server when $JACK_START_SERVER is defined and
+	 * $JACK_NO_START_SERVER is not. */
+	if (getenv("JACK_START_SERVER") == NULL ||
+	    getenv("JACK_NO_START_SERVER") != NULL) {
 		return 1;
 	}
 
-	switch (pid1 = fork()) {
+	/* The double fork() forces the server to become a child of
+	 * init, which will always clean up zombie process state on
+	 * termination.  This even works in strange corner cases where
+	 * the server terminates but this client does not.
+	 *
+	 * Since fork() is usually implemented using copy-on-write
+	 * virtual memory tricks, the overhead of the second fork() is
+	 * probably relatively small.
+	 */
+	switch (fork()) {
+	case 0:				/* child process */
+		switch (fork()) {
+		case 0:			/* grandchild process */
+			_start_server();
+			_exit (99);	/* exec failed */
 		case -1:
-			return 1;
+			_exit (98);
+		default:
+			_exit (0);
+		}
+	case -1:			/* fork() error */
+		return 1;		/* failed to start server */
 
-		case 0:
-			switch (pid2 = fork()) {
-				case -1:
-					return 1;
-				case 0:
-					_start_server();
-			}
-    		_exit(0);
+	default:			/* original parent process */
+		/* fall through and return */
 	}
-	return 0;
+	return 0;			/* (probably) successful */
 }
 
 static int
@@ -537,14 +552,17 @@ jack_request_client (ClientType type, const char* client_name,
 	}
 
 	if ((*req_fd = server_connect (0)) < 0) {
-		if (start_server() == 0) {
-			sleep(2);
-			if ((*req_fd = server_connect (0)) < 0) {
-				goto fail;
-			}
-		} else {
+		int trys;
+		if (start_server()) {
 			goto fail;
 		}
+		trys = 5;
+		do {
+			sleep(1);
+			if (--trys < 0) {
+				goto fail;
+			}
+		} while ((*req_fd = server_connect (0)) < 0);
 	}
 
 	req.load = TRUE;

@@ -1,4 +1,4 @@
-.TH JACKD "1" @VERSION@ "March 2004"
+.TH JACKD "1" @VERSION@ "April 2004"
 .SH NAME
 jackd, jackstart \- JACK Audio Connection Kit sound server
 .SH SYNOPSYS
@@ -209,16 +209,18 @@ data loss.  Rectangular dithering will be used for playback.
 \fBjackd \-d alsa \-d hw:1 \-p2048 \-n3 \-\-softmode \-zr\fR
 .SH ENVIRONMENT
 .br
-Clients started without a running JACK server will attempt to start
-one themselves. It will be started using the command line found in the
-first line of $HOME/.jackdrc, or /etc/jackdrc if the former file does
-not exist. If neither file exists, builtin defaults will be used,
-including the -T flag so that the server shuts down when all clients
-have exited.
-.br
-This behaviour can be avoided by defining the
-environment variable \fBJACK_NO_START_SERVER\fR. If defined, a running
-JACK server must be running before any client can start.
+JACK is evolving a mechanism for automatically starting the server
+when needed.  Any client started without a running JACK server will
+attempt to start one itself using the command line found in the first
+line of \fB$HOME/.jackdrc\fR if it exists, or \fB/etc/jackdrc\fR if it
+does not.  If neither file exists, a built-in default command will be
+used, including the \fB-T\fR flag, which causes the server to shut
+down when all clients have exited.
+
+As a transition, this only happens when \fB$JACK_START_SERVER\fR is
+defined in the environment of the calling process.  In the future this
+will become normal behavior.  In either case, defining
+\fB$JACK_NO_START_SERVER\fR disables this feature.
 .SH SEE ALSO:
 .br
 <\fBjackit-devel@lists.sourceforge.net\fR>
