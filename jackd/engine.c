@@ -30,7 +30,9 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdarg.h>
+#ifdef HAVE_STDINT_H
 #include <stdint.h>
+#endif
 #include <dirent.h>
 #include <signal.h>
 #include <sys/types.h>

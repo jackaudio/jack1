@@ -26,7 +26,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
-#if HAVE_STDINT_H
+#ifdef HAVE_STDINT_H
 #include <stdint.h>
 #endif
 #include <regex.h>
