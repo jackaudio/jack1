@@ -77,13 +77,13 @@ int jack_set_process_callback (jack_client_t *, JackProcessCallback process_call
 int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback bufsize_callback, void *arg);
 
 /**
- * Tell the Jack server to call 'srate_callback' whenver the sample rate of
+ * Tell the Jack server to call 'srate_callback' whenever the sample rate of
  * the system changes.
  */
 int jack_set_sample_rate_callback (jack_client_t *, JackSampleRateCallback srate_callback, void *arg);
 
 /**
- * Tell the Jack server to call 'registration_callback' whenver the a Port is registered
+ * Tell the Jack server to call 'registration_callback' whenever the a Port is registered
  * or unregistered, passing 'arg' as a second argument.
  */
 int jack_set_port_registration_callback (jack_client_t *, JackPortRegistrationCallback registration_callback, void *arg);
