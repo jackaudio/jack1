@@ -4,7 +4,34 @@
 #include <string.h>
 #include <getopt.h>
 
+#include <config.h>
+
 #include <jack/jack.h>
+
+char * my_name;
+
+void
+show_version (void)
+{
+	fprintf (stderr, "%s: JACK Audio Connection Kit version " VERSION "\n",
+		my_name);
+}
+
+void
+show_usage (void)
+{
+	show_version ();
+	fprintf (stderr, "\nUsage: %s [options]\n", my_name);
+	fprintf (stderr, "List active Jack ports, and optionally display extra information.\n\n");
+	fprintf (stderr, "Display options:\n");
+	fprintf (stderr, "        -c, --connections     List connections to/from each port\n");
+	fprintf (stderr, "        -l, --latency         Display total latency in frames at each port\n");
+	fprintf (stderr, "        -p, --properties      Display port properties. Output may include:\n"
+			 "                              input|output, can-monitor, physical, terminal\n\n");
+	fprintf (stderr, "        -h, --help            Display this help message\n");
+	fprintf (stderr, "        --version             Output version information and exit\n\n");
+	fprintf (stderr, "For more information see http://jackit.sourceforge.net/\n");
+}
 
 int
 main (int argc, char *argv[])
@@ -22,10 +49,19 @@ main (int argc, char *argv[])
 		{ "connections", 0, 0, 'c' },
 		{ "latency", 0, 0, 'l' },
 		{ "properties", 0, 0, 'p' },
+		{ "help", 0, 0, 'h' },
+		{ "version", 0, 0, 'v' },
 		{ 0, 0, 0, 0 }
 	};
 
-	while ((c = getopt_long (argc, argv, "clp", long_options, &option_index)) >= 0) {
+	my_name = strrchr(argv[0], '/');
+	if (my_name == 0) {
+		my_name = argv[0];
+	} else {
+		my_name ++;
+	}
+
+	while ((c = getopt_long (argc, argv, "clphv", long_options, &option_index)) >= 0) {
 		switch (c) {
 		case 'c':
 			show_con = 1;
@@ -35,6 +71,18 @@ main (int argc, char *argv[])
 			break;
 		case 'p':
 			show_properties = 1;
+			break;
+		case 'h':
+			show_usage ();
+			return 1;
+			break;
+		case 'v':
+			show_version ();
+			return 1;
+			break;
+		default:
+			show_usage ();
+			return 1;
 			break;
 		}
 	}

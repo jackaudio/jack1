@@ -297,7 +297,7 @@ int
 main (int argc, char *argv[])
 
 {
-	const char *options = "-ad:D:P:vhVRFl:";
+	const char *options = "-ad:D:P:vhVRFl:t:";
 	struct option long_options[] = 
 	{ 
 		{ "asio", 0, 0, 'a' },
