@@ -712,6 +712,19 @@ jack_remove_clients (jack_engine_t* engine)
 }
 
 static void
+jack_reset_transport (jack_engine_t *engine)
+{
+	engine->control->current_time.frame = 0;
+	engine->control->pending_time.frame = 0;
+	engine->control->current_time.transport_state = JackTransportStopped;
+	engine->control->pending_time.transport_state = JackTransportStopped;
+	engine->control->current_time.valid =
+		JackTransportState|JackTransportPosition;
+	engine->control->pending_time.valid =
+		JackTransportState|JackTransportPosition;
+}
+
+static void
 jack_engine_post_process (jack_engine_t *engine)
 {
 	jack_client_control_t *ctl;
@@ -1350,12 +1363,7 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 
 			if (client == engine->timebase_client) {
 				engine->timebase_client = 0;
-				engine->control->current_time.frame = 0;
-				engine->control->pending_time.frame = 0;
-				engine->control->current_time.transport_state = JackTransportStopped;
-				engine->control->pending_time.transport_state = JackTransportStopped;
-				engine->control->current_time.valid = JackTransportState|JackTransportPosition;
-				engine->control->pending_time.valid = JackTransportState|JackTransportPosition;
+				jack_reset_transport (engine);
 			}
 			
 			for (portnode = client->ports; portnode; portnode = jack_slist_next (portnode)) {
@@ -1821,9 +1829,8 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
  
 	engine->control->buffer_size = 0;
 	engine->control->current_time.frame_rate = 0;
-	engine->control->current_time.frame = 0;
 	engine->control->pending_time.frame_rate = 0;
-	engine->control->pending_time.frame = 0;
+	jack_reset_transport (engine);
 	engine->control->internal = 0;
 
 	engine->control->has_capabilities = 0;
@@ -2330,12 +2337,7 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 	
 	if (client == engine->timebase_client) {
 		engine->timebase_client = 0;
-		engine->control->current_time.frame = 0;
-		engine->control->pending_time.frame = 0;
-		engine->control->current_time.transport_state = JackTransportStopped;
-		engine->control->pending_time.transport_state = JackTransportStopped;
-		engine->control->current_time.valid = JackTransportState|JackTransportPosition;
-		engine->control->pending_time.valid = JackTransportState|JackTransportPosition;
+		jack_reset_transport (engine);
 	}
 
 	jack_client_disconnect (engine, client);
