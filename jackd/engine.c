@@ -693,6 +693,7 @@ jack_remove_clients (jack_engine_t* engine)
 static void
 jack_engine_post_process (jack_engine_t *engine)
 {
+	/* precondition: caller holds the graph lock. */
 	jack_client_control_t *ctl;
 	jack_client_internal_t *client;
 	JSList *node;

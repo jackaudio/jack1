@@ -191,7 +191,7 @@ int  jack_set_sync_timeout (jack_client_t *client,
  *
  * The timebase master should not use its @a pos argument to set a
  * discontinuous position.  Use jack_transport_reposition() or
- * jack_transport_goto_frame(), instead.
+ * jack_transport_locate(), instead.
  *
  * @param state current transport state.
  * @param nframes number of frames in current period.
@@ -254,8 +254,8 @@ int  jack_set_timebase_callback (jack_client_t *client,
  *
  * @return 0 if valid request, otherwise a non-zero error code.
  */
-int  jack_transport_goto_frame (jack_client_t *client,
-				jack_nframes_t frame);
+int  jack_transport_locate (jack_client_t *client,
+			    jack_nframes_t frame);
 
 /**
  * Query the current transport state and position.
@@ -283,7 +283,7 @@ jack_transport_state_t jack_transport_query (jack_client_t *client,
  * rolling, it enters the ::JackTransportStarting state and begins
  * invoking their sync_callbacks until they declare themselves ready.
  *
- * @see jack_transport_goto_frame, jack_set_sync_callback
+ * @see jack_transport_locate, jack_set_sync_callback
  * 
  * @param client the JACK client structure.
  * @param pos requested new transport position.

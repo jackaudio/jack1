@@ -137,11 +137,10 @@ jack_timebase_set (jack_engine_t *engine,
 void
 jack_start_sync_poll(jack_engine_t *engine)
 {
+	/* precondition: caller holds the graph lock. */
 	jack_control_t *ectl = engine->control;
 	JSList *node;
 	long sync_count = 0;		/* number of slow-sync clients */
-
-	jack_lock_graph (engine);
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t *clintl =
@@ -154,8 +153,6 @@ jack_start_sync_poll(jack_engine_t *engine)
 
 	ectl->sync_remain = ectl->sync_clients = sync_count;
 	ectl->sync_cycle = 0;
-
-	jack_unlock_graph (engine);
 }
 
 /* when timebase master exits the graph */
@@ -194,6 +191,7 @@ jack_timebase_init (jack_engine_t *engine)
 void
 jack_transport_cycle_end (jack_engine_t *engine)
 {
+	/* precondition: caller holds the graph lock. */
 	jack_control_t *ectl = engine->control;
 	transport_command_t cmd;	/* latest transport command */
 

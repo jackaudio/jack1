@@ -131,7 +131,7 @@ void com_locate(char *arg)
     if (*arg != '\0')
 	frame = atoi(arg);
 
-    jack_transport_goto_frame(client, frame);
+    jack_transport_locate(client, frame);
 }
 
 void com_master(char *arg)

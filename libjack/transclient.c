@@ -107,7 +107,7 @@ jack_call_sync_client (jack_client_t *client)
 				      control->sync_arg)) {
 
 			control->sync_ready = 1;
-			eng->sync_cycle--;
+			eng->sync_cycle++;
 		}
 	}
 }
@@ -268,7 +268,7 @@ jack_set_timebase_callback (jack_client_t *client, int conditional,
 }
 
 int
-jack_transport_goto_frame (jack_client_t *client, jack_nframes_t frame)
+jack_transport_locate (jack_client_t *client, jack_nframes_t frame)
 {
 	jack_position_t pos;
 

@@ -158,8 +158,8 @@ an opportunity to catch up.
 @code
   int  jack_transport_reposition (jack_client_t *client,
                                   jack_position_t *pos);
-  int  jack_transport_goto_frame (jack_client_t *client,
-                                  jack_nframes_t frame);
+  int  jack_transport_locate (jack_client_t *client,
+                              jack_nframes_t frame);
 @endcode
 
 These request a new transport position.  They can be called at any
