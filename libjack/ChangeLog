@@ -1,3 +1,7 @@
+2004-09-15  Jack O'Quin  <joq@io.com>
+
+	* new API functions from <jack/thread.h>
+
 2004-07-08  Jack O'Quin  <joq@io.com>
 
 	* add jack_ringbuffer_peek()
