@@ -257,6 +257,7 @@ jack_initialize_shm (void)
 		}
 		break;
 	default:			/* failure return code */
+		break;
 	}
 
 	jack_shm_unlock_registry ();

@@ -29,10 +29,10 @@
 #ifndef __jack_messagebuffer_h__
 #define __jack_messagebuffer_h__
 
-#define MESSAGE(fmt...) jack_messagebuffer_add(##fmt)
-#define VERBOSE(engine,fmt...)	\
+#define MESSAGE(fmt,args...) jack_messagebuffer_add(fmt , ##args)
+#define VERBOSE(engine,fmt,args...)	\
 	if ((engine)->verbose)		\
-		jack_messagebuffer_add(##fmt)
+		jack_messagebuffer_add(fmt , ##args)
 
 void jack_messagebuffer_init();
 void jack_messagebuffer_exit();
