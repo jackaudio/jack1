@@ -369,6 +369,14 @@ jack_client_new (const char *client_name)
 	}
 	
 	if ((n = read (req_fd, &res, sizeof (res))) != sizeof (res)) {
+
+		if (errno == 0) {
+			/* server shut the socket */
+			jack_error ("could not attach as client (duplicate client name?)");
+			close (req_fd);
+			return NULL;
+		}
+
 		jack_error ("cannot read response from jack server (%s)", strerror (errno));
 		close (req_fd);
 		return NULL;
@@ -376,7 +384,7 @@ jack_client_new (const char *client_name)
 
 	if (res.status) {
 		close (req_fd);
-		jack_error ("could not attach as client");
+		jack_error ("could not attach as client (duplicate client name?)");
 		return NULL;
 	}
 
