@@ -1140,13 +1140,6 @@ jack_engine_takeover_timebase (jack_client_t *client)
 }	
 
 void
-jack_update_time (jack_client_t *client, nframes_t time)
-
-{
-	client->control->frame_time = time;
-}
-
-void
 jack_set_error_function (void (*func) (const char *, ...))
 {
 	jack_error = func;
