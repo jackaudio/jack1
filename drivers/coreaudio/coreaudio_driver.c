@@ -267,39 +267,39 @@ coreaudio_driver_write(coreaudio_driver_t * driver, jack_nframes_t nframes)
     int b = 0;
 
     for (chn = 0, node = driver->playback_ports; node;
-	 node = jack_slist_next(node), chn++) {
+		node = jack_slist_next(node), chn++) {
 
-	port = (jack_port_t *) node->data;
+		port = (jack_port_t *) node->data;
 
-	if (!driver->isInterleaved) {
-	    if (jack_port_connected(port)
-		&& (driver->outcoreaudio[chn] != NULL)) {
-		float *out = driver->outcoreaudio[chn];
-		buf = jack_port_get_buffer(port, nframes);
-		memcpy(out, buf, sizeof(float) * nframes);
-	    }
-	} else {
-	    if (jack_port_connected(port)
-		&& (driver->outcoreaudio[b] != NULL)) {
-		int channels = driver->out_channelsPerStream[b];
-		if (channels <= chn) {
-		    b++;
-		    if (driver->out_numberOfStreams > 1
-			&& b < driver->out_numberOfStreams) {
-			channels = driver->out_channelsPerStream[b];
-			chn = 0;
-		    } else
-			return 0;
+		if (!driver->isInterleaved) {
+			if (jack_port_connected(port)
+			&& (driver->outcoreaudio[chn] != NULL)) {
+			float *out = driver->outcoreaudio[chn];
+			buf = jack_port_get_buffer(port, nframes);
+			memcpy(out, buf, sizeof(float) * nframes);
+			}
+		} else {
+			if (jack_port_connected(port)
+				&& (driver->outcoreaudio[b] != NULL)) {
+				int channels = driver->out_channelsPerStream[b];
+				if (channels <= chn) {
+					b++;
+					if (driver->out_numberOfStreams > 1
+					&& b < driver->out_numberOfStreams) {
+					channels = driver->out_channelsPerStream[b];
+					chn = 0;
+					} else
+					return 0;
+				}
+				if (channels > 0) {
+					float *out = driver->outcoreaudio[b];
+					buf = jack_port_get_buffer(port, nframes);
+					for (i = 0; i < nframes; i++)
+					out[channels * i + chn] = buf[i];
+				}
+			}
 		}
-		if (channels > 0) {
-		    float *out = driver->outcoreaudio[b];
-		    buf = jack_port_get_buffer(port, nframes);
-		    for (i = 0; i < nframes; i++)
-			out[channels * i + chn] = buf[i];
-		}
-	    }
 	}
-    }
 
     return 0;
 }
@@ -577,48 +577,48 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 
 	switch (param->character) {
 
-	case 'n':
-	    name = (char *) param->value.str;
-	    printf("Driver name found %s\n", name);
-	    break;
+		case 'n':
+			name = (char *) param->value.str;
+			printf("Driver name found %s\n", name);
+			break;
 
-	case 'D':
-	    capture = TRUE;
-	    playback = TRUE;
-	    break;
+		case 'D':
+			capture = TRUE;
+			playback = TRUE;
+			break;
 
-	case 'c':
-	    chan_in = chan_out = (int) param->value.ui;
-	    break;
+		case 'c':
+			chan_in = chan_out = (int) param->value.ui;
+			break;
 
-	case 'i':
-	    chan_in = (int) param->value.ui;
-	    break;
+		case 'i':
+			chan_in = (int) param->value.ui;
+			break;
 
-	case 'o':
-	    chan_out = (int) param->value.ui;
-	    break;
+		case 'o':
+			chan_out = (int) param->value.ui;
+			break;
 
-	case 'C':
-	    capture = param->value.i;
-	    break;
+		case 'C':
+			capture = param->value.i;
+			break;
 
-	case 'P':
-	    playback = param->value.i;
-	    break;
+		case 'P':
+			playback = param->value.i;
+			break;
 
-	case 'r':
-	    srate = param->value.ui;
-	    break;
+		case 'r':
+			srate = param->value.ui;
+			break;
 
-	case 'p':
-	    frames_per_interrupt = (unsigned int) param->value.ui;
-	    break;
+		case 'p':
+			frames_per_interrupt = (unsigned int) param->value.ui;
+			break;
 
-	case 'I':
-	    get_device_id_from_num((int) param->value.ui, &deviceID);
-	    break;
-	}
+		case 'I':
+			get_device_id_from_num((int) param->value.ui, &deviceID);
+			break;
+		}
     }
 
     /* duplex is the default */

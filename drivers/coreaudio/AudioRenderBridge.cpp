@@ -34,24 +34,24 @@ void *openPandaAudioInstance(float sampleRate, long bufferSize,
 	new AudioRender(sampleRate, bufferSize, inChannels, outChannels,
 			device);
     if (newInst->status)
-	return newInst;
+		return newInst;
     return NULL;
 }
 
 void closePandaAudioInstance(void *instance)
 {
     if (instance) {
-	AudioRender *inst = (AudioRender *) instance;
-	inst->StopAudio();
-	delete inst;
+		AudioRender *inst = (AudioRender *) instance;
+		inst->StopAudio();
+		delete inst;
     }
 }
 
 int startPandaAudioProcess(void *instance)
 {
     if (instance) {
-	AudioRender *inst = (AudioRender *) instance;
-	return inst->StartAudio();
+		AudioRender *inst = (AudioRender *) instance;
+		return inst->StartAudio();
     }
     return FALSE;
 }
@@ -59,8 +59,8 @@ int startPandaAudioProcess(void *instance)
 int stopPandaAudioProcess(void *instance)
 {
     if (instance) {
-	AudioRender *inst = (AudioRender *) instance;
-	return inst->StopAudio();
+		AudioRender *inst = (AudioRender *) instance;
+		return inst->StopAudio();
     }
     return FALSE;
 }
@@ -68,8 +68,8 @@ int stopPandaAudioProcess(void *instance)
 float **getPandaAudioInputs(void *instance)
 {
     if (instance) {
-	AudioRender *inst = (AudioRender *) instance;
-	return inst->inBuffers;
+		AudioRender *inst = (AudioRender *) instance;
+		return inst->inBuffers;
     }
     return NULL;
 }
@@ -77,8 +77,8 @@ float **getPandaAudioInputs(void *instance)
 float **getPandaAudioOutputs(void *instance)
 {
     if (instance) {
-	AudioRender *inst = (AudioRender *) instance;
-	return inst->outBuffers;
+		AudioRender *inst = (AudioRender *) instance;
+		return inst->outBuffers;
     }
     return NULL;
 }
@@ -86,8 +86,8 @@ float **getPandaAudioOutputs(void *instance)
 void *getHostData(void *instance)
 {
     if (instance) {
-	AudioRender *inst = (AudioRender *) instance;
-	return inst->jackData;
+		AudioRender *inst = (AudioRender *) instance;
+		return inst->jackData;
     }
     return NULL;
 }
@@ -95,41 +95,41 @@ void *getHostData(void *instance)
 void setHostData(void *instance, void *hostData)
 {
     if (instance) {
-	AudioRender *inst = (AudioRender *) instance;
-	inst->jackData = hostData;
+		AudioRender *inst = (AudioRender *) instance;
+		inst->jackData = hostData;
     }
 }
 
 void setCycleFun(void *instance, JackRunCyclePtr fun)
 {
     if (instance) {
-	AudioRender *inst = (AudioRender *) instance;
-	inst->f_JackRunCycle = fun;
+		AudioRender *inst = (AudioRender *) instance;
+		inst->f_JackRunCycle = fun;
     }
 }
 
 void setParameter(void *instance, int id, void *data)
 {
     if (instance) {
-	AudioRender *inst = (AudioRender *) instance;
-	switch (id) {
-	case 'inte':
-	    inst->isInterleaved = (int *) data;
-	    break;
-	case 'nstr':
-	    inst->numberOfStreams = (int *) data;
-	    *inst->numberOfStreams = inst->n_streams;
-	    break;
-	case 'cstr':
-	    inst->channelsPerStream = (int *) data;
-	    break;
-	case 'nstO':
-	    inst->out_numberOfStreams = (int *) data;
-	    *inst->out_numberOfStreams = inst->n_out_streams;
-	    break;
-	case 'cstO':
-	    inst->out_channelsPerStream = (int *) data;
-	    break;
-	}
+		AudioRender *inst = (AudioRender *) instance;
+		switch (id) {
+		case 'inte':
+			inst->isInterleaved = (int *) data;
+			break;
+		case 'nstr':
+			inst->numberOfStreams = (int *) data;
+			*inst->numberOfStreams = inst->n_streams;
+			break;
+		case 'cstr':
+			inst->channelsPerStream = (int *) data;
+			break;
+		case 'nstO':
+			inst->out_numberOfStreams = (int *) data;
+			*inst->out_numberOfStreams = inst->n_out_streams;
+			break;
+		case 'cstO':
+			inst->out_channelsPerStream = (int *) data;
+			break;
+		}
     }
 }
