@@ -1859,7 +1859,7 @@ jack_client_feeds (jack_client_internal_t *might, jack_client_internal_t *target
 }
 
 static nframes_t
-jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port)
+jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port, int hop_count)
 {
 	GSList *node;
 	nframes_t latency;
@@ -1868,6 +1868,14 @@ jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port)
 	/* call tree must hold engine->client_lock. */
 	
 	latency = port->shared->latency;
+
+	/* we don't prevent cyclic graphs, so we have to do something to bottom out
+	   in the event that they are created.
+	*/
+
+	if (hop_count > 8) {
+		return latency;
+	}
 
 	for (node = port->connections; node; node = g_slist_next (node)) {
 
@@ -1885,7 +1893,7 @@ jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port)
 			if (connection->source->shared->flags & JackPortIsTerminal) {
 				this_latency = connection->source->shared->latency;
 			} else {
-				this_latency = jack_get_port_total_latency (engine, connection->source);
+				this_latency = jack_get_port_total_latency (engine, connection->source, hop_count + 1);
 			}
 
 		} else {
@@ -1895,7 +1903,7 @@ jack_get_port_total_latency (jack_engine_t *engine, jack_port_internal_t *port)
 			if (connection->destination->shared->flags & JackPortIsTerminal) {
 				this_latency = connection->destination->shared->latency;
 			} else {
-				this_latency = jack_get_port_total_latency (engine, connection->destination);
+				this_latency = jack_get_port_total_latency (engine, connection->destination, hop_count + 1);
 			}
 		}
 
@@ -1915,7 +1923,7 @@ jack_compute_all_port_total_latencies (jack_engine_t *engine)
 
 	for (i = 0; i < engine->control->port_max; i++) {
 		if (shared[i].in_use) {
-			shared[i].total_latency = jack_get_port_total_latency (engine, &engine->internal_ports[i]);
+			shared[i].total_latency = jack_get_port_total_latency (engine, &engine->internal_ports[i], 0);
 		}
 	}
 }
