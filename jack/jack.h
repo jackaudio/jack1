@@ -700,10 +700,8 @@ extern void (*jack_error_callback)(const char *msg);
  */
 void jack_set_error_function (void (*func)(const char *));
 
-#ifdef __cplusplus}
-
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* __jack_h__ */
-
-
