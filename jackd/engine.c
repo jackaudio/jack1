@@ -742,6 +742,7 @@ jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
 	JSList *node;
 
 	engine->process_errors = 0;
+	engine->watchdog_check = 1;
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_control_t *ctl =
@@ -2155,7 +2156,7 @@ jack_watchdog_thread (void *arg)
 
 	while (1) {
 		usleep (5000000);
-		if (engine->watchdog_check == 0) {
+		if ( engine->watchdog_check == 0) {
 
 			jack_error ("jackd watchdog: timeout - killing jackd");
 
@@ -2376,8 +2377,6 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 			goto unlock;
 		}
 	}
-
-	engine->watchdog_check = 1;
 
 	if (jack_engine_process (engine, nframes) == 0) {
 		if (!engine->freewheeling) {
