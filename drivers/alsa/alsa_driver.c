@@ -2257,7 +2257,7 @@ driver_get_descriptor ()
 	params[i].character  = 'n';
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 2U;
-	strcpy (params[i].short_desc, "Number of periods in hardware buffer");
+	strcpy (params[i].short_desc, "Number of periods of playback latency");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
 	i++;
