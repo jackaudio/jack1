@@ -232,9 +232,14 @@ enum JackPortFlags {
 enum JackOpenOptions {
 
      /**
-      * Do not automatically start the JACK server if it is not
-      * already running.  This option is selected by default if
-      * $JACK_NO_START_SERVER is defined in the calling process
+      * Null value to use when no option bits are needed.
+      */
+     JackNullOption = 0x00,
+
+     /**
+      * Do not automatically start the JACK server when it is not
+      * already running.  This option is always selected if
+      * \$JACK_NO_START_SERVER is defined in the calling process
       * environment.
       */
      JackNoStartServer = 0x01,
@@ -243,9 +248,17 @@ enum JackOpenOptions {
       * Use the exact client name requested.  Otherwise, JACK
       * automatically generates a unique one, if needed.
       */
-     JackUseExactName = 0x02
+     JackUseExactName = 0x02,
+
+     /**
+      * Open with optional @a char @a *server_name parameter.
+      *
+      * @warning This option has not yet been implemented.
+      */
+     JackServerName = 0x04
 };
 
+/* options mask does not include unimplemented features */
 #define JackValidOptions (JackNoStartServer|JackUseExactName)
 
 /**
@@ -260,12 +273,10 @@ typedef enum JackOpenOptions jack_options_t;
 enum JackOpenStatus {
 
      /**
-      * The JACK server was started as a result of this open.
-      * Otherwise, it was running already.  In either case the caller
-      * is now connected to jackd, so there is no race condition.
-      * When the server shuts down, the client will find out.
+      * The open request failed because it contained an invalid or
+      * unsupported option.
       */
-     JackServerStarted = 0x01,
+     JackInvalidOption = 0x01,
 
      /**
       * The desired client name was not unique.  With the @ref
@@ -279,10 +290,17 @@ enum JackOpenStatus {
      JackNameNotUnique = 0x02,
 
      /**
-      * The open request contained an invalid or unsupported option or
-      * parameter.
+      * The JACK server was started as a result of this open.
+      * Otherwise, it was running already.  In either case the caller
+      * is now connected to jackd, so there is no race condition.
+      * When the server shuts down, the client will find out.
       */
-     JackInvalidOpen = 0x04
+     JackServerStarted = 0x04,
+
+     /**
+      * Unable to connect to the JACK server, open failed.
+      */
+     JackServerFailed = 0x08
 };
 
 /**

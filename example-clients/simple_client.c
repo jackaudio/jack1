@@ -70,10 +70,16 @@ main (int argc, char *argv[])
 {
 	const char **ports;
 	const char *client_name;
+	const char *server_name = NULL;
+	jack_options_t options = JackNullOption;
 	jack_status_t status;
 
-	if (argc >= 2) {		/* session name specified? */
+	if (argc >= 2) {		/* client name specified? */
 		client_name = argv[1];
+		if (argc >= 3) {	/* server name specified? */
+			server_name = argv[2];
+			options |= JackServerName;
+		}
 	} else {			/* use basename of argv[0] */
 		client_name = strrchr(argv[0], '/');
 		if (client_name == 0) {
@@ -85,10 +91,13 @@ main (int argc, char *argv[])
 
 	/* open a client connection to the JACK server */
 
-	client = jack_client_open (client_name, 0, &status, NULL, NULL);
+	client = jack_client_open (client_name, options, &status, server_name);
 	if (client == NULL) {
 		fprintf (stderr, "jack_client_open() failed, status = %d\n",
 			 status);
+		if (status & JackServerFailed) {
+			fprintf (stderr, "Unable to connect to JACK server\n");
+		}
 		exit (1);
 	}
 	if (status & JackServerStarted) {

@@ -343,6 +343,9 @@ server_connect (const char *server_name)
 		return -1;
 	}
 
+	//JOQ: temporary debug code
+	// fprintf (stderr, "connecting to %s server\n", server_name);
+
 	//JOQ: use server_name as part of socket path
 	addr.sun_family = AF_UNIX;
 	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d_%d",
@@ -409,7 +412,7 @@ server_event_connect (jack_client_t *client)
 
 /* Exec the JACK server in this process.  Does not return. */
 static void
-_start_server (const char *server_command)
+_start_server (const char *server_cmd)
 {
 	FILE* fp = 0;
 	char filename[255];
@@ -498,7 +501,7 @@ _start_server (const char *server_command)
 }
 
 int
-start_server (jack_options_t options, const char *server_command)
+start_server (jack_options_t options, const char *server_cmd)
 {
 	if ((options & JackNoStartServer)
 	    || (getenv("JACK_NO_START_SERVER") != NULL)) {
@@ -518,7 +521,7 @@ start_server (jack_options_t options, const char *server_command)
 	case 0:				/* child process */
 		switch (fork()) {
 		case 0:			/* grandchild process */
-			_start_server(server_command);
+			_start_server(server_cmd);
 			_exit (99);	/* exec failed */
 		case -1:
 			_exit (98);
@@ -538,7 +541,7 @@ jack_request_client (ClientType type, const char* client_name,
 		     const char* so_name, const char* so_data,
 		     jack_client_connect_result_t *res, int *req_fd,
 		     jack_options_t options, jack_status_t *status,
-		     const char *server_name, const char *server_command)
+		     const char *server_name, const char *server_cmd)
 {
 	jack_client_connect_request_t req;
 
@@ -574,13 +577,15 @@ jack_request_client (ClientType type, const char* client_name,
 
 	if ((*req_fd = server_connect (server_name)) < 0) {
 		int trys;
-		if (start_server(options, server_command)) {
+		if (start_server(options, server_cmd)) {
+			*status |= JackServerFailed;
 			goto fail;
 		}
 		trys = 5;
 		do {
 			sleep(1);
 			if (--trys < 0) {
+				*status |= JackServerFailed;
 				goto fail;
 			}
 		} while ((*req_fd = server_connect (server_name)) < 0);
@@ -727,10 +732,13 @@ jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 jack_client_t *
 jack_client_open (const char *client_name,
 		  jack_options_t options,
-		  jack_status_t *status,
-		  const char *server_name,
-		  const char *server_command)
+		  jack_status_t *status, ...)
 {
+	/* optional arguments: */
+	char *server_name = "default";	/* server name */
+	char *server_cmd = NULL;	/* server command (not implemented) */
+	va_list ap;			/* variable argument pointer */
+
 	int req_fd = -1;
 	int ev_fd = -1;
 	jack_client_connect_result_t  res;
@@ -744,11 +752,18 @@ jack_client_open (const char *client_name,
 	*status = 0;
 
 	/* validate parameters */
-	if ((options & (~JackValidOptions))
-	    || server_name || server_command) {
-		*status |= JackInvalidOpen;
+	if ((options & ~JackValidOptions)) {
+		*status |= JackInvalidOption;
 		return NULL;
 	}
+
+	/* parse optional arguments */
+	va_start (ap, status);
+	if ((options & JackServerName))
+		server_name = va_arg(ap, char *);
+	//if ((options & JackServerCmd))	/* not implemented */
+	//	server_cmd = va_arg(ap, char *);
+	va_end (ap);
 
 	/* External clients need this initialized.  It is already set
 	 * up in the server's address space for internal clients.
@@ -762,7 +777,7 @@ jack_client_open (const char *client_name,
 
 	if (jack_request_client (ClientExternal, client_name, "", "",
 				 &res, &req_fd, options, status,
-				 server_name, server_command)) {
+				 server_name, server_cmd)) {
 		return NULL;
 	}
 
@@ -868,7 +883,7 @@ jack_client_new (const char *client_name)
 	if (getenv("JACK_START_SERVER") == NULL)
 		options |= JackNoStartServer;
 
-	return jack_client_open (client_name, options, NULL, NULL, NULL);
+	return jack_client_open (client_name, options, NULL);
 }
 
 char *

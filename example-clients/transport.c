@@ -422,6 +422,8 @@ void command_loop()
 
 int main(int argc, char *argv[])
 {
+	jack_status_t status;
+
 	/* basename $0 */
 	package = strrchr(argv[0], '/');
 	if (package == 0)
@@ -429,9 +431,11 @@ int main(int argc, char *argv[])
 	else
 		package++;
 
-	/* become a new client of the JACK server */
-	if ((client = jack_client_new(package)) == 0) {
-		fprintf(stderr, "jack server not running?\n");
+	/* open a connection to the JACK server */
+	client = jack_client_open (package, JackNullOption, &status);
+	if (client == NULL) {
+		fprintf (stderr, "jack_client_open() failed, status = %d\n",
+			 status);
 		return 1;
 	}
 

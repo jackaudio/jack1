@@ -47,49 +47,47 @@ extern "C" {
  * @ref JackUseExactName option, the server will modify this name to
  * create a unique variant, if needed.
  *
- * @param options formed by AND-ing together @ref JackOpenOptions
- * bits.
+ * @param options formed by OR-ing together @ref JackOpenOptions bits.
  *
  * @param status (if non-NULL) an address for JACK to return
  * information from the open operation.  This status word is formed by
- * AND-ing together the relevant @ref JackOpenStatus bits.
+ * OR-ing together the relevant @ref JackOpenStatus bits.
  *
- * @param server_name (if non-NULL) selects from among several
- * possible concurrent server instances.  If unspecified, "default" is
- * assumed.  Server names are unique to each user.
+ * <b>Optional parameters:</b>
  *
- * @param server_command (if non-NULL) is a command line to start the
- * server if it was not running.  The @ref JackNoStartServer option
- * disables automatic server creation, as does defining
- * $JACK_NO_START_SERVER in the environment.
+ * @arg @a server_name <tt>(char *)</tt> selects from among several
+ * possible concurrent server instances.  This parameter must follow
+ * @a status if the @ref JackServerName option is specified.
+ * Otherwise, "default" is assumed.  Server names are unique to each
+ * user.
  *
  * @return Opaque client handle if successful.  If this is NULL, the
  * open operation failed, and the caller is not a JACK client.
  */
 jack_client_t *jack_client_open (const char *client_name,
 				 jack_options_t options,
-				 jack_status_t *status,
-				 const char *server_name,
-				 const char *server_command);
+				 jack_status_t *status, ...);
 
 /**
  * Attempt to become an external client of the Jack server.
  *
  * JACK is evolving a mechanism for automatically starting the server
  * when needed.  As a transition, jack_client_new() only does this
- * when $JACK_START_SERVER is defined in the environment of the
+ * when \$JACK_START_SERVER is defined in the environment of the
  * calling process.  In the future this will become normal behavior.
- * In either case, defining $JACK_NO_START_SERVER disables this
+ * For full control of this feature, use jack_client_open(), instead.
+ * In either case, defining \$JACK_NO_START_SERVER disables this
  * feature.
  *
  * @param client_name of at most jack_client_name_size() characters.
+ * If this name is already in use, the request fails.
  *
  * @return Opaque client handle if successful, otherwise NULL.
  *
  * @note Failure generally means that the JACK server is not running.
  * If there was some other problem, it will be reported via the @ref
  * jack_error_callback mechanism.  Use jack_client_open() and check
- * the @a status parameter if you need more detailed information.
+ * the @a status parameter for more detailed information.
  */
 jack_client_t *jack_client_new (const char *client_name);
 
