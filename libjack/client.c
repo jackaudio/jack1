@@ -898,10 +898,14 @@ jack_internal_client_new (const char *client_name, const char *so_name, const ch
 	jack_client_connect_result_t res;
 	int req_fd;
 	jack_status_t status;
-	
+	jack_options_t options = JackUseExactName;
+
+	if (getenv("JACK_START_SERVER") == NULL)
+		options |= JackNoStartServer;
+
 	return jack_request_client (ClientInternal, client_name, so_name,
 				    so_data, &res, &req_fd,
-				    0, &status, NULL, NULL);
+				    options, &status, NULL, NULL);
 }
 
 void
