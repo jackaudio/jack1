@@ -31,7 +31,7 @@
 #include <stdlib.h>
 #include <limits.h>
 
-#include <jack/memops.h>
+#include "memops.h"
 
 #define SAMPLE_MAX_24BIT  8388607.0f
 #define SAMPLE_MAX_16BIT  32767.0f

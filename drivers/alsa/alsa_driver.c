@@ -27,14 +27,14 @@
 #include <stdarg.h>
 #include <getopt.h>
 
-#include <jack/alsa_driver.h>
+#include "alsa_driver.h"
 #include <jack/types.h>
 #include <jack/internal.h>
 #include <jack/engine.h>
-#include <jack/hammerfall.h>
-#include <jack/hdsp.h>
-#include <jack/ice1712.h>
-#include <jack/generic.h>
+#include "hammerfall.h"
+#include "hdsp.h"
+#include "ice1712.h"
+#include "generic.h"
 #include <jack/time.h>
 
 extern void store_work_time (int);
@@ -346,6 +346,11 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		return -1;
 	}
 	
+	if (!jack_power_of_two(driver->frames_per_cycle)) {
+		jack_error("JACK: frames must be a power of two (64, 512, 1024, ...)\n");
+		return -1;
+	}
+
 	if ((err = snd_pcm_hw_params_set_buffer_size (handle, hw_params, driver->user_nperiods * driver->frames_per_cycle)) < 0) {
 		jack_error ("ALSA: cannot set buffer length to %" PRIu32
 			    " for %s",
@@ -1984,3 +1989,4 @@ driver_finish (jack_driver_t *driver)
 {
 	alsa_driver_delete ((alsa_driver_t *) driver);
 }
+

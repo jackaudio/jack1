@@ -26,7 +26,7 @@
 #include <jack/types.h>
 #include <jack/hardware.h>
 #include <jack/driver.h>
-#include <jack/memops.h>
+#include "memops.h"
 #include <jack/jack.h>
 
 typedef void (*ReadCopyFunction)  (jack_default_audio_sample_t *dst, char *src,

@@ -19,7 +19,7 @@
 */
 
 #include <jack/hardware.h>
-#include <jack/alsa_driver.h>
+#include "alsa_driver.h"
 
 static int generic_set_input_monitor_mask (jack_hardware_t *hw, unsigned long mask)
 {

@@ -1,4 +1,4 @@
-MAINTAINERCLEANFILES    = Makefile.in
+MAINTAINERCLEANFILES = Makefile.in
 
 if HAVE_ALSA
 ALSA_DIR = alsa
@@ -9,4 +9,3 @@ endif
 SUBDIRS = dummy $(ALSA_DIR)
 
 DIST_SUBDIRS = dummy alsa 
-

@@ -19,8 +19,8 @@
 */
 
 #include <jack/hardware.h>
-#include <jack/alsa_driver.h>
-#include <jack/hammerfall.h>
+#include "alsa_driver.h"
+#include "hammerfall.h"
 #include <jack/internal.h>
 
 /* Set this to 1 if you want this compile error:

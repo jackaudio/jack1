@@ -239,6 +239,12 @@ portaudio_driver_new (char *name,
 	jack_driver_init ((jack_driver_t *) driver);
         
         driver->frame_rate = rate;
+
+	if (!jack_power_of_two(frames_per_cycle)) {
+		printf("JACK: frames must be a power of two (64, 512, 1024, ...)\n");
+		goto error;
+	}
+
 	driver->frames_per_cycle = frames_per_cycle;
 
 	driver->attach = (JackDriverAttachFunction) portaudio_driver_attach;

@@ -16,5 +16,6 @@ many small patches and documentation. Fernando Pablo Lopez-Lezcano
 contributed the capabilities-based code. Jeremy Hall, Steve Harris, 
 and Martin Boer contributed sample clients and utilities. 
 Jack O'Quin contributed new transport interfaces and documentation.
+Taybin Rutkin helps with patch management and releases.
 
 Many others have contributed patches and/or test results.

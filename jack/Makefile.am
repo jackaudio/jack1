@@ -9,18 +9,12 @@ libjackinclude_HEADERS = 	\
 	types.h	
 
 noinst_HEADERS = 	\
-	alsa_driver.h 	\
 	cycles.h 		\
 	driver.h 		\
 	engine.h		\
-	generic.h 		\
-	hammerfall.h 	\
 	hardware.h 		\
-	hdsp.h			\
-	ice1712.h		\
 	internal.h 		\
 	jslist.h		\
-	memops.h 		\
 	pool.h			\
 	port.h			\
 	shm.h			\

@@ -136,4 +136,9 @@ static inline void jack_unlock_graph (jack_engine_t* engine)
 	pthread_mutex_unlock (&engine->client_lock);
 }
 
+static inline unsigned int jack_power_of_two (unsigned int n)
+{
+	return !(n & (n - 1));
+}
+
 #endif /* __jack_engine_h__ */
