@@ -147,7 +147,6 @@ typedef enum {
 
 typedef volatile struct {
 
-    volatile jack_nframes_t  frame_time;       /* w: client r: engine (if client is timebase) */
     volatile int        id;               /* w: engine r: engine and client */
     volatile jack_nframes_t  nframes;          /* w: engine r: client */
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
