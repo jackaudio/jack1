@@ -395,6 +395,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 {
 	jack_control_t *ectl = engine->control;
 	transport_command_t cmd;	/* latest transport command */
+	jack_transport_state_t old_state;
 
 	/* Promote pending_time to current_time.  Maintain the usecs,
 	 * frame_rate and frame values, clients may not set them. */
@@ -403,6 +404,8 @@ jack_transport_cycle_end (jack_engine_t *engine)
 	ectl->pending_time.frame = ectl->pending_frame;
 	ectl->current_time = ectl->pending_time;
 	ectl->new_pos = ectl->pending_pos;
+
+	old_state = ectl->transport_state;
 
 	/* check sync results from previous cycle */
 	if (ectl->transport_state == JackTransportStarting) {
@@ -425,6 +428,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 		cmd = TransportCommandNone;
 
 	/* state transition switch */
+
 	switch (ectl->transport_state) {
 
 	case JackTransportStopped:
@@ -476,7 +480,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 	}
 
 	/* update timebase, if needed */
-	if (ectl->transport_state == JackTransportRolling) {
+	if (old_state == JackTransportRolling) {
 		ectl->pending_time.frame =
 			ectl->current_time.frame + ectl->buffer_size;
 	} 
