@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=97
-JACK_MICRO_VERSION=6
+JACK_MICRO_VERSION=7
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -106,8 +106,9 @@ AC_CHECK_HEADERS(string.h strings.h)
 AC_CHECK_HEADERS(getopt.h, [], [
     for d in /Developer/SDKs/MacOSX10.3.0.sdk/usr/include/ ; do
 	AC_CHECK_HEADERS($d/getopt.h, [], [INCLUDES=-I$d ${INCLUDES}])
-    done]
-)
+    done])
+AC_CHECK_HEADER(/usr/include/nptl/pthread.h,
+	[INCLUDES=-I/usr/include/nptl ${INCLUDES}])
 
 # functions and libraries
 AC_CHECK_FUNC(getopt_long, [],
@@ -123,8 +124,9 @@ AC_CHECK_LIB(m, sin)
 
 # should we use mlockall() on this platform?
 if test "x$JACK_DO_NOT_MLOCK" = "x"; then
-    AC_CHECK_FUNC(mlockall,
-	    [AC_DEFINE(USE_MLOCK, 1, [Use POSIX memory locking])])
+    AC_CHECK_HEADER(sys/mman.h,
+        [AC_CHECK_FUNC(mlockall,
+	    [AC_DEFINE(USE_MLOCK, 1, [Use POSIX memory locking])])])
 fi
 
 # look for system support for POSIX shm API
@@ -315,15 +317,14 @@ fi
 AC_SUBST(DEFAULT_TMP_DIR)
 AC_DEFINE_UNQUOTED(DEFAULT_TMP_DIR,"$DEFAULT_TMP_DIR",[Default tmp directory])
 
-# check for barrier functions in the pthreads library
+# Check for barrier functions in the pthreads library.  The default
+# option setting may be OS-dependent, otherwise it's "yes".
+test "x$USE_BARRIER" = "x" && USE_BARRIER="yes"
 AC_ARG_WITH(barrier,
 	AC_HELP_STRING([--without-barrier],
 		       [avoid using pthread barrier functions]),
-	[ USE_BARRIER=$withval ],
-	[ USE_BARRIER="yes" ]
-)
-if test "x$USE_BARRIER" = "xyes"
-then
+	[ USE_BARRIER=$withval ])
+if test "x$USE_BARRIER" = "xyes"; then
 	AC_CHECK_LIB([pthread], [pthread_barrier_init],
 		AC_DEFINE(USE_BARRIER, 1, [Use pthread barrier functions]))
 fi

@@ -31,8 +31,7 @@
  * defined as optional by the standard, so OS conformance to this level
  * doesn't necessarily mean everything exists.
  */
-#define _POSIX_C_SOURCE 200112L
-#define _BSD_SOURCE
+#define _XOPEN_SOURCE	600
 #endif
 #include <unistd.h>
 #include <pthread.h>

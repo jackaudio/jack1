@@ -141,6 +141,12 @@ case "${host_os}" in
   gnu* | linux* | kfreebsd*-gnu | knetbsd*-gnu)
     os_include_dir="os/gnu-linux"
     ;;
+  freebsd*)
+    # current FreeBSD header files conflict with the OSS driver's
+    # barrier code, this may be fixed in 5.3, stay tuned.
+    os_include_dir="os/generic"
+    USE_BARRIER="no"
+    ;;
   irix*)
     os_include_dir="os/irix"
     atomicity_include_dir=$os_include_dir
