@@ -14,6 +14,7 @@ libjackinclude_HEADERS = 	\
 
 noinst_HEADERS =		\
 	atomicity.h		\
+	bitset.h		\
 	driver.h 		\
 	driver_interface.h	\
 	driver_parse.h	        \

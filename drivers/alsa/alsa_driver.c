@@ -58,6 +58,9 @@ extern void show_work_times ();
 static void
 alsa_driver_release_channel_dependent_memory (alsa_driver_t *driver)
 {
+	bitset_destroy (&driver->channels_done);
+	bitset_destroy (&driver->channels_not_done);
+
 	if (driver->playback_addr) {
 		free (driver->playback_addr);
 		driver->playback_addr = 0;
@@ -340,7 +343,8 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			      snd_pcm_hw_params_t *hw_params, 
 			      snd_pcm_sw_params_t *sw_params, 
 			      unsigned int *nperiodsp,
-			      unsigned long *nchns,unsigned long sample_width)
+			      unsigned long *nchns,
+			      unsigned long sample_width)
 {
 	int err, format;
 	unsigned int frame_rate;
@@ -387,9 +391,9 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		if ((err = snd_pcm_hw_params_set_format (
 			     handle, hw_params, formats[format].format)) < 0) {
 			int failed_format = format; 
-			if (sample_width == (4
-					     ? format++ < NOFORMATS - 1
-					     : format-- > 0)) {
+			if ((sample_width == 4
+			     ? format++ < NOFORMATS - 1
+			     : format-- > 0)) {
 				jack_error ("Couldn't open %s for %s samples"
 					    " trying %s instead", device_name,
 					    formats[failed_format].Name,
@@ -806,12 +810,10 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	   channels require action on every cycle. any bits that are
 	   not set after the engine's process() call indicate channels
 	   that potentially need to be silenced.
-
-	   XXX this is limited to <wordsize> channels. Use a bitset
-	   type instead.
 	*/
 
-	driver->channel_done_bits = 0;
+	bitset_create (&driver->channels_done, driver->max_nchannels);
+	bitset_create (&driver->channels_not_done, driver->max_nchannels);
 
 	if (driver->playback_handle) {
 		driver->playback_addr = (char **)
@@ -827,7 +829,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 		}
 
 		for (chn = 0; chn < driver->playback_nchannels; chn++) {
-			driver->channel_done_bits |= (1<<chn);
+			bitset_add (driver->channels_done, chn);
 		}
 
 		driver->dither_state = (dither_state_t *)
@@ -1148,7 +1150,7 @@ alsa_driver_silence_untouched_channels (alsa_driver_t *driver,
 		driver->frames_per_cycle * driver->playback_nperiods;
 
 	for (chn = 0; chn < driver->playback_nchannels; chn++) {
-		if ((driver->channels_not_done & (1<<chn))) { 
+		if (bitset_contains (driver->channels_not_done, chn)) { 
 			if (driver->silent[chn] < buffer_frames) {
 				alsa_driver_silence_on_channel_no_mark (
 					driver, chn, nframes);
@@ -1414,7 +1416,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 
 	/* mark all channels not done for now. read/write will change this */
 
-	driver->channels_not_done = driver->channel_done_bits;
+	bitset_copy (driver->channels_not_done, driver->channels_done);
 
 	/* constrain the available count to the nearest (round down) number of
 	   periods.
@@ -1622,7 +1624,7 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 				buf + nwritten, contiguous);
 		}
 
-		if (driver->channels_not_done) {
+		if (!bitset_empty (driver->channels_not_done)) {
 			alsa_driver_silence_untouched_channels (driver,
 								contiguous);
 		}
