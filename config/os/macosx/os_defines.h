@@ -23,8 +23,6 @@
 #ifndef _jack_os_defines
 #define _jack_os_defines 1
 
-/* a bigger process stack makes the application crash... */
-#define JACK_THREAD_STACK_TOUCH 10000
 #define JACK_CPP_VARARGS_BROKEN 1
 #define JACK_USE_MACH_THREADS 1
 #define JACK_DO_NOT_MLOCK 1

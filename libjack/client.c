@@ -57,11 +57,7 @@ JACK_TIME_GLOBAL_DECL;			/* One instance per process. */
 #include <jack/timestamps.h>
 #endif /* WITH_TIMESTAMPS */
 
-#ifdef DEFAULT_TMP_DIR
 char *jack_server_dir = DEFAULT_TMP_DIR;
-#else
-char *jack_server_dir = "/tmp";
-#endif
 
 void
 jack_set_server_dir (const char *path)
@@ -1343,7 +1339,7 @@ jack_start_thread (jack_client_t *client)
                 }
 #endif /* JACK_DO_NOT_MLOCK */
 	}
-        
+
 #ifdef JACK_USE_MACH_THREADS
 
 	if (pthread_create (&client->thread, attributes,

@@ -132,7 +132,7 @@ jack_cleanup_shm (void)
 	jack_shm_unlock_registry ();
 }
 
-#if USE_POSIX_SHM
+#ifdef USE_POSIX_SHM
 
 int
 jack_initialize_shm (void)

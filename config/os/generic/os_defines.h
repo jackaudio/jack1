@@ -23,7 +23,6 @@
 #ifndef _jack_os_defines
 #define _jack_os_defines 1
 
-#define JACK_THREAD_STACK_TOUCH 1048576
 #define PORTAUDIO_H <portaudio.h>
 #define GETOPT_H <getopt.h>
 

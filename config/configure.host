@@ -141,6 +141,7 @@ case "${host_os}" in
     ;;
   darwin*)
     os_include_dir="os/macosx"
+    JACK_THREAD_STACK_TOUCH=10000	# need small realtime stack
     OS_LDFLAGS="-framework CoreAudio"
     TRY_POSIX_SHM=yes		# POSIX shm works better on darwin
     ;;
