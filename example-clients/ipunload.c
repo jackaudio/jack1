@@ -3,7 +3,7 @@
 int
 main (int argc, char *argv[])
 {
-	jack_inprocess_client_close (argv[1]);
+	jack_internal_client_close (argv[1]);
 	return 0;
 }
 	

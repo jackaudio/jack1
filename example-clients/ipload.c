@@ -21,8 +21,8 @@ main (int argc, char *argv[])
 	} else {
 		so_data = argv[3];
 	}
-
-	if (jack_inprocess_client_new (name, so_name, so_data) != 0) {
+	
+	if (jack_internal_client_new (name, so_name, so_data) != 0) {
 		fprintf (stderr, "could not load %s\n", so_name);
 		return -1;
 	} else {

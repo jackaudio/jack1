@@ -1619,6 +1619,8 @@ alsa_error (char *type, char *value)
 
 /* DRIVER "PLUGIN" INTERFACE */
 
+const char driver_client_name[] = "alsa_pcm";
+
 jack_driver_t *
 driver_initialize (jack_client_t *client, int argc, char **argv)
 {

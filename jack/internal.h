@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2001 Paul Davis
+    Copyright (C) 2001-2003 Paul Davis
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -103,7 +103,7 @@ typedef struct {
     jack_time_info_t    current_time;
     jack_time_info_t    pending_time;
     jack_frame_timer_t  frame_timer;
-    int                 in_process;
+    int                 internal;
     jack_nframes_t      frames_at_cycle_start;
     pid_t               engine_pid;
     unsigned long       buffer_size;
@@ -146,9 +146,9 @@ typedef struct {
 } jack_event_t;
 
 typedef enum {
-	ClientInProcess,   /* connect request just names .so */
-	ClientDriver,      /* code is loaded along with driver */
-	ClientOutOfProcess /* client is in another process */
+	ClientInternal, /* connect request just names .so */
+	ClientDriver,   /* code is loaded along with driver */
+	ClientExternal  /* client is in another process */
 } ClientType;
 
 typedef enum {
@@ -197,7 +197,7 @@ typedef volatile struct {
 
     /* for engine use only */
 
-    void *private_internal_client;
+    void *private_client;
 
 } jack_client_control_t;
 
@@ -302,11 +302,11 @@ extern int  jack_client_handle_port_connection (jack_client_t *client, jack_even
 extern void jack_client_handle_new_port_segment (jack_client_t *client, int key, void* addr);
 
 extern jack_client_t *jack_driver_client_new (jack_engine_t *, const char *client_name);
-jack_client_t *jack_client_alloc_inprocess(jack_client_control_t*, jack_control_t*);
+jack_client_t *jack_client_alloc_internal (jack_client_control_t*, jack_control_t*);
 
-/* in process clients call this. its defined in jack/engine.c */
+/* internal clients call this. its defined in jack/engine.c */
 
-void handle_in_process_client_request (jack_control_t*, jack_request_t*);
+void handle_internal_client_request (jack_control_t*, jack_request_t*);
 
 extern char *jack_server_dir;
 

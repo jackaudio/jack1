@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2001 Paul Davis
+    Copyright (C) 2001-2003 Paul Davis
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -140,7 +140,7 @@ static int
 deliver_request (const jack_client_t *client, jack_request_t *req)
 {
 	/* indirect through the function pointer that was set 
-	   either by jack_client_new() (OOP) or handle_new_client()
+	   either by jack_client_new() (external) or handle_new_client()
 	   in the server.
 	*/
 
@@ -173,7 +173,7 @@ jack_client_alloc ()
 }
 
 jack_client_t *
-jack_client_alloc_inprocess (jack_client_control_t *cc, jack_control_t *ec)
+jack_client_alloc_internal (jack_client_control_t *cc, jack_control_t *ec)
 {
 	jack_client_t* client;
 
@@ -488,7 +488,7 @@ jack_request_client (ClientType type, const char* client_name, const char* so_na
 
 	switch (type) {
 	case ClientDriver:
-	case ClientInProcess:
+	case ClientInternal:
 		close (*req_fd);
 		*req_fd = -1;
 		break;
@@ -518,7 +518,7 @@ jack_client_new (const char *client_name)
 	int control_shm_id;
 	void *addr;
 
-	if (jack_request_client (ClientOutOfProcess, client_name, "", "", &res, &req_fd)) {
+	if (jack_request_client (ClientExternal, client_name, "", "", &res, &req_fd)) {
 		return NULL;
 	}
 
@@ -560,7 +560,7 @@ jack_client_new (const char *client_name)
 
 	jack_client_handle_new_port_segment (client, res.port_segment_key, 0);
 
-	/* set up the client so that it does the right thing for an OOP client */
+	/* set up the client so that it does the right thing for an external client */
 
 	client->control->deliver_request = oop_client_deliver_request;
 	client->control->deliver_arg = client;
@@ -592,16 +592,16 @@ jack_client_new (const char *client_name)
 }
 
 int
-jack_inprocess_client_new (const char *client_name, const char *so_name, const char *so_data)
+jack_internal_client_new (const char *client_name, const char *so_name, const char *so_data)
 {
 	jack_client_connect_result_t res;
 	int req_fd;
 	
-	return jack_request_client (ClientInProcess, client_name, so_name, so_data, &res, &req_fd);
+	return jack_request_client (ClientInternal, client_name, so_name, so_data, &res, &req_fd);
 }
 
 void
-jack_inprocess_client_close (const char *client_name)
+jack_internal_client_close (const char *client_name)
 {
 	jack_client_connect_request_t req;
 	int fd;
@@ -634,7 +634,7 @@ jack_client_handle_new_port_segment (jack_client_t *client, int key, void* addr)
 	   right now.
 	*/
 
-	if (client->control->type == ClientOutOfProcess) {
+	if (client->control->type == ClientExternal) {
 
 		/* map shared memory */
 
@@ -1041,7 +1041,7 @@ jack_activate (jack_client_t *client)
 
 #undef BIG_ENOUGH_STACK
 
-	if (client->control->type == ClientInProcess || client->control->type == ClientDriver) {
+	if (client->control->type == ClientInternal || client->control->type == ClientDriver) {
 		goto startit;
 	}
 
@@ -1132,7 +1132,7 @@ jack_client_close (jack_client_t *client)
 		jack_deactivate (client);
 	}
 
-	if (client->control->type == ClientOutOfProcess) {
+	if (client->control->type == ClientExternal) {
 		/* stop the thread that communicates with the jack server */
 		pthread_cancel (client->thread);
 		pthread_join (client->thread, &status);
