@@ -37,19 +37,15 @@
 #include <sysdeps/pThreadUtilities.h>
 #endif
 
-#define log_internal(msg, res, fatal)	                             \
-  if (res) {                                                         \
-    char outbuf[500];                                                \
-    snprintf(outbuf, sizeof(outbuf),                                 \
-             "jack_create_thread: error %d %s: %s",                  \
-             res, msg, strerror(res));                               \
-    jack_error(outbuf);                                              \
-    if (fatal)                                                       \
-      return res;                                                    \
-  }
-
-#define log_result(msg) log_internal(msg, result, 1);
-#define log_result_nonfatal(msg) log_internal(msg, result, 0);
+static inline void
+log_result (char *msg, int res)
+{
+	char outbuf[500];
+	snprintf(outbuf, sizeof(outbuf),
+		 "jack_create_thread: error %d %s: %s",
+		 res, msg, strerror(res));
+	jack_error(outbuf);
+}
 
 int
 jack_create_thread (pthread_t* thread,
@@ -64,19 +60,22 @@ jack_create_thread (pthread_t* thread,
 	struct sched_param param;
 	int actual_policy;
 	struct sched_param actual_param;
-#endif /* JACK_USE_MACH_THREADS */
+#endif /* !JACK_USE_MACH_THREADS */
+
 	int result = 0;
 
 	if (!realtime) {
 		result = pthread_create (thread, 0, start_routine, arg);
-		log_result("creating thread with default parameters");
-
-		return 0;
+		if (result) {
+			log_result("creating thread with default parameters",
+				   result);
+		}
+		return result;
 	}
 
-	/* realtime thread. this disgusting mess is a
-	 * reflection of the 2nd-class nature of RT
-	 * programming under POSIX in general and Linux in particular.
+	/* realtime thread. this disgusting mess is a reflection of
+	 * the 2nd-class nature of RT programming under POSIX in
+	 * general and Linux in particular.
 	 */
 
 #ifndef JACK_USE_MACH_THREADS
@@ -85,15 +84,30 @@ jack_create_thread (pthread_t* thread,
 	policy = SCHED_FIFO;
 	param.sched_priority = priority;
 	result = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
-	log_result("requesting explicit scheduling");
+	if (result) {
+		log_result("requesting explicit scheduling", result);
+		return result;
+	}
 	result = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-	log_result("requesting joinable thread creation");
+	if (result) {
+		log_result("requesting joinable thread creation", result);
+		return result;
+	}
 	result = pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
-	log_result("requesting system scheduling scope");
+	if (result) {
+		log_result("requesting system scheduling scope", result);
+		return result;
+	}
 	result = pthread_attr_setschedpolicy(&attr, policy);
-	log_result("requesting non-standard scheduling policy");
+	if (result) {
+		log_result("requesting non-standard scheduling policy", result);
+		return result;
+	}
 	result = pthread_attr_setschedparam(&attr, &param);
-	log_result("requesting thread priority");
+	if (result) {
+		log_result("requesting thread priority", result);
+		return result;
+	}
 	
 	/* with respect to getting scheduling class+priority set up
 	   correctly, there are three possibilities here: 
@@ -145,18 +159,33 @@ jack_create_thread (pthread_t* thread,
 		sched_getparam (0, &current_param);
 		
 		result = sched_setscheduler (0, policy, &param);
-		log_result("switching current thread to rt for inheritance");
+		if (result) {
+			log_result("switching current thread to rt for "
+				   "inheritance", result);
+			return result;
+		}
 		
 		pthread_attr_init (&inherit_attr);
 		result = pthread_attr_setscope (&inherit_attr,
 						PTHREAD_SCOPE_SYSTEM);
-		log_result("requesting system scheduling scope for inheritance");
+		if (result) {
+			log_result("requesting system scheduling scope "
+				   "for inheritance", result);
+			return result;
+		}
 		result = pthread_attr_setinheritsched (&inherit_attr,
 						       PTHREAD_INHERIT_SCHED);
-		log_result("requesting inheritance of scheduling parameters");
+		if (result) {
+			log_result("requesting inheritance of scheduling "
+				   "parameters", result);
+			return result;
+		}
 		result = pthread_create (thread, &inherit_attr, start_routine,
 					 arg);
-		log_result_nonfatal("creating real-time thread by inheritance");
+		if (result) {
+			log_result("creating real-time thread by inheritance",
+				   result);
+		}
 		
 		sched_setscheduler (0, current_policy, &current_param);
 		
@@ -167,14 +196,14 @@ jack_create_thread (pthread_t* thread,
 	/* Still here? Good. Let's see if this worked... */
 
 	result = pthread_getschedparam (*thread, &actual_policy, &actual_param);
-	log_result ("verifying scheduler parameters");
+	if (result) {
+		log_result ("verifying scheduler parameters", result);
+		return result;
+	}
 
 	if (actual_policy == policy &&
 	    actual_param.sched_priority == param.sched_priority) {
-
-		/* everything worked OK */
-
-		return 0;
+		return 0;		/* everything worked OK */
 	}
 
 	/* we failed to set the sched class and priority,
@@ -185,12 +214,20 @@ jack_create_thread (pthread_t* thread,
 	 */
 
 	result = pthread_setschedparam (*thread, policy, &param);
-	log_result("setting scheduler parameters after thread creation");
+	if (result) {
+		log_result("setting scheduler parameters after thread "
+			   "creation", result);
+		return result;
+	}
 
 #else /* JACK_USE_MACH_THREADS */
 
 	result = pthread_create (thread, 0, start_routine, arg);
-	log_result ("creating realtime thread");
+	if (result) {
+		log_result ("creating realtime thread", result);
+		return result;
+	}
+
 	/* time constraint thread */
 	setThreadToPriority (*thread, 96, TRUE, 10000000);
 	

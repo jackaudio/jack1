@@ -15,12 +15,12 @@ implementation contained here.  Andy Wingo and Kai Vehmanen provided
 many small patches and documentation.  Fernando Pablo Lopez-Lezcano
 contributed the capabilities-based code.  Jeremy Hall, Steve Harris,
 and Martin Boer contributed sample clients and utilities.  Jack O'Quin
-contributed new transport interfaces, implemented the buffer size
-callback, and added much documentation.  Taybin Rutkin helps with
-patch management and releases.  Melanie Thielker contributed
-significantly to JACK's interaction with aspects of both POSIX and
-System V APIs.  Stephane Letz ported JACK to Mac OS X.  Jussi Laako
-wrote the OSS driver interface.  Tilman Linneweh ported JACK to
-FreeBSD.
+contributed new transport interfaces, buffer resizing, documentation
+and many bug fixes.  Taybin Rutkin helps with patch management and
+releases.  Melanie Thielker contributed significantly to JACK's
+interaction with aspects of both POSIX and System V APIs.  Stephane
+Letz ported JACK to Mac OS X.  Jussi Laako wrote the OSS driver
+interface.  Tilman Linneweh ported JACK to FreeBSD.  Johnny Petrantoni
+wrote the Mac OS X CoreAudio driver interface.
 
 Many others have contributed patches and/or test results.

@@ -369,6 +369,7 @@ INPUT                  = @top_srcdir@/doc/mainpage.dox \
                          @top_srcdir@/jack/types.h \
                          @top_srcdir@/jack/transport.h \
                          @top_srcdir@/jack/ringbuffer.h \
+                         @top_srcdir@/jack/thread.h \
 			 @top_srcdir@/example-clients/simple_client.c \
 			 @top_srcdir@/example-clients/inprocess.c
 

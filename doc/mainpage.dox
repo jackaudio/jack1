@@ -91,6 +91,8 @@ The JACK programming interfaces are described in several header files:
   control mechanism for starting, stopping and repositioning clients.
   This is described in the @ref transport-design document.
   - @ref types.h "<jack/types.h>" defines most of the JACK data types.
+  - @ref thread.h "<jack/thread.h>" functions standardize thread
+  creation for JACK and its clients.
 
 In addition, the example-clients directory provides numerous examples
 of simple JACK clients that nevertheless use the API to do something
