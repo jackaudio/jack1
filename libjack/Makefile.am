@@ -6,7 +6,8 @@ SOURCE_FILES = \
 	     driver.c \
 	     pool.c \
 	     port.c \
-	     timestamps.c
+	     timestamps.c \
+	     transclient.c
 
 lib_LTLIBRARIES	= libjack.la
 

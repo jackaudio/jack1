@@ -14,7 +14,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=74
-JACK_MICRO_VERSION=1
+JACK_MICRO_VERSION=2
 
 dnl ---
 dnl HOWTO: updating the jack protocal version
@@ -163,6 +163,16 @@ AC_ARG_ENABLE(capabilities,
                 fi
               ]
 )
+
+with_oldtrans=yes
+AC_ARG_ENABLE(oldtrans,
+              [  --disable-oldtrans      remove old transport interfaces],
+              [ if test "x$enable_oldtrans" = "xno" ; then
+		    with_oldtrans=no
+		fi ])
+if test "x$with_oldtrans" != "xno" ; then
+	AC_DEFINE(OLD_TRANSPORT,,[Include old transport interfaces])
+fi
 
 STRIPPED_JACKD=false
 AC_ARG_ENABLE(stripped-jackd,

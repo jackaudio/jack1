@@ -1332,18 +1332,6 @@ jack_disconnect (jack_client_t *client, const char *source_port, const char *des
 	return jack_client_deliver_request (client, &req);
 }
 
-int
-jack_engine_takeover_timebase (jack_client_t *client)
-
-{
-	jack_request_t req;
-
-	req.type = SetTimeBaseClient;
-	req.x.client_id = client->control->id;
-
-	return jack_client_deliver_request (client, &req);
-}	
-
 void
 jack_set_error_function (void (*func) (const char *))
 {
@@ -1566,23 +1554,6 @@ jack_frame_time (const jack_client_t *client)
 	
 	return current.frames + elapsed;
 }
-
-
-/* TRANSPORT CONTROL */
-
-void
-jack_get_transport_info (jack_client_t *client,
-			 jack_transport_info_t *info)
-{
-	*info = client->engine->current_time;
-}
-
-void
-jack_set_transport_info (jack_client_t *client,
-			 jack_transport_info_t *info)
-{
-	client->engine->pending_time = *info;
-}	
 
 float
 jack_cpu_load (jack_client_t *client)
