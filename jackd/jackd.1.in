@@ -239,6 +239,8 @@ As a transition, this only happens when \fB$JACK_START_SERVER\fR is
 defined in the environment of the calling process.  In the future this
 will become normal behavior.  In either case, defining
 \fB$JACK_NO_START_SERVER\fR disables this feature.
+
+To change where JACK looks for the backend drivers, set \fB$JACK_DRIVER_DIR\fR.
 .SH SEE ALSO:
 .br
 <\fBjackit-devel@lists.sourceforge.net\fR>
