@@ -2279,7 +2279,8 @@ jack_engine_freewheel (void *arg)
 
 		jack_lock_graph (engine);
 
-		if (jack_engine_process (engine, engine->control->buffer_size)) {
+		if (jack_engine_process (engine,
+					 engine->control->buffer_size)) {
 			jack_error ("process cycle within freewheel failed");
 			jack_unlock_graph (engine);
 			break;
@@ -2428,25 +2429,30 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 
 	} else {
 
-		DEBUG ("engine process cycle failed");
 		JSList *node;
+		DEBUG ("engine process cycle failed");
 
 		/* we are already late, or something else went wrong,
 		   so it can't hurt to check the existence of all
 		   clients.
 		*/
 
-		for (node = engine->clients; node; node = jack_slist_next (node)) {
-			jack_client_internal_t *client = (jack_client_internal_t *) node->data;
+		for (node = engine->clients; node;
+		     node = jack_slist_next (node)) {
+			jack_client_internal_t *client =
+				(jack_client_internal_t *) node->data;
 
 			if (client->control->type == ClientExternal) {
 				if (kill (client->control->pid, 0)) {
-					VERBOSE(engine, "client %s has died/exited\n", client->control->name);
+					VERBOSE(engine,
+						"client %s has died/exited\n",
+						client->control->name);
 					client->error++;
 				}
 			}
 			
-			DEBUG ("client %s errors = %d", client->control->name, client->error);
+			DEBUG ("client %s errors = %d", client->control->name,
+			       client->error);
 		}
 	}
 

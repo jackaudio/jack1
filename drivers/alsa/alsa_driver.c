@@ -1604,11 +1604,11 @@ alsa_driver_run_cycle (alsa_driver_t *driver)
 	jack_engine_t *engine = driver->engine;
 	int wait_status;
 	float delayed_usecs;
+	jack_nframes_t nframes;
 
 	DEBUG ("alsa run cycle wait\n");
 
-	jack_nframes_t nframes = alsa_driver_wait (driver, -1, &wait_status,
-						   &delayed_usecs);
+	nframes = alsa_driver_wait (driver, -1, &wait_status, &delayed_usecs);
 
 	DEBUG ("alsa back from wait, nframes = %lu", nframes);
 
