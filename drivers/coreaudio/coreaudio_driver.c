@@ -424,15 +424,12 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     driver->start = (JackDriverStartFunction) coreaudio_driver_audio_start;
     driver->stop = (JackDriverStopFunction) coreaudio_driver_audio_stop;
 
-    char deviceName[64];
-    bzero(&deviceName[0], sizeof(char) * 64);
-	
     if (!driver_name) {
-		if (get_device_name_from_id(deviceID, deviceName) != noErr)
+		if (get_device_name_from_id(deviceID, driver->driver_name) != noErr)
 			goto error;
     } else {
 		JCALog("Use driver name from command line \n");
-		strcpy(&deviceName[0], driver_name);
+		strcpy(driver->driver_name, driver_name);
     }
 
 	driver->client = client;
@@ -443,8 +440,6 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     driver->playback_nchannels = chan_out;
     driver->capture_nchannels = chan_in;
 	driver->device_id = deviceID;
-
-    strcpy(&driver->driver_name[0], &deviceName[0]);
 	
 	// Setting buffer size
     outSize = sizeof(UInt32);
