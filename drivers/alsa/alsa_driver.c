@@ -900,7 +900,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 		}
 
 #ifdef DEBUG_WAKEUP
-		printf ("%Lu: checked %d fds, %.9f usecs since poll entered\n", 
+		fprintf (stderr, "%Lu: checked %d fds, %.9f usecs since poll entered\n", 
 			poll_ret, 
 			nfds,
 			(float) (poll_ret - poll_enter) / driver->cpu_mhz);
@@ -1019,6 +1019,10 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 		 avail, playback_avail, capture_avail);
 #endif
 
+	/* mark all channels not done for now. read/write will change this */
+
+	driver->channels_not_done = driver->channel_done_bits;
+
 	/* constrain the available count to the nearest (round down) number of
 	   periods.
 	*/
@@ -1027,186 +1031,187 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delay
 }
 
 static int
-alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
+alsa_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 {
-	snd_pcm_sframes_t contiguous = 0;
-	snd_pcm_sframes_t capture_avail = 0;
-	snd_pcm_sframes_t playback_avail = 0;
-	snd_pcm_uframes_t capture_offset = 0;
-	snd_pcm_uframes_t playback_offset = 0;
-	channel_t chn;
-	JSList *node;
-	jack_engine_t *engine = driver->engine;
-	static int cnt = 0;
-	int engine_ran = 0;
+	jack_nframes_t nf;
+	snd_pcm_uframes_t offset = 0;
+	snd_pcm_uframes_t contiguous;
 
-	cnt++;
-
-	while (nframes) {
-
-		if (driver->capture_handle) {
-
-			if (driver->playback_handle) {
-
-				/* DUPLEX */
-
-				capture_avail = (nframes > driver->frames_per_cycle) ? driver->frames_per_cycle : nframes;
-				playback_avail = (nframes > driver->frames_per_cycle) ? driver->frames_per_cycle : nframes;
-
-				if (alsa_driver_get_channel_addresses (driver, 
-								       (snd_pcm_uframes_t *) &capture_avail, 
-								       (snd_pcm_uframes_t *) &playback_avail,
-								       &capture_offset, &playback_offset) < 0) {
-					return -1;
-				}
-
-				contiguous = capture_avail < playback_avail ? capture_avail : playback_avail;
-
-			} else {
-
-				/* CAPTURE ONLY */
-
-				capture_avail = (nframes > driver->frames_per_cycle) ? driver->frames_per_cycle : nframes;
-				
-				if (alsa_driver_get_channel_addresses (driver, 
-								       (snd_pcm_uframes_t *) &capture_avail, 
-								       (snd_pcm_uframes_t *) 0,
-								       &capture_offset, 0) < 0) {
-					return -1;
-				}
-				
-				contiguous = capture_avail;
+	if (driver->capture_handle) {
+		nf = nframes;
+		while (nf) {
+			
+			contiguous = (nf > driver->frames_per_cycle) ? driver->frames_per_cycle : nf;
+			
+			if (snd_pcm_mmap_begin (driver->capture_handle, &driver->capture_areas,
+						(snd_pcm_uframes_t *) offset, 
+						(snd_pcm_uframes_t *) contiguous)) {
+				return -1;
+			}
+		
+			if (snd_pcm_mmap_commit (driver->capture_handle, offset, contiguous) < 0) {
+				return -1;
 			}
 
-		} else {
+			nf -= contiguous;
+		}
+	}
 
-			/* PLAYBACK ONLY */
-
-			playback_avail = (nframes > driver->frames_per_cycle) ? driver->frames_per_cycle : nframes;
+	if (driver->playback_handle) {
+		nf = nframes;
+		while (nf) {
+			contiguous = (nf > driver->frames_per_cycle) ? driver->frames_per_cycle : nf;
 			
-			if (alsa_driver_get_channel_addresses (driver, 
-							       (snd_pcm_uframes_t *) 0, 
-							       (snd_pcm_uframes_t *) &playback_avail,
-							       0, &playback_offset) < 0) {
+			if (snd_pcm_mmap_begin (driver->playback_handle, &driver->playback_areas,
+						(snd_pcm_uframes_t *) offset, 
+						(snd_pcm_uframes_t *) contiguous)) {
 				return -1;
 			}
 			
-			contiguous = playback_avail;
+			if (snd_pcm_mmap_commit (driver->playback_handle, offset, contiguous) < 0) {
+				return -1;
+			}
+
+			nf -= contiguous;
 		}
+	}
 
-		driver->channels_not_done = driver->channel_done_bits;
+	return 0;
+}
 
-		if (engine->process_lock (engine) == 0) {
+static int
+alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
+{
+	snd_pcm_sframes_t contiguous;
+	snd_pcm_sframes_t nread;
+	snd_pcm_sframes_t offset;
+	jack_default_audio_sample_t* buf;
+	channel_t chn;
+	JSList *node;
+	jack_port_t* port;
 
-			channel_t chn;
-			jack_port_t *port;
-			JSList *node;
-			int ret;
+	if (!driver->capture_handle) {
+		return 0;
+	}
 
-			if (driver->capture_handle) {
-				for (chn = 0, node = driver->capture_ports; node; node = jack_slist_next (node), chn++) {
-					
-					port = (jack_port_t *) node->data;
-					
-					if (!jack_port_connected (port)) {
-						continue;
-					}
+	nread = 0;
+	contiguous = 0;
 
-					alsa_driver_read_from_channel (driver, chn, jack_port_get_buffer (port, nframes), nframes);
-				}
-				snd_pcm_mmap_commit (driver->capture_handle, capture_offset, contiguous);
-			}
-
-			if (contiguous != (snd_pcm_sframes_t) driver->frames_per_cycle) {
-				jack_error ("wierd contiguous size %lu", contiguous);
-			}
-
-			if ((ret = engine->process (engine, contiguous)) != 0) {
-				alsa_driver_audio_stop (driver);
-				if (ret > 0) {
-					engine->post_process (engine);
-				}
-				engine->process_unlock (engine);
-				return ret;
-			}
-
-			engine_ran = 1;
-
-			if (driver->playback_handle) {
-				/* now move data from ports to channels */
-				
-				for (chn = 0, node = driver->playback_ports; node; node = jack_slist_next (node), chn++) {
-					jack_default_audio_sample_t *buf;
-
-					jack_port_t *port = (jack_port_t *) node->data;
-					
-					if (!jack_port_connected (port)) {
-						continue;
-					}
-
-					buf = jack_port_get_buffer (port, contiguous);
-					
-					alsa_driver_write_to_channel (driver, chn, buf, contiguous);
-				}
-			}
-
-
-		} else {
-			/* oh well, the engine can't run, so we'll just throw away this 
-			   cycle's data ...
-			*/
-			if (driver->capture_handle)
-				snd_pcm_mmap_commit (driver->capture_handle, capture_offset, contiguous);
-		}
-
-		/* Now handle input monitoring */
+	while (nframes) {
 		
-		driver->input_monitor_mask = 0;
+		contiguous = (nframes > driver->frames_per_cycle) ? driver->frames_per_cycle : nframes;
 		
-		for (chn = 0, node = driver->capture_ports; node; node = jack_slist_next (node), chn++) {
-			if (((jack_port_t *) node->data)->shared->monitor_requests) {
-				driver->input_monitor_mask |= (1<<chn);
-			}
+		if (alsa_driver_get_channel_addresses (driver, 
+						       (snd_pcm_uframes_t *) &contiguous, 
+						       (snd_pcm_uframes_t *) 0,
+						       &offset, 0) < 0) {
+			return -1;
 		}
 			
-		if (!driver->hw_monitoring) {
-			if (driver->playback_handle) {
-				if (driver->all_monitor_in) {
-					for (chn = 0; chn < driver->playback_nchannels; chn++) {
-						alsa_driver_copy_channel (driver, chn, chn, contiguous);
-					}
-				} else if (driver->input_monitor_mask) {
-					for (chn = 0; chn < driver->playback_nchannels; chn++) {
-						if (driver->input_monitor_mask & (1<<chn)) {
-							alsa_driver_copy_channel (driver, chn, chn, contiguous);
-						}
-					}
-				}
+		for (chn = 0, node = driver->capture_ports; node; node = jack_slist_next (node), chn++) {
+			
+			port = (jack_port_t *) node->data;
+			
+			if (!jack_port_connected (port)) {
+				/* no-copy optimization */
+				continue;
 			}
 
-		} else {
-			if ((driver->hw->input_monitor_mask != driver->input_monitor_mask) && !driver->all_monitor_in) {
-				driver->hw->set_input_monitor_mask (driver->hw, driver->input_monitor_mask);
-			} 
+			buf = jack_port_get_buffer (port, nframes);
+			alsa_driver_read_from_channel (driver, chn, buf + nread, contiguous);
 		}
-
-		if (driver->playback_handle) {
-			if (driver->channels_not_done) {
-				alsa_driver_silence_untouched_channels (driver, contiguous);
-			}
-			snd_pcm_mmap_commit (driver->playback_handle, playback_offset, contiguous);
+		
+		if (snd_pcm_mmap_commit (driver->capture_handle, offset, contiguous) < 0) {
+			jack_error ("alsa_pcm: could not complete read of %lu frames\n", contiguous);
+			return -1;
 		}
 
 		nframes -= contiguous;
 	}
 
-	if (engine_ran) {
-		engine->post_process (engine);
-		engine->process_unlock (engine);
+	return 0;
+}
+
+static int
+alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
+{
+	channel_t chn;
+	JSList *node;
+	jack_default_audio_sample_t* buf;
+	snd_pcm_sframes_t nwritten;
+	snd_pcm_sframes_t contiguous;
+	snd_pcm_sframes_t offset;
+	jack_port_t *port;
+
+	if (!driver->playback_handle) {
+		return 0;
+	}
+
+	nwritten = 0;
+	contiguous = 0;
+	
+	/* check current input monitor request status */
+	
+	driver->input_monitor_mask = 0;
+	
+	for (chn = 0, node = driver->capture_ports; node; node = jack_slist_next (node), chn++) {
+		if (((jack_port_t *) node->data)->shared->monitor_requests) {
+			driver->input_monitor_mask |= (1<<chn);
+		}
+	}
+
+	if (driver->hw_monitoring) {
+		if ((driver->hw->input_monitor_mask != driver->input_monitor_mask) && !driver->all_monitor_in) {
+			driver->hw->set_input_monitor_mask (driver->hw, driver->input_monitor_mask);
+		}
+	}
+	
+	while (nframes) {
+		
+		contiguous = (nframes > driver->frames_per_cycle) ? driver->frames_per_cycle : nframes;
+		
+		if (alsa_driver_get_channel_addresses (driver, 
+						       (snd_pcm_uframes_t *) 0,
+						       (snd_pcm_uframes_t *) &contiguous, 
+						       0, &offset) < 0) {
+			return -1;
+		}
+		
+		for (chn = 0, node = driver->playback_ports; node; node = jack_slist_next (node), chn++) {
+
+			port = (jack_port_t *) node->data;
+
+			if (!jack_port_connected (port)) {
+				continue;
+			}
+			
+			buf = jack_port_get_buffer (port, contiguous);
+
+			if (driver->all_monitor_in || (driver->input_monitor_mask & (1<<chn))) {	
+				if (!driver->hw_monitoring) {
+					alsa_driver_copy_channel (driver, chn, chn, contiguous);
+				}
+			} else {
+				alsa_driver_write_to_channel (driver, chn, buf + nwritten, contiguous);
+			}
+
+		}
+
+		if (driver->channels_not_done) {
+			alsa_driver_silence_untouched_channels (driver, contiguous);
+		}
+		
+		if (snd_pcm_mmap_commit (driver->playback_handle, offset, contiguous) < 0) {
+			jack_error ("could not complete playback of %lu frames", contiguous);
+			return -1;
+		}
+
+		nframes -= contiguous;
 	}
 
 	return 0;
 }
+
 
 static int
 alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
@@ -1436,7 +1441,9 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->attach = (JackDriverAttachFunction) alsa_driver_attach;
         driver->detach = (JackDriverDetachFunction) alsa_driver_detach;
 	driver->wait = (JackDriverWaitFunction) alsa_driver_wait;
-	driver->process = (JackDriverProcessFunction) alsa_driver_process;
+	driver->read = (JackDriverReadFunction) alsa_driver_read;
+	driver->write = (JackDriverReadFunction) alsa_driver_write;
+	driver->null_cycle = (JackDriverNullCycleFunction) alsa_driver_null_cycle;
 	driver->start = (JackDriverStartFunction) alsa_driver_audio_start;
 	driver->stop = (JackDriverStopFunction) alsa_driver_audio_stop;
 
@@ -1483,6 +1490,8 @@ alsa_driver_new (char *name, char *alsa_device,
 			driver->capture_handle = NULL;
 		}
 	}
+
+	fprintf (stderr, "open\n");
 
 	if (driver->playback_handle == NULL) {
 		if (playing) {
@@ -1776,14 +1785,14 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 		playback = atoi (envvar);
 	}
 		
-
-
 	/*
 	 * Setting optind back to zero is a hack to reinitialize a new
 	 * getopts() loop.  See declaration in <getopt.h>.
 	 */
+
 	optind = 0;
 	opterr = 0;
+
 	while ((opt = getopt_long(argc, argv, "-CDd:HMPp:r:n:sz::",
 				  long_options, NULL))
 	       != EOF) {

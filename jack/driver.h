@@ -48,10 +48,12 @@ struct _jack_driver;
 
 typedef int       (*JackDriverAttachFunction)(struct _jack_driver *, struct _jack_engine *);
 typedef int       (*JackDriverDetachFunction)(struct _jack_driver *, struct _jack_engine *);
-typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, int *status, float *delayed_usecs);
-typedef int       (*JackDriverProcessFunction)(struct _jack_driver *, jack_nframes_t);
+typedef int       (*JackDriverReadFunction)(struct _jack_driver *, jack_nframes_t nframes);
+typedef int       (*JackDriverWriteFunction)(struct _jack_driver *, jack_nframes_t nframes);
+typedef int       (*JackDriverNullCycleFunction)(struct _jack_driver *, jack_nframes_t nframes);
 typedef int       (*JackDriverStopFunction)(struct _jack_driver *);
 typedef int       (*JackDriverStartFunction)(struct _jack_driver *);
+typedef jack_nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, int *status, float *delayed_usecs);
 
 /* 
    Call sequence summary:
@@ -131,29 +133,14 @@ typedef int       (*JackDriverStartFunction)(struct _jack_driver *);
 
  */
 
-    JackDriverWaitFunction wait; \
+    JackDriverWaitFunction wait;
 
-/* this is somewhat like a JACK client process callback. see jack.h for
-   details. the engine will call this after the driver has returned
-   from `wait', and it will pass the number of audio frames that
-   the driver returned from `wait' as the second argument.
+    JackDriverReadFunction read;
 
-   the driver should make the following calls (with error checking)
-   from within this function:
+    JackDriverWriteFunction write;
 
-   engine->process_lock (engine);
-   ...
-   engine->process (engine);
-   ...
-   engine->process_unlock (engine);
-   ...
-   engine->post_process (engine);
-
-   the reason for the structure is complex. it can be explained
-   in more detail you are curious.
- */
-    JackDriverProcessFunction process; \
-
+    JackDriverNullCycleFunction null_cycle;
+    
 /* the engine will call this when it plans to stop calling the `wait'
    function for some period of time. the driver should take
    appropriate steps to handle this (possibly no steps at all)
@@ -178,7 +165,9 @@ typedef int       (*JackDriverStartFunction)(struct _jack_driver *);
     JackDriverAttachFunction attach; \
     JackDriverDetachFunction detach; \
     JackDriverWaitFunction wait; \
-    JackDriverProcessFunction process; \
+    JackDriverReadFunction read; \
+    JackDriverWriteFunction write; \
+    JackDriverNullCycleFunction null_cycle; \
     JackDriverStartFunction stop; \
     JackDriverStopFunction start;
 

@@ -706,6 +706,50 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 	return engine->process_errors > 0;
 }
 
+static void 
+jack_calc_cpu_load(jack_engine_t *engine)
+{
+	jack_time_t cycle_end = jack_get_microseconds ();
+	
+	/* store the execution time for later averaging */
+
+	engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = 
+		cycle_end - engine->control->current_time.usecs;
+
+	if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
+		engine->rolling_client_usecs_index = 0;
+	}
+
+	/* every so often, recompute the current maximum use over the
+	   last JACK_ENGINE_ROLLING_COUNT client iterations.
+	*/
+
+	if (++engine->rolling_client_usecs_cnt % engine->rolling_interval == 0) {
+		float max_usecs = 0.0f;
+		int i;
+
+		for (i = 0; i < JACK_ENGINE_ROLLING_COUNT; i++) {
+			if (engine->rolling_client_usecs[i] > max_usecs) {
+				max_usecs = engine->rolling_client_usecs[i];
+			}
+		}
+
+		if (max_usecs < engine->driver->period_usecs) {
+			engine->spare_usecs = engine->driver->period_usecs - max_usecs;
+		} else {
+			engine->spare_usecs = 0;
+		}
+
+		engine->control->cpu_load = (1.0f - (engine->spare_usecs / engine->driver->period_usecs)) * 50.0f + (engine->control->cpu_load * 0.5f);
+
+		if (engine->verbose) {
+			fprintf (stderr, "load = %.4f max usecs: %.3f, spare = %.3f\n", 
+				 engine->control->cpu_load, max_usecs, engine->spare_usecs);
+		}
+	}
+
+}
+
 static int
 jack_engine_post_process (jack_engine_t *engine)
 {
@@ -801,6 +845,8 @@ jack_engine_post_process (jack_engine_t *engine)
 		jack_engine_reset_rolling_usecs (engine);
 
 	}
+
+	jack_calc_cpu_load(engine);
 
 	return 0;
 }
@@ -1972,56 +2018,13 @@ jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t amount)
 	time->guard2++;
 }
 
-static void 
-jack_calc_cpu_load(jack_engine_t *engine)
-{
-	jack_time_t cycle_end = jack_get_microseconds ();
-	
-	/* store the execution time for later averaging */
-
-	engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = 
-		cycle_end - engine->control->current_time.usecs;
-
-	if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
-		engine->rolling_client_usecs_index = 0;
-	}
-
-	/* every so often, recompute the current maximum use over the
-	   last JACK_ENGINE_ROLLING_COUNT client iterations.
-	*/
-
-	if (++engine->rolling_client_usecs_cnt % engine->rolling_interval == 0) {
-		float max_usecs = 0.0f;
-		int i;
-
-		for (i = 0; i < JACK_ENGINE_ROLLING_COUNT; i++) {
-			if (engine->rolling_client_usecs[i] > max_usecs) {
-				max_usecs = engine->rolling_client_usecs[i];
-			}
-		}
-
-		if (max_usecs < engine->driver->period_usecs) {
-			engine->spare_usecs = engine->driver->period_usecs - max_usecs;
-		} else {
-			engine->spare_usecs = 0;
-		}
-
-		engine->control->cpu_load = (1.0f - (engine->spare_usecs / engine->driver->period_usecs)) * 50.0f + (engine->control->cpu_load * 0.5f);
-
-		if (engine->verbose) {
-			fprintf (stderr, "load = %.4f max usecs: %.3f, spare = %.3f\n", 
-				 engine->control->cpu_load, max_usecs, engine->spare_usecs);
-		}
-	}
-
-}
-
 static int
-jack_pre_process(jack_engine_t *engine, int* consecutive_excessive_delays, jack_nframes_t* nframes)
+jack_engine_wait (jack_engine_t *engine, jack_nframes_t* nframes)
 {
 	jack_driver_t *driver = engine->driver;
 	float delayed_usecs;
 	int status;
+	static int consecutive_excessive_delays = 0;
 
 	if ((*nframes = driver->wait (driver, -1, &status, &delayed_usecs)) == 0) {
 		/* the driver detected an xrun, and restarted */
@@ -2037,20 +2040,20 @@ jack_pre_process(jack_engine_t *engine, int* consecutive_excessive_delays, jack_
 	if (engine->control->real_time != 0 && engine->spare_usecs && ((WORK_SCALE * engine->spare_usecs) <= delayed_usecs)) {
 
 		fprintf (stderr, "delay of %.3f usecs exceeds estimated spare time of %.3f; restart ...\n",
-			delayed_usecs, WORK_SCALE * engine->spare_usecs);
-
-		if (++(*consecutive_excessive_delays) > 10) {
-			jack_error ("too many consecutive interrupt delays ... engine stopping");
+			 delayed_usecs, WORK_SCALE * engine->spare_usecs);
+		
+		if (++consecutive_excessive_delays > 10) {
+			jack_error ("too many consecutive interrupt delays ... engine pausing");
 			return -1; /* will exit the thread loop */
 		}
-
+		
 		if (driver->stop (driver)) {
 			jack_error ("cannot stop current driver");
 			return -1; /* will exit the thread loop */
 		}
-
+		
 		jack_engine_notify_clients_about_delay (engine);
-
+		
 		if (driver->start (driver)) {
 			jack_error ("cannot restart current driver after delay");
 			return -1; /* will exit the thread loop */
@@ -2059,25 +2062,54 @@ jack_pre_process(jack_engine_t *engine, int* consecutive_excessive_delays, jack_
 		return 1; /* will continue */
 
 	} else {
-		*consecutive_excessive_delays = 0;
-	}
-
-	if (status != 0) {
-		jack_error ("driver wait function failed, exiting");
-		return -1; /* will exit the thread loop */
+		consecutive_excessive_delays = 0;
 	}
 	
-	return 0;
+	return status;
 }
 
+static int
+jack_audio_cycle (jack_engine_t *engine, jack_nframes_t nframes)
+{
+	int ret;
+	jack_driver_t* driver = engine->driver;
+
+	if (engine->process_lock (engine)) {
+		/* engine can't run. just throw away an entire cycle */
+		driver->null_cycle (driver, nframes);
+		return 0;
+	}
+	
+	if (driver->read (driver, nframes)) {
+		return -1;
+	}
+	
+	if ((ret = engine->process (engine, nframes)) != 0) {
+		driver->stop (driver);
+	} 
+	
+	if (driver->write (driver, nframes)) {
+		return -1;
+	}
+
+	engine->post_process (engine);
+
+	engine->process_unlock (engine);
+
+	if (ret > 0) {
+		/* driver stopped, restart and return "OK" */
+		driver->start (driver);
+		ret = 0;
+	}
+	
+	return ret;
+}
 
 static void *
 jack_main_thread (void *arg)
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
-	jack_driver_t *driver = engine->driver;
 	jack_nframes_t nframes;
-	int consecutive_excessive_delays;
 
 	if (engine->control->real_time) {
 
@@ -2092,40 +2124,29 @@ jack_main_thread (void *arg)
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
-	consecutive_excessive_delays = 0;
 	engine->watchdog_check = 1; /* really needed here ? */
 	nframes = 0; /* really needed here ? */
 
 	while (1) {
 	
-		int res = jack_pre_process(engine, &consecutive_excessive_delays, &nframes);
-		
-		if (res == 1)
-			continue;
-		else if (res == -1)
+		int wait_status = jack_engine_wait (engine, &nframes);
+			
+		if (wait_status == -1) {
+			
 			break;
-		
-		/* this will execute the entire jack graph */
-
-		switch (driver->process (driver, nframes)) {
-		
-			case -1:
-				jack_error ("driver process function failed, exiting");
-				pthread_exit (0);
+			
+		} else if (wait_status == 0) {
+			
+			if (jack_audio_cycle (engine, nframes)) {
+				jack_error ("audio cycle failure, exiting");
 				break;
+			}
 
-			case  1:
-				if (driver->start (driver)) {
-					jack_error ("cannot restart driver");
-					pthread_exit (0);
-				}
-				break;
+ 		} else {
 
-			default:
-				break;
+			/* driver restarted, just continue */
+			
 		}
-
-		jack_calc_cpu_load(engine);
 	}
 
 	pthread_exit (0);
