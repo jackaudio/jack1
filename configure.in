@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=97
-JACK_MICRO_VERSION=7
+JACK_MICRO_VERSION=8
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -105,10 +105,10 @@ fi
 AC_CHECK_HEADERS(string.h strings.h)
 AC_CHECK_HEADERS(getopt.h, [], [
     for d in /Developer/SDKs/MacOSX10.3.0.sdk/usr/include/ ; do
-	AC_CHECK_HEADERS($d/getopt.h, [], [INCLUDES=-I$d ${INCLUDES}])
+	AC_CHECK_HEADERS($d/getopt.h, [], [CFLAGS="$CFLAGS -I$d"])
     done])
 AC_CHECK_HEADER(/usr/include/nptl/pthread.h,
-	[INCLUDES=-I/usr/include/nptl ${INCLUDES}])
+	[CFLAGS="$CFLAGS -I/usr/include/nptl"])
 
 # functions and libraries
 AC_CHECK_FUNC(getopt_long, [],
