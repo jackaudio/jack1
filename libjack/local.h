@@ -17,8 +17,14 @@ struct _jack_client {
     void *on_shutdown_arg;
     char thread_ok : 1;
     char first_active : 1;
-    float cpu_mhz;
     pthread_t thread_id;
+    
+#if defined(__APPLE__) && defined(__POWERPC__)
+    /* specific ressources for server/client real-time thread communication */
+    mach_port_t clienttask, bp, serverport, replyport;
+    trivial_message  message;
+    pthread_t process_thread;
+#endif
 
 };
 

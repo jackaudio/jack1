@@ -29,6 +29,10 @@
 #include <sys/time.h>
 #include <pthread.h>
 
+#if defined(__APPLE__) && defined(__POWERPC__) 
+    #include "mach_port.h"
+#endif
+
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/port.h>
@@ -39,7 +43,11 @@
 #define DEBUG(format,args...) \
 	printf ("jack:%5d:%Lu %s:%s:%d: " format "\n", getpid(), jack_get_microseconds(), __FILE__, __FUNCTION__, __LINE__ , ## args)
 #else
-#define DEBUG(format,args...)
+#if defined(linux) 
+    #define DEBUG(format,args...)
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+    #define DEBUG(format...)
+#endif
 #endif
 
 #ifndef	FALSE
@@ -220,6 +228,11 @@ typedef struct {
     */
 
     unsigned long n_port_types;
+    
+#if defined(__APPLE__) && defined(__POWERPC__) 
+    /* specific ressources for server/client real-time thread communication */
+    int portnum;
+#endif
 
 } jack_client_connect_result_t;
 
@@ -271,6 +284,34 @@ struct _jack_request {
     int status;
 };
 
+typedef struct _jack_client_internal {
+
+    jack_client_control_t *control;
+
+    int        request_fd;
+    int        event_fd;
+    int        subgraph_start_fd;
+    int        subgraph_wait_fd;
+    JSList    *ports;    /* protected by engine->client_lock */
+    JSList    *fed_by;   /* protected by engine->client_lock */
+    shm_name_t shm_name;
+    unsigned long execution_order;
+    struct  _jack_client_internal *next_client; /* not a linked list! */
+    dlhandle handle;
+    int     (*initialize)(jack_client_t*, const char*);  /* for internal clients only */
+    void    (*finish)(void);  /* for internal clients only */
+    int      error;
+    
+#if defined(__APPLE__) && defined(__POWERPC__) 
+    /* specific ressources for server/client real-time thread communication */
+    mach_port_t serverport;
+    trivial_message message;
+    int running;
+    int portnum;
+#endif
+    
+} jack_client_internal_t;
+
 extern void jack_cleanup_files ();
 
 extern int  jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event);
@@ -292,7 +333,4 @@ extern jack_port_type_info_t jack_builtin_port_types[];
 extern void jack_client_invalidate_port_buffers (jack_client_t *client);
 
 #endif /* __jack_internal_h__ */
-
-
-
 

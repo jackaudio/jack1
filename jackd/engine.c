@@ -21,7 +21,14 @@
 #include <math.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include <sys/poll.h>
+
+#if defined(linux) 
+    #include <sys/poll.h>
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+    #include "fakepoll.h"
+    #include "ipc.h"
+#endif
+
 #include <sys/un.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -59,26 +66,6 @@ typedef struct {
     jack_port_internal_t *destination;
 
 } jack_connection_internal_t;
-
-typedef struct _jack_client_internal {
-
-    jack_client_control_t *control;
-
-    int        request_fd;
-    int        event_fd;
-    int        subgraph_start_fd;
-    int        subgraph_wait_fd;
-    JSList    *ports;    /* protected by engine->client_lock */
-    JSList    *fed_by;   /* protected by engine->client_lock */
-    shm_name_t shm_name;
-    unsigned   long execution_order;
-    struct    _jack_client_internal *next_client; /* not a linked list! */
-    dlhandle   handle;
-    int      (*initialize)(jack_client_t*, const char*);  /* for internal clients only */
-    void     (*finish)(void);  /* for internal clients only */
-    int        error;
-
-} jack_client_internal_t;
 
 typedef struct _jack_driver_info {
     jack_driver_t *(*initialize)(jack_client_t*, int, char**);
@@ -123,6 +110,7 @@ static void jack_engine_post_process (jack_engine_t *);
 static int  internal_client_request (void*, jack_request_t *);
 
 static int  jack_use_driver (jack_engine_t *engine, jack_driver_t *driver);
+static int  jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes, float delayed_usecs);
 
 static char *client_state_names[] = {
 	"Not triggered",
@@ -300,6 +288,7 @@ jack_resize_port_segment (jack_engine_t *engine, jack_port_type_info_t *port_typ
 	size_t one_buffer;
 	size_t size;
 	int shmid;
+    int perm;
 
 	if (port_type->buffer_scale_factor < 0) {
 		one_buffer = port_type->buffer_size;
@@ -308,13 +297,20 @@ jack_resize_port_segment (jack_engine_t *engine, jack_port_type_info_t *port_typ
 	}
 
 	size = nports * one_buffer;
+    
+#if defined(linux) 
+        perm = O_RDWR|O_CREAT|O_TRUNC;
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+        /* using O_TRUNC option does not work on Darwin */
+        perm = O_RDWR|O_CREAT;
+#endif
 
 	if (port_type->shm_info.size == 0) {
-
-		snprintf (port_type->shm_info.shm_name, sizeof(port_type->shm_info.shm_name), "/jck-[%s]", port_type->type_name);
+        
+                 snprintf (port_type->shm_info.shm_name, sizeof(port_type->shm_info.shm_name), "/jck-[%s]", port_type->type_name);
 
 		if ((addr = jack_get_shm (port_type->shm_info.shm_name, size, 
-					  (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE, &shmid)) == MAP_FAILED) {
+					  perm, 0666, PROT_READ|PROT_WRITE, &shmid)) == MAP_FAILED) {
 			jack_error ("cannot create new port segment of %d bytes, shm_name = %s (%s)", 
 				    size, port_type->shm_info.shm_name, strerror (errno));
 			return -1;
@@ -326,7 +322,7 @@ jack_resize_port_segment (jack_engine_t *engine, jack_port_type_info_t *port_typ
 	} else {
 
 		if ((addr = jack_resize_shm (port_type->shm_info.shm_name, size, 
-					     (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
+					     perm, 0666, PROT_READ|PROT_WRITE)) == MAP_FAILED) {
 			jack_error ("cannot resize port segment to %d bytes, shm_name = %s (%s)", 
 				    size, port_type->shm_info.shm_name, strerror (errno));
 			return -1;
@@ -444,6 +440,7 @@ jack_process_internal(jack_engine_t *engine, JSList *node, jack_nframes_t nframe
        return jack_slist_next (node);
 }
 
+#if defined(linux)
 static JSList * 
 jack_process_external(jack_engine_t *engine, JSList *node)
 {
@@ -556,6 +553,31 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	
 	return node;
 }
+
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+
+static JSList * 
+jack_process_external(jack_engine_t *engine, JSList *node)
+{
+        jack_client_internal_t * client = (jack_client_internal_t *) node->data;
+        jack_client_control_t *ctl;
+        
+        client = (jack_client_internal_t *) node->data;
+        ctl = client->control;
+        
+        engine->current_client = client;
+        
+        ctl->state = Triggered; // a race exists if we do this after the write(2) 
+        ctl->signalled_at = jack_get_microseconds();
+        ctl->awake_at = 0;
+        ctl->finished_at = 0;
+        
+        jack_client_resume(client);
+        
+        return jack_slist_next (node);
+}
+#endif
+
 
 static int
 jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
@@ -821,8 +843,13 @@ setup_client (jack_engine_t *engine, int client_fd, jack_client_connect_request_
 	res->control_size = engine->control_size;
 	res->realtime = engine->control->real_time;
 	res->realtime_priority = engine->rtpriority - 1;
-	res->n_port_types = engine->control->n_port_types;
-
+    res->n_port_types = engine->control->n_port_types;
+        
+#if defined(__APPLE__) && defined(__POWERPC__) 	
+     /* specific ressources for server/client real-time thread communication */
+     res->portnum = client->portnum; 
+#endif
+  	
 	if (jack_client_is_internal(client)) {
 		
 		/* set up the pointers necessary for the request system
@@ -1603,7 +1630,15 @@ jack_server_thread (void *arg)
 			} else if (pfd[i].revents & POLLIN) {
 				if (handle_external_client_request (engine, pfd[i].fd)) {
 					jack_error ("could not handle external client request");
-				}
+				#if defined(__APPLE__) && defined(__POWERPC__) 
+                                    /* poll is implemented using select (see the fakepool code). When the socket is closed
+                                    select does not return any error, POLLIN is true and the next read will return 0 bytes. 
+                                    This behaviour is diffrent from the Linux poll behaviour. Thus we use this condition 
+                                    as a socket error and remove the client.
+                                    */
+                                    handle_client_socket_error(engine, pfd[i].fd);
+                                #endif
+                                                }
 			}
 		}
 		
@@ -1663,6 +1698,8 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 	void *addr;
 	unsigned int i;
 	int shmid;
+    int perm;
+        
 #ifdef USE_CAPABILITIES
 	uid_t uid = getuid ();
 	uid_t euid = geteuid ();
@@ -1674,6 +1711,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 	engine->driver = 0;
 	engine->set_sample_rate = jack_set_sample_rate;
 	engine->set_buffer_size = jack_set_buffer_size;
+        engine->run_cycle = jack_run_cycle;
 	engine->client_timeout_msecs = client_timeout;
 
 	engine->next_client_id = 1;
@@ -1712,9 +1750,16 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 	if (jack_initialize_shm (engine)) {
 		return 0;
 	}
+        
+#if defined(linux) 
+        perm = O_RDWR|O_CREAT|O_TRUNC;
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+        /* using O_TRUNC option does not work on Darwin */
+        perm = O_RDWR|O_CREAT;
+#endif
 
 	if ((addr = jack_get_shm (engine->control_shm_name, engine->control_size, 
-				  O_RDWR|O_CREAT|O_TRUNC, 0644, PROT_READ|PROT_WRITE, &shmid)) == MAP_FAILED) {
+				  perm, 0644, PROT_READ|PROT_WRITE, &shmid)) == MAP_FAILED) {
 		jack_error ("cannot create engine control shared memory segment (%s)", strerror (errno));
 		return 0;
 	}
@@ -1782,6 +1827,18 @@ jack_engine_new (int realtime, int rtpriority, int verbose, int client_timeout)
 	engine->control->internal = 0;
 
 	engine->control->has_capabilities = 0;
+        
+#if defined(__APPLE__) && defined(__POWERPC__) 
+        /* specific ressources for server/client real-time thread communication */
+	engine->servertask = mach_task_self();
+	if (task_get_bootstrap_port(engine->servertask, &engine->bp)){
+            jack_error("Jackd: Can't find bootstrap mach port");
+            return 0;
+        }
+        engine->portnum = 0;
+#endif
+        
+        
 #ifdef USE_CAPABILITIES
 	if (uid == 0 || euid == 0) {
 		if (engine->verbose) {
@@ -1829,12 +1886,15 @@ jack_become_real_time (pthread_t thread, int priority)
 		jack_error ("cannot set thread to real-time priority (FIFO/%d) (%d: %s)", rtparam.sched_priority, x, strerror (errno));
 		return -1;
 	}
-
-	if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
+        
+#if defined(linux) 
+        if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
 	    jack_error ("cannot lock down memory for RT thread (%s)", strerror (errno));
 	    return -1;
 	}
-
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+        // To be implemented
+#endif
 	return 0;
 }
 
@@ -2058,6 +2118,8 @@ jack_main_thread (void *arg)
 	}
 
 	pthread_exit (0);
+        
+    return 0;
 }
 
 int
@@ -2075,19 +2137,26 @@ jack_run (jack_engine_t *engine)
 #endif /* HAVE_ATEXIT */
 #endif /* HAVE_ON_EXIT */
 
-	if (engine->driver == NULL) {
-		jack_error ("engine driver not set; cannot start");
-		return -1;
-	}
+        if (engine->driver == NULL) {
+                jack_error ("engine driver not set; cannot start");
+                return -1;
+        }
 
-	if (engine->driver->start (engine->driver)) {
-		jack_error ("cannot start driver");
-		return -1;
-	}
-	
-	return pthread_create (&engine->main_thread, 0, jack_main_thread, engine);
+        if (engine->driver->start (engine->driver)) {
+                jack_error ("cannot start driver");
+                return -1;
+        }
+        
+#if defined(linux)
+        return pthread_create (&engine->main_thread, 0, jack_main_thread, engine);
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+        return 0;
+#endif
+
 }
 
+
+#if defined(linux)
 int
 jack_wait (jack_engine_t *engine)
 {
@@ -2112,11 +2181,27 @@ jack_wait (jack_engine_t *engine)
 	return (int) ((intptr_t)ret);
 }
 
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+
+int
+jack_wait (jack_engine_t *engine)
+{
+        while(1) sleep(1);
+}
+
+#endif
+
 int 
 jack_engine_delete (jack_engine_t *engine)
 {
 	if (engine) {
-		return pthread_cancel (engine->main_thread);
+
+    #if defined(linux)
+            return pthread_cancel (engine->main_thread);
+    #elif defined(__APPLE__) && defined(__POWERPC__) 
+            /* the jack_run_cycle function is directly called from the CoreAudo audio callback */
+            return 0;
+    #endif
 	}
 
 	return 0;
@@ -2128,6 +2213,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	jack_client_internal_t *client;
 	shm_name_t shm_name;
 	int shmid;
+    int perm;
 	void *addr = 0;
 
 	switch (req->type) {
@@ -2136,17 +2222,24 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 		break;
 
 	case ClientExternal:
-
-		snprintf (shm_name, sizeof (shm_name), "/jack-c-%s", req->name);
-		if ((addr = jack_get_shm (shm_name, sizeof (jack_client_control_t), 
-					  (O_RDWR|O_CREAT|O_TRUNC), 0666, PROT_READ|PROT_WRITE, &shmid)) == MAP_FAILED) {
-			jack_error ("cannot create client control block for %s", req->name);
-			return 0;
-		}
-		jack_register_shm (shm_name, addr, shmid);
-		break;
-	}
-
+                
+        #if defined(linux) 
+                perm = O_RDWR|O_CREAT|O_TRUNC;
+        #elif defined(__APPLE__) && defined(__POWERPC__) 
+                /* using O_TRUNC option does not work on Darwin */
+                perm = O_RDWR|O_CREAT;
+        #endif
+                snprintf (shm_name, sizeof (shm_name), "/jack-c-%s", req->name);
+                
+                if ((addr = jack_get_shm (shm_name, sizeof (jack_client_control_t), 
+                                          perm, 0666, PROT_READ|PROT_WRITE, &shmid)) == MAP_FAILED) {
+                        jack_error ("cannot create client control block for %s", req->name);
+                        return 0;
+                }
+                jack_register_shm (shm_name, addr, shmid);
+                break;
+        }
+                
 	client = (jack_client_internal_t *) malloc (sizeof (jack_client_internal_t));
 
 	client->request_fd = fd;
@@ -2189,7 +2282,12 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	client->control->port_register_arg = NULL;
 	client->control->graph_order = NULL;
 	client->control->graph_order_arg = NULL;
-
+        
+#if defined(__APPLE__) && defined(__POWERPC__) 
+        /* specific ressources for server/client real-time thread communication */
+        allocate_mach_serverport(engine, client);
+        client->running = FALSE;
+#endif
 	if (req->type == ClientInternal) {
 		if (jack_load_client (engine, client, req->object_path)) {
 			jack_error ("cannot dynamically load client from \"%s\"", req->object_path);
@@ -3128,7 +3226,12 @@ jack_get_fifo_fd (jack_engine_t *engine, unsigned int which_fifo)
 
 	if (stat (path, &statbuf)) {
 		if (errno == ENOENT) {
-			if (mknod (path, 0666|S_IFIFO, 0) < 0) {
+       
+                #if defined(linux) 
+                        if (mknod (path, 0666|S_IFIFO, 0) < 0) {
+                #elif defined(__APPLE__) && defined(__POWERPC__) 
+                        if (mkfifo(path,0666) < 0){
+                #endif
 				jack_error ("cannot create inter-client FIFO [%s] (%s)\n", path, strerror (errno));
 				return -1;
 			}

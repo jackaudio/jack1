@@ -36,6 +36,7 @@ struct _jack_engine {
 
     int  (*set_buffer_size)(struct _jack_engine *, jack_nframes_t frames);
     int  (*set_sample_rate)(struct _jack_engine *, jack_nframes_t frames);
+    int  (*run_cycle)(struct _jack_engine *, jack_nframes_t nframes, float delayed_usecs);
 
     /* "private" sections starts here */
 
@@ -85,12 +86,19 @@ struct _jack_engine {
 #define JACK_ENGINE_ROLLING_COUNT 32
 #define JACK_ENGINE_ROLLING_INTERVAL 1024
 
-    float rolling_client_usecs[JACK_ENGINE_ROLLING_COUNT];
+    jack_time_t rolling_client_usecs[JACK_ENGINE_ROLLING_COUNT];
     int   rolling_client_usecs_cnt;
     int   rolling_client_usecs_index;
     int   rolling_interval;
     float spare_usecs;
     float usecs_per_cycle;
+    
+#if defined(__APPLE__) && defined(__POWERPC__) 
+    /* specific ressources for server/client real-time thread communication */
+    mach_port_t servertask, bp;
+    int portnum;
+#endif
+   
 };
 
 /* public functions */

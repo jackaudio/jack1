@@ -40,7 +40,11 @@ typedef unsigned long        jack_nframes_t;
  * monotonic clock with units of microseconds.
  */
 
+#if defined(linux)
 typedef unsigned long long jack_time_t;
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+typedef double jack_time_t;
+#endif
 
 /**
  *  jack_port_t is an opaque type. You may only access it using the API provided.

@@ -16,4 +16,4 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 */
-const unsigned int jack_protocol_version = @JACK_PROTOCOL_VERSION@;
+#define jack_protocol_version @JACK_PROTOCOL_VERSION@

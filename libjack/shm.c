@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <config.h>
 
 #include <jack/shm.h>
 #include <jack/internal.h>
@@ -63,6 +64,7 @@ jack_initialize_shm ()
 {
 	void *addr;
 	int id;
+        int perm;
 
 #ifdef USE_POSIX_SHM
 	fprintf (stderr, "JACK compiled with POSIX SHM support\n");
@@ -79,9 +81,16 @@ jack_initialize_shm ()
 	   if we exit. otherwise, they can get lost in crash
 	   or debugger driven exits.
 	*/
+        
+#if defined(linux) 
+        perm = O_RDWR|O_CREAT|O_TRUNC;
+#elif defined(__APPLE__) && defined(__POWERPC__)
+        /* using O_TRUNC option does not work on Darwin */
+        perm = O_RDWR|O_CREAT;
+#endif
 	
 	if ((addr = jack_get_shm ("/jack-shm-registry", sizeof (jack_shm_registry_entry_t) * MAX_SHM_ID, 
-				  O_RDWR|O_CREAT|O_TRUNC, 0600, PROT_READ|PROT_WRITE, &id)) == MAP_FAILED) {
+				  perm, 0600, PROT_READ|PROT_WRITE, &id)) == MAP_FAILED) {
 		return -1;
 	}
 
@@ -108,7 +117,7 @@ jack_cleanup_shm ()
 void
 jack_destroy_shm (const char *shm_name)
 {
-	shm_unlink (shm_name);
+        shm_unlink (shm_name);
 }
 
 void
@@ -256,7 +265,7 @@ jack_get_shm (const char *shm_name, size_t size, int perm, int mode, int prot, i
 			return MAP_FAILED;
 		}
 	}
-
+        
 	snprintf (path, sizeof(path), "%s/jack/shm%s", jack_server_dir, shm_name);
 	if ((status = stat (path, &statbuf)) < 0) {
 		int fd;

@@ -38,6 +38,17 @@ static inline jack_time_t jack_get_microseconds (void) {
 }
 
 
-#endif /* x86 */
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+
+#include <mach/mach_time.h>
+
+extern double __jack_time_ratio;
+
+static inline jack_time_t jack_get_microseconds(void) 
+{  
+        return  mach_absolute_time () * __jack_time_ratio;
+}
+
+#endif
 
 #endif /* __jack_time_h__ */

@@ -18,6 +18,14 @@
     $Id$
 */
 
+#if defined(linux) 
+    #include <sys/poll.h>
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+    #include "pThreadUtilities.h"
+    #include "ipc.h"
+    #include "fakepoll.h"
+#endif
+
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <pthread.h>
@@ -26,7 +34,7 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/mman.h>
-#include <sys/poll.h>
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <regex.h>
@@ -50,7 +58,7 @@
 #include <jack/timestamps.h>
 #endif /* WITH_TIMESTAMPS */
 
-jack_time_t __jack_cpu_mhz;
+
 
 
 #ifdef DEFAULT_TMP_DIR
@@ -535,8 +543,22 @@ jack_client_new (const char *client_name)
 	}
 
 	client->event_fd = ev_fd;
-
-	return client;
+        
+#if defined(__APPLE__) && defined(__POWERPC__) 
+        /* specific ressources for server/client real-time thread communication */
+	client->clienttask = mach_task_self();
+        
+	if (task_get_bootstrap_port(client->clienttask, &client->bp)){
+            jack_error ("Can't find bootstrap port");
+            goto fail;
+        }
+        
+        if (allocate_mach_clientport(client, res.portnum) < 0) {
+            jack_error("Can't allocate mach port");
+            goto fail; 
+        }; 
+#endif
+ 	return client;
 	
   fail:
 	if (client->engine) {
@@ -670,6 +692,8 @@ jack_client_thread (void *arg)
 			status = -1;
 			break;
 		}
+                
+        pthread_testcancel();
 
 		/* get an accurate timestamp on waking from poll for a process()
 		   cycle.
@@ -837,7 +861,7 @@ jack_client_thread (void *arg)
 		client->on_shutdown (client->on_shutdown_arg);
 	} else {
 		jack_error ("zombified - exiting from JACK");
-		jack_client_close (client);
+		jack_client_close (client); /* Need a fix : possibly make client crash if zombified without shutdown handler */
 	}
 
 	pthread_exit (0);
@@ -845,6 +869,80 @@ jack_client_thread (void *arg)
 	return 0;
 }
 
+
+#if defined(__APPLE__) && defined(__POWERPC__) 
+/* real-time thread : separated from the normal client thread, it will communicate with the server using fast mach RPC mechanism */
+
+static void *
+jack_client_process_thread (void *arg)
+{
+	jack_client_t *client = (jack_client_t *) arg;
+	jack_client_control_t *control = client->control;
+	int err = 0;
+      
+	client->control->pid = getpid();
+        DEBUG ("client process thread is now running");
+        
+        pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+            
+   	while (err == 0) {
+        
+                if (jack_client_suspend(client) < 0) {
+                        pthread_exit (0);
+                }
+                
+                control->awake_at = jack_get_microseconds();
+                
+                DEBUG ("client resumed");
+                 
+                control->state = Running;
+
+                if (control->process) {
+                        if (control->process (control->nframes, control->process_arg) == 0) {
+                                control->state = Finished;
+                        }
+                } else {
+                        control->state = Finished;
+                }
+                
+                control->finished_at = jack_get_microseconds();
+                
+#ifdef WITH_TIMESTAMPS
+                jack_timestamp ("finished");
+#endif
+                DEBUG ("client finished processing at %Lu (elapsed = %f usecs)", 
+                               control->finished_at, ((float)(control->finished_at - control->awake_at)));
+                  
+                /* check if we were killed during the process cycle (or whatever) */
+
+                if (client->control->dead) {
+                        jack_error ("jack_client_process_thread : client->control->dead");
+                        goto zombie;
+                }
+
+                DEBUG("process cycle fully complete\n");
+
+        }
+        
+ 	return (void *) ((intptr_t)err);
+
+  zombie:
+        
+        jack_error ("jack_client_process_thread : zombified");
+        
+	if (client->on_shutdown) {
+		jack_error ("zombified - calling shutdown handler");
+		client->on_shutdown (client->on_shutdown_arg);
+	} else {
+		jack_error ("zombified - exiting from JACK");
+                jack_client_close (client); /* Need a fix : possibly make client crash if zombified without shutdown handler */
+	}
+
+	pthread_exit (0);
+	/*NOTREACHED*/
+	return 0;
+}
+#endif
 static int
 jack_start_thread (jack_client_t *client)
 
@@ -884,11 +982,16 @@ jack_start_thread (jack_client_t *client)
 			jack_error ("Cannot set scheduling priority for RT thread (%s)", strerror (errno));
 			return -1;
 		}
-
-		if (mlockall (MCL_CURRENT|MCL_FUTURE)) {
-			jack_error ("cannot lock down all memory (%s)", strerror (errno));
-			return -1;
-		}
+                
+        #if defined(linux) 
+                if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
+                    jack_error ("cannot lock down memory for RT thread (%s)", strerror (errno));
+                    return -1;
+                }
+        #elif defined(__APPLE__) && defined(__POWERPC__) 
+                // To be implemented
+        #endif
+        
 	}
 
 	if (pthread_create (&client->thread, attributes, jack_client_thread, client)) {
@@ -902,6 +1005,22 @@ jack_start_thread (jack_client_t *client)
 #endif
 		return -1;
 	}
+        
+#if defined(__APPLE__) && defined(__POWERPC__) 
+        /* a spcial real-time thread to call the "process" callback. It will communicate with the server using fast mach RPC mechanism */
+        if (pthread_create (&client->process_thread, attributes, jack_client_process_thread, client)) {
+                jack_error("pthread_create failed for process_thread \n");
+                return -1;
+        }
+        if (client->engine->real_time){
+            /* time constraint thread */
+            setThreadToPriority(client->process_thread, 96, true, 10000000);
+        }else{
+            /* fixed priority thread */
+            setThreadToPriority(client->process_thread, 63, true, 10000000);
+        }
+#endif
+            
 	return 0;
 
 #ifdef USE_CAPABILITIES
@@ -1001,8 +1120,12 @@ jack_activate (jack_client_t *client)
 	 * actually mapped (more important for mlockall(2) usage in
 	 * jack_start_thread()) 
 	 */
-
-#define BIG_ENOUGH_STACK 1048576
+         
+#if defined(linux) 
+       #define BIG_ENOUGH_STACK 1048576
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+       #define BIG_ENOUGH_STACK 10000 // a bigger stack make the application crash...
+#endif
 
 	char buf[BIG_ENOUGH_STACK];
 	int i;
@@ -1511,9 +1634,22 @@ jack_get_mhz (void)
 	}
 }
 
+jack_time_t __jack_cpu_mhz;
+
 void jack_init_time ()
 {
 	__jack_cpu_mhz = jack_get_mhz ();
+}
+
+#elif defined(__APPLE__) && defined(__POWERPC__) 
+
+double __jack_time_ratio;
+
+void jack_init_time ()
+{
+        mach_timebase_info_data_t info; 
+        mach_timebase_info(&info);
+        __jack_time_ratio = ((float)info.numer/info.denom) / 1000;
 }
 
 #endif

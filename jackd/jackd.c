@@ -23,9 +23,9 @@
 #include <getopt.h>
 #include <sys/types.h>
 #include <sys/shm.h>
+#include <sys/wait.h>
 #include <string.h>
 #include <errno.h>
-#include <wait.h>
 
 #include <config.h>
 
