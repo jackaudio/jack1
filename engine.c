@@ -1657,6 +1657,9 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 						client->control->name, n);
 				}
 
+				if (client->control->graph_order) {
+					client->control->graph_order ();
+				}
 				
 				subgraph_client = 0;
 				
