@@ -114,7 +114,7 @@ jack_messagebuffer_exit ()
 		fprintf(stderr, "WARNING: %d message buffer overruns!\n",
 			mb_overruns);
 	else
-		fprintf(stderr, "No message buffer overruns.\n");
+		fprintf(stderr, "no message buffer overruns\n");
 
 	pthread_mutex_destroy(&mb_write_lock);
 	pthread_cond_destroy(&mb_ready_cond);
@@ -124,22 +124,24 @@ jack_messagebuffer_exit ()
 void 
 jack_messagebuffer_add (const char *fmt, ...)
 {
+	char msg[MB_BUFFERSIZE];
 	va_list ap;
 
+	/* format the message first, to reduce lock contention */
+	va_start(ap, fmt);
+	vsnprintf(msg, MB_BUFFERSIZE, fmt, ap);
+	va_end(ap);
+
 	if (!mb_initialized) {
-		/* Unable to print message with realtime safety.  So,
-		 * complain and print it anyway. */
-		fprintf(stderr, "ERROR: messagebuffer not initialized...\n");
-		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
-		va_end(ap);
+		/* Unable to print message with realtime safety.
+		 * Complain and print it anyway. */
+		fprintf(stderr, "ERROR: messagebuffer not initialized: %s",
+			msg);
 		return;
 	}
 
 	if (pthread_mutex_trylock(&mb_write_lock) == 0) {
-		va_start(ap, fmt);
-		vsnprintf(mb_buffers[mb_inbuffer], MB_BUFFERSIZE, fmt, ap);
-		va_end(ap);
+		strncpy(mb_buffers[mb_inbuffer], msg, MB_BUFFERSIZE);
 		mb_inbuffer = MB_NEXT(mb_inbuffer);
 		pthread_cond_signal(&mb_ready_cond);
 		pthread_mutex_unlock(&mb_write_lock);
