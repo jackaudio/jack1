@@ -1376,6 +1376,7 @@ jack_client_internal_new (jack_engine_t *engine, int fd, jack_client_connect_req
 	client->control->srate_arg = NULL;
 	client->control->port_register = NULL;
 	client->control->port_register_arg = NULL;
+	client->control->graph_order = NULL;
 
 	if (req->type == ClientDynamic) {
 		if (jack_load_client (engine, client, req->object_path)) {
@@ -1580,7 +1581,6 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 
 int
 jack_client_set_order (jack_engine_t *engine, jack_client_internal_t *client)
-
 {
 	jack_event_t event;
 
@@ -1592,12 +1592,10 @@ jack_client_set_order (jack_engine_t *engine, jack_client_internal_t *client)
 
 int
 jack_rechain_graph (jack_engine_t *engine, int take_lock)
-
 {
 	GSList *node, *next;
 	unsigned long n;
 	int err = 0;
-	int need_to_reset_fifo;
 	jack_client_internal_t *client, *subgraph_client, *next_client;
 
 	if (take_lock) {
@@ -1605,11 +1603,6 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 	}
 
 	jack_clear_fifos (engine);
-
-	/* We're going to try to avoid reconnecting clients that 
-	   don't need to be reconnected. This is slightly tricky, 
-	   but worth it for performance reasons.
-	*/
 
 	subgraph_client = 0;
 
@@ -1640,13 +1633,8 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 				next_client = (jack_client_internal_t *) next->data;
 			}
 
-			if (client->execution_order != n || client->next_client != next_client) {
-				client->execution_order = n;
-				client->next_client = next_client;
-				need_to_reset_fifo = TRUE;
-			} else {
-				need_to_reset_fifo = FALSE;
-			}
+			client->execution_order = n;
+			client->next_client = next_client;
 			
 			if (jack_client_is_inprocess (client)) {
 				
@@ -1695,14 +1683,11 @@ jack_rechain_graph (jack_engine_t *engine, int take_lock)
 
 				}
 				
-				if (need_to_reset_fifo) {
-					/* make sure fifo for 'n + 1' exists 
-					 * before issuing client reorder */
-					(void) jack_get_fifo_fd(engine, n + 1);
-
-					jack_client_set_order (engine, client);
-				}
-				
+				/* make sure fifo for 'n + 1' exists 
+				 * before issuing client reorder 
+				 */
+				(void) jack_get_fifo_fd(engine, n + 1);
+				jack_client_set_order (engine, client);
 				n++;
 			}
 		}

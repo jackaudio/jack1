@@ -259,6 +259,14 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 		return -1;
 	}
 
+	/* If the client registered its own callback for graph order events,
+	   execute it now.
+	*/
+
+	if (client->control->graph_order) {
+		client->control->graph_order ();
+	}
+
 	return 0;
 }
 		
@@ -1247,6 +1255,16 @@ jack_port_untie (jack_port_t *port)
 		return -1;
 	}
 	port->tied = NULL;
+	return 0;
+}
+
+int 
+jack_set_graph_order_callback (jack_client_t *client, JackGraphOrderCallback callback)
+{
+	if (client->control->active) {
+		return -1;
+	}
+	client->control->graph_order = callback;
 	return 0;
 }
 

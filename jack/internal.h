@@ -144,6 +144,7 @@ typedef volatile struct {
     void *srate_arg;
     JackPortRegistrationCallback port_register;
     void *port_register_arg;
+    JackGraphOrderCallback graph_order;
 
     /* for engine use only */
 
