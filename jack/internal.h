@@ -104,7 +104,7 @@ typedef struct {
     float               cpu_load;
     unsigned long       port_max;
     jack_port_shared_t ports[0];
-
+    int                 engine_ok;
 } jack_control_t;
 
 typedef enum  {

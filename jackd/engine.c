@@ -1440,7 +1440,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose)
 		}
 	}
 #endif
-
+	engine->control->engine_ok = 1;
 	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix), "%s/jack-ack-fifo-%d", jack_temp_dir, getpid());
 
 	(void) jack_get_fifo_fd (engine, 0);
@@ -1478,6 +1478,7 @@ cancel_cleanup (int status, void *arg)
 
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
+	engine->control->engine_ok = 0;
 	engine->driver->stop (engine->driver);
 	engine->driver->finish (engine->driver);
 }

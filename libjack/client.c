@@ -527,6 +527,14 @@ jack_client_thread (void *arg)
 	pthread_mutex_unlock (&client_lock);
 
 	while (err == 0) {
+	        if (client->engine->engine_ok == 0) {
+		     jack_error ("engine unexpectedly shutdown; thread exiting\n");
+		     if (client->on_shutdown) {
+		       client->on_shutdown (client->on_shutdown_arg);
+		     }
+		     pthread_exit (0);
+
+		}
 
 		DEBUG ("client polling on event_fd and graph_wait_fd...");
                 
@@ -1453,7 +1461,7 @@ int
 jack_set_graph_order_callback (jack_client_t *client, JackGraphOrderCallback callback, void *arg)
 {
 	if (client->control->active) {
-		g_warning ("You cannot set callbacks on an active client.");
+		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
 	client->control->graph_order = callback;
@@ -1466,7 +1474,7 @@ jack_set_process_callback (jack_client_t *client, JackProcessCallback callback, 
 
 {
 	if (client->control->active) {
-		g_warning ("You cannot set callbacks on an active client.");
+		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
 	client->control->process_arg = arg;
@@ -1479,7 +1487,7 @@ jack_set_buffer_size_callback (jack_client_t *client, JackBufferSizeCallback cal
 
 {
 	if (client->control->active) {
-		g_warning ("You cannot set callbacks on an active client.");
+		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
 	client->control->bufsize_arg = arg;
@@ -1497,7 +1505,7 @@ jack_set_sample_rate_callback (jack_client_t *client, JackSampleRateCallback cal
 
 {
 	if (client->control->active) {
-		g_warning ("You cannot set callbacks on an active client.");
+		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
 	client->control->srate_arg = arg;
@@ -1515,7 +1523,7 @@ jack_set_port_registration_callback(jack_client_t *client, JackPortRegistrationC
 
 {
 	if (client->control->active) {
-		g_warning ("You cannot set callbacks on an active client.");
+		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
 	client->control->port_register_arg = arg;

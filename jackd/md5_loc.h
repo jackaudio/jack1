@@ -33,23 +33,24 @@
 #define HEX_STRING	"0123456789abcdef"	/* to convert to hex */
 #define BLOCK_SIZE_MASK	(MD5_BLOCK_SIZE - 1)
 
+
+#include <config.h>
+
 /*
  * Define my endian-ness.  Could not do in a portable manner using the
  * include files -- grumble.
  */
-#if defined(__alpha) || defined(WIN32) || defined(__i386__)
-/*
- * little endian
- */
-#define SWAP(n)	(n)
-#endif
-
-#ifdef __sparc
+#ifdef WORDS_BIGENDIAN
 /*
  * big endian - big is better
  */
 #define SWAP(n)	\
     (((n) << 24) | (((n) & 0xff00) << 8) | (((n) >> 8) & 0xff00) | ((n) >> 24))
+#else
+/*
+	+ * little endian
+	+ */
+#define SWAP(n)    (n)
 #endif
 
 /*
