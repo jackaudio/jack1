@@ -93,7 +93,7 @@ int coreaudio_runCycle(void *driver, long bufferSize)
 	}
 }
 
-void coreaudio_XRun(void *driver, float delayed_usecs)
+void coreaudio_XRun(void *driver)
 {
     coreaudio_driver_t *ca_driver = (coreaudio_driver_t *) driver;
 	ca_driver->xrun_detected = 1;

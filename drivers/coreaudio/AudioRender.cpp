@@ -423,7 +423,7 @@ OSStatus AudioRender::notification(AudioDeviceID inDevice,
 	
 		case kAudioDeviceProcessorOverload:
 			JCALog("notification kAudioDeviceProcessorOverload\n");
-			classe->f_JackXRun(classe->jackData, 100);
+			classe->f_JackXRun(classe->jackData);
 			break;
 	}
 	

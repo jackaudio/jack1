@@ -35,7 +35,7 @@
 }
 
 typedef int (*JackRunCyclePtr) (void *driver, long bufferSize);
-typedef void (*JackXRunPtr) (void* driver, float delayed_usecs);
+typedef void (*JackXRunPtr) (void* driver);
 
 class AudioRender {
   public:
