@@ -1512,6 +1512,7 @@ jack_client_disconnect (jack_engine_t *engine, jack_client_internal_t *client)
 	for (node = client->ports; node; node = jack_slist_next (node)) {
 		port = (jack_port_internal_t *) node->data;
 		jack_port_clear_connections (engine, port);
+		jack_port_registration_notify (engine, port->shared->id, FALSE);
 		jack_port_release (engine, port);
 	}
 
