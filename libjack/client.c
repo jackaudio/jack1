@@ -417,6 +417,7 @@ _start_server (void)
 	}
 
 	if (fp) {
+		arguments[0] = '\0';
 		ret = fscanf(fp, "%s", buffer);
 		while(ret != 0 && ret != EOF) {
 			strcat(arguments, buffer);
