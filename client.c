@@ -247,14 +247,14 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 
 	sprintf (path, "%s-%lu", client->fifo_prefix, event->x.n);
 
-	if ((client->graph_wait_fd = open (path, O_RDONLY)) <= 0) {
+	if ((client->graph_wait_fd = open (path, O_RDONLY|O_NONBLOCK)) <= 0) {
 		jack_error ("cannot open specified fifo [%s] for reading (%s)", path, strerror (errno));
 		return -1;
 	}
 
 	sprintf (path, "%s-%lu", client->fifo_prefix, event->x.n+1);
 	
-	if ((client->graph_next_fd = open (path, O_WRONLY)) < 0) {
+	if ((client->graph_next_fd = open (path, O_WRONLY|O_NONBLOCK)) < 0) {
 		jack_error ("cannot open specified fifo [%s] for writing (%s)", path, strerror (errno));
 		return -1;
 	}
@@ -515,7 +515,7 @@ jack_client_thread (void *arg)
 			status = -1;
 			break;
 		}
-
+		
 		if (client->pollfd[0].revents & ~POLLIN) {
 			jack_error ("engine has shut down socket; thread exiting");
 			if (client->on_shutdown) {
@@ -572,6 +572,12 @@ jack_client_thread (void *arg)
 				}
 				break;
 
+			case XRun:
+				if (control->xrun) {
+					status = control->xrun (control->xrun_arg);
+				}
+				break;
+
 			case NewPortBufferSegment:
 				break;
 			}
@@ -585,15 +591,7 @@ jack_client_thread (void *arg)
 
 		if (client->pollfd[1].revents & POLLIN) {
 
-			/* the previous stage of the graph has told us to 
-			   process().
-			*/
-
-			if (read (client->graph_wait_fd, &c, sizeof (c)) != sizeof (c)) {
-				jack_error ("cannot clean up byte from inter-client pipe (%s)", strerror (errno));
-				err++;
-				break;
-			}
+			rdtscll (control->signalled_at);
 
 			control->state = Running;
 
@@ -604,14 +602,23 @@ jack_client_thread (void *arg)
 			} else {
 				control->state = Finished;
 			}
+			
+			rdtscll (control->finished_at);
 
-			/* this may fail. if it does, the engine will discover
-			   it due a cycle timeout, which is about
-			   the best we can do without a lot of mostly wasted
-			   effort.
-			*/
+			/* pass the execution token along */
 
-			write (client->graph_next_fd, &c, 1);
+			if (write (client->graph_next_fd, &c, sizeof (c)) != sizeof (c)) {
+				jack_error ("cannot continue execution of the processing graph (%s)", strerror(errno));
+				err++;
+				break;
+			}
+
+			if ((read (client->graph_wait_fd, &c, sizeof (c)) != sizeof (c))) {
+				jack_error ("cannot complete execution of the processing graph (%s)", strerror(errno));
+				err++;
+				break;
+			}
+
 		}
 	}
 	
@@ -671,6 +678,17 @@ jack_activate (jack_client_t *client)
 
 {
 	jack_request_t req;
+
+#define BIG_ENOUGH_STACK 1048576
+
+	char buf[BIG_ENOUGH_STACK];
+	int i;
+
+	for (i = 0; i < BIG_ENOUGH_STACK; i++) {
+		buf[i] = (char) (i & 0xff);
+	}
+
+#undef BIG_ENOUGH_STACK
 
 	if (client->control->type == ClientOutOfProcess && client->first_active) {
 
@@ -1739,4 +1757,36 @@ nframes_t
 jack_port_get_total_latency (jack_client_t *client, jack_port_t *port)
 {
 	return port->shared->total_latency;
+}
+
+int
+jack_get_mhz (void)
+{
+	FILE *f = fopen("/proc/cpuinfo", "r");
+	if (f == 0)
+	{
+		perror("can't open /proc/cpuinfo\n");
+		exit(1);
+	}
+
+	for ( ; ; )
+	{
+		int mhz;
+		int ret;
+		char buf[1000];
+
+		if (fgets(buf, sizeof(buf), f) == NULL)
+		{
+			fprintf(stderr, "cannot locate cpu MHz in /proc/cpuinfo\n");
+			exit(1);
+		}
+
+		ret = sscanf(buf, "cpu MHz         : %d", &mhz);
+
+		if (ret == 1)
+		{
+			fclose(f);
+			return mhz;
+		}
+	}
 }

@@ -94,6 +94,7 @@ typedef enum  {
   GraphReordered,
   PortRegistered,
   PortUnregistered,
+  XRun,
 } AudioEngineEventType;
 
 typedef struct {
@@ -133,6 +134,8 @@ typedef volatile struct {
     volatile char       active : 1;       /* w: engine r: engine and client */
     volatile char       dead : 1;         /* r/w: engine */
     volatile char       timed_out : 1;    /* r/w: engine */
+    volatile unsigned long long signalled_at;
+    volatile unsigned long long finished_at;
 
     /* callbacks */
     
@@ -146,6 +149,8 @@ typedef volatile struct {
     void *port_register_arg;
     JackGraphOrderCallback graph_order;
     void *graph_order_arg;
+    JackXRunCallback xrun;
+    void *xrun_arg;
 
     /* for engine use only */
 
@@ -236,6 +241,8 @@ extern int jack_client_handle_port_connection (jack_client_t *client, jack_event
 jack_client_t *jack_driver_become_client (const char *client_name);
 
 extern char *jack_temp_dir;
+
+extern int jack_get_mhz (void);
 
 #endif /* __jack_internal_h__ */
 

@@ -108,7 +108,9 @@ main (int argc, char *argv[])
 	}
 
 	/* connect the ports. Note: you can't do this before
-	   the client is activated (this may change in the future).
+	   the client is activated, because we can't allow
+	   connections to be made to clients that aren't
+	   running.
 	*/
 
 	if (jack_connect (client, "alsa_pcm:in_1", jack_port_name (input_port))) {

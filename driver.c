@@ -30,7 +30,7 @@
 
 static int dummy_attach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
 static int dummy_detach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
-static nframes_t dummy_wait (jack_driver_t *drv, int fd, int *status) { *status = 0; return 0; }
+static nframes_t dummy_wait (jack_driver_t *drv, int fd, int *status, float *delayed_usecs) { *status = 0; *delayed_usecs = 0; return 0; }
 static int dummy_process (jack_driver_t *drv, nframes_t nframes) { return 0; }
 static int dummy_stop (jack_driver_t *drv) { return 0; }
 static int dummy_start (jack_driver_t *drv) { return 0; }

@@ -27,7 +27,7 @@
 #include <glib.h>
 #include <stdarg.h>
 #include <getopt.h>
-#include <asm/msr.h>
+#include <asm/timex.h>
 
 #include <jack/alsa_driver.h>
 #include <jack/types.h>
@@ -35,6 +35,12 @@
 #include <jack/engine.h>
 #include <jack/hammerfall.h>
 #include <jack/generic.h>
+#include <jack/util.h>
+
+extern void store_work_time (int);
+extern void store_wait_time (int);
+extern void show_wait_times ();
+extern void show_work_times ();
 
 static void
 alsa_driver_release_channel_dependent_memory (alsa_driver_t *driver)
@@ -236,7 +242,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 	if ((err = snd_pcm_hw_params_set_access (handle, hw_params, SND_PCM_ACCESS_MMAP_NONINTERLEAVED)) < 0) {
 		if ((err = snd_pcm_hw_params_set_access (handle, hw_params, SND_PCM_ACCESS_MMAP_INTERLEAVED)) < 0) {
 			jack_error ("ALSA: mmap-based access is not possible for the %s "
-				  "stream of this audio interface", stream_name);
+				    "stream of this audio interface", stream_name);
 			return -1;
 		}
 	}
@@ -244,8 +250,8 @@ alsa_driver_configure_stream (alsa_driver_t *driver,
 	if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S32_LE)) < 0) {
 		if ((err = snd_pcm_hw_params_set_format (handle, hw_params, SND_PCM_FORMAT_S16_LE)) < 0) {
 			jack_error ("Sorry. The audio interface \"%s\""
-				  "doesn't support either of the two hardware sample formats that ardour can use.",
-				  driver->alsa_name);
+				    "doesn't support either of the two hardware sample formats that ardour can use.",
+				    driver->alsa_name);
 			return -1;
 		}
 	}
@@ -444,7 +450,6 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 
 	driver->buffer_frames = driver->frames_per_cycle * driver->nfragments;
 	driver->sample_bytes = snd_pcm_format_physical_width (driver->sample_format) / 8;
-	driver->bytes_per_cycle = driver->sample_bytes * driver->frames_per_cycle;
 
 	switch (driver->sample_format) {
 	case SND_PCM_FORMAT_S32_LE:
@@ -515,9 +520,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver, nframes_t frames_per_cycle, n
 	driver->clock_sync_data = (ClockSyncStatus *) malloc (sizeof (ClockSyncStatus) * 
 							      driver->capture_nchannels > driver->playback_nchannels ?
 							      driver->capture_nchannels : driver->playback_nchannels);
-	
 
-	driver->period_interval = (unsigned long) floor ((((float) driver->frames_per_cycle) / driver->frame_rate) * 1000.0);
+	driver->period_usecs = (((float) driver->frames_per_cycle) / driver->frame_rate) * 1000000.0f;
 
 	if (driver->engine) {
 		driver->engine->set_buffer_size (driver->engine, driver->frames_per_cycle);
@@ -583,6 +587,9 @@ alsa_driver_audio_start (alsa_driver_t *driver)
 	int err;
 	snd_pcm_uframes_t poffset, pavail;
 	channel_t chn;
+
+	driver->poll_last = 0;
+	driver->poll_next = 0;
 
 	if (driver->playback_handle) {
 		if ((err = snd_pcm_prepare (driver->playback_handle)) < 0) {
@@ -723,14 +730,13 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver)
 		gettimeofday(&now, 0);
 		snd_pcm_status_get_trigger_tstamp(status, &tstamp);
 		timersub(&now, &tstamp, &diff);
-		fprintf(stderr, "alsa_pcm: xrun of at least %.3f msecs\n", diff.tv_sec * 1000 + diff.tv_usec / 1000.0);
+		fprintf(stderr, "\n\n**** alsa_pcm: xrun of at least %.3f msecs\n\n", diff.tv_sec * 1000 + diff.tv_usec / 1000.0);
 	}
 
 	if (alsa_driver_audio_stop (driver) || alsa_driver_audio_start (driver)) {
 		return -1;
 
 	}
-
 	return 0;
 }	
 
@@ -761,7 +767,7 @@ alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn, ClockSy
 static int under_gdb = FALSE;
 
 static nframes_t 
-alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
+alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float *delayed_usecs)
 {
 	snd_pcm_sframes_t avail = 0;
 	snd_pcm_sframes_t capture_avail = 0;
@@ -770,10 +776,14 @@ alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 	int need_capture;
 	int need_playback;
 	int i;
+	unsigned long long poll_enter, poll_ret;
 
 	*status = -1;
+	*delayed_usecs = 0;
+
 	need_capture = driver->capture_handle ? 1 : 0;
-	if (fd >= 0) {
+
+	if (extra_fd >= 0) {
 		need_playback = 0;
 	} else {
 		need_playback = driver->playback_handle ? 1 : 0;
@@ -806,13 +816,15 @@ alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 			driver->pfd[nfds].events |= POLLERR;
 		}
 
-		if (fd >= 0) {
-			driver->pfd[nfds].fd = fd;
+		if (extra_fd >= 0) {
+			driver->pfd[nfds].fd = extra_fd;
 			driver->pfd[nfds].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
 			nfds++;
 		}
 
-		if (poll (driver->pfd, nfds, 1000) < 0) {
+		poll_enter = get_cycles ();
+
+		if (poll (driver->pfd, nfds, (int) floor (driver->period_usecs / 1000.0f)) < 0) {
 			if (errno == EINTR) {
 				printf ("poll interrupt\n");
 				// this happens mostly when run
@@ -820,26 +832,48 @@ alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 				if (under_gdb) {
 					goto again;
 				}
+				*status = -2;
 				return 0;
 			}
 			
-			jack_error ("ALSA::Device: poll call failed (%s)", strerror (errno));
+			jack_error ("ALSA: poll call failed (%s)", strerror (errno));
+			*status = -3;
 			return 0;
 			
+		}
+
+		poll_ret = get_cycles ();
+
+		if (extra_fd < 0) {
+			if (driver->poll_next && poll_ret > driver->poll_next) {
+				*delayed_usecs = (float) (poll_ret - driver->poll_next) / driver->cpu_mhz;
+			} 
+			driver->poll_last = poll_ret;
+			driver->poll_next = poll_ret + (unsigned long long) floor ((driver->period_usecs * driver->cpu_mhz));
 		}
 
 		/* check to see if it was the extra FD that caused us to return from poll
 		 */
 
-		if (fd >= 0) {
+		if (extra_fd >= 0) {
+
 			if (driver->pfd[nfds-1].revents == 0) {
 				/* we timed out on the extra fd */
+
+				*status = -4;
+#if 0
+				printf ("checked %d fds, at %Lu %.9f usecs since poll entered\n", 
+					nfds,
+					poll_ret, 
+					(float) (poll_ret - poll_enter) / driver->cpu_mhz);
+#endif
 				return -1;
-			} else {
-				/* if POLLIN was the only bit set, we're OK */
-				*status = 0;
-				return (driver->pfd[nfds-1].revents == POLLIN) ? 0 : -1;
-			}
+			} 
+
+			/* if POLLIN was the only bit set, we're OK */
+
+			*status = 0;
+			return (driver->pfd[nfds-1].revents == POLLIN) ? 0 : -1;
 		}
 
 		if (driver->engine) {
@@ -887,6 +921,7 @@ alsa_driver_wait (alsa_driver_t *driver, int fd, int *status)
 		if ((p_timed_out && (p_timed_out == driver->playback_nfds)) &&
 		    (c_timed_out && (c_timed_out == driver->capture_nfds))){
 			jack_error ("ALSA: poll time out");
+			*status = -5;
 			return 0;
 		}		
 
@@ -979,7 +1014,7 @@ alsa_driver_process (alsa_driver_t *driver, nframes_t nframes)
 								       &capture_offset, 0) < 0) {
 					return -1;
 				}
-
+				
 				contiguous = capture_avail;
 			}
 
@@ -993,8 +1028,8 @@ alsa_driver_process (alsa_driver_t *driver, nframes_t nframes)
 							       (snd_pcm_uframes_t *) 0, 
 							       (snd_pcm_uframes_t *) &playback_avail,
 							       0, &playback_offset) < 0) {
-					return -1;
-				}
+				return -1;
+			}
 			
 			contiguous = playback_avail;
 		}
@@ -1019,8 +1054,11 @@ alsa_driver_process (alsa_driver_t *driver, nframes_t nframes)
 
 					alsa_driver_read_from_channel (driver, chn, jack_port_get_buffer (port, nframes), nframes);
 				}
-				
 				snd_pcm_mmap_commit (driver->capture_handle, capture_offset, contiguous);
+			}
+
+			if (contiguous != driver->frames_per_cycle) {
+				printf ("wierd contig size %lu\n", contiguous);
 			}
 
 			if ((ret = engine->process (engine, contiguous)) != 0) {
@@ -1031,7 +1069,6 @@ alsa_driver_process (alsa_driver_t *driver, nframes_t nframes)
 				}
 				return ret;
 			}
-
 
 			if (driver->playback_handle) {
 				/* now move data from ports to channels */
@@ -1091,7 +1128,6 @@ alsa_driver_process (alsa_driver_t *driver, nframes_t nframes)
 			if (driver->channels_not_done) {
 				alsa_driver_silence_untouched_channels (driver, contiguous);
 			}
-			
 			snd_pcm_mmap_commit (driver->playback_handle, playback_offset, contiguous);
 		}
 
@@ -1109,6 +1145,7 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 	char buf[32];
 	channel_t chn;
 	jack_port_t *port;
+	int port_flags;
 
 	driver->engine = engine;
 
@@ -1122,12 +1159,17 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 		return;
 	}
 
+	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
+
+	if (driver->has_hw_monitoring) {
+		port_flags |= JackPortCanMonitor;
+	}
+
 	for (chn = 0; chn < driver->capture_nchannels; chn++) {
+
 		snprintf (buf, sizeof(buf) - 1, "in_%lu", chn+1);
-		port = jack_port_register (driver->client, buf, 
-					   JACK_DEFAULT_AUDIO_TYPE,
-					   JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal|JackPortCanMonitor, 0);
-		if (port == 0) {
+
+		if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
 			jack_error ("ALSA: cannot register port for %s", buf);
 			break;
 		}
@@ -1139,13 +1181,13 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 
 		driver->capture_ports = g_slist_append (driver->capture_ports, port);
 	}
+	
+	port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
 
 	for (chn = 0; chn < driver->playback_nchannels; chn++) {
 		snprintf (buf, sizeof(buf) - 1, "out_%lu", chn+1);
-		port = jack_port_register (driver->client, buf, 
-					    JACK_DEFAULT_AUDIO_TYPE,
-					    JackPortIsInput|JackPortIsTerminal|JackPortIsPhysical, 0);
-		if (port == 0) {
+
+		if ((port = jack_port_register (driver->client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0)) == NULL) {
 			jack_error ("ALSA: cannot register port for %s", buf);
 			break;
 		}
@@ -1157,8 +1199,6 @@ alsa_driver_attach (alsa_driver_t *driver, jack_engine_t *engine)
 
 		driver->playback_ports = g_slist_append (driver->playback_ports, port);
 	}
-
-	printf ("ALSA: ports registered, starting driver\n");
 
 	jack_activate (driver->client);
 }
@@ -1336,6 +1376,7 @@ alsa_driver_new (char *name, char *alsa_device,
 	driver->capture_addr = 0;
 	driver->silent = 0;
 	driver->all_monitor_in = FALSE;
+	driver->cpu_mhz = jack_get_mhz();
 
 	driver->clock_mode = ClockMaster; /* XXX is it? */
 	driver->input_monitor_mask = 0;   /* XXX is it? */

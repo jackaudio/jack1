@@ -39,13 +39,13 @@ struct _jack_driver;
 
 typedef int       (*JackDriverAttachFunction)(struct _jack_driver *, struct _jack_engine *);
 typedef int       (*JackDriverDetachFunction)(struct _jack_driver *, struct _jack_engine *);
-typedef nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, int *status);
+typedef nframes_t (*JackDriverWaitFunction)(struct _jack_driver *, int fd, int *status, float *delayed_usecs);
 typedef int       (*JackDriverProcessFunction)(struct _jack_driver *, nframes_t);
 typedef int       (*JackDriverStopFunction)(struct _jack_driver *);
 typedef int       (*JackDriverStartFunction)(struct _jack_driver *);
 
 #define JACK_DRIVER_DECL \
-    nframes_t period_interval; \
+    nframes_t period_usecs; \
     void *handle; \
     void (*finish)(struct _jack_driver *);\
     JackDriverAttachFunction attach; \

@@ -6,11 +6,12 @@ MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure config.h.in \
 
 if HAVE_DOXYGEN
 SUBDIRS = . jack doc
+DIST_SUBDIRS = jack
 else
 SUBDIRS = . jack
+DIST_SUBDIRS = jack
 endif
 
-DIST_SUBDIRS = jack doc
 
 if HAVE_FLTK
 FLTK_CLIENT = jack_fltk_client
@@ -25,7 +26,7 @@ JACKREC =
 endif
 
 bin_PROGRAMS = jackd jack_simple_client jack_monitor_client \
-	jack_impulse_grabber jack_connect jack_disconnect $(FLTK_CLIENT) $(JACKREC)
+	jack_impulse_grabber jack_cache_killer jack_connect jack_disconnect $(FLTK_CLIENT) $(JACKREC)
 
 AM_CFLAGS = $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" $(GLIB_CFLAGS)
 
@@ -50,6 +51,10 @@ jack_disconnect_LDADD = libjack.la
 jack_monitor_client_SOURCES = monitor_client.c
 jack_monitor_client_LDFLAGS = -ldl -lpthread
 jack_monitor_client_LDADD = libjack.la
+
+jack_cache_killer_SOURCES = cache_killer.c
+jack_cache_killer_LDFLAGS = -ldl -lpthread
+jack_cache_killer_LDADD = libjack.la
 
 if HAVE_FLTK
 jack_fltk_client_SOURCES = fltk_client.cc
@@ -76,7 +81,7 @@ libjack_la_SOURCES = client.c pool.c driver.c
 libjack_la_LDFLAGS = $(GLIB_LIBS) -lm
 
 jack_alsa_la_LDFLAGS = -module
-jack_alsa_la_SOURCES = alsa_driver.c hammerfall.c generic_hw.c memops.c 
+jack_alsa_la_SOURCES = alsa_driver.c hammerfall.c generic_hw.c memops.c
 jack_alsa_la_LIBADD = -lasound $(GLIB_LIBS) -lm
 
 pkgconfigdir = $(libdir)/pkgconfig

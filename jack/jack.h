@@ -62,26 +62,41 @@ int            jack_client_close (jack_client_t *client);
 void jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg);
 
 /**
- * Tell the Jack serve to call 'process()' whenever there is work
- * be done.
+ * Tell the Jack serve to call 'process_callback' whenever there is work
+ * be done, passing 'arg' as the second argument.
  */
-int jack_set_process_callback (jack_client_t *, JackProcessCallback, void *arg);
+int jack_set_process_callback (jack_client_t *, JackProcessCallback process_callback, void *arg);
 
 /**
- * Tell the Jack server to call 'bufsize()' whenever the
- * maximum number of frames that will be passed to 'process()'
- * changes.
+ * Tell the Jack server to call 'bufsize_callback' whenever the
+ * maximum number of frames that could be passed to 'process()'
+ * changes. 'arg' will be supplied as a second argument.
  */
-int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback, void *arg);
+int jack_set_buffer_size_callback (jack_client_t *, JackBufferSizeCallback bufsize_callback, void *arg);
 
 /**
- * Tell the Jack server to call 'srate()' whenver the sample rate of
+ * Tell the Jack server to call 'srate_callback' whenver the sample rate of
  * the system changes.
  */
-int jack_set_sample_rate_callback (jack_client_t *, JackSampleRateCallback, void *arg);
+int jack_set_sample_rate_callback (jack_client_t *, JackSampleRateCallback srate_callback, void *arg);
 
-int jack_set_port_registration_callback (jack_client_t *, JackPortRegistrationCallback, void *);
-int jack_set_graph_order_callback (jack_client_t *, JackGraphOrderCallback, void *);
+/**
+ * Tell the Jack server to call 'registration_callback' whenver the a Port is registered
+ * or unregistered, passing 'arg' as a second argument.
+ */
+int jack_set_port_registration_callback (jack_client_t *, JackPortRegistrationCallback registration_callback, void *arg);
+
+/**
+ * Tell the Jack server to call 'registration_callback' whenever the processing
+ * graph is reordered, passing 'arg' as an argument.
+ */
+int jack_set_graph_order_callback (jack_client_t *, JackGraphOrderCallback graph_callback, void *);
+
+/**
+ * Tell the Jack serve to call 'xrun_callback' whenever there is a xrun, passing
+ * 'arg' as an argument.
+ */
+int jack_set_xrun_callback (jack_client_t *, JackXRunCallback xrun_callback, void *arg);
 
 /**
  * Tell the Jack server that the program is ready to start processing
@@ -92,24 +107,42 @@ int jack_activate (jack_client_t *client);
 
 /**
  * Tells the Jack server that the program should be removed from the 
- * processing graph.
+ * processing graph. As a side effect, this will disconnect any
+ * and all ports belonging to the client, since inactive clients
+ * are not allowed to be connected to any other ports.
  */
 
 int jack_deactivate (jack_client_t *client);
 
-
 /**
-   A port has a set of flags, enumerated below and passed as the third
-   argument in the form of a bitmask created by AND-ing together the
-   desired flags. The flags "IsInput" and "IsOutput" are mutually
-   exclusive and it is an error to use them both.  
+   A port has a set of flags that are formed by AND-ing together the
+   desired values from the list below. The flags "JackPortIsInput" and
+   "JackPortIsOutput" are mutually exclusive and it is an error to use
+   them both.
 */
 
 enum JackPortFlags {
 
+     /**
+        * if JackPortIsInput is set, then the port can receive
+	data.
+     */
+
      JackPortIsInput = 0x1,
+
+     /**
+        * if JackPortIsOutput is set, then data can be read from
+	the port.
+     */
+
      JackPortIsOutput = 0x2,
-     JackPortIsPhysical = 0x4, /* refers to a physical connection */
+
+     /**
+         * if JackPortIsPhysical is set, then the port corresponds
+	 to some kind of physical I/O connector.
+     */
+
+     JackPortIsPhysical = 0x4, 
 
     /**
 	 * if JackPortCanMonitor is set, then a call to
@@ -143,11 +176,10 @@ enum JackPortFlags {
      */
 
      JackPortIsTerminal = 0x10
-     
 };	    
 
 /**
- * Used for the flag argument of jack_port_register().
+ * Used for the type argument of jack_port_register().
  */
 
 #define JACK_DEFAULT_AUDIO_TYPE "32 bit float mono audio"
@@ -170,6 +202,8 @@ enum JackPortFlags {
    JACK_DEFAULT_AUDIO_TYPE) the client MUST supply a non-zero size
    for the buffer as the fourth argument. For builtin types, the
    fourth argument is ignored.
+
+   The flags argument is formed from a bitmask of JackPortFlags values.
 */
 
 jack_port_t *

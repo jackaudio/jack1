@@ -46,6 +46,76 @@ typedef struct {
     char **argv;
 } waiter_arg_t;
 
+#define ILOWER 0
+#define IRANGE 3000
+int wait_times[IRANGE];
+int unders = 0;
+int overs = 0;
+int max_over = 0;
+int min_under = INT_MAX;
+
+#define WRANGE 3000
+int work_times[WRANGE];
+int work_overs = 0;
+int work_max = 0;
+
+void
+store_work_time (int howlong)
+{
+	if (howlong < WRANGE) {
+		work_times[howlong]++;
+	} else {
+		work_overs++;
+	}
+
+	if (work_max < howlong) {
+		work_max = howlong;
+	}
+}
+
+void
+show_work_times ()
+{
+	int i;
+	for (i = 0; i < WRANGE; ++i) {
+		printf ("%d %d\n", i, work_times[i]);
+	}
+	printf ("work overs = %d\nmax = %d\n", work_overs, work_max);
+}
+
+void
+store_wait_time (int interval)
+{
+	if (interval < ILOWER) {
+		unders++;
+	} else if (interval >= ILOWER + IRANGE) {
+		overs++;
+	} else {
+		wait_times[interval-ILOWER]++;
+	}
+
+	if (interval > max_over) {
+		max_over = interval;
+	}
+
+	if (interval < min_under) {
+		min_under = interval;
+	}
+}
+
+void
+show_wait_times ()
+{
+	int i;
+
+	for (i = 0; i < IRANGE; i++) {
+		printf ("%d %d\n", i+ILOWER, wait_times[i]);
+	}
+
+	printf ("unders: %d\novers: %d\n", unders, overs);
+	printf ("max: %d\nmin: %d\n", max_over, min_under);
+}	
+
 static void
 signal_handler (int sig)
 {
@@ -205,6 +275,8 @@ jack_main (int argc, char **argv)
 
 	while(1) {
 		err = sigwait (&signals, &sig);
+
+		printf ("jack main caught signal %d\n", sig);
 		
 		if (sig == SIGUSR1) {
 			jack_dump_configuration(engine, 1);
@@ -213,7 +285,7 @@ jack_main (int argc, char **argv)
 			break;
 		}
 	} 
-	
+
 	pthread_cancel (waiter_thread);
 	jack_engine_delete (engine);
 
@@ -237,7 +309,7 @@ int
 main (int argc, char *argv[])
 
 {
-	const char *options = "ad:D:P:vhRF";
+	const char *options = "ad:D:P:vhRFl:";
 	struct option long_options[] = 
 	{ 
 		{ "asio", 0, 0, 'a' },

@@ -45,6 +45,8 @@ typedef struct {
 
     JACK_DRIVER_DECL
 
+    unsigned long long            poll_last;
+    unsigned long long            poll_next;
     char                        **playback_addr;
     char                        **capture_addr;
     const snd_pcm_channel_area_t *capture_areas;
@@ -63,6 +65,7 @@ typedef struct {
 
     nframes_t                     frame_rate;
     nframes_t                     frames_per_cycle;
+    float                         cpu_mhz;
     nframes_t                     capture_frame_latency;
     nframes_t                     playback_frame_latency;
 
@@ -70,7 +73,6 @@ typedef struct {
     char                         *alsa_name;
     char                         *alsa_driver;
     snd_pcm_uframes_t             buffer_frames;
-    unsigned long                 bytes_per_cycle; /* per channel */
     unsigned long                 channels_not_done;
     unsigned long                 channel_done_bits;
     snd_pcm_format_t              sample_format;

@@ -81,6 +81,17 @@ struct _jack_engine {
     char asio_mode;
     int reordered;
     int watchdog_check;
+    float cpu_mhz;
+
+#define JACK_ENGINE_ROLLING_COUNT 32
+#define JACK_ENGINE_ROLLING_INTERVAL 1024
+
+    float rolling_client_usecs[JACK_ENGINE_ROLLING_COUNT];
+    int   rolling_client_usecs_cnt;
+    int   rolling_client_usecs_index;
+    int   rolling_interval;
+    float spare_usecs;
+    float usecs_per_cycle;
 };
 
 /* public functions */
