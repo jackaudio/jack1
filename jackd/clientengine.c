@@ -32,6 +32,7 @@
 #include <jack/engine.h>
 #include <jack/version.h>
 #include <sysdeps/poll.h>
+#include <sysdeps/ipc.h>
 
 #include "clientengine.h"
 #include "transengine.h"
