@@ -1,0 +1,6 @@
+2002-11-05  Kai Vehmanen  <kai.vehmanen@wakkanet.fi>
+
+	* Created this file. Current JACK version is 
+	0.39.0 and libjack interface 0:5:0. See 
+	jack/README.developers for details on how to 
+	use this file.
