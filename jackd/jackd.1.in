@@ -54,6 +54,9 @@ requires a kernel with "POSIX draft capabilities" enabled (see the
 invoke the daemon using \fBjackstart\fR, and later launch JACK clients
 without running as root.
 .TP
+\fB\-T, \-\-temporary
+Will exit once all clients have closed their connections.
+.TP
 \fB\-P, \-\-realtime\-priority \fIint\fR
 When running \fB\-\-realtime\fR, set the scheduler priority to
 \fIint\fR.

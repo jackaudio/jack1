@@ -43,8 +43,8 @@
 
 #define READ_BLOCKSIZE 4096
 
-/* JACKD_LOCATION must be passed on the gcc command line */
-static char *jackd_bin_path = JACKD_LOCATION;
+/* JACK_LOCATION must be passed on the gcc command line */
+static char *jackd_bin_path = JACK_LOCATION "/jackd";
 
 static char *jackd_md5_sum = JACKD_MD5_SUM;
 

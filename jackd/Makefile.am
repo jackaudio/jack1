@@ -21,7 +21,7 @@ endif
 
 bin_PROGRAMS = jackd $(CAP_PROGS)
 
-AM_CFLAGS = $(JACK_CFLAGS) -DJACKD_LOCATION=\"$(bindir)/jackd\"
+AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 
 jackd_SOURCES = jackd.c engine.c transengine.c
 jackd_LDADD = ../libjack/libjack.la -lm -ldl -lrt -lpthread $(CAP_LIBS)

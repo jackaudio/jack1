@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <regex.h>
+#include <signal.h>
 
 #include <config.h>
 
@@ -392,6 +393,102 @@ server_event_connect (jack_client_t *client)
 	return fd;
 }
 
+static void
+_start_server (void)
+{
+	FILE* fp = 0;
+	char filename[255];
+	char arguments[255];
+	char buffer[255];
+	char* command = 0;
+	size_t pos = 0;
+	size_t result = 0;
+	char** argv = 0;
+	int i = 0;
+	int good = 0;
+	int ret;
+
+
+	snprintf(filename, 255, "%s/.jackdrc", getenv("HOME"));
+	fp = fopen(filename, "r");
+
+	if (!fp) {
+		fp = fopen("/etc/jackd.conf", "r");
+	}
+
+	if (fp) {
+		ret = fscanf(fp, "%s", buffer);
+		while(ret != 0 && ret != EOF) {
+			strcat(arguments, buffer);
+			strcat(arguments, " ");
+			ret = fscanf(fp, "%s", buffer);
+		}
+		if (strlen(arguments) > 0) {
+			good = 1;
+		}
+	}
+
+	if (!good) {
+#if defined(__APPLE__) && defined(__POWERPC__) 
+		command = JACK_LOCATION "/jackd";
+		strncpy(arguments, JACK_LOCATION "/jackd -T -d portaudio -p 512", 255);
+#elif defined(USE_CAPABILITIES)
+		command = JACK_LOCATION "/jackstart";
+		strncpy(arguments, JACK_LOCATION "/jackstart -T -R -d alsa -d hw:0 -p 512", 255);
+#else
+		command = JACK_LOCATION "/jackd";
+		strncpy(arguments, JACK_LOCATION "/jackd -T -d alsa -d hw:0 -p 2048", 255);
+#endif
+	} else {
+		result = strcspn(arguments, " ");
+		command = (char*)malloc(result+1);
+		strncpy(command, arguments, result);
+		command[result] = '\0';
+	}
+
+	argv = (char**)malloc(255);
+	while(1) {
+		result = strcspn(arguments+pos, " ");
+		if (result == 0) {
+			break;
+		}
+		argv[i] = (char*)malloc(result+1);
+
+		strncpy(argv[i], arguments+pos, result);
+		argv[i][result] = '\0';
+
+		pos += result+1;
+		++i;
+	}
+
+	execv (command, argv);
+}
+
+int
+start_server (void)
+{
+	pid_t pid1, pid2;
+	
+	if (getenv("JACK_NO_START_SERVER")) {
+		return 1;
+	}
+
+	switch (pid1 = fork()) {
+		case -1:
+			return 1;
+
+		case 0:
+			switch (pid2 = fork()) {
+				case -1:
+					return 1;
+				case 0:
+					_start_server();
+			}
+    		_exit(0);
+	}
+	return 0;
+}
+
 static int
 jack_request_client (ClientType type, const char* client_name,
 		     const char* so_name, const char* so_data,
@@ -428,7 +525,14 @@ jack_request_client (ClientType type, const char* client_name,
 	}
 
 	if ((*req_fd = server_connect (0)) < 0) {
-		goto fail;
+		if (start_server() == 0) {
+			sleep(2);
+			if ((*req_fd = server_connect (0)) < 0) {
+				goto fail;
+			}
+		} else {
+			goto fail;
+		}
 	}
 
 	req.load = TRUE;
@@ -1666,7 +1770,6 @@ jack_get_process_done_fd (jack_client_t *client)
 {
 	return client->graph_next_fd;
 }
-
 
 void
 jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg)

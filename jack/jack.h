@@ -39,6 +39,7 @@ extern "C" {
  *
  * @param client_name of at most jack_client_name_size() characters.
  *
+ * @param client_name The name for the new client
  * @return opaque client handle if successful, otherwise NULL.
  *
  * @note Failure generally means that the JACK server is not running.

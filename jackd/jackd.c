@@ -56,6 +56,7 @@ static sigset_t signals;
 static jack_engine_t *engine = 0;
 static int realtime = 0;
 static int realtime_priority = 10;
+static int temporary = 0;
 static int verbose = 0;
 static int client_timeout = 500; /* msecs */
 
@@ -132,7 +133,7 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	
 	/* get the engine/driver started */
 
-	if ((engine = jack_engine_new (realtime, realtime_priority,
+	if ((engine = jack_engine_new (realtime, realtime_priority, temporary,
 				       verbose, client_timeout,
 				       getpid(), drivers)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
@@ -374,8 +375,8 @@ int
 main (int argc, char *argv[])
 
 {
-        jack_driver_desc_t * desc;
-	const char *options = "-ad:P:vshVRFl:t:";
+    jack_driver_desc_t * desc;
+	const char *options = "-ad:P:vshVRTFl:t:";
 	struct option long_options[] = 
 	{ 
 		{ "driver", 1, 0, 'd' },
@@ -384,12 +385,13 @@ main (int argc, char *argv[])
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
 		{ "timeout", 1, 0, 't' },
+		{ "temporary", 0, 0, 'T' },
 		{ "version", 0, 0, 'V' },
 		{ "silent", 0, 0, 's' },
 		{ 0, 0, 0, 0 }
 	};
-	int option_index;
-	int opt;
+	int opt = 0;
+	int option_index = 0;
 	int seen_driver = 0;
 	char *driver_name = 0;
 	char **driver_args = 0;
@@ -436,10 +438,10 @@ main (int argc, char *argv[])
 		}
 	}
 #endif
+
 	opterr = 0;
 	while (!seen_driver && (opt = getopt_long (argc, argv, options,
-						   long_options,
-						   &option_index)) != EOF) {
+						   long_options, &option_index)) != EOF) {
 		switch (opt) {
 
 		case 'd':
@@ -461,6 +463,10 @@ main (int argc, char *argv[])
 
 		case 'R':
 			realtime = 1;
+			break;
+
+		case 'T':
+			temporary = 1;
 			break;
 
 		case 't':

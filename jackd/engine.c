@@ -875,7 +875,7 @@ jack_remove_clients (jack_engine_t* engine)
 		
 		node = tmp;
 	}
-	
+
 	if (need_sort) {
 		jack_sort_graph (engine);
 	}
@@ -1916,7 +1916,7 @@ jack_server_thread (void *arg)
 }
 
 jack_engine_t *
-jack_engine_new (int realtime, int rtpriority, int verbose,
+jack_engine_new (int realtime, int rtpriority, int temporary, int verbose,
 		 int client_timeout, pid_t wait_pid, JSList * drivers)
 {
 	jack_engine_t *engine;
@@ -1948,6 +1948,7 @@ jack_engine_new (int realtime, int rtpriority, int verbose,
 	engine->rtpriority = rtpriority;
 	engine->silent_buffer = 0;
 	engine->verbose = verbose;
+	engine->temporary = temporary;
 	engine->freewheeling = 0;
 	engine->wait_pid = wait_pid;
 
@@ -2646,6 +2647,12 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	}
 	
 	jack_client_delete (engine, client);
+
+	/* ignore the driver, which counts as a client. */
+	if (engine->temporary && (jack_slist_length(engine->clients) <= 1)) {
+		exit(0);
+	}
+	
 }
 
 

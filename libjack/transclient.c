@@ -227,7 +227,7 @@ jack_get_current_transport_frame (const jack_client_t *client)
 	
 	usecs = jack_get_microseconds() - position.usecs;
 	elapsed = (jack_nframes_t) floor ((((float) position.frame_rate) / 1000000.0f) * usecs);
-	
+
 	/* return the estimated transport frame position
 	 */
 	
