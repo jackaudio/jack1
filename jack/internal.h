@@ -36,6 +36,13 @@
 #include <jack/transport.h>
 #include <jack/cycles.h>
 
+#ifdef DEBUG_ENABLED
+#define DEBUG(format,args...) \
+	printf ("jack:%5d %s:%s:%d: " format "\n", getpid(), __FILE__, __FUNCTION__, __LINE__ , ## args)
+#else
+#define DEBUG(format,args...)
+#endif
+
 typedef struct _jack_engine  jack_engine_t;
 
 typedef void * dlhandle;
@@ -110,10 +117,10 @@ typedef enum  {
   PortRegistered,
   PortUnregistered,
   XRun,
-} AudioEngineEventType;
+} EventType;
 
 typedef struct {
-    AudioEngineEventType type;
+    EventType type;
     union {
 	unsigned long n;
 	jack_port_id_t port_id;
@@ -226,11 +233,11 @@ typedef enum {
 	DeactivateClient = 7,
 	DisconnectPort = 8,
 	SetClientCapabilities = 9
-} AudioEngineRequestType;
+} RequestType;
 
 typedef struct {
     
-    AudioEngineRequestType type;
+    RequestType type;
     union {
 	struct {
 	    char name[JACK_PORT_NAME_SIZE+1];

@@ -19,6 +19,9 @@
 */
 
 #include <stdlib.h>
+
+#include <config.h>
+
 #include <jack/pool.h>
 
 void *

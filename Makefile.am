@@ -1,20 +1,22 @@
-MAINTAINERCLEANFILES    = Makefile.in aclocal.m4 configure config.h.in \
-                          stamp-h.in config.log config.cache \
-			  				config.guess mkinstalldirs config.status \
-                          missing install-sh config.sub ltconfig \
-                          ltmain.sh acinclude.m4
+MAINTAINERCLEANFILES = Makefile.in aclocal.m4 configure config.h.in \
+                       stamp-h.in config.log config.cache \
+                       config.guess mkinstalldirs config.status \
+                       missing install-sh config.sub ltconfig \
+                       ltmain.sh acinclude.m4
 
 if HAVE_DOXYGEN
-SUBDIRS = jack libjack jackd drivers example-clients doc
+DOC_DIR = doc
 dist-check-doxygen:
 else
-SUBDIRS = jack libjack jackd drivers example-clients
+DOC_DIR =
 dist-check-doxygen:
 	@echo
 	@echo ' ******' You need doxygen installed to make dist.' ******'
 	@echo
 	@false
 endif
+
+SUBDIRS = jack libjack jackd drivers example-clients $(DOC_DIR)
 
 DIST_SUBDIRS = jack libjack jackd drivers example-clients doc
 

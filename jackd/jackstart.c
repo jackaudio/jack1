@@ -32,6 +32,7 @@
 #include <errno.h>
 #include <string.h>
 
+#include <config.h>
 
 #undef _POSIX_SOURCE
 #include <sys/capability.h>

@@ -10,6 +10,11 @@ aclocal $ACLOCAL_FLAGS || {
     exit 1
 }
 
+autoheader || {
+    echo "autoheader failed, exiting..."
+    exit 1
+}
+
 automake --add-missing --foreign || {
     echo "automake --add-missing --foreign failed, exiting..."
     exit 1

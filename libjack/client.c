@@ -33,6 +33,8 @@
 #include <regex.h>
 #include <math.h>
 
+#include <config.h>
+
 #include <jack/jack.h>
 #include <jack/internal.h>
 #include <jack/engine.h>
@@ -244,11 +246,13 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 	char path[PATH_MAX+1];
 
 	if (client->graph_wait_fd >= 0) {
+		DEBUG ("closing graph_wait_fd==%d", client->graph_wait_fd);
 		close (client->graph_wait_fd);
 		client->graph_wait_fd = -1;
 	} 
 
 	if (client->graph_next_fd >= 0) {
+		DEBUG ("closing graph_next_fd==%d", client->graph_next_fd);
 		close (client->graph_next_fd);
 		client->graph_next_fd = -1;
 	}
@@ -260,12 +264,17 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 		return -1;
 	}
 
+
+	DEBUG ("opened new graph_wait_fd %d (%s)", client->graph_wait_fd, path);
+
 	sprintf (path, "%s-%lu", client->fifo_prefix, event->x.n+1);
 	
 	if ((client->graph_next_fd = open (path, O_WRONLY|O_NONBLOCK)) < 0) {
 		jack_error ("cannot open specified fifo [%s] for writing (%s)", path, strerror (errno));
 		return -1;
 	}
+
+	DEBUG ("opened new graph_next_fd %d (%s)", client->graph_next_fd, path);
 
 	/* If the client registered its own callback for graph order events,
 	   execute it now.
@@ -519,6 +528,8 @@ jack_client_thread (void *arg)
 
 	while (err == 0) {
 
+		DEBUG ("client polling on event_fd and graph_wait_fd...");
+                
 		if (poll (client->pollfd, client->pollmax, 1000) < 0) {
 			if (errno == EINTR) {
 				printf ("poll interrupted\n");
@@ -539,6 +550,8 @@ jack_client_thread (void *arg)
 
 		if (client->pollfd[0].revents & POLLIN) {
 
+			DEBUG ("client receives an event, now reading on event fd");
+                
 			/* server has sent us an event. process the event and reply */
 
 			if (read (client->event_fd, &event, sizeof (event)) != sizeof (event)) {
@@ -595,6 +608,8 @@ jack_client_thread (void *arg)
 				break;
 			}
 
+			DEBUG ("client has dealt with the event, writing response on event fd");
+
 			if (write (client->event_fd, &status, sizeof (status)) != sizeof (status)) {
 				jack_error ("cannot send event response to engine (%s)", strerror (errno));
 				err++;
@@ -603,6 +618,7 @@ jack_client_thread (void *arg)
 		}
 
 		if (client->pollfd[1].revents & POLLIN) {
+			DEBUG ("client told to process() (wakeup on graph_wait_fd==%d)", client->pollfd[1].fd);
 
 			control->signalled_at = get_cycles();
 
@@ -620,16 +636,23 @@ jack_client_thread (void *arg)
 
 			/* pass the execution token along */
 
+			DEBUG ("client finished processing, writing on graph_next_fd==%d", client->graph_next_fd);
+
 			if (write (client->graph_next_fd, &c, sizeof (c)) != sizeof (c)) {
 				jack_error ("cannot continue execution of the processing graph (%s)", strerror(errno));
 				err++;
 				break;
 			}
 
+			DEBUG ("client reading on graph_wait_fd==%d", client->graph_wait_fd);
+
 			if ((read (client->graph_wait_fd, &c, sizeof (c)) != sizeof (c))) {
+				DEBUG ("WARNING: READ FAILED!");
+/*
 				jack_error ("cannot complete execution of the processing graph (%s)", strerror(errno));
 				err++;
 				break;
+*/
 			}
 
 		}
@@ -707,7 +730,7 @@ jack_start_thread (jack_client_t *client)
 	   that code fail when running under a non-root user but with the
 	   proper realtime capabilities (in short,  pthread_attr_setschedpolicy 
 	   does not check for capabilities, only for the uid being
-	   zero). Newer versions apparently have this fixed. Thus
+	   zero). Newer versions apparently have this fixed. This
 	   workaround temporarily switches the client thread to the
 	   proper scheduler and priority, then starts the realtime
 	   thread so that it can inherit them and finally switches the
@@ -790,6 +813,10 @@ jack_activate (jack_client_t *client)
 
 {
 	jack_request_t req;
+
+	/* we need to scribble on our stack to ensure that its memory pages are
+	 * actually mapped (more important for mlockall(2) usage in
+	 * jack_start_thread()) */
 
 #define BIG_ENOUGH_STACK 1048576
 
@@ -886,12 +913,12 @@ jack_deactivate (jack_client_t *client)
 	req.x.client_id = client->control->id;
 
 	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send activate client request to server");
+		jack_error ("cannot send deactivate client request to server");
 		return -1;
 	}
 
 	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read activate client result from server (%s)", strerror (errno));
+		jack_error ("cannot read deactivate client result from server (%s)", strerror (errno));
 		return -1;
 	}
 
@@ -1214,15 +1241,21 @@ jack_connect (jack_client_t *client, const char *source_port, const char *destin
 	strncpy (req.x.connect.destination_port, destination_port, sizeof (req.x.connect.destination_port) - 1);
 	req.x.connect.destination_port[sizeof(req.x.connect.destination_port) - 1] = '\0';
 
+	DEBUG ("writing to request_fd");
+
 	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
 		jack_error ("cannot send port connection request to server");
 		return -1;
 	}
 
+	DEBUG ("reading from request_fd");
+
 	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
 		jack_error ("cannot read port connection result from server");
 		return -1;
 	}
+
+	DEBUG ("connected: %d", req.status);
 
 	return req.status;
 }
@@ -1420,6 +1453,7 @@ int
 jack_set_graph_order_callback (jack_client_t *client, JackGraphOrderCallback callback, void *arg)
 {
 	if (client->control->active) {
+		g_warning ("You cannot set callbacks on an active client.");
 		return -1;
 	}
 	client->control->graph_order = callback;
@@ -1432,6 +1466,7 @@ jack_set_process_callback (jack_client_t *client, JackProcessCallback callback, 
 
 {
 	if (client->control->active) {
+		g_warning ("You cannot set callbacks on an active client.");
 		return -1;
 	}
 	client->control->process_arg = arg;
@@ -1444,6 +1479,7 @@ jack_set_buffer_size_callback (jack_client_t *client, JackBufferSizeCallback cal
 
 {
 	if (client->control->active) {
+		g_warning ("You cannot set callbacks on an active client.");
 		return -1;
 	}
 	client->control->bufsize_arg = arg;
@@ -1461,6 +1497,7 @@ jack_set_sample_rate_callback (jack_client_t *client, JackSampleRateCallback cal
 
 {
 	if (client->control->active) {
+		g_warning ("You cannot set callbacks on an active client.");
 		return -1;
 	}
 	client->control->srate_arg = arg;
@@ -1478,6 +1515,7 @@ jack_set_port_registration_callback(jack_client_t *client, JackPortRegistrationC
 
 {
 	if (client->control->active) {
+		g_warning ("You cannot set callbacks on an active client.");
 		return -1;
 	}
 	client->control->port_register_arg = arg;

@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <config.h>
+
 #include <jack/driver.h>
 #include <jack/internal.h>
 #include <jack/error.h>

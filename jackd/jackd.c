@@ -27,6 +27,8 @@
 #include <errno.h>
 #include <wait.h>
 
+#include <config.h>
+
 #include <jack/engine.h>
 #include <jack/internal.h>
 #include <jack/driver.h>

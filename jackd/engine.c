@@ -23,6 +23,7 @@
 #include <sys/socket.h>
 #include <sys/poll.h>
 #include <sys/un.h>
+#include <sys/shm.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -36,6 +37,8 @@
 #include <string.h>
 #include <limits.h>
 #include <sys/mman.h>
+
+#include <config.h>
 
 #include <jack/internal.h>
 #include <jack/engine.h>
@@ -133,11 +136,15 @@ jack_client_is_inprocess (jack_client_internal_t *client)
 	return (client->control->type == ClientDynamic) || (client->control->type == ClientDriver);
 }
 
-static inline void
-jack_lock_graph (jack_engine_t *engine)
-{
-	pthread_mutex_lock (&engine->client_lock);
-}
+#define jack_lock_graph(engine) G_STMT_START{		\
+	DEBUG ("acquiring graph lock");			\
+	pthread_mutex_lock (&engine->client_lock);	\
+}G_STMT_END
+
+#define jack_unlock_graph(engine) G_STMT_START{		\
+	DEBUG ("releasing graph lock");			\
+	pthread_mutex_unlock (&engine->client_lock);	\
+}G_STMT_END
 
 static inline void
 jack_engine_reset_rolling_usecs (jack_engine_t *engine)
@@ -153,12 +160,6 @@ jack_engine_reset_rolling_usecs (jack_engine_t *engine)
 	}
 
 	engine->spare_usecs = 0;
-}
-
-static inline void
-jack_unlock_graph (jack_engine_t *engine)
-{
-	pthread_mutex_unlock (&engine->client_lock);
 }
 
 static int
@@ -419,12 +420,15 @@ jack_set_sample_rate (jack_engine_t *engine, jack_nframes_t nframes)
 int
 jack_engine_process_lock (jack_engine_t *engine)
 {
-	return pthread_mutex_trylock (&engine->client_lock);
+	int ret = pthread_mutex_trylock (&engine->client_lock);
+	if (ret == 0) DEBUG ("success"); else DEBUG ("FAILURE");
+	return ret;
 }
 
 void
 jack_engine_process_unlock (jack_engine_t *engine)
 {
+	DEBUG ("success");
 	pthread_mutex_unlock (&engine->client_lock);
 }
 
@@ -455,6 +459,8 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 
 		client = (jack_client_internal_t *) node->data;
 
+		DEBUG ("considering client %s for processing", client->control->name);
+
 		if (!client->control->active || client->control->dead) {
 			node = g_slist_next (node);
 			continue;
@@ -469,6 +475,8 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 
 			if (ctl->process) {
 
+				DEBUG ("calling process() on an in-process client");
+
 				ctl->state = Running;
 
 				/* XXX how to time out an in-process client? */
@@ -482,6 +490,8 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 				}
 
 			} else {
+				DEBUG ("in-process client has no process() function");
+
 				ctl->state = Finished;
 			}
 
@@ -494,6 +504,8 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 			ctl->state = Triggered; // a race exists if we do this after the write(2) 
 			ctl->signalled_at = 0;
 			ctl->finished_at = 0;
+
+			DEBUG ("calling process() on an OOP subgraph, fd==%d", client->subgraph_start_fd);
 
 			if (write (client->subgraph_start_fd, &c, sizeof (c)) != sizeof (c)) {
 				jack_error ("cannot initiate graph processing (%s)", strerror (errno));
@@ -511,6 +523,8 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 
 				pfd[0].fd = client->subgraph_wait_fd;
 				pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
+
+				DEBUG ("waiting on fd==%d for process() subgraph to finish", client->subgraph_wait_fd);
 
 				if (poll (pfd, 1, poll_timeout) < 0) {
 					jack_error ("poll on subgraph processing failed (%s)", strerror (errno));
@@ -549,6 +563,8 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 				engine->process_errors++;
 				break;
 			} else {
+				DEBUG ("reading byte from subgraph_wait_fd==%d", client->subgraph_wait_fd);
+
 				if (read (client->subgraph_wait_fd, &c, sizeof (c)) != sizeof (c)) {
 					jack_error ("pp: cannot clean up byte from graph wait fd (%s)", strerror (errno));
 					client->error++;
@@ -1116,6 +1132,8 @@ handle_client_request (jack_engine_t *engine, int fd)
 
 	reply_fd = client->request_fd;
 
+	DEBUG ("got a request of type %d", req.type);
+
 	switch (req.type) {
 	case RegisterPort:
 		req.status = jack_port_do_register (engine, &req);
@@ -1165,12 +1183,17 @@ handle_client_request (jack_engine_t *engine, int fd)
 		break;
 	}
 
+	DEBUG ("status of request: %d", req.status);
+
 	if (reply_fd >= 0) {
+		DEBUG ("replying to client");
 		if (write (reply_fd, &req, sizeof (req)) < sizeof (req)) {
 			jack_error ("cannot write request result to client");
 			return -1;
 		}
-	}
+	} else {
+		DEBUG ("*not* replying to client");
+        }
 
 	return 0;
 }
@@ -1449,6 +1472,7 @@ jack_become_real_time (pthread_t thread, int priority)
 	return 0;
 }
 
+#ifdef HAVE_ON_EXIT
 static void
 cancel_cleanup (int status, void *arg)
 
@@ -1457,6 +1481,22 @@ cancel_cleanup (int status, void *arg)
 	engine->driver->stop (engine->driver);
 	engine->driver->finish (engine->driver);
 }
+#else
+#ifdef HAVE_ATEXIT
+jack_engine_t *global_engine;
+
+static void
+cancel_cleanup (void)
+
+{
+	jack_engine_t *engine = global_engine;
+	engine->driver->stop (engine->driver);
+	engine->driver->finish (engine->driver);
+}
+#else
+#error "Don't know how to make an exit handler"
+#endif /* HAVE_ATEXIT */
+#endif /* HAVE_ON_EXIT */
 
 static void *
 watchdog_thread (void *arg)
@@ -1549,7 +1589,16 @@ jack_main_thread (void *arg)
 	}
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+#ifdef HAVE_ON_EXIT
 	on_exit (cancel_cleanup, engine);
+#else
+#ifdef HAVE_ATEXIT
+	global_engine = engine;
+	atexit (cancel_cleanup);
+#else
+#error "Don't know how to install an exit handler"
+#endif /* HAVE_ATEXIT */
+#endif /* HAVE_ON_EXIT */
 
 	if (driver->start (driver)) {
 		jack_error ("cannot start driver");
@@ -1605,6 +1654,8 @@ jack_main_thread (void *arg)
 			jack_error ("driver wait function failed, exiting");
 			pthread_exit (0);
 		}
+
+		/* this will execute the entire jack graph */
 
 		switch (driver->process (driver, nframes)) {
 		case -1:
@@ -1931,6 +1982,8 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 
 	/* caller must hold the client_lock */
 
+	DEBUG ("delivering event (type %d)", event->type);
+
 	if (client->control->dead) {
 		return 0;
 	}
@@ -1974,11 +2027,15 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 
 	} else {
 
+		DEBUG ("engine writing on event fd");
+
 		if (write (client->event_fd, event, sizeof (*event)) != sizeof (*event)) {
 			jack_error ("cannot send event to client [%s] (%s)", client->control->name, strerror (errno));
 			client->error++;
 		}
-		
+
+		DEBUG ("engine reading from event fd");
+
 		if (!client->error && (read (client->event_fd, &status, sizeof (status)) != sizeof (status))) {
 			jack_error ("cannot read event response from client [%s] (%s)", client->control->name, strerror (errno));
 			client->error++;
@@ -1989,6 +2046,8 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client, jack_
 			client->error++;
 		}
 	}
+
+	DEBUG ("event delivered");
 
 	return 0;
 }
@@ -2097,6 +2156,7 @@ jack_rechain_graph (jack_engine_t *engine)
 				event.x.n = client->execution_order;
 				
 				jack_deliver_event (engine, client, &event);
+                                
 				n++;
 			}
 		}
@@ -2502,6 +2562,8 @@ jack_port_do_connect (jack_engine_t *engine,
 		
 		jack_sort_graph (engine);
 
+		DEBUG ("actually sorted the graph...");
+
 		jack_send_connection_notification (engine, srcport->shared->client_id, src_id, dst_id, TRUE);
 		jack_send_connection_notification (engine, dstport->shared->client_id, dst_id, src_id, TRUE);
 	}
@@ -2627,6 +2689,8 @@ jack_get_fifo_fd (jack_engine_t *engine, int which_fifo)
 
 	sprintf (path, "%s-%d", engine->fifo_prefix, which_fifo);
 
+	DEBUG ("%s", path);
+
 	if (stat (path, &statbuf)) {
 		if (errno == ENOENT) {
 			if (mknod (path, 0666|S_IFIFO, 0) < 0) {
@@ -2659,6 +2723,7 @@ jack_get_fifo_fd (jack_engine_t *engine, int which_fifo)
 			jack_error ("cannot open fifo [%s] (%s)", path, strerror (errno));
 			return -1;
 		}
+		DEBUG ("opened engine->fifo[%d] == %d (%s)", which_fifo, engine->fifo[which_fifo], path);
 	}
 
 	return engine->fifo[which_fifo];
