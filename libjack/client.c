@@ -71,7 +71,6 @@ jack_set_server_dir (const char *path)
 	jack_server_dir = strdup (path);
 }
 
-
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
 void *jack_zero_filled_buffer = NULL;
@@ -84,7 +83,6 @@ typedef struct {
     struct _jack_client *client;
     const char *client_name;
 } client_info;
-
 
 void 
 jack_error (const char *fmt, ...)

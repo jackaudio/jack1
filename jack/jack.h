@@ -576,11 +576,6 @@ jack_port_t *jack_port_by_id (const jack_client_t *client, jack_port_id_t id);
 int  jack_engine_takeover_timebase (jack_client_t *);
 
 /**
- * undocumented
- */
-void jack_update_time (jack_client_t *, jack_nframes_t);
-
-/**
  * This estimates the time that has passed since the JACK server
  * started calling the process callbacks of all its clients.
  */
