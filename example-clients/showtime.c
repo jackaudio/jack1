@@ -7,26 +7,70 @@
 #include <jack/jack.h>
 #include <jack/transport.h>
 
+typedef struct {
+    volatile jack_nframes_t guard1;
+    volatile jack_transport_info_t info;
+    volatile jack_nframes_t guard2;
+} guarded_transport_info_t;
+
+guarded_transport_info_t now;
 jack_client_t *client;
-jack_transport_info_t now;
+
 
 void
 showtime ()
 {
-	jack_transport_info_t current = now;
-	printf ("frame: %lu state: %d loop: %lu-%lu "
-		"BBT: %d|%d|%d\n",
-		current.frame, current.transport_state, current.loop_start, current.loop_end,
-		current.bar,
-		current.beat,
-		current.tick);
+	guarded_transport_info_t current;
+	int tries = 0;
+
+	/* Since "now" is updated from the process() thread every
+	 * buffer period, we must copy it carefully to avoid getting
+	 * an incoherent hash of multiple versions. */
+	do {
+		/* Throttle the busy wait if we don't get the a clean
+		 * copy very quickly. */
+		if (tries > 10) {
+			usleep (20);
+			tries = 0;
+		}
+		current = now;
+		tries++;
+
+	} while (current.guard1 != current.guard2);
+
+	if (current.info.valid & JackTransportPosition)
+		printf ("frame: %lu ", current.info.frame);
+	else
+		printf ("frame: [-] ");
+
+	if (current.info.valid & JackTransportState)
+		printf ("state: %d ", current.info.transport_state);
+	else
+		printf ("state: [-] ");
+
+	if (current.info.valid & JackTransportLoop)
+		printf ("loop: %lu-%lu ", current.info.loop_start,
+			current.info.loop_end);
+	else
+		printf ("loop: [-] ");
+
+	if (current.info.valid & JackTransportBBT)
+		printf ("BBT: %d|%d|%d\n", current.info.bar,
+			current.info.beat, current.info.tick);
+	else
+		printf ("BBT: [-]\n");
 }
 
 int
 process (jack_nframes_t nframes, void *arg)
 {
-	now.valid = JackTransportState|JackTransportPosition|JackTransportLoop;
-	jack_get_transport_info (client, &now);
+	/* The guard flags contain a running counter of sufficiently
+	 * high resolution, that showtime() can detect whether the
+	 * last update is complete. */
+	now.guard1 = jack_frame_time(client);
+	jack_get_transport_info (client, &now.info);
+	now.guard2 = now.guard1;
+
 	return 0;      
 }
 
@@ -39,8 +83,8 @@ jack_shutdown (void *arg)
 void
 signal_handler (int sig)
 {
-	fprintf (stderr, "signal received, exiting ...\n");
 	jack_client_close (client);
+	fprintf (stderr, "signal received, exiting ...\n");
 	exit (0);
 }
 

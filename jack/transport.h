@@ -95,8 +95,8 @@ typedef struct {
  * a bitmask of all transport info fields that are set
  * in tinfo.
  *
- * @pre Caller must be the current timebase master.
- *
+ * @pre Caller must be the current timebase master.  Must be called
+ * from the process() thread.
  */
 void jack_set_transport_info (jack_client_t *client,
 			      jack_transport_info_t *tinfo);
@@ -108,6 +108,7 @@ void jack_set_transport_info (jack_client_t *client,
  * a bitmask of all transport info fields that are legal to
  * use.
  *
+ * @pre Must be called from the process() thread.
  */
 void jack_get_transport_info (jack_client_t *client,
 			      jack_transport_info_t *tinfo);
