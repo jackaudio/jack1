@@ -13,6 +13,7 @@ TO BE DECIDED (owner)
 
 - dropping the use of CAP_RESOURCE (nando)
 - support for on-the-fly sampling rate change
+- whether to default to triangular dithering the at 16bit. (swh)
 
 TODO for 1.0 (owner)
 
@@ -42,7 +43,6 @@ TO THINK ABOUT
 CLOSED (date,who,comment)
 
 - added code to enforce the 'bufsize==2^x' rule (taybin) (2003/8/28)
-- whether to default to triangular dithering the at 16bit.  This was decided to leave off. (taybin) (2003/8/28)
 - make sure that process callbacks always have nframes equal to buffersize (2003/08/27,done,kaiv)
 - add Paul's graph/subgraph explanation to the design doc (2003/08/27,done,kaiv)
 - add support for custom jackd --tmpdir in libjack (2003/05/06,done,jesse)

@@ -402,6 +402,11 @@ main (int argc, char *argv[])
 
 	if (show_version) {
 		printf ( "jackd version " VERSION "\n");
+#ifdef DEFAULT_TMP_DIR
+		printf ( "default tmp directory: " DEFAULT_TMP_DIR "\n");
+#else
+		printf ( "default tmp directory: /tmp\n");
+#endif
 		return -1;
 	}
 

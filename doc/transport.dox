@@ -170,6 +170,7 @@ sync_callbacks until ready.
 
 
 @image html	fsm.png "Transport State Transition Diagram"
+@image latex    fsm.eps "Transport State Transition Diagram"
 
 
 @subsection transportclients Transport Clients
