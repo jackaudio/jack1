@@ -1076,7 +1076,7 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 					
 					port = (jack_port_t *) node->data;
 					
-					if (!jack_port_connected (port)) {
+					if (!jack_port_connected (driver->client, port)) {
 						continue;
 					}
 
@@ -1106,7 +1106,7 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 
 					jack_port_t *port = (jack_port_t *) node->data;
 					
-					if (!jack_port_connected (port)) {
+					if (!jack_port_connected (driver->client, port)) {
 						continue;
 					}
 

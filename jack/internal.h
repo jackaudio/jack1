@@ -240,7 +240,9 @@ typedef enum {
 	ActivateClient = 6,
 	DeactivateClient = 7,
 	DisconnectPort = 8,
-	SetClientCapabilities = 9
+	SetClientCapabilities = 9,
+	GetPortConnections = 10,
+	GetPortNConnections = 11
 } RequestType;
 
 typedef struct {
@@ -261,6 +263,7 @@ typedef struct {
 	} connect;
 	jack_client_id_t client_id;
 	jack_nframes_t nframes;
+	unsigned int nports;
     } x;
     int status;
 }  jack_request_t;

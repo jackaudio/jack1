@@ -134,13 +134,6 @@ jack_client_alloc ()
 jack_port_t *
 jack_port_by_id (jack_client_t *client, jack_port_id_t id)
 {
-/*	
-        if (id >= client->engine->port_max)
-                return NULL;
-
-        if (client->engine->ports[id].in_use)
-                return jack_port_new (client, id, client->engine);
-*/
 	JSList *node;
 
 	for (node = client->ports; node; node = jack_slist_next (node)) {
@@ -148,6 +141,12 @@ jack_port_by_id (jack_client_t *client, jack_port_id_t id)
 			return (jack_port_t *) node->data;
 		}
 	}
+
+	if (id >= client->engine->port_max)
+		return NULL;
+
+	if (client->engine->ports[id].in_use)
+		return jack_port_new (client, id, client->engine);
 
 	return NULL;
 }
@@ -1860,79 +1859,136 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 }
 
 const char **
-jack_port_get_connections (const jack_port_t *port)
+jack_port_get_connections (const jack_client_t *client, const jack_port_t *port)
 {
 	const char **ret;
-	JSList *node;
-	unsigned int n;
+	jack_request_t req;
+	int i;
 
-	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
+	req.type = GetPortConnections;
 
-	if (port->connections == NULL) {
-		pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
-		return NULL;
+	req.x.port_info.name[0] = '\0';
+	req.x.port_info.type[0] = '\0';
+	req.x.port_info.flags = 0;
+	req.x.port_info.buffer_size = 0;
+	req.x.port_info.client_id = 0;
+	req.x.port_info.port_id = port->shared->id;
+
+	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot send port connections request to server");
+		return 0;
 	}
 
-	ret = (const char **) malloc (sizeof (char *) * (jack_slist_length (port->connections) + 1));
-
-	for (n = 0, node = port->connections; node; node = jack_slist_next (node), n++) {
-		ret[n] = ((jack_port_t *) node->data)->shared->name;
+	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot read port connections result from server");
+		return 0;
 	}
-
-	ret[n] = NULL;
-
-	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
 	
+	ret = (const char **) malloc (sizeof (char *) * (req.x.nports + 1));
+
+	for ( i=0; i<req.x.nports; i++ ) {
+		jack_port_id_t port_id;
+		
+		if (read (client->request_fd, &port_id, sizeof (port_id)) != sizeof (port_id)) {
+			jack_error ("cannot read port id from server");
+			return 0;
+		}
+		
+		ret[i] = jack_port_by_id (client, port_id)->shared->name;
+	}
+
+	ret[i] = NULL;
+
 	return ret;
 }
 
 int
-jack_port_connected (const jack_port_t *port)
+jack_port_connected (const jack_client_t *client, const jack_port_t *port)
 {
-	return port->connections != NULL;
+	jack_request_t req;
+
+	if( port->shared->client_id == client->control->id )
+	{
+		return port->connections != NULL;
+	}
+
+	req.type = GetPortNConnections;
+
+	req.x.nports = 0;
+	req.x.port_info.name[0] = '\0';
+	req.x.port_info.type[0] = '\0';
+	req.x.port_info.flags = 0;
+	req.x.port_info.buffer_size = 0;
+	req.x.port_info.client_id = 0;
+	req.x.port_info.port_id = port->shared->id;
+
+	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot send port connections request to server");
+		return 0;
+	}
+
+	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot read port connections result from server");
+		return 0;
+	}
+	
+	return req.x.nports > 0;
 }
 
 int
-jack_port_connected_to (const jack_port_t *port, const char *portname)
+jack_port_connected_to (const jack_client_t *client,
+						const jack_port_t *port,
+						const char *portname)
 {
-	JSList *node;
 	int ret = FALSE;
 
-	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
+	jack_request_t req;
+	int i;
 
-	for (node = port->connections; node; node = jack_slist_next (node)) {
-		jack_port_t *other_port = (jack_port_t *) node->data;
-		
-		if (strcmp (other_port->shared->name, portname) == 0) {
-			ret = TRUE;
-			break;
-		}
+	req.type = GetPortConnections;
+
+	req.x.port_info.name[0] = '\0';
+	req.x.port_info.type[0] = '\0';
+	req.x.port_info.flags = 0;
+	req.x.port_info.buffer_size = 0;
+	req.x.port_info.client_id = 0;
+	req.x.port_info.port_id = port->shared->id;
+
+	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot send port connections request to server");
+		return 0;
 	}
 
-	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
+	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
+		jack_error ("cannot read port connections result from server");
+		return 0;
+	}
+	
+	for ( i=0; i<req.x.nports; i++ ) {
+		jack_port_id_t port_id;
+		
+		if (read (client->request_fd, &port_id, sizeof (port_id)) != sizeof (port_id)) {
+			jack_error ("cannot read port id from server");
+			return 0;
+		}
+		
+		if( strcmp( jack_port_by_id (client, port_id)->shared->name, portname ) == 0 )
+		{
+			ret = TRUE;
+			// don't break here because we must read all the data from
+			// the pipe or bad things will happen
+		}
+	}
+	
 	return ret;
 }
 
 int
-jack_port_connected_to_port (const jack_port_t *port, const jack_port_t *other_port)
+jack_port_connected_to_port (const jack_client_t *client,
+							 const jack_port_t *port,
+							 const jack_port_t *other_port)
 {
-	JSList *node;
-	int ret = FALSE;
-	
-	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
-	
-	for (node = port->connections; node; node = jack_slist_next (node)) {
-
-		jack_port_t *this_port = (jack_port_t *) node->data;
-		
-		if (other_port->shared == this_port->shared) {
-			ret = TRUE;
-			break;
-		}
-	}
-
-	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
-	return ret;
+	return jack_port_connected_to (client, port, other_port->shared->name);
 }
 
 /* TRANSPORT CONTROL */

@@ -176,19 +176,19 @@ int          jack_port_is_mine (const jack_client_t *, const jack_port_t *port);
  * This returns TRUE or FALSE to indicate if there are
  * any connections to/from the port argument.
  */
-int jack_port_connected (const jack_port_t *port);
+int jack_port_connected (const jack_client_t *client, const jack_port_t *port);
 
 /**
  * This returns TRUE or FALSE if the port argument is
  * DIRECTLY connected to the port with the name given in 'portname' 
  */
-int jack_port_connected_to (const jack_port_t *port, const char *portname);
+int jack_port_connected_to (const jack_client_t *client, const jack_port_t *port, const char *portname);
 
 /**
  * This returns TRUE or FALSE if the two ports are
  * directly connected to each other.
  */
-int jack_port_connected_to_port (const jack_port_t *port, const jack_port_t *other_port);
+int jack_port_connected_to_port (const jack_client_t *client, const jack_port_t *port, const jack_port_t *other_port);
 
 /**
  * This returns a null-terminated array of port names to which 
@@ -198,7 +198,7 @@ int jack_port_connected_to_port (const jack_port_t *port, const jack_port_t *oth
  * The caller is responsible for calling free(3) on any
  * non-NULL returned value.
  */   
-const char ** jack_port_get_connections (const jack_port_t *port);
+const char ** jack_port_get_connections (const jack_client_t *client, const jack_port_t *port);
 
 /**
  * This modifies a port's name, and may be called at any time.

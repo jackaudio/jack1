@@ -38,6 +38,9 @@
 #include <limits.h>
 #include <sys/mman.h>
 
+//REMOVE ME XXX - swh
+#include <glib.h>
+
 #include <config.h>
 
 #include <jack/internal.h>
@@ -107,6 +110,7 @@ static int  jack_port_do_disconnect_all (jack_engine_t *engine, jack_port_id_t);
 
 static int  jack_port_do_unregister (jack_engine_t *engine, jack_request_t *);
 static int  jack_port_do_register (jack_engine_t *engine, jack_request_t *);
+static int  jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int reply_fd);
 static void jack_port_release (jack_engine_t *engine, jack_port_internal_t *);
 static void jack_port_clear_connections (jack_engine_t *engine, jack_port_internal_t *port);
 static int  jack_port_disconnect_internal (jack_engine_t *engine, jack_port_internal_t *src, 
@@ -1112,14 +1116,20 @@ handle_client_request (jack_engine_t *engine, int fd)
 	JSList *node;
 	int might_reorder = FALSE;
 
+	DEBUG ("HIT: before lock");
+	
 	jack_lock_graph (engine);
+
+	DEBUG ("HIT: before for");
 	
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		if (((jack_client_internal_t *) node->data)->request_fd == fd) {
+			DEBUG ("HIT: in for");
 			client = (jack_client_internal_t *) node->data;
 			break;
 		}
 	}
+	DEBUG ("HIT: after for");
 
 	jack_unlock_graph (engine);
 
@@ -1180,6 +1190,14 @@ handle_client_request (jack_engine_t *engine, int fd)
 		req.status = jack_set_client_capabilities (engine, req.x.client_id);
 		break;
 #endif
+		
+	case GetPortConnections:
+	case GetPortNConnections:
+		req.status = jack_do_get_port_connections (engine, &req, reply_fd);
+		if( req.status >= 0 )
+			reply_fd = -1;
+		break;
+
 	default:
 		/* some requests are handled entirely on the client side,
 		   by adjusting the shared memory area(s)
@@ -1224,6 +1242,7 @@ jack_server_thread (void *arg)
 	engine->pfd_max = 2;
 
 	while (!done) {
+		DEBUG ("start while");
 
 		/* XXX race here with new external clients
 		   causing engine->pfd to be reallocated.
@@ -1251,6 +1270,7 @@ jack_server_thread (void *arg)
 		}
 
 		if (pfd[0].revents & POLLIN) {
+			DEBUG ("pfd[0].revents & POLLIN");
 
 			memset (&client_addr, 0, sizeof (client_addr));
 			client_addrlen = sizeof (client_addr);
@@ -1271,6 +1291,7 @@ jack_server_thread (void *arg)
 		}
 
 		if (pfd[1].revents & POLLIN) {
+			DEBUG ("pfd[1].revents & POLLIN");
 
 			memset (&client_addr, 0, sizeof (client_addr));
 			client_addrlen = sizeof (client_addr);
@@ -2940,6 +2961,46 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 	jack_port_registration_notify (engine, req->x.port_info.port_id, FALSE);
 	jack_unlock_graph (engine);
 
+	return 0;
+}
+
+int
+jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req, int reply_fd)
+	
+{
+	jack_port_internal_t *port = &engine->internal_ports[req->x.port_info.port_id];
+	GSList *node;
+
+	DEBUG ("Getting connections for port '%s'.", port->shared->name);
+	
+	req->x.nports = g_slist_length (port->connections);
+
+	if (write (reply_fd, req, sizeof (*req)) < sizeof (req)) {
+		jack_error ("cannot write GetPortConnections result to client");
+		return -1;
+	}
+
+	if (req->type == GetPortConnections)
+	{
+		for (node = port->connections; node; node = g_slist_next (node) ) {
+			jack_port_id_t port_id;
+			
+			if (((jack_connection_internal_t *) node->data)->source == port)
+			{
+				port_id = ((jack_connection_internal_t *) node->data)->destination->shared->id;
+			}
+			else
+			{
+				port_id = ((jack_connection_internal_t *) node->data)->source->shared->id;
+			}
+			
+			if (write (reply_fd, &port_id, sizeof (port_id)) < sizeof (port_id)) {
+				jack_error ("cannot write port id to client");
+				return -1;
+			}
+		}
+	}
+	
 	return 0;
 }
 
