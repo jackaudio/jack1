@@ -87,7 +87,7 @@ jack_ringbuffer_reset (jack_ringbuffer_t * rb)
    pointer.  */
 
 size_t
-jack_ringbuffer_read_space (jack_ringbuffer_t * rb)
+jack_ringbuffer_read_space (const jack_ringbuffer_t * rb)
 {
   size_t w, r;
 
@@ -106,7 +106,7 @@ jack_ringbuffer_read_space (jack_ringbuffer_t * rb)
    pointer.  */
 
 size_t
-jack_ringbuffer_write_space (jack_ringbuffer_t * rb)
+jack_ringbuffer_write_space (const jack_ringbuffer_t * rb)
 {
   size_t w, r;
 
@@ -166,7 +166,7 @@ jack_ringbuffer_read (jack_ringbuffer_t * rb, char *dest, size_t cnt)
    `src'.  Returns the actual number of bytes copied. */
 
 size_t
-jack_ringbuffer_write (jack_ringbuffer_t * rb, char *src, size_t cnt)
+jack_ringbuffer_write (jack_ringbuffer_t * rb, const char *src, size_t cnt)
 {
   size_t free_cnt;
   size_t cnt2;
@@ -226,8 +226,8 @@ jack_ringbuffer_write_advance (jack_ringbuffer_t * rb, size_t cnt)
    length.  */
 
 void
-jack_ringbuffer_get_read_vector (jack_ringbuffer_t * rb,
-			    jack_ringbuffer_data_t * vec)
+jack_ringbuffer_get_read_vector (const jack_ringbuffer_t * rb,
+				 jack_ringbuffer_data_t * vec)
 {
   size_t free_cnt;
   size_t cnt2;
@@ -270,7 +270,7 @@ jack_ringbuffer_get_read_vector (jack_ringbuffer_t * rb,
    length.  */
 
 void
-jack_ringbuffer_get_write_vector (jack_ringbuffer_t * rb,
+jack_ringbuffer_get_write_vector (const jack_ringbuffer_t * rb,
 				  jack_ringbuffer_data_t * vec)
 {
   size_t free_cnt;
