@@ -56,7 +56,7 @@
     time out solve the problem but does not seems really satisfactory.
 */
 
-#define WAIT 25 /* in millisecond */
+#define WAIT 2500 /* in millisecond */
 
 static inline int 
 jack_client_resume(jack_client_internal_t *client)
