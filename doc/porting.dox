@@ -49,7 +49,7 @@ directories were adapted from the @c libstdc++-v3 component of the GNU
 Compiler Collective, <http://gcc.gnu.org>.
 
 
-@section portopsys Operating System Dependencies
+@section portlang C Language Dependencies
 
 JACK is written to conform with C99, as defined in International
 Standard ISO/IEC 9899:1999.  Because many existing compilers do not
@@ -58,13 +58,22 @@ portablility reasons.  For example, variables should not be declared
 in the middle of a compound statement, because many compilers still
 cannot handle that language extension.
 
-Some needed POSIX features may be missing on certain platforms.  If
-so, the preferred solution is to provide a substitute, like the @c
-fakepoll.c implementation for Mac OS X.
+
+@section portopsys Operating System Dependencies
+
+JACK is written for a POSIX environment compliant with IEEE Std
+1003.1-2001, ISO/IEC 9945:2003, including the POSIX Threads Extension
+(1003.1c-1995) and the Realtime and Realtime Threads feature groups.
+When some needed POSIX feature is missing on a platform, the preferred
+solution is to provide a substitute, as with the @c fakepoll.c
+implementation for Mac OS X.
 
 Whenever possible, OS dependencies should be auto-detected by @c
 configure.  Sometimes they can be isolated in OS-specific header
-files.  If conditional compilation must be used in mainline
+files, found in subdirectories of @c config/os and referenced with a
+@c <sysdeps/xxx.h> name.
+
+If conditional compilation must be used in mainline
 platform-independent code, avoid using the system name.  Instead, @c
 #define a descriptive name in @c <config.h>, and test it like this:
 
@@ -76,8 +85,8 @@ platform-independent code, avoid using the system name.  Instead, @c
 @endcode
 
 Be sure to place any generic implementation alternative in the @c
-#else or use an @c #ifndef, so other OS ports are not required to know
-your platform's conditional labels.
+#else or use an @c #ifndef, so no other code needs to know your
+conditional labels.
 
 @section portcpu Processor Dependencies
 
