@@ -450,7 +450,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 		}
 
 		ctl = client->control;
-		ctl->timed_out;
+		ctl->timed_out = 0;
 
 		if (jack_client_is_inprocess (client)) {
 
@@ -500,7 +500,7 @@ jack_process (jack_engine_t *engine, nframes_t nframes)
 				pfd[0].fd = client->subgraph_wait_fd;
 				pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
 				
-				if (poll (pfd, 1, engine->driver->period_usecs) < 0) {
+				if (poll (pfd, 1, engine->driver->period_usecs/1000) < 0) {
 					jack_error ("poll on subgraph processing failed (%s)", strerror (errno));
 					status = -1; 
 				}
