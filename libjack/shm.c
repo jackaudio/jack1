@@ -253,6 +253,7 @@ jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
 	registry->allocator = getpid();
 	
 	si->index = registry->index;
+	si->attached_at = MAP_FAILED;	/* segment not attached */
 	
 	return 0;
 }
@@ -428,6 +429,7 @@ jack_shmalloc (const char* name_not_used, jack_shmsize_t size, jack_shm_info_t* 
 	registry->allocator = getpid();
 
 	si->index = registry->index;
+	si->attached_at = MAP_FAILED;	/* segment not attached */
 
 	return 0;
 }
