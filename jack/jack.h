@@ -25,6 +25,8 @@
 extern "C" {
 #endif
 
+#include <pthread.h>
+
 #include <jack/types.h>
 #include <jack/error.h>
 #include <jack/transport.h>
