@@ -500,8 +500,6 @@ jack_client_thread (void *arg)
 			break;
 		}
 
-		rdtscll (client->control->when_started);
-
 		if (client->pollfd[0].revents & ~POLLIN) {
 			jack_error ("engine has shut down socket; thread exiting");
 			if (client->on_shutdown) {
@@ -596,8 +594,6 @@ jack_client_thread (void *arg)
 			   the best we can do without a lot of mostly wasted
 			   effort.
 			*/
-
-			rdtscll (control->when_done);
 
 			write (client->graph_next_fd, &c, 1);
 		}
