@@ -34,9 +34,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#ifdef USE_MLOCK
 #include <sys/mman.h>
-#endif /* USE_MLOCK */
 
 #include <jack/internal.h>
 #include <jack/jack.h>

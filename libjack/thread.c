@@ -58,11 +58,13 @@ jack_create_thread (pthread_t* thread,
 		    void*(*start_routine)(void*),
 		    void* arg)
 {
+#ifndef JACK_USE_MACH_THREADS
 	pthread_attr_t attr;
 	int policy;
 	struct sched_param param;
 	int actual_policy;
 	struct sched_param actual_param;
+#endif /* JACK_USE_MACH_THREADS */
 	int result = 0;
 
 	if (!realtime) {
@@ -192,7 +194,7 @@ jack_create_thread (pthread_t* thread,
 	/* time constraint thread */
 	setThreadToPriority (*thread, 96, TRUE, 10000000);
 	
-#endif
+#endif /* JACK_USE_MACH_THREADS */
 
 	return 0;
 }
@@ -214,7 +216,7 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 	return 0;
 }
 
-#else
+#else /* !JACK_USE_MACH_THREADS */
 
 int
 jack_drop_real_time_scheduling (pthread_t thread)
@@ -251,4 +253,4 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
         return 0;
 }
 
-#endif
+#endif /* JACK_USE_MACH_THREADS */
