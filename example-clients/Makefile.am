@@ -27,7 +27,6 @@ endif
 bin_PROGRAMS = jack_simple_client \
 	       jack_monitor_client \
 	       jack_impulse_grabber \
-	       jack_cache_killer \
 	       jack_connect \
 	       jack_disconnect \
 	       jack_metro \
@@ -53,10 +52,6 @@ jack_disconnect_LDADD = ../libjack/libjack.la
 jack_monitor_client_SOURCES = monitor_client.c
 jack_monitor_client_LDFLAGS = -ldl -lpthread
 jack_monitor_client_LDADD = ../libjack/libjack.la
-
-jack_cache_killer_SOURCES = cache_killer.c
-jack_cache_killer_LDFLAGS = -ldl -lpthread
-jack_cache_killer_LDADD = ../libjack/libjack.la
 
 jack_metro_SOURCES = metro.c
 jack_metro_LDFLAGS = -ldl -lpthread

@@ -78,6 +78,7 @@ main (int argc, char *argv[])
 
 {
 	jack_client_t *client;
+	const char **ports;
 	float fs;		// The sample rate
 	float peak;
 	unsigned long peak_sample;
@@ -168,13 +169,27 @@ main (int argc, char *argv[])
 	   the client is activated (this may change in the future).
 	*/
 
-	if (jack_connect (client, "alsa_pcm:capture_1", jack_port_name (input_port))) {
+	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsOutput)) == NULL) {
+		fprintf(stderr, "Cannot find any physical capture ports");
+		exit(1);
+	}
+
+	if (jack_connect (client, ports[0], jack_port_name (input_port))) {
 		fprintf (stderr, "cannot connect input ports\n");
 	}
+
+	free (ports);
 	
-	if (jack_connect (client, jack_port_name (output_port), "alsa_pcm:playback_1")) {
+	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsInput)) == NULL) {
+		fprintf(stderr, "Cannot find any physical playback ports");
+		exit(1);
+	}
+
+	if (jack_connect (client, jack_port_name (output_port), ports[0])) {
 		fprintf (stderr, "cannot connect output ports\n");
 	}
+
+	free (ports);
 
 	/* Wait for grab to finish */
 	while (!grab_finished) {

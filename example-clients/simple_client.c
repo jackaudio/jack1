@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include <jack/jack.h>
 
@@ -43,9 +44,9 @@ jack_shutdown (void *arg)
 
 int
 main (int argc, char *argv[])
-
 {
 	jack_client_t *client;
+	const char **ports;
 
 	if (argc < 2) {
 		fprintf (stderr, "usage: jack_simple_client <name>\n");
@@ -111,13 +112,28 @@ main (int argc, char *argv[])
 	   running.
 	*/
 
-	if (jack_connect (client, "alsa_pcm:capture_1", jack_port_name (input_port))) {
+
+	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsOutput)) == NULL) {
+		fprintf(stderr, "Cannot find any physical capture ports");
+		exit(1);
+	}
+
+	if (jack_connect (client, ports[0], jack_port_name (input_port))) {
 		fprintf (stderr, "cannot connect input ports\n");
 	}
+
+	free (ports);
 	
-	if (jack_connect (client, jack_port_name (output_port), "alsa_pcm:playback_1")) {
+	if ((ports = jack_get_ports (client, NULL, NULL, JackPortIsPhysical|JackPortIsInput)) == NULL) {
+		fprintf(stderr, "Cannot find any physical playback ports");
+		exit(1);
+	}
+
+	if (jack_connect (client, jack_port_name (output_port), ports[0])) {
 		fprintf (stderr, "cannot connect output ports\n");
 	}
+
+	free (ports);
 
 	/* Since this is just a toy, run for a few seconds, then finish */
 

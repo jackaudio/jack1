@@ -13,8 +13,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=40
-JACK_MICRO_VERSION=1
+JACK_MINOR_VERSION=41
+JACK_MICRO_VERSION=0
 
 dnl ---
 dnl HOWTO: updating the libjack interface version
@@ -25,9 +25,13 @@ dnl age = current libjack is both source and binary compatible with
 dnl       libjack interfaces current,current-1,...,current-age
 dnl
 dnl Note! see libtool documentation for detailed documentation
+dnl
+dnl Note Also! until we reach CURRENT>=1, the rules are somewhat
+dnl slacker than this, and closer to those for the JACK version
+dnl number.
 dnl ---
 JACK_API_CURRENT=0
-JACK_API_REVISION=5
+JACK_API_REVISION=6
 JACK_API_AGE=0
 
 AC_SUBST(JACK_MAJOR_VERSION)

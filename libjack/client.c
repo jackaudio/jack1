@@ -85,6 +85,7 @@ struct _jack_client {
     char thread_ok : 1;
     char first_active : 1;
     float cpu_mhz;
+    pthread_t thread_id;
 };
 
 #define event_fd pollfd[0].fd
@@ -522,8 +523,15 @@ jack_client_thread (void *arg)
 
 	pthread_mutex_lock (&client_lock);
 	client->thread_ok = TRUE;
+	client->thread_id = pthread_self();
 	pthread_cond_signal (&client_ready);
 	pthread_mutex_unlock (&client_lock);
+
+	/* XXX reset the PID to be the actual client thread. Kai and Fernando know
+	   about this and it needs fixing.
+	*/
+
+	client->control->pid = getpid()
 
 	DEBUG ("client thread is now running");
 
@@ -852,13 +860,13 @@ jack_start_thread (jack_client_t *client)
 
 int 
 jack_activate (jack_client_t *client)
-
 {
 	jack_request_t req;
 
 	/* we need to scribble on our stack to ensure that its memory pages are
 	 * actually mapped (more important for mlockall(2) usage in
-	 * jack_start_thread()) */
+	 * jack_start_thread()) 
+	 */
 
 #define BIG_ENOUGH_STACK 1048576
 
@@ -871,9 +879,10 @@ jack_activate (jack_client_t *client)
 
 #undef BIG_ENOUGH_STACK
 
-#ifdef USE_CAPABILITIES
 	/* get the pid of the client process to pass it to engine */
 	client->control->pid = getpid ();
+
+#ifdef USE_CAPABILITIES
 
 	if (client->engine->has_capabilities != 0 &&
 	    client->control->pid != 0 && client->engine->real_time != 0) {
@@ -2148,3 +2157,8 @@ jack_remove_alias (jack_client_t *client, const char *alias)
 	return req.status;
 }
 
+pthread_t
+jack_client_thread_id (jack_client_t *client)
+{
+	return client->thread_id;
+}

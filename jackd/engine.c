@@ -459,7 +459,7 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 	for (node = engine->clients; engine->process_errors == 0 && node; ) {
 
 		client = (jack_client_internal_t *) node->data;
-
+		
 		DEBUG ("considering client %s for processing", client->control->name);
 
 		if (!client->control->active || client->control->dead) {
@@ -481,6 +481,8 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 				ctl->state = Running;
 
 				/* XXX how to time out an in-process client? */
+
+				engine->current_client = client;
 
 				if (ctl->process (nframes, ctl->process_arg) == 0) {
 					ctl->state = Finished;
@@ -506,6 +508,8 @@ jack_process (jack_engine_t *engine, jack_nframes_t nframes)
 			ctl->signalled_at = get_cycles();
 			ctl->awake_at = 0;
 			ctl->finished_at = 0;
+
+			engine->current_client = client;
 
 			DEBUG ("calling process() on an OOP subgraph, fd==%d", client->subgraph_start_fd);
 
@@ -1559,6 +1563,11 @@ watchdog_thread (void *arg)
 		usleep (5000000);
 		if (engine->watchdog_check == 0) {
 			jack_error ("jackd watchdog: timeout - killing jackd");
+			/* kill the process group of the current client */
+			kill (-engine->current_client->control->pid, SIGKILL);
+			/* kill our process group */
+			kill (-getpgrp(), SIGKILL);
+			/*NOTREACHED*/
 			exit (1);
 		}
 		engine->watchdog_check = 0;
@@ -1919,7 +1928,6 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	JSList *node;
 	int i;
 
-
 	if (engine->verbose) {
 		fprintf (stderr, "adios senor %s\n", client->control->name);
 	}
@@ -1944,6 +1952,18 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	close (client->event_fd);
 	close (client->request_fd);
+
+	/* if the client is stuck in its process() callback, its not going to 
+	   notice that we closed the pipes. give it a little help ... though
+	   this could prove fatal to some clients.
+	*/
+
+	if (client->control->pid > 0) {
+		if (engine->verbose) {
+			fprintf (stderr, "sending SIGHUP to client %s at %d\n", client->control->name, client->control->pid);
+		}
+		kill (client->control->pid, SIGHUP);
+	}
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		if (((jack_client_internal_t *) node->data)->control->id == client->control->id) {

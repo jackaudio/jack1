@@ -34,9 +34,19 @@ extern "C" {
  */
 
 /**
- * Attemps to become a client of the Jack server.
+ * Attemps to become an out-of-process client of the Jack server.
  */
 jack_client_t *jack_client_new (const char *client_name);
+
+
+/**
+ * @param client_name The name for the new client
+ * @param so_name A path to a shared object file containing the code for the new client 
+ * @param so_data An arbitary string containing information to be passed to the init() routine of the new client
+ *
+ * Attemps to create an in-process client of the Jack server.
+ */
+jack_client_t *jack_client_new_inprocess (const char *client_name, const char *so_name, const char *so_data);
 
 /**
  * Disconnects from Jack server.
@@ -499,6 +509,13 @@ int jack_add_alias    (jack_client_t *, const char *portname, const char *alias)
  */
 
 int jack_remove_alias (jack_client_t *, const char *alias);
+
+/**
+ * Return the pthread ID of the thread running the JACK client
+ * side code.
+ */
+
+pthread_t jack_client_thread_id (jack_client_t *);
 
 #ifdef __cplusplus
 }

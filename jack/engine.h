@@ -90,7 +90,7 @@ struct _jack_engine {
     int watchdog_check;
     float cpu_mhz;
 
-    
+    struct _jack_client_internal *current_client;
 
 #define JACK_ENGINE_ROLLING_COUNT 32
 #define JACK_ENGINE_ROLLING_INTERVAL 1024
