@@ -32,8 +32,8 @@ bin_PROGRAMS = jack_simple_client \
 	       jack_disconnect \
 	       $(FLTK_CLIENT) $(JACKREC)
 
-AM_CFLAGS = -I.. $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\" $(GLIB_CFLAGS)
-AM_CXXFLAGS = -I.. $(JACK_CFLAGS) -DADDON_DIR=\"$(ADDON_DIR)\"
+AM_CFLAGS = -I.. $(JACK_CFLAGS) $(GLIB_CFLAGS)
+AM_CXXFLAGS = -I.. $(JACK_CFLAGS)
 
 jack_simple_client_SOURCES = simple_client.c
 jack_simple_client_LDFLAGS = -ldl -lpthread
