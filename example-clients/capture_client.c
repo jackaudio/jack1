@@ -15,10 +15,14 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
+    * 2002/08/23 - modify for libsndfile 1.0.0 <andy@alsaplayer.org>
+    
     $Id$
 */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <unistd.h>
 #include <sndfile.h>
@@ -155,7 +159,7 @@ disk_thread (void *arg)
 					}
 				}
 				
-				if (sf_writef_double (info->sf, fbuf, buf->nframes, 1) != buf->nframes) {
+				if (sf_writef_double (info->sf, fbuf, buf->nframes) != buf->nframes) {
 					char errstr[256];
 					sf_error_str (0, errstr, sizeof (errstr) - 1);
 					fprintf (stderr, "cannot write data to sndfile (%s)\n", errstr);
@@ -230,13 +234,26 @@ void
 setup_disk_thread (thread_info_t *info)
 {
 	SF_INFO sf_info;
-
+	int short_mask;
+	
 	sf_info.samplerate = jack_get_sample_rate (info->client);
 	sf_info.channels = info->channels;
-	sf_info.format = SF_FORMAT_WAV|SF_FORMAT_PCM;
-	sf_info.pcmbitwidth = info->bitdepth;
+	
+	switch (info->bitdepth) {
+		case 8: short_mask = SF_FORMAT_PCM_U8;
+		  	break;
+		case 16: short_mask = SF_FORMAT_PCM_16;
+			 break;
+		case 24: short_mask = SF_FORMAT_PCM_24;
+			 break;
+		case 32: short_mask = SF_FORMAT_PCM_32;
+			 break;
+		default: short_mask = SF_FORMAT_PCM_16;
+			 break;
+	}		 
+	sf_info.format = SF_FORMAT_WAV|short_mask;
 
-	if ((info->sf = sf_open_write (info->path, &sf_info)) == NULL) {
+	if ((info->sf = sf_open (info->path, SFM_WRITE, &sf_info)) == NULL) {
 		char errstr[256];
 		sf_error_str (0, errstr, sizeof (errstr) - 1);
 		fprintf (stderr, "cannot open sndfile \"%s\" for output (%s)\n", info->path, errstr);
