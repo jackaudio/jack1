@@ -202,7 +202,7 @@ make_sockets (int fd[2])
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
 		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1,
-			  "%s/jack_%d", jack_server_dir, i);
+			  "%s/jack_%d_%d", jack_server_dir, getuid (), i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -240,7 +240,7 @@ make_sockets (int fd[2])
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
 		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1,
-			  "%s/jack_ack_%d", jack_server_dir, i);
+			  "%s/jack_%d_ack_%d", jack_server_dir, getuid (), i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -290,8 +290,13 @@ jack_cleanup_files ()
 	}
 
 	while ((dirent = readdir (dir)) != NULL) {
-		if (strncmp (dirent->d_name, "jack-", 5) == 0 ||
-		    strncmp (dirent->d_name, "jack_", 5) == 0) {
+		/* jack-99999999- is 14 chars long */
+		char name_prefix1[15];
+		char name_prefix2[15];
+		snprintf (name_prefix1, sizeof (name_prefix1), "jack-%d-", getuid ());
+		snprintf (name_prefix2, sizeof (name_prefix2), "jack_%d_", getuid ());
+		if (strncmp (dirent->d_name, name_prefix1, strlen(name_prefix1)) == 0 ||
+		    strncmp (dirent->d_name, name_prefix2, strlen(name_prefix2)) == 0) {
 			char fullpath[PATH_MAX+1];
 			snprintf (fullpath, sizeof (fullpath), "%s/%s",
 				  jack_server_dir, dirent->d_name);
@@ -2128,7 +2133,7 @@ jack_engine_new (int realtime, int rtpriority,
 
 	engine->control->engine_ok = 1;
 	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix),
-		  "%s/jack-ack-fifo-%d", jack_server_dir, getpid());
+		  "%s/jack-%d-ack-fifo-%d", jack_server_dir, getuid (), getpid());
 
 	(void) jack_get_fifo_fd (engine, 0);
 

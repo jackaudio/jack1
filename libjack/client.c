@@ -343,8 +343,8 @@ server_connect (int which)
 	}
 
 	addr.sun_family = AF_UNIX;
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d",
-		  jack_server_dir, which);
+	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d_%d",
+		  jack_server_dir, getuid (), which);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		close (fd);
@@ -369,8 +369,8 @@ server_event_connect (jack_client_t *client)
 	}
 
 	addr.sun_family = AF_UNIX;
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0",
-		  jack_server_dir);
+	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d_ack_0",
+		  jack_server_dir, getuid () );
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server for events",

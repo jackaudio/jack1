@@ -508,11 +508,16 @@ main (int argc, char *argv[])
 	}
 
 	if (show_version) {
-		printf ( "jackd version " VERSION "\n");
 #ifdef DEFAULT_TMP_DIR
-		printf ( "default tmp directory: " DEFAULT_TMP_DIR "\n");
+		printf ( "jackd version " VERSION 
+				" tmpdir " DEFAULT_TMP_DIR 
+				" protocol " PROTOCOL_VERSION
+				"\n");
 #else
-		printf ( "default tmp directory: /tmp\n");
+		printf ( "jackd version " VERSION 
+				" tmpdir " "/tmp" 
+				" protocol " PROTOCOL_VERSION
+				"\n");
 #endif
 		return -1;
 	}

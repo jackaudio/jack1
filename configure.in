@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=98
-JACK_MICRO_VERSION=9
+JACK_MICRO_VERSION=10
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -50,6 +50,7 @@ AC_SUBST(JACK_MINOR_VERSION)
 AC_SUBST(JACK_MICRO_VERSION)
 
 AC_SUBST(JACK_PROTOCOL_VERSION)
+AC_DEFINE_UNQUOTED(PROTOCOL_VERSION, "$JACK_PROTOCOL_VERSION", [Protocol version])
 
 AC_SUBST(JACK_API_MAJOR_VERSION)
 AC_SUBST(JACK_API_MINOR_VERSION)
@@ -164,9 +165,6 @@ dnl
 
 dnl ----------------------------------------------------------------------
 
-
-dnl ----------------------------------------------------------------------
-
                                                                                 
 if test "$target_cpu" = "powerpc"; then
 
@@ -245,7 +243,7 @@ if test "x$enable_mmx" = xyes; then
       )
   fi
 
-  AC_DEFINE(x86, 1, "Nope its intel")
+  AC_DEFINE(x86, 1, "Nope it's intel")
   COMMON_X86_OPT_FLAGS="-DREENTRANT -O3 -fomit-frame-pointer -ffast-math -funroll-loops -fmove-all-movables"
 
   if test "$target_cpu" = "i586"; then
@@ -517,7 +515,7 @@ fi
 # the cached result to work around this problem.
 READLINE_DEPS=""
 HAVE_READLINE=true
-AC_CHECK_LIB(readline, readline, [],
+AC_CHECK_LIB(readline, readline, [:],
     [unset ac_cv_lib_readline_readline
      AC_CHECK_LIB(readline, readline, [READLINE_DEPS="-ltermcap"],
         [unset ac_cv_lib_readline_readline
