@@ -1542,7 +1542,8 @@ jack_get_mhz (void)
 
 #if defined(__powerpc__)
 		ret = sscanf(buf, "clock\t: %" SCNu64 "MHz", &mhz);
-#elif defined( __i386__ ) || defined (__hppa__)  || defined (__ia64__)
+#elif defined( __i386__ ) || defined (__hppa__)  || defined (__ia64__) || \
+      defined(__x86_64__)
 		ret = sscanf(buf, "cpu MHz         : %" SCNu64, &mhz);
 #elif defined( __sparc__ )
 		ret = sscanf(buf, "Cpu0Bogo        : %" SCNu64, &mhz);
