@@ -59,6 +59,7 @@ static OSStatus GetTotalChannels(AudioDeviceID device, UInt32  *channelCount, Bo
     err = AudioDeviceGetPropertyInfo(device, 0, isInput, kAudioDevicePropertyStreamConfiguration,  &outSize, &outWritable);
     if (err == noErr)
     {
+		JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamConfiguration: OK\n");
         bufferList = (AudioBufferList*)malloc(outSize);
         
         err = AudioDeviceGetProperty(device, 0, isInput, kAudioDevicePropertyStreamConfiguration, &outSize, bufferList);
@@ -72,7 +73,7 @@ static OSStatus GetTotalChannels(AudioDeviceID device, UInt32  *channelCount, Bo
     return (err);
 }
 
-void PrintStreamDesc(AudioStreamBasicDescription * inDesc)
+static void PrintStreamDesc(AudioStreamBasicDescription * inDesc)
 {
     if (!inDesc) {
 		JCALog("Can't print a NULL desc!\n");
@@ -91,6 +92,47 @@ void PrintStreamDesc(AudioStreamBasicDescription * inDesc)
     JCALog("  Bits per Channel:%ld\n", inDesc->mBitsPerChannel);
     JCALog("- - - - - - - - - - - - - - - - - - - -\n");
 }
+
+static void printError(OSStatus err) 
+{
+#ifdef PRINTDEBUG
+	switch (err) {
+		case kAudioHardwareNoError:
+			JCALog("error code : kAudioHardwareNoError\n");
+			break;
+		 case kAudioHardwareNotRunningError:
+			JCALog("error code : kAudioHardwareNotRunningError\n");
+			break;
+		case kAudioHardwareUnspecifiedError:
+			printf("error code : kAudioHardwareUnspecifiedError\n");
+		case kAudioHardwareUnknownPropertyError:
+			JCALog("error code : kAudioHardwareUnknownPropertyError\n");
+			break;
+		case kAudioHardwareBadPropertySizeError:
+			JCALog("error code : kAudioHardwareBadPropertySizeError\n");
+			break;
+		case kAudioHardwareIllegalOperationError:
+			JCALog("error code : kAudioHardwareIllegalOperationError\n");
+			break;
+		case kAudioHardwareBadDeviceError:
+			JCALog("error code : kAudioHardwareBadDeviceError\n");
+			break;
+		case kAudioHardwareBadStreamError:
+			JCALog("error code : kAudioHardwareBadStreamError\n");
+			break;
+		case kAudioDeviceUnsupportedFormatError:
+			JCALog("error code : kAudioDeviceUnsupportedFormatError\n");
+			break;
+		case kAudioDevicePermissionsError:
+			JCALog("error code : kAudioDevicePermissionsError\n");
+			break;
+		default:
+			JCALog("error code : unknown\n");
+			break;
+	}
+#endif
+}
+
 
 AudioRender::AudioRender(float sampleRate, long bufferSize, int inChannels,
 			 int outChannels,
@@ -167,7 +209,7 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 		if (err != noErr)
 			return false;
 		if (strncmp(device, name, strlen(device)) == 0) {	// steph : name seems to be limited to 32 character, thus compare the common part only 
-			JCALog("Found DEVICE: %s %ld\n", name, device);
+			JCALog("Found DEVICE: %s %ld\n", name, devices[i]);
 			vDevice = devices[i];
 			found = true;
 		}
@@ -191,16 +233,26 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
     err = AudioDeviceGetProperty(vDevice, 0, false,
 								kAudioDevicePropertyStreamFormat, &size,
 								&SR);
-    if (err != noErr) return false;
+    if (err != noErr) {
+		JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamFormat error: %ld\n",err);
+		printError(err);
+		return false;
+	}
+	JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamFormat: OK\n");
 
     err = AudioDeviceGetPropertyInfo(vDevice, 0, false,
 									kAudioDevicePropertyStreams, &size,
 									&isWritable);
-    if (err != noErr) return false;
+    if (err != noErr) {
+		JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreams error: %ld\n",err);
+		printError(err);
+		return false;
+	}
+	JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreams: OK\n");
 
 	err = GetTotalChannels(vDevice,(UInt32*)&vOutChannels,false);
 	if (err != noErr) return false;
-
+	
     n_out_streams = size / sizeof(AudioStreamID);
 
     if (channels > vOutChannels) {
@@ -227,11 +279,13 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 								kAudioDevicePropertyStreamFormat, &size,
 								&inSR);
     if (err != noErr) return false;
-
+	JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreamFormat: OK\n");
+	
     err = AudioDeviceGetPropertyInfo(vDevice, 0, true,
 									kAudioDevicePropertyStreams, &size,
 									&isWritable);
     if (err != noErr) return false;
+	JCALog("AudioDeviceGetPropertyInfo kAudioDevicePropertyStreams: OK\n");
 
 	err = GetTotalChannels(vDevice,(UInt32*)&vInChannels,true);
 	if (err != noErr) return false;
@@ -290,8 +344,7 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 		JCALog("I'm trying to set a new sample rate.\n");
 		UInt32 theSize = sizeof(AudioStreamBasicDescription);
 		SR.mSampleRate = (Float64) sampleRate;
-		err =
-			AudioDeviceSetProperty(vDevice, NULL, 0, false,
+		err = AudioDeviceSetProperty(vDevice, NULL, 0, false,
 					   kAudioDevicePropertyStreamFormat,
 					   theSize, &SR);
 		if (err != noErr) {
@@ -304,8 +357,7 @@ bool AudioRender::ConfigureAudioProc(float sampleRate, long bufferSize,
 			AudioDeviceGetProperty(vDevice, 0, false,
 						   kAudioDevicePropertyStreamFormat,
 						   &size, &newCheckSR);
-			if (err != noErr)
-			return false;
+			if (err != noErr) return false;
 			vSampleRate = (float) newCheckSR.mSampleRate;
 		}
     }
@@ -361,37 +413,36 @@ OSStatus AudioRender::process(AudioDeviceID inDevice,
 			      && inInputData->mBuffers[0].
 			      mNumberChannels == 1) ? FALSE : TRUE;
 
-    if (!*classe->isInterleaved) {
-	for (unsigned int a = 0; a < inInputData->mNumberBuffers; a++) {
-	    classe->inBuffers[channel] =
-		(float *) inInputData->mBuffers[a].mData;
-	    channel++;
-	    if (channel == classe->vInChannels)
-		break;
-	}
-	channel = 0;
-	for (unsigned int a = 0; a < outOutputData->mNumberBuffers; a++) {
-	    classe->outBuffers[channel] =
-		(float *) outOutputData->mBuffers[a].mData;
-	    channel++;
-	    if (channel == classe->vOutChannels)
-		break;
-	}
-    } else {
-	for (unsigned int b = 0; b < inInputData->mNumberBuffers; b++) {
-	    classe->channelsPerStream[b] =
-		(int) inInputData->mBuffers[b].mNumberChannels;
-	    classe->inBuffers[b] = (float *) inInputData->mBuffers[b].mData;	// but jack will read only the inBuffers[0], anyway that should not be a problem.
-	}
-	for (unsigned int b = 0; b < outOutputData->mNumberBuffers; b++) {
-	    classe->out_channelsPerStream[b] =
-		(int) outOutputData->mBuffers[b].mNumberChannels;
-	    classe->outBuffers[b] = (float *) outOutputData->mBuffers[b].mData;	// but jack will read only the outBuffers[0], anyway that should not be a problem.
-	}
+	if (!*classe->isInterleaved) {
+		for (unsigned int a = 0; a < inInputData->mNumberBuffers; a++) {
+			classe->inBuffers[channel] =
+			(float *) inInputData->mBuffers[a].mData;
+			channel++;
+			if (channel == classe->vInChannels)
+			break;
+		}
+		channel = 0;
+		for (unsigned int a = 0; a < outOutputData->mNumberBuffers; a++) {
+			classe->outBuffers[channel] =
+			(float *) outOutputData->mBuffers[a].mData;
+			channel++;
+			if (channel == classe->vOutChannels)
+			break;
+		}
+	} else {
+		for (unsigned int b = 0; b < inInputData->mNumberBuffers; b++) {
+			classe->channelsPerStream[b] =
+			(int) inInputData->mBuffers[b].mNumberChannels;
+			classe->inBuffers[b] = (float *) inInputData->mBuffers[b].mData;	// but jack will read only the inBuffers[0], anyway that should not be a problem.
+		}
+		for (unsigned int b = 0; b < outOutputData->mNumberBuffers; b++) {
+			classe->out_channelsPerStream[b] =
+			(int) outOutputData->mBuffers[b].mNumberChannels;
+			classe->outBuffers[b] = (float *) outOutputData->mBuffers[b].mData;	// but jack will read only the outBuffers[0], anyway that should not be a problem.
+		}
     }
 
     classe->f_JackRunCycle(classe->jackData, classe->vBufferSize);
-
     return noErr;
 }
 
