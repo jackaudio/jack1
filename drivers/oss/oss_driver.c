@@ -1009,7 +1009,7 @@ jack_driver_desc_t * driver_get_descriptor ()
 		return NULL;
 	}
 	strcpy(desc->name, driver_client_name);
-	desc->nparams = 8;
+	desc->nparams = OSS_DRIVER_N_PARAMS;
 
 	params = calloc(desc->nparams, sizeof(jack_driver_param_desc_t));
 	memcpy(params, oss_params, 
