@@ -461,8 +461,10 @@ _start_server (void)
 		pos += result+1;
 		++i;
 	}
+	argv[i] = 0;
 
 	execv (command, argv);
+	jack_error ("exec of server failed (%s)", strerror (errno));
 }
 
 int
