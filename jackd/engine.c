@@ -407,7 +407,8 @@ jack_resize_port_segment (jack_engine_t *engine,
 		char name[64];
 
 		/* no segment allocated, yet */
-		snprintf (name, sizeof(name), "/jck-[%s]", port_type->type_name);
+		snprintf (name, sizeof(name), "/jck-[%s]",
+			  port_type->type_name);
 
 		if (jack_shmalloc (name, size, shm_info)) {
 			jack_error ("cannot create new port segment of %d"
@@ -418,8 +419,8 @@ jack_resize_port_segment (jack_engine_t *engine,
 		}
 		
 		if (jack_attach_shm (shm_info)) {
-			jack_error ("cannot attach to new port segment (name=%s) (%s)",
-				    name, strerror (errno));
+			jack_error ("cannot attach to new port segment "
+				    "(name=%s) (%s)", name, strerror (errno));
 			return;
 		}
 
@@ -450,8 +451,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 		jack_zero_filled_buffer =
 			jack_shm_addr (shm_info)
 			+ engine->silent_buffer->offset;
-		memset (jack_zero_filled_buffer, 0,
-			sizeof (jack_default_audio_sample_t) * one_buffer);
+		memset (jack_zero_filled_buffer, 0, one_buffer);
 	}
 
 	if (engine->control->real_time) {
