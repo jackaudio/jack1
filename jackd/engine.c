@@ -454,7 +454,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 		memset (jack_zero_filled_buffer, 0, one_buffer);
 	}
 
-	if (engine->control->real_time) {
+	if (engine->control->real_time && engine->control->do_mlock) {
 
 		/* Although we've called mlockall(CURRENT|FUTURE), the
 		 * Linux VM manager still allows newly allocated pages
@@ -1916,8 +1916,9 @@ jack_server_thread (void *arg)
 }
 
 jack_engine_t *
-jack_engine_new (int realtime, int rtpriority, int temporary, int verbose,
-		 int client_timeout, pid_t wait_pid, JSList * drivers)
+jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
+		 int verbose, int client_timeout, pid_t wait_pid,
+		 JSList *drivers)
 {
 	jack_engine_t *engine;
 	unsigned int i;
@@ -1980,7 +1981,8 @@ jack_engine_new (int realtime, int rtpriority, int temporary, int verbose,
 	}
         
 	if (jack_shmalloc ("/jack-engine",
-			   sizeof (jack_control_t) + ((sizeof (jack_port_shared_t) * engine->port_max)),
+			   sizeof (jack_control_t)
+			   + ((sizeof (jack_port_shared_t) * engine->port_max)),
 			   &engine->control_shm)) {
 		jack_error ("cannot create engine control shared memory "
 			    "segment (%s)", strerror (errno));
@@ -1994,7 +1996,8 @@ jack_engine_new (int realtime, int rtpriority, int temporary, int verbose,
 		return 0;
 	}
 
-	engine->control = (jack_control_t *) jack_shm_addr (&engine->control_shm);
+	engine->control = (jack_control_t *)
+		jack_shm_addr (&engine->control_shm);
 
 	/* Setup port type information from builtins. buffer space is
 	 * allocated when the driver calls jack_driver_buffer_size().
@@ -2050,6 +2053,7 @@ jack_engine_new (int realtime, int rtpriority, int temporary, int verbose,
 	engine->control->port_max = engine->port_max;
 	engine->control->real_time = realtime;
 	engine->control->client_priority = engine->rtpriority - 1;
+	engine->control->do_mlock = do_mlock;
 	engine->control->cpu_load = 0;
  
 	engine->control->buffer_size = 0;
@@ -2105,7 +2109,7 @@ jack_engine_new (int realtime, int rtpriority, int temporary, int verbose,
 }
 
 static int
-jack_become_real_time (pthread_t thread, int priority)
+jack_become_real_time (jack_engine_t *engine, pthread_t thread, int priority)
 
 {
 	struct sched_param rtparam;
@@ -2124,11 +2128,12 @@ jack_become_real_time (pthread_t thread, int priority)
 #if defined(__APPLE__) && defined(__POWERPC__) 
         // To be implemented
 #else
-        if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
-	    jack_error ("cannot lock down memory for RT thread (%s)",
-			strerror (errno));
+        if (engine->control->do_mlock
+	    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
+		jack_error ("cannot lock down memory for RT thread (%s)",
+			    strerror (errno));
 #ifdef ENSURE_MLOCK
-	    return -1;
+		return -1;
 #endif /* ENSURE_MLOCK */
 	}
 #endif
@@ -2148,7 +2153,7 @@ jack_watchdog_thread (void *arg)
 
 	pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
-	if (jack_become_real_time (pthread_self(), watchdog_priority)) {
+	if (jack_become_real_time (engine, pthread_self(), watchdog_priority)) {
 		VERBOSE(engine, "no realtime watchdog thread\n");
 		return 0;
 	}

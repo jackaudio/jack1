@@ -148,7 +148,8 @@ struct _jack_engine {
 /* public functions */
 
 jack_engine_t  *jack_engine_new (int real_time, int real_time_priority,
-				 int temporary, int verbose, int client_timeout,
+				 int do_mlock, int temporary,
+				 int verbose, int client_timeout,
                                  pid_t waitpid, JSList *drivers);
 int             jack_engine_delete (jack_engine_t *);
 int             jack_run (jack_engine_t *engine);

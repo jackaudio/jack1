@@ -1284,7 +1284,8 @@ jack_start_thread (jack_client_t *client)
 #if defined(__APPLE__) && defined(__POWERPC__) 
                 // To be implemented
 #else
-                if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
+                if (client->engine->do_mlock
+		    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
                     jack_error ("cannot lock down memory for RT thread (%s)",
 				strerror (errno));
 #ifdef ENSURE_MLOCK

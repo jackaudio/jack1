@@ -106,6 +106,7 @@ typedef struct {
     pid_t                 engine_pid;
     jack_nframes_t	  buffer_size;
     int8_t		  real_time;
+    int8_t		  do_mlock;
     int32_t		  client_priority;
     int32_t		  has_capabilities;
     float                 cpu_load;

@@ -1874,7 +1874,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 		user_capture_nchnls,user_playback_nchnls,
 		hw_monitoring ? "hwmon": "nomon",
 		hw_metering ? "hwmeter":"swmeter",
-		soft_mode ? "soft-mode":"rt",
+		soft_mode ? "soft-mode":"-",
 		shorts_first ? "16bit":"32bit");
 
 	driver = (alsa_driver_t *) calloc (1, sizeof (alsa_driver_t));

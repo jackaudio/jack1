@@ -1,4 +1,4 @@
-.TH JACKD "1" @VERSION@ "October 2003"
+.TH JACKD "1" @VERSION@ "March 2004"
 .SH NAME
 jackd, jackstart \- JACK Audio Connection Kit sound server
 .SH SYNOPSYS
@@ -33,14 +33,17 @@ For the latest JACK information, please consult the web site,
 .br
 Select the output driver.  The only \fIdriver\fR currently documented
 is \fBalsa\fR (see below).  There are additional drivers named
-\fBdummy\fR and \fBportaudio\fR.  Examples below show how to list
-their parameters.
+\fBdummy\fR, \fBoss\fR and \fBportaudio\fR.  Examples below show how
+to list their parameters.
 .TP
 \fB\-h, \-\-help\fR
 .br
 Print a brief usage message describing the main \fBjackd\fR options.
 These do not include driver options, which are obtained using the
 \fB\-\-help\fR option for that specific driver, instead.
+.TP
+\fB\-m, \-\-no\-mlock\fR
+Do not attempt to lock memory, even if \fB\-\-realtime\fR.
 .TP
 \fB\-R, \-\-realtime\fR 
 .br
@@ -54,15 +57,15 @@ requires a kernel with "POSIX draft capabilities" enabled (see the
 invoke the daemon using \fBjackstart\fR, and later launch JACK clients
 without running as root.
 .TP
-\fB\-T, \-\-temporary
-Will exit once all clients have closed their connections.
-.TP
 \fB\-P, \-\-realtime\-priority \fIint\fR
 When running \fB\-\-realtime\fR, set the scheduler priority to
 \fIint\fR.
 .TP
 \fB\-\-silent\fR
-Stops any output during operation.
+Silence any output during operation.
+.TP
+\fB\-T, \-\-temporary\fR
+Exit once all clients have closed their connections.
 .TP
 \fB\-t, \-\-timeout \fIint\fR
 .br
@@ -166,6 +169,8 @@ Print usage message for options specific to each driver.
 \fBjackd \-d alsa \-\-help\fR
 .br
 \fBjackd \-d dummy \-\-help\fR
+.br
+\fBjackd \-d oss \-\-help\fR
 .br
 \fBjackd \-d portaudio \-\-help\fR
 .PP

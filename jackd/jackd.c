@@ -56,6 +56,7 @@ static sigset_t signals;
 static jack_engine_t *engine = 0;
 static int realtime = 0;
 static int realtime_priority = 10;
+static int do_mlock = 1;
 static int temporary = 0;
 static int verbose = 0;
 static int client_timeout = 500; /* msecs */
@@ -133,8 +134,8 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	
 	/* get the engine/driver started */
 
-	if ((engine = jack_engine_new (realtime, realtime_priority, temporary,
-				       verbose, client_timeout,
+	if ((engine = jack_engine_new (realtime, realtime_priority, do_mlock,
+				       temporary, verbose, client_timeout,
 				       getpid(), drivers)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
 		return -1;
@@ -342,12 +343,13 @@ static void usage (FILE *file)
 	copyright (file);
 	fprintf (file, "\n"
 "usage: jackd [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
+"             [ --no-mlock OR -m ]\n"
 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
 "             [ --verbose OR -v ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
 "         -d driver [ ... driver args ... ]\n"
-"             driver can be `alsa', `dummy' or `portaudio'\n\n"
+"             driver can be `alsa', `dummy', `oss' or `portaudio'\n\n"
 "       jackd -d driver --help\n"
 "             to display options for each driver\n\n");
 }	
@@ -376,12 +378,13 @@ main (int argc, char *argv[])
 
 {
     jack_driver_desc_t * desc;
-	const char *options = "-ad:P:vshVRTFl:t:";
+	const char *options = "-ad:P:vshVRTFl:t:m";
 	struct option long_options[] = 
 	{ 
 		{ "driver", 1, 0, 'd' },
 		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
+		{ "no-mlock", 0, 0, 'm' },
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
 		{ "timeout", 1, 0, 't' },
@@ -440,8 +443,9 @@ main (int argc, char *argv[])
 #endif
 
 	opterr = 0;
-	while (!seen_driver && (opt = getopt_long (argc, argv, options,
-						   long_options, &option_index)) != EOF) {
+	while (!seen_driver &&
+	       (opt = getopt_long (argc, argv, options,
+				   long_options, &option_index)) != EOF) {
 		switch (opt) {
 
 		case 'd':
@@ -455,6 +459,10 @@ main (int argc, char *argv[])
 
 		case 's':
 			jack_set_error_function (silent_jack_error_callback);
+			break;
+
+		case 'm':
+			do_mlock = 0;
 			break;
 
 		case 'P':
