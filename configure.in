@@ -126,7 +126,7 @@ AM_PATH_GLIB(1.0.0,
 AC_CHECK_LIB(asound,snd_pcm_drop,
 	     [
                HAVE_ALSA="true"
-               AC_SUBST(ALSA_LIBS, -lasound)
+               ALSA_LIBS=-lasound
              ],
              [ 
                HAVE_ALSA="false"
@@ -134,6 +134,7 @@ AC_CHECK_LIB(asound,snd_pcm_drop,
              ],
 	     [-lm]
 )
+AC_SUBST(ALSA_LIBS)
 
 dnl replace me with a proper test
 HAVE_SOLARIS="false"
