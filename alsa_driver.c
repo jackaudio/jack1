@@ -575,9 +575,16 @@ alsa_driver_audio_start (alsa_driver_t *driver)
 		if (alsa_driver_get_channel_addresses (driver, 0, &pavail, 0, &poffset)) {
 			return -1;
 		}
+
+		/* XXX this is cheating. ALSA offers no guarantee that we can access
+		   the entire buffer at any one time. It works on most hardware
+		   tested so far, however, buts its a liability in the long run. I think
+		   that alsa-lib may have a better function for doing this here, where
+		   the goal is to silence the entire buffer.
+		*/
 		
 		for (chn = 0; chn < driver->playback_nchannels; chn++) {
-		alsa_driver_silence_on_channel (driver, chn, driver->buffer_frames);
+			alsa_driver_silence_on_channel (driver, chn, driver->buffer_frames);
 		}
 		
 		snd_pcm_mmap_commit (driver->playback_handle, poffset, driver->buffer_frames);

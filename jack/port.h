@@ -52,17 +52,19 @@ typedef struct _jack_port_type_info {
 */
 
 typedef struct _jack_port_shared {
-    int                   shm_key;
-    size_t                offset;
+    int                    shm_key;
+    size_t                 offset;
     
-    unsigned long         flags; 
-    unsigned long         buffer_size;
-    jack_port_id_t        id;
-    char                  name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
-    jack_port_type_info_t type_info;
-    jack_client_id_t      client_id;
-    nframes_t             latency;
-    unsigned char         monitor_requests;
+    unsigned long          flags; 
+    unsigned long          buffer_size;
+    jack_port_id_t         id;
+    char                   name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE+2];
+    jack_port_type_info_t  type_info;
+    jack_client_id_t       client_id;
+
+    volatile nframes_t     latency;
+    volatile nframes_t     total_latency;
+    volatile unsigned char monitor_requests;
 
     char                  in_use     : 1;
     char                  locked     : 1;

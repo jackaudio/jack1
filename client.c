@@ -525,7 +525,7 @@ jack_client_thread (void *arg)
 		}
 
 		if (client->pollfd[0].revents & POLLIN) {
-			
+
 			/* server has sent us an event. process the event and reply */
 
 			if (read (client->event_fd, &event, sizeof (event)) != sizeof (event)) {
@@ -1407,8 +1407,6 @@ jack_port_request_monitor (jack_port_t *port, int onoff)
 int
 jack_ensure_port_monitor_input (jack_port_t *port, int yn)
 {
-	printf ("ENSURE PORT monitor, req = %d, status = %d\n", yn, port->shared->monitor_requests);
-	
 	if (yn) {
 		if (port->shared->monitor_requests == 0) {
 			port->shared->monitor_requests++;
@@ -1739,23 +1737,7 @@ jack_set_transport_info (jack_client_t *client,
 }	
 
 nframes_t
-jack_port_get_total_latency (jack_client_t *client,
-			     jack_port_t *port)
+jack_port_get_total_latency (jack_client_t *client, jack_port_t *port)
 {
-	jack_request_t req;
-
-	req.type = GetPortTotalLatency;
-	strcpy (req.x.port_info.name, port->shared->name);
-	
-	if (write (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send port total latency request to server");
-		return 0;
-	}
-
-	if (read (client->request_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot read port total latency result from server (%s)", strerror (errno));
-		return 0;
-	}
-	
-	return req.x.nframes;
+	return port->shared->total_latency;
 }

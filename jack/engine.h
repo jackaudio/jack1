@@ -31,13 +31,14 @@ struct _jack_port_internal;
 struct _jack_engine {
     jack_control_t        *control;
     struct _jack_driver   *driver;
-    int (*process)(struct _jack_engine *, nframes_t frames);
-    int (*set_buffer_size)(struct _jack_engine *, nframes_t frames);
-    int (*set_sample_rate)(struct _jack_engine *, nframes_t frames);
-    int (*process_lock)(struct _jack_engine *);
-    int (*process_unlock)(struct _jack_engine *);
-    int (*post_process)(struct _jack_engine *);
-    pthread_mutex_t graph_lock;
+    int  (*process)(struct _jack_engine *, nframes_t frames);
+    int  (*set_buffer_size)(struct _jack_engine *, nframes_t frames);
+    int  (*set_sample_rate)(struct _jack_engine *, nframes_t frames);
+    int  (*process_lock)(struct _jack_engine *);
+    void (*process_unlock)(struct _jack_engine *);
+    int  (*post_process)(struct _jack_engine *);
+    pthread_mutex_t client_lock;
+    pthread_mutex_t cleanup_lock;
     pthread_mutex_t buffer_lock;
     pthread_mutex_t port_lock;
     int process_errors;
@@ -55,7 +56,7 @@ struct _jack_engine {
     GSList *port_segments;
     GSList *port_buffer_freelist;
 
-    /* these lists are all protected by `graph_lock' */
+    /* these lists are all protected by `client_lock' */
 
     GSList *clients;
     GSList *clients_waiting;
@@ -79,6 +80,7 @@ struct _jack_engine {
     int rtpriority;
     char verbose;
     char asio_mode;
+    int reordered;
 };
 
 /* public functions */
