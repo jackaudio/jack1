@@ -32,6 +32,7 @@
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <jack/hammerfall.h>
+#include <jack/hdsp.h>
 #include <jack/ice1712.h>
 #include <jack/generic.h>
 #include <jack/cycles.h>
@@ -109,6 +110,14 @@ alsa_driver_hammerfall_hardware (alsa_driver_t *driver)
 }
 
 static int
+alsa_driver_hdsp_hardware (alsa_driver_t *driver)
+
+{
+	driver->hw = jack_alsa_hdsp_hw_new (driver);
+	return 0;
+}
+
+static int
 alsa_driver_ice1712_hardware (alsa_driver_t *driver)
 
 {
@@ -134,6 +143,10 @@ alsa_driver_hw_specific (alsa_driver_t *driver, int hw_monitoring)
 		if ((err = alsa_driver_hammerfall_hardware (driver)) != 0) {
 			return err;
 		}
+	} else if (!strcmp(driver->alsa_driver, "H-DSP")) {
+                if ((err = alsa_driver_hdsp_hardware (driver)) !=0) {
+                        return err;
+                }
 	} else if (!strcmp(driver->alsa_driver, "ICE1712")) {
                 if ((err = alsa_driver_ice1712_hardware (driver)) !=0) {
                         return err;
@@ -1139,7 +1152,6 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 		}
 			
 		if (!driver->hw_monitoring) {
-
 			if (driver->playback_handle) {
 				if (driver->all_monitor_in) {
 					for (chn = 0; chn < driver->playback_nchannels; chn++) {
@@ -1155,7 +1167,6 @@ alsa_driver_process (alsa_driver_t *driver, jack_nframes_t nframes)
 			}
 
 		} else {
-
 			if ((driver->hw->input_monitor_mask != driver->input_monitor_mask) && !driver->all_monitor_in) {
 				driver->hw->set_input_monitor_mask (driver->hw, driver->input_monitor_mask);
 			} 
