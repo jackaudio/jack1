@@ -20,7 +20,7 @@
 
 /* Defined "by hand" on Darwin/MacOSX */
 
-#define VERSION "0.71.3"
+#define VERSION "0.74.2"
 
 #define ADDON_DIR "/usr/local/lib"
 
