@@ -2590,7 +2590,6 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	client->control->dead = TRUE;
 	
-	jack_transport_client_exit (engine, client);
 	jack_client_disconnect (engine, client);
 	jack_client_do_deactivate (engine, client, FALSE);
 }

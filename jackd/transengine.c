@@ -59,7 +59,8 @@ jack_sync_poll_new (jack_engine_t *engine, jack_client_internal_t *client)
  *
  *   precondition: caller holds the graph lock. */
 static inline void
-jack_sync_poll_exit (jack_engine_t *engine, jack_client_internal_t *client)
+jack_sync_poll_deactivate (jack_engine_t *engine,
+			   jack_client_internal_t *client)
 {
 	if (client->control->sync_poll) {
 		client->control->sync_poll = 0;
@@ -68,6 +69,9 @@ jack_sync_poll_exit (jack_engine_t *engine, jack_client_internal_t *client)
 		VERBOSE (engine, "sync poll interrupted for client %"
 			 PRIu32 "\n", client->control->id);
 	}
+	client->control->active_slowsync = 0;
+	engine->control->sync_clients--;
+	assert(engine->control->sync_clients >= 0);
 }
 
 /* stop polling all the slow-sync clients
@@ -82,8 +86,7 @@ jack_sync_poll_stop (jack_engine_t *engine)
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t *client =
 			(jack_client_internal_t *) node->data;
-		if (client->control->is_slowsync &&
-		    client->control->active &&
+		if (client->control->active_slowsync &&
 		    client->control->sync_poll) {
 			client->control->sync_poll = 0;
 			poll_count++;
@@ -113,8 +116,7 @@ jack_sync_poll_start (jack_engine_t *engine)
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t *client =
 			(jack_client_internal_t *) node->data;
-		if (client->control->is_slowsync &&
-		    client->control->active) {
+		if (client->control->active_slowsync) {
 			client->control->sync_poll = 1;
 			sync_count++;
 		}
@@ -248,6 +250,8 @@ void
 jack_transport_activate (jack_engine_t *engine, jack_client_internal_t *client)
 {
 	if (client->control->is_slowsync) {
+		assert(!client->control->active_slowsync);
+		client->control->active_slowsync = 1;
 		engine->control->sync_clients++;
 		jack_sync_poll_new (engine, client);
 	}
@@ -300,8 +304,8 @@ jack_transport_client_exit (jack_engine_t *engine,
 	}
 
 	if (client->control->is_slowsync) {
-		jack_sync_poll_exit(engine, client);
-		engine->control->sync_clients--;
+		if (client->control->active_slowsync)
+			jack_sync_poll_deactivate (engine, client);
 		if (client->control->dead)
 			client->control->is_slowsync = 0;
 	}
@@ -314,6 +318,7 @@ jack_transport_client_new (jack_client_internal_t *client)
 	client->control->is_timebase = 0;
 	client->control->timebase_new = 0;
 	client->control->is_slowsync = 0;
+	client->control->active_slowsync = 0;
 	client->control->sync_poll = 0;
 	client->control->sync_new = 0;
 	client->control->sync_cb = NULL;
@@ -335,10 +340,9 @@ jack_transport_client_reset_sync (jack_engine_t *engine,
 	client = jack_client_internal_by_id (engine, client_id);
 
 	if (client && (client->control->is_slowsync)) {
-		jack_sync_poll_exit(engine, client);
+		if (client->control->active_slowsync)
+			jack_sync_poll_deactivate (engine, client);
 		client->control->is_slowsync = 0;
-		if (client->control->active)
-			engine->control->sync_clients--;
 		ret = 0;
 	}  else
 		ret = EINVAL;
@@ -364,12 +368,14 @@ jack_transport_client_set_sync (jack_engine_t *engine,
 	if (client) {
 		if (!client->control->is_slowsync) {
 			client->control->is_slowsync = 1;
-			if (client->control->active)
+			if (client->control->active) {
+				client->control->active_slowsync = 1;
 				engine->control->sync_clients++;
+			}
 		}
 
 		/* force poll of the new slow-sync client, if active */
-		if (client->control->active)
+		if (client->control->active_slowsync)
 			jack_sync_poll_new (engine, client);
 		ret = 0;
 	}  else

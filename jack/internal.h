@@ -61,7 +61,7 @@
 #endif
 
 #ifndef	TRUE
-#define	TRUE	(!FALSE)
+#define	TRUE	(1)
 #endif
 
 typedef struct _jack_engine  jack_engine_t;
@@ -96,8 +96,8 @@ typedef struct {
     int8_t		  new_pos;	/* new position this cycle */
     int8_t		  pending_pos;	/* new position request pending */
     jack_nframes_t	  pending_frame; /* pending frame number */
-    uint32_t		  sync_clients;	/* number of active slowsync clients */
-    uint32_t		  sync_remain;	/* number of them with sync_poll */
+    int32_t		  sync_clients;	/* number of active_slowsync clients */
+    int32_t		  sync_remain;	/* number of them with sync_poll */
     jack_time_t           sync_timeout;
     jack_time_t           sync_time_left;
     jack_frame_timer_t    frame_timer;
@@ -166,14 +166,15 @@ typedef volatile struct {
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
     volatile int8_t     name[JACK_CLIENT_NAME_SIZE+1];
     volatile ClientType type;             /* w: engine r: engine and client */
-    volatile int8_t     active : 1;       /* w: engine r: engine and client */
-    volatile int8_t     dead : 1;         /* r/w: engine */
-    volatile int8_t	timed_out : 1;    /* r/w: engine */
-    volatile int8_t     is_timebase : 1;  /* w: engine, r: engine and client */
-    volatile int8_t     timebase_new : 1; /* w: engine and client, r: engine */
-    volatile int8_t     is_slowsync : 1;  /* w: engine, r: engine and client */
-    volatile int8_t     sync_poll : 1;    /* w: engine and client, r: engine */
-    volatile int8_t     sync_new : 1;     /* w: engine and client, r: engine */
+    volatile int8_t     active;           /* w: engine r: engine and client */
+    volatile int8_t     dead;             /* r/w: engine */
+    volatile int8_t	timed_out;        /* r/w: engine */
+    volatile int8_t     is_timebase;	  /* w: engine, r: engine and client */
+    volatile int8_t     timebase_new;	  /* w: engine and client, r: engine */
+    volatile int8_t     is_slowsync;	  /* w: engine, r: engine and client */
+    volatile int8_t     active_slowsync;  /* w: engine, r: engine and client */
+    volatile int8_t     sync_poll;        /* w: engine and client, r: engine */
+    volatile int8_t     sync_new;         /* w: engine and client, r: engine */
     volatile pid_t      pid;              /* w: client r: engine; client pid */
     volatile pid_t      pgrp;             /* w: client r: engine; client pgrp */
     volatile uint64_t	signalled_at;

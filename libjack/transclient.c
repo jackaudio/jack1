@@ -145,10 +145,10 @@ jack_call_sync_client (jack_client_t *client)
 	jack_client_control_t *control = client->control;
 	jack_control_t *ectl = client->engine;
 
-	/* Make sure we are still slow-sync; is_slowsync is set in a
-	 * critical section; sync_cb is not. */
+	/* Make sure still active and slow-sync; active_slowsync is
+	 * set in a critical section; sync_cb is not. */
 	if ((ectl->new_pos || control->sync_poll || control->sync_new) &&
-	    control->is_slowsync) {
+	    control->active_slowsync) {
 
 		if (control->sync_cb (ectl->transport_state,
 				      &ectl->current_time,
