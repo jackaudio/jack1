@@ -2,7 +2,7 @@
 *** README.developers - JACK development practices                  ***
 =======================================================================
 
-Version: $id$
+Version: $Id$
 
 -----------------------------------------------------------------------
  What is this? 
@@ -44,6 +44,8 @@ to CVS:
     age      = current libjack is both source and binary compatible with
                libjack interfaces current,current-1,...,current-age
 
+JACK Client Protocol is versioned... <TBD>.
+
 Note! All changes that affect the libjack API must be documented 
 in jack/libjack/ChangeLog using the standard ChangeLog style
 (see GNU developer docs).
@@ -75,7 +77,7 @@ common sense is recommended. ;)
  CVS Access
 -----------------------------------------------------------------------
 
-TBD
+<TBD>
 
 ---------------------------------------------------------------------
  Uses of external libraries and other packages
