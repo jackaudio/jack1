@@ -566,13 +566,15 @@ alsa_driver_set_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cyc
 	return 0;
 }	
 
-static int
+#if 0
+static int  /* UNUSED */
 alsa_driver_reset_parameters (alsa_driver_t *driver, jack_nframes_t frames_per_cycle, jack_nframes_t user_nperiods, jack_nframes_t rate)
 {
 	/* XXX unregister old ports ? */
 	alsa_driver_release_channel_dependent_memory (driver);
 	return alsa_driver_set_parameters (driver, frames_per_cycle, user_nperiods, rate);
 }
+#endif
 
 static int
 alsa_driver_get_channel_addresses (alsa_driver_t *driver,
@@ -1282,14 +1284,15 @@ alsa_driver_detach (alsa_driver_t *driver, jack_engine_t *engine)
 	driver->engine = 0;
 }
 
-static int
+#if 0
+static int  /* UNUSED */
 alsa_driver_change_sample_clock (alsa_driver_t *driver, SampleClockMode mode)
 
 {
 	return driver->hw->change_sample_clock (driver->hw, mode);
 }
 
-static void
+static void  /* UNUSED */
 alsa_driver_request_all_monitor_input (alsa_driver_t *driver, int yn)
 
 {
@@ -1304,7 +1307,7 @@ alsa_driver_request_all_monitor_input (alsa_driver_t *driver, int yn)
 	driver->all_monitor_in = yn;
 }
 
-static void
+static void  /* UNUSED */
 alsa_driver_set_hw_monitoring (alsa_driver_t *driver, int yn)
 
 {
@@ -1322,12 +1325,13 @@ alsa_driver_set_hw_monitoring (alsa_driver_t *driver, int yn)
 	}
 }
 
-static ClockSyncStatus
+static ClockSyncStatus  /* UNUSED */
 alsa_driver_clock_sync_status (channel_t chn)
 
 {
 	return Lock;
 }
+#endif
 
 static void
 alsa_driver_delete (alsa_driver_t *driver)
@@ -1587,19 +1591,30 @@ static void
 alsa_usage ()
 {
 	fprintf (stderr, "\n"
+"ALSA driver arguments:\n"
+"    -h,--help    \tprint this message\n"
+"    -d,--device <name> \tALSA device name (default: \"default\")\n"
+"    -r,--rate <n>      \tsample rate (default: 48000)\n"
+"    -p,--period <n>    \tframes per period (default: 1024)\n"
+"    -n,--nperiods <n>  \tnumber of periods in hardware buffer (default: 2)\n"
+"    -H,--hwmon   \tuse hardware monitoring, if available (default: no)\n"
+"    -D,--duplex  \tduplex I/O (default: yes)\n"
+"    -C,--capture \tcapture input (default: duplex)\n"
+"    -P,--playback\tplayback output (default: duplex)\n"
+"    -s,--softmode\tsoft-mode, no xrun handling (default: off)\n"
+"    -z,--dither  \tdithering mode:\n"
+"        -z-,--dither (off, the default)\n"
+"        -zr,--dither=rectangular\n"
+"        -zs,--dither=shaped\n"
+"        -zt,--dither=triangular\n"
+"\n");
+}
 
-"alsa PCM driver args:\n"
-"    -d alsa-pcm-name (default: default)\n"
-"    -r sample-rate (default: 48kHz)\n"
-"    -p frames-per-period (default: 1024)\n"
-"    -n periods-per-hardware-buffer (default: 2)\n"
-"    -H (use hardware monitoring if available, default: no)\n"
-"    -D (duplex, default: yes)\n"
-"    -C (capture, default: duplex)\n"
-"    -P (playback, default: duplex)\n"
-"    -z[r|t|s|-] (dither, rect|tri|shaped|off, default: off)\n"
-"    -s soft-mode, no xrun handling (default: off)\n"
-);
+static void
+alsa_error (char *type, char *value)
+{
+	fprintf (stderr, "ALSA driver: unknown %s: `%s'\n", type, value);
+	alsa_usage();
 }
 
 /* DRIVER "PLUGIN" INTERFACE */
@@ -1616,91 +1631,119 @@ driver_initialize (jack_client_t *client, int argc, char **argv)
 	int playback = FALSE;
 	int soft_mode = FALSE;
 	DitherAlgorithm dither = None;
-	int i;
+	int opt;
+	char optstring[2];		/* string made from opt char */
+	struct option long_options[] = 
+	{ 
+		{ "capture",	0, NULL, 'C' },
+		{ "duplex",	0, NULL, 'D' },
+		{ "device",	1, NULL, 'd' },
+		{ "hwmon",	0, NULL, 'H' },
+		{ "help",	0, NULL, 'h' },
+		{ "playback",	0, NULL, 'P' },
+		{ "period",	1, NULL, 'p' },
+		{ "rate",	1, NULL, 'r' },
+		{ "nperiods",	1, NULL, 'n' },
+		{ "softmode",	1, NULL, 's' },
+		{ "dither",	2, NULL, 'z' },
+		{ 0, 0, 0, 0 }
+	};
 
-	/* grrrr ... getopt() cannot be called in more than one "loop"
-	   per process instance. ridiculous, but true. why isn't there
-	   a getopt_reinitialize() function?
-	*/
+	/*
+	 * Setting optind back to zero is a hack to reinitialize a new
+	 * getopts() loop.  See declaration in <getopt.h>.
+	 */
+	optind = 0;
+	opterr = 0;
+	while ((opt = getopt_long(argc, argv, "-CDd:HPp:r:n:sz::",
+				  long_options, NULL))
+	       != EOF) {
+		switch (opt) {
 
-	for (i = 1; i < argc; i++) {
-		if (argv[i][0] == '-') {
-			switch (argv[i][1]) {
-			case 'D':
-				capture = TRUE;
-				playback = TRUE;
-				break;
+		case 'C':
+			capture = TRUE;
+			break;
 
-			case 'C':
-				capture = TRUE;
-				break;
+		case 'D':
+			capture = TRUE;
+			playback = TRUE;
+			break;
 
-			case 'P':
-				playback = TRUE;
-				break;
+		case 'd':
+			pcm_name = optarg;
+			break;
 
-			case 'd':
-				pcm_name = argv[i+1];
-				i++;
-				break;
+		case 'H':
+			hw_monitoring = TRUE;
+			break;
+
+		case 'h':
+			alsa_usage();
+			return NULL;
+
+		case 'P':
+			playback = TRUE;
+			break;
+
+		case 'p':
+			frames_per_interrupt = atoi(optarg);
+			break;
 				
-			case 'n':
-				user_nperiods = atoi (argv[i+1]);
-				i++;
-				break;
+		case 'r':
+			srate = atoi(optarg);
+			break;
 				
-			case 'r':
-				srate = atoi (argv[i+1]);
-				i++;
-				break;
+		case 'n':
+			user_nperiods = atoi(optarg);
+			break;
 				
-			case 'p':
-				frames_per_interrupt = atoi (argv[i+1]);
-				i++;
-				break;
-				
-			case 'H':
-				hw_monitoring = TRUE;
-				break;
+		case 's':
+			soft_mode = TRUE;
+			break;
 
-			case 'z':
-				switch (argv[i][2]) {
-					case '-':
+		case 'z':
+			if (optarg == NULL) {
+				dither = None;
+			} else {
+
+				switch (*optarg) {
+				case '-':
 					dither = None;
 					break;
 
-					case 'r':
+				case 'r':
 					dither = Rectangular;
 					break;
 
-					case 's':
+				case 's':
 					dither = Shaped;
 					break;
 
-					case 't':
-					default:
+				case 't':
 					dither = Triangular;
 					break;
+
+				default:
+					alsa_error("dithering mode", optarg);
+					return NULL;
 				}
-				break;
-
-			case 's':
-				soft_mode = TRUE;
-				break;
-
-				
-			default:
-				alsa_usage ();
-				return NULL;
 			}
-		} else {
-			alsa_usage ();
+			break;
+
+		/* the rest is error handling: */
+		case 1:			/* not an option */
+			alsa_error("parameter", optarg);
+			return NULL;
+				
+		default:		/* unrecognized option */
+			optstring[0] = (char) optopt;
+			optstring[1] = '\0';
+			alsa_error("option", optstring);
 			return NULL;
 		}
 	}
-
+			
 	/* duplex is the default */
-
 	if (!capture && !playback) {
 		capture = TRUE;
 		playback = TRUE;

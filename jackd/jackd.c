@@ -280,7 +280,7 @@ int
 main (int argc, char *argv[])
 
 {
-	const char *options = "ad:D:P:vhRFl:";
+	const char *options = "-ad:D:P:vhRFl:";
 	struct option long_options[] = 
 	{ 
 		{ "asio", 0, 0, 'a' },
