@@ -45,6 +45,7 @@
 #include <jack/jslist.h>
 #include <jack/version.h>
 #include <jack/shm.h>
+#include <jack/unlock.h>
 
 #include <sysdeps/time.h>
 JACK_TIME_GLOBAL_DECL;			/* One instance per process. */
@@ -76,8 +77,10 @@ static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
 void *jack_zero_filled_buffer = NULL;
 
-#define event_fd pollfd[0].fd
-#define graph_wait_fd pollfd[1].fd
+#define EVENT_POLL_INDEX 0
+#define WAIT_POLL_INDEX 1
+#define event_fd pollfd[EVENT_POLL_INDEX].fd
+#define graph_wait_fd pollfd[WAIT_POLL_INDEX].fd
 
 typedef struct {
     int status;
@@ -161,6 +164,7 @@ jack_client_alloc ()
 	client->pollmax = 2;
 	client->request_fd = -1;
 	client->event_fd = -1;
+	client->upstream_is_jackd = 0;
 	client->graph_wait_fd = -1;
 	client->graph_next_fd = -1;
 	client->ports = NULL;
@@ -300,7 +304,6 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 		return -1;
 	}
 
-
 	DEBUG ("opened new graph_wait_fd %d (%s)", client->graph_wait_fd, path);
 
 	sprintf (path, "%s-%" PRIu32, client->fifo_prefix, event->x.n+1);
@@ -310,7 +313,11 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 		return -1;
 	}
 
-	DEBUG ("opened new graph_next_fd %d (%s)", client->graph_next_fd, path);
+	client->upstream_is_jackd = event->y.n;
+	client->pollmax = 2;
+
+	DEBUG ("opened new graph_next_fd %d (%s) (upstream is jackd? %d)", client->graph_next_fd, path, 
+	       client->upstream_is_jackd);
 
 	/* If the client registered its own callback for graph order events,
 	   execute it now.
@@ -729,8 +736,8 @@ jack_client_new (const char *client_name)
 	strcpy (client->fifo_prefix, res.fifo_prefix);
 	client->request_fd = req_fd;
 
-	client->pollfd[0].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
-	client->pollfd[1].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
+	client->pollfd[EVENT_POLL_INDEX].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
+	client->pollfd[WAIT_POLL_INDEX].events = POLLIN|POLLERR|POLLHUP|POLLNVAL;
 
 	/* attach the engine control/info block */
 	client->engine_shm = res.engine_shm;
@@ -990,8 +997,10 @@ jack_client_thread (void *arg)
 		     pthread_exit (0);
 		}
 
-		DEBUG ("client polling on event_fd and graph_wait_fd...");
-                
+		DEBUG ("client polling on %s", client->pollmax == 2 ? 
+		       "event_fd and graph_wait_fd..." :
+		       "event_fd only");
+
 		if (poll (client->pollfd, client->pollmax, 1000) < 0) {
 			if (errno == EINTR) {
 				continue;
@@ -1006,20 +1015,59 @@ jack_client_thread (void *arg)
 		 * process() cycle. 
 		 */
 
-		if (client->pollfd[1].revents & POLLIN) {
+		if (client->graph_wait_fd >= 0 && client->pollfd[WAIT_POLL_INDEX].revents & POLLIN) {
 			control->awake_at = jack_get_microseconds();
 		}
 
-		DEBUG ("pfd[0].revents = 0x%x pfd[1].revents = 0x%x",
-		       client->pollfd[0].revents,
-		       client->pollfd[1].revents);
+		DEBUG ("pfd[EVENT].revents = 0x%x pfd[WAIT].revents = 0x%x",
+		       client->pollfd[EVENT_POLL_INDEX].revents,
+		       client->pollfd[WAIT_POLL_INDEX].revents);
 
-		if ((client->pollfd[0].revents & ~POLLIN) ||
-		    client->control->dead) {
+		pthread_testcancel();
+		
+		if (client->graph_wait_fd >= 0 && (client->pollfd[WAIT_POLL_INDEX].revents & ~POLLIN)) {
+			
+			DEBUG ("\n\n\n\n\n\n\n\nWAITFD ERROR, ZOMBIE\n\n\n\n\n");
+			
+			/* our upstream "wait" connection
+			   closed, which either means that
+			   an intermediate client exited, or
+			   jackd exited, or jackd zombified
+			   us.
+
+			   we can discover the zombification
+			   via client->control->dead, but
+			   the other two possibilities are
+			   impossible to identify just from
+			   this situation. so we have to
+			   check what we are connected to,
+			   and act accordingly.
+			*/
+			
+			if (client->upstream_is_jackd) {
+                                DEBUG ("WE DIE\n");
+				goto zombie;
+			} else {
+                                DEBUG ("WE PUNT\n");
+				/* don't poll on the wait fd
+				 * again until we get a
+				 * GraphReordered event.
+				 */
+				client->graph_wait_fd = -1;
+				client->pollmax = 1;
+			}
+		}
+
+		if (client->control->dead) {
 			goto zombie;
 		}
 
-		if (client->pollfd[0].revents & POLLIN) {
+		if (client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
+			/* jackd shutdown */
+			goto zombie;
+		}
+
+		if (client->pollfd[EVENT_POLL_INDEX].revents & POLLIN) {
 
 			DEBUG ("client receives an event, "
 			       "now reading on event fd");
@@ -1114,11 +1162,7 @@ jack_client_thread (void *arg)
 			}
 		}
 
-		if (client->pollfd[1].revents & ~POLLIN) {
-			goto zombie;
-		}
-
-		if (client->pollfd[1].revents & POLLIN) {
+		if (client->pollfd[WAIT_POLL_INDEX].revents & POLLIN) {
 
 #ifdef WITH_TIMESTAMPS
 			jack_reset_timestamps ();
@@ -1132,7 +1176,7 @@ jack_client_thread (void *arg)
 			       control->signalled_at, 
 			       control->awake_at, 
 			       control->awake_at - control->signalled_at,
-			       client->pollfd[1].fd);
+			       client->pollfd[WAIT_POLL_INDEX].fd);
 
 			control->state = Running;
 
@@ -1321,7 +1365,6 @@ jack_client_process_thread (void *arg)
 
 static int
 jack_start_thread (jack_client_t *client)
-
 {
 #ifndef JACK_USE_MACH_THREADS
 	int policy = SCHED_OTHER;
@@ -1378,14 +1421,18 @@ jack_start_thread (jack_client_t *client)
 		}
                 
 #ifdef USE_MLOCK
-                if (client->engine->do_mlock
-		    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
-                    jack_error ("cannot lock down memory for RT thread (%s)",
-				strerror (errno));
+                if (client->engine->do_mlock) {
+			if (mlockall (MCL_CURRENT | MCL_FUTURE) != 0) {
+				jack_error ("cannot lock down memory for RT thread (%s)",
+					    strerror (errno));
 #ifdef ENSURE_MLOCK
-                    return -1;
+				return -1;
 #endif /* ENSURE_MLOCK */
-                }
+			}
+			if (client->engine->do_munlock) {
+				cleanup_mlock ();
+			}
+		}
 #endif /* USE_MLOCK */
 	}
 
@@ -1866,18 +1913,6 @@ jack_set_port_registration_callback(jack_client_t *client,
 	client->control->port_register_arg = arg;
 	client->control->port_register = callback;
 	return 0;
-}
-
-int
-jack_get_process_start_fd (jack_client_t *client)
-{
-	/* once this has been called, the client thread
-	   does not sleep on the graph wait fd.
-	*/
-
-	client->pollmax = 1;
-	return client->graph_wait_fd;
-
 }
 
 int

@@ -61,6 +61,7 @@ static int temporary = 0;
 static int verbose = 0;
 static int client_timeout = 500; /* msecs */
 static unsigned int port_max = 128;
+static int do_unlock = 0;
 
 static void 
 do_nothing_handler (int sig)
@@ -135,7 +136,8 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	
 	/* get the engine/driver started */
 
-	if ((engine = jack_engine_new (realtime, realtime_priority, do_mlock,
+	if ((engine = jack_engine_new (realtime, realtime_priority, 
+				       do_mlock, do_unlock,
 				       temporary, verbose, client_timeout, port_max,
 				       getpid(), drivers)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
@@ -222,11 +224,12 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 	filename = malloc (strlen (ADDON_DIR) + 1 + strlen (sofile) + 1);
 	sprintf (filename, "%s/%s", ADDON_DIR, sofile);
 
-	if (verbose)
-		printf ("getting driver descriptor from %s\n", filename);
 
-	dlhandle = dlopen (filename, RTLD_NOW|RTLD_GLOBAL);
-	if (!dlhandle) {
+	if (verbose) {
+		fprintf (stderr, "getting driver descriptor from %s", filename);
+	}
+
+	if ((dlhandle = dlopen (filename, RTLD_NOW|RTLD_GLOBAL)) == NULL) {
 		jack_error ("could not open driver .so '%s': %s\n", filename, dlerror ());
 		free (filename);
 		return NULL;
@@ -237,23 +240,20 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 	so_get_descriptor = (JackDriverDescFunction)
 		dlsym (dlhandle, "driver_get_descriptor");
 
-	dlerr = dlerror ();
-	if (dlerr) {
+	if ((dlerr = dlerror ()) != NULL) {
 		dlclose (dlhandle);
 		free (filename);
 		return NULL;
 	}
 
-	descriptor = so_get_descriptor ();
-	if (!descriptor) {
+	if ((descriptor = so_get_descriptor ()) == NULL) {
 		jack_error ("driver from '%s' returned NULL descriptor\n", filename);
 		dlclose (dlhandle);
 		free (filename);
 		return NULL;
 	}
 
-	err = dlclose (dlhandle);
-	if (err) {
+	if ((err = dlclose (dlhandle)) != 0) {
 		jack_error ("error closing driver .so '%s': %s\n", filename, dlerror ());
 	}
 
@@ -345,6 +345,7 @@ static void usage (FILE *file)
 	fprintf (file, "\n"
 "usage: jackd [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
 "             [ --no-mlock OR -m ]\n"
+"             [ --unlock OR -u ]\n"
 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
 "             [ --port-max OR -p maximum-number-of-ports]\n"
 "             [ --verbose OR -v ]\n"
@@ -388,6 +389,7 @@ main (int argc, char *argv[])
 		{ "help", 0, 0, 'h' },
 		{ "port-max", 1, 0, 'p' },
 		{ "no-mlock", 0, 0, 'm' },
+		{ "unmlock", 0, 0, 'u' },
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },
 		{ "timeout", 1, 0, 't' },
@@ -486,6 +488,10 @@ main (int argc, char *argv[])
 
 		case 't':
 			client_timeout = atoi (optarg);
+			break;
+
+		case 'u':
+			do_unlock = 1;
 			break;
 
 		case 'V':

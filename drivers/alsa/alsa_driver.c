@@ -30,7 +30,7 @@
 #include <sys/types.h>
 #include <regex.h>
 #include <string.h>
-
+ 
 #include <jack/internal.h>
 #include <jack/engine.h>
 
@@ -989,8 +989,7 @@ alsa_driver_start (alsa_driver_t *driver)
 
 	if (driver->playback_handle) {
 		driver->playback_nfds =
-			snd_pcm_poll_descriptors_count (
-				driver->playback_handle);
+			snd_pcm_poll_descriptors_count (driver->playback_handle);
 	} else {
 		driver->playback_nfds = 0;
 	}
@@ -1606,8 +1605,12 @@ alsa_driver_run_cycle (alsa_driver_t *driver)
 	int wait_status;
 	float delayed_usecs;
 
+	DEBUG ("alsa run cycle wait\n");
+
 	jack_nframes_t nframes = alsa_driver_wait (driver, -1, &wait_status,
 						   &delayed_usecs);
+
+	DEBUG ("alsa back from wait, nframes = %lu", nframes);
 
 	if (nframes == 0) {
 
@@ -1938,17 +1941,30 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 				  playback_alsa_device,
 				  SND_PCM_STREAM_PLAYBACK,
 				  SND_PCM_NONBLOCK) < 0) {
-			if (errno == EBUSY) {
+			switch (errno) {
+			case EBUSY:
 				jack_error ("the playback device \"%s\" is "
 					    "already in use. Please stop the"
 					    " application using it and "
 					    "run JACK again",
 					    playback_alsa_device);
 				return NULL;
-			}
+				break;
+
+			case EPERM:
+				jack_error ("you do not have permission to open "
+					    "the audio device \"%s\" for playback",
+					    playback_alsa_device);
+				return NULL;
+				break;
+			} 
+			
 			driver->playback_handle = NULL;
 		} 
-		snd_pcm_nonblock (driver->playback_handle, 0);
+
+		if (driver->playback_handle) {
+			snd_pcm_nonblock (driver->playback_handle, 0);
+		}
 	} 
 
 	if (capturing) {
@@ -1956,17 +1972,30 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 				  capture_alsa_device,
 				  SND_PCM_STREAM_CAPTURE,
 				  SND_PCM_NONBLOCK) < 0) {
-			if (errno == EBUSY) {
+			switch (errno) {
+			case EBUSY:
 				jack_error ("the capture device \"%s\" is "
 					    "already in use. Please stop the"
 					    " application using it and "
 					    "run JACK again",
 					    capture_alsa_device);
 				return NULL;
-			}
+				break;
+
+			case EPERM:
+				jack_error ("you do not have permission to open "
+					    "the audio device \"%s\" for capture",
+					    capture_alsa_device);
+				return NULL;
+				break;
+			} 
+
 			driver->capture_handle = NULL;
 		}
-		snd_pcm_nonblock (driver->capture_handle, 0);
+
+		if (driver->capture_handle) {
+			snd_pcm_nonblock (driver->capture_handle, 0);
+		}
 	}
 
 	if (driver->playback_handle == NULL) {

@@ -660,6 +660,8 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 		status = -1; 
 	}
 
+	DEBUG ("\n\n\n\n\n back from subgraph poll, revents = 0x%x\n\n\n", pfd[0].revents);
+
 	if (pfd[0].revents & ~POLLIN) {
 		jack_error ("subgraph starting at %s lost client",
 			    client->control->name);
@@ -681,7 +683,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 
 	if (status != 0) {
 		VERBOSE (engine, "at %" PRIu64
-			 " client waiting on %d took %" PRIu64
+			 " waiting on %d for %" PRIu64
 			 " usecs, status = %d sig = %" PRIu64
 			 " awa = %" PRIu64 " fin = %" PRIu64
 			 " dur=%" PRIu64 "\n",
@@ -914,7 +916,7 @@ jack_engine_post_process (jack_engine_t *engine)
 			    ctl->state > NotTriggered &&
 			    ctl->state != Finished &&
 			    ctl->timed_out++) {
-				fprintf (stderr, "client %s error: awake_at = %"
+				VERBOSE(engine, "client %s error: awake_at = %"
 					 PRIu64
 					 " state = %d timed_out = %d\n",
 					 ctl->name,
@@ -1842,6 +1844,8 @@ jack_server_thread (void *arg)
 			jack_error ("poll failed (%s)", strerror (errno));
 			break;
 		}
+
+		DEBUG("server thread back from poll");
 			
 		/* check each client socket before handling other request*/
 		for (i = 2; i < max; i++) {
@@ -1937,7 +1941,9 @@ jack_server_thread (void *arg)
 }
 
 jack_engine_t *
-jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
+jack_engine_new (int realtime, int rtpriority, 
+		 int do_mlock, int do_unlock,
+		 int temporary,
 		 int verbose, int client_timeout, unsigned int port_max, pid_t wait_pid,
 		 JSList *drivers)
 {
@@ -2076,6 +2082,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int temporary,
 	engine->control->real_time = realtime;
 	engine->control->client_priority = engine->rtpriority - 1;
 	engine->control->do_mlock = do_mlock;
+	engine->control->do_munlock = do_unlock;
 	engine->control->cpu_load = 0;
  
 	engine->control->buffer_size = 0;
@@ -2399,16 +2406,42 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	}
 
 	if (!engine->freewheeling) {
+		DEBUG("waiting for driver read\n");
 		if (driver->read (driver, nframes)) {
 			goto unlock;
 		}
 	}
+	
+	DEBUG("run process\n");
 
 	if (jack_engine_process (engine, nframes) == 0) {
 		if (!engine->freewheeling) {
 			if (driver->write (driver, nframes)) {
 				goto unlock;
 			}
+		}
+
+	} else {
+
+		DEBUG ("engine process cycle failed");
+		JSList *node;
+
+		/* we are already late, or something else went wrong,
+		   so it can't hurt to check the existence of all
+		   clients.
+		*/
+
+		for (node = engine->clients; node; node = jack_slist_next (node)) {
+			jack_client_internal_t *client = (jack_client_internal_t *) node->data;
+
+			if (client->control->type == ClientExternal) {
+				if (kill (client->control->pid, 0)) {
+					VERBOSE(engine, "client %s has died/exited\n", client->control->name);
+					client->error++;
+				}
+			}
+			
+			DEBUG ("client %s errors = %d", client->control->name, client->error);
 		}
 	}
 
@@ -2418,6 +2451,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 
   unlock:
 	jack_unlock_graph (engine);
+	DEBUG("cycle finished, status = %d", ret);
 	return ret;
 }
 
@@ -2632,7 +2666,7 @@ jack_port_clear_connections (jack_engine_t *engine,
 static void
 jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
-	VERBOSE (engine, "*&*&*&*&** senor %s - you are a ZOMBIE\n",
+	VERBOSE (engine, "removing client \"%s\" from the processing chain\n",
 		 client->control->name);
 
 	/* caller must hold the client_lock */
@@ -2653,7 +2687,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	/* caller must hold the client_lock */
 
-	VERBOSE (engine, "adios senor %s\n", client->control->name);
+	VERBOSE (engine, "removing client \"%s\"\n", client->control->name);
 
 	/* if its not already a zombie, make it so */
 
@@ -2795,9 +2829,17 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 
 	DEBUG ("delivering event (type %d)", event->type);
 
-	if (client->control->dead) {
+	/* we are not RT-constrained here, so use kill(2) to beef up
+	   our check on a client's continued well-being
+	*/
+
+	if (client->control->dead || 
+	    (client->control->type == ClientExternal && kill (client->control->pid, 0))) {
+		DEBUG ("client %s is dead - no event sent", client->control->name);
 		return 0;
 	}
+
+	DEBUG ("client %s is still alive", client->control->name);
 
 	if (jack_client_is_internal (client)) {
 
@@ -2897,6 +2939,7 @@ jack_rechain_graph (jack_engine_t *engine)
 	int err = 0;
 	jack_client_internal_t *client, *subgraph_client, *next_client;
 	jack_event_t event;
+	int upstream_is_jackd;
 
 	jack_clear_fifos (engine);
 
@@ -2962,12 +3005,13 @@ jack_rechain_graph (jack_engine_t *engine)
 					 client->control->name, n);
 
 				/* this does the right thing for
-				 * internal clients too */
+				 * internal clients too 
+				 */
 
 				jack_deliver_event (engine, client, &event);
 
 				subgraph_client = 0;
-				
+
 			} else {
 				
 				if (subgraph_client == NULL) {
@@ -2975,7 +3019,8 @@ jack_rechain_graph (jack_engine_t *engine)
 				        /* start a new subgraph. the
 					 * engine will start the chain
 					 * by writing to the nth
-					 * FIFO. */
+					 * FIFO. 
+					 */
 					
 					subgraph_client = client;
 					subgraph_client->subgraph_start_fd =
@@ -2987,6 +3032,13 @@ jack_rechain_graph (jack_engine_t *engine)
 						 control->name,
 						 subgraph_client->
 						 subgraph_start_fd, n);
+					
+					/* this external client after this will have
+					   jackd as its upstream connection.
+					*/
+					
+					upstream_is_jackd = 1;
+
 				} 
 				else {
 					VERBOSE (engine, "client %s: in"
@@ -2997,6 +3049,12 @@ jack_rechain_graph (jack_engine_t *engine)
 						 subgraph_client->
 						 control->name, n);
 					subgraph_client->subgraph_wait_fd = -1;
+					
+					/* this external client after this will have
+					   another client as its upstream connection.
+					*/
+					
+					upstream_is_jackd = 0;
 				}
 
 				/* make sure fifo for 'n + 1' exists
@@ -3005,6 +3063,7 @@ jack_rechain_graph (jack_engine_t *engine)
 				(void) jack_get_fifo_fd(
 					engine, client->execution_order + 1);
 				event.x.n = client->execution_order;
+				event.y.n = upstream_is_jackd;
 				jack_deliver_event (engine, client, &event);
 				n++;
 			}

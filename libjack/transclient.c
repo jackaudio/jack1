@@ -61,16 +61,6 @@ jack_read_frame_time (const jack_client_t *client, jack_frame_timer_t *copy)
 	} while (copy->guard1 != copy->guard2);
 }
 
-
-jack_nframes_t
-jack_last_frame_time (const jack_client_t *client)
-{
-	jack_frame_timer_t current;
-	jack_read_frame_time (client, &current);
-	return current.frames;
-}
-
-
 /* copy a JACK transport position structure (thread-safe) */
 void
 jack_transport_copy_position (jack_position_t *from, jack_position_t *to)
@@ -241,6 +231,14 @@ jack_frame_time (const jack_client_t *client)
 			/ 1000000.0f) * usecs);
 	
 	return current.frames + elapsed;
+}
+
+jack_nframes_t
+jack_last_frame_time (const jack_client_t *client)
+{
+	jack_frame_timer_t current;
+	jack_read_frame_time (client, &current);
+	return current.frames;
 }
 
 jack_nframes_t

@@ -4,6 +4,7 @@ SOURCE_FILES = \
 	     shm.c \
 	     client.c \
 	     driver.c \
+	     unlock.c  \
 	     pool.c \
 	     port.c \
 	     ringbuffer.c \

@@ -9,10 +9,11 @@ struct _jack_client {
     jack_shm_info_t        engine_shm;
     jack_shm_info_t        control_shm;
 
-    struct pollfd* pollfd;
-    int            pollmax;
-    int            graph_next_fd;
-    int            request_fd;
+    struct pollfd*  pollfd;
+    int             pollmax;
+    int             graph_next_fd;
+    int             request_fd;
+    int             upstream_is_jackd;
 
     /* these two are copied from the engine when the 
      * client is created.
@@ -43,7 +44,6 @@ struct _jack_client {
 
 extern int jack_client_deliver_request (const jack_client_t *client, jack_request_t *req);
 extern jack_port_t *jack_port_new (const jack_client_t *client, jack_port_id_t port_id, jack_control_t *control);
-
 
 extern void *jack_zero_filled_buffer;
 

@@ -14,6 +14,7 @@
 
 jack_port_t *input_port;
 jack_port_t *output_port;
+jack_client_t *client;
 
 /**
  * The process callback for this JACK application.
@@ -26,7 +27,7 @@ process (jack_nframes_t nframes, void *arg)
 	jack_default_audio_sample_t *in = (jack_default_audio_sample_t *) jack_port_get_buffer (input_port, nframes);
 
 	memcpy (out, in, sizeof (jack_default_audio_sample_t) * nframes);
-	
+
 	return 0;      
 }
 
@@ -45,7 +46,6 @@ jack_shutdown (void *arg)
 int
 main (int argc, char *argv[])
 {
-	jack_client_t *client;
 	const char **ports;
 
 	if (argc < 2) {

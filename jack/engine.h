@@ -112,6 +112,7 @@ struct _jack_engine {
     int		    rtpriority;
     char	    freewheeling;
     char	    verbose;
+    char	    do_munlock;
     char	    temporary;
     int		    reordered;
     int		    watchdog_check;
@@ -149,7 +150,7 @@ struct _jack_engine {
 /* public functions */
 
 jack_engine_t  *jack_engine_new (int real_time, int real_time_priority,
-				 int do_mlock, int temporary,
+				 int do_mlock, int do_unlock, int temporary,
 				 int verbose, int client_timeout,
 				 unsigned int port_max,
                                  pid_t waitpid, JSList *drivers);

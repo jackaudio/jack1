@@ -111,6 +111,7 @@ typedef struct {
     jack_nframes_t	  buffer_size;
     int8_t		  real_time;
     int8_t		  do_mlock;
+    int8_t		  do_munlock;
     int32_t		  client_priority;
     int32_t		  has_capabilities;
     float                 cpu_load;
