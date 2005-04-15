@@ -901,7 +901,7 @@ jack_watchdog_thread (void *arg)
 
 	while (1) {
 		sleep (5);
-		if ( engine->watchdog_check == 0) {
+		if (!engine->freewheeling && engine->watchdog_check == 0) {
 
 			jack_error ("jackd watchdog: timeout - killing jackd");
 
@@ -930,7 +930,7 @@ jack_start_watchdog (jack_engine_t *engine)
 	    (max_priority < watchdog_priority))
 		watchdog_priority = max_priority;
 	
-	if (jack_create_thread (&engine->watchdog_thread, watchdog_priority,
+	if (jack_create_thread (NULL, &engine->watchdog_thread, watchdog_priority,
 				TRUE, jack_watchdog_thread, engine)) {
 		jack_error ("cannot start watchdog thread");
 		return -1;
@@ -1134,40 +1134,25 @@ static int give_capabilities (jack_engine_t *engine, pid_t pid)
 }
 
 static int
-jack_set_client_capabilities (jack_engine_t *engine, jack_client_id_t id)
-
+jack_set_client_capabilities (jack_engine_t *engine, pid_t cap_pid)
 {
-	JSList *node;
 	int ret = -1;
 
-	jack_lock_graph (engine);
+	/* before sending this request the client has
+	   already checked that the engine has
+	   realtime capabilities, that it is running
+	   realtime and that the pid is defined
+	*/
 
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-
-		jack_client_internal_t *client =
-			(jack_client_internal_t *) node->data;
-
-		if (client->control->id == id) {
-
-			/* before sending this request the client has
-			   already checked that the engine has
-			   realtime capabilities, that it is running
-			   realtime and that the pid is defined
-			*/
-			ret = give_capabilities (engine, client->control->pid);
-			if (ret) {
-				jack_error ("could not give capabilities to "
-					    "process %d\n",
-					    client->control->pid);
-			} else {
-				VERBOSE (engine, "gave capabilities to"
-					 " process %d\n",
-					 client->control->pid);
-			}
-		}
+	if ((ret = give_capabilities (engine, cap_pid)) != 0) {
+		jack_error ("could not give capabilities to "
+			    "process %d\n",
+			    cap_pid);
+	} else {
+		VERBOSE (engine, "gave capabilities to"
+			 " process %d\n",
+			 cap_pid);
 	}
-
-	jack_unlock_graph (engine);
 
 	return ret;
 }	
@@ -1252,7 +1237,7 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 #ifdef USE_CAPABILITIES
 	case SetClientCapabilities:
 		req->status = jack_set_client_capabilities (engine,
-							    req->x.client_id);
+							    req->x.cap_pid);
 		break;
 #endif /* USE_CAPABILITIES */
 		
@@ -1757,7 +1742,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	(void) jack_get_fifo_fd (engine, 0);
 
-	jack_create_thread (&engine->server_thread, 0, FALSE,
+	jack_create_thread (NULL, &engine->server_thread, 0, FALSE,
 			    &jack_server_thread, engine);
 
 	return engine;
@@ -1870,8 +1855,8 @@ jack_start_freewheeling (jack_engine_t* engine)
 	event.type = StartFreewheel;
 	jack_deliver_event_to_all (engine, &event);
 	
-	if (jack_create_thread (&engine->freewheel_thread, 0, FALSE,
-			    jack_engine_freewheel, engine)) {
+	if (jack_create_thread (NULL, &engine->freewheel_thread, 0, FALSE,
+				jack_engine_freewheel, engine)) {
 		jack_error ("could not start create freewheel thread");
 		return -1;
 	}

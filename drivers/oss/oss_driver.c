@@ -655,7 +655,7 @@ static int oss_driver_start (oss_driver_t *driver)
 	driver->threads = 0;
 	if (infd >= 0)
 	{
-		if (jack_create_thread(&driver->thread_in, 
+		if (jack_create_thread(NULL, &driver->thread_in, 
 			driver->engine->rtpriority, 
 			driver->engine->control->real_time, 
 			io_thread, driver) < 0)
@@ -669,7 +669,7 @@ static int oss_driver_start (oss_driver_t *driver)
 #	ifdef USE_BARRIER
 	if (outfd >= 0)
 	{
-		if (jack_create_thread(&driver->thread_out, 
+		if (jack_create_thread(NULL, &driver->thread_out, 
 			driver->engine->rtpriority, 
 			driver->engine->control->real_time, 
 			io_thread, driver) < 0)

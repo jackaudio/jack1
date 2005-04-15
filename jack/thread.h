@@ -51,6 +51,8 @@ int jack_acquire_real_time_scheduling (pthread_t thread, int priority);
  * created executing @a start_routine with @a arg as its sole
  * argument.
  *
+ * @param client the JACK client for whom the thread is being created. May be
+ * NULL if the client is being created within the JACK server.
  * @param thread place to return POSIX thread ID.
  * @param priority thread priority, if realtime.
  * @param realtime true for the thread to use realtime scheduling.  On
@@ -58,10 +60,10 @@ int jack_acquire_real_time_scheduling (pthread_t thread, int priority);
  * @param start_routine function the thread calls when it starts.
  * @param arg parameter passed to the @a start_routine.
  *
- * @returns 0, if successful; EPERM, if the calling process lacks
- * required realtime privileges; otherwise some other error number.
+ * @returns 0, if successful; otherwise some error number.
  */
-int jack_create_thread (pthread_t *thread,
+int jack_create_thread (jack_client_t* client,
+			pthread_t *thread,
 			int priority,
 			int realtime,	/* boolean */
 			void *(*start_routine)(void*),

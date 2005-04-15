@@ -988,34 +988,9 @@ int
 jack_set_freewheel (jack_client_t* client, int onoff)
 {
 	jack_request_t request;
-	int ret;
-
-	/* Note: the thread that initiates and terminates freewheeling must
-	   be the one that called jack_activate(), because that is the only
-	   thread with RT-granting capabilities.
-
-	   XXX horrible design. The RT thread should acquire/drop/reacquire
-	   scheduling all by itself. 
-	*/
 
 	request.type = onoff ? FreeWheel : StopFreeWheel;
-
-	if ((ret = jack_client_deliver_request (client, &request)) == 0) {
-		if (onoff == 0 && client->engine->real_time) {
-			/* get the relevant thread back to RT priority */
-#if JACK_USE_MACH_THREADS 
-			jack_acquire_real_time_scheduling (
-				client->process_thread,
-				client->engine->client_priority);
-#else
-			jack_acquire_real_time_scheduling (
-				client->thread,
-				client->engine->client_priority);
-#endif
-		}
-	} 
-
-	return ret;
+	return jack_client_deliver_request (client, &request);
 }
 
 void
@@ -1040,6 +1015,16 @@ void
 jack_stop_freewheel (jack_client_t* client)
 {
 	jack_client_control_t *control = client->control;
+
+	if (client->engine->real_time) {
+#if JACK_USE_MACH_THREADS 
+		jack_acquire_real_time_scheduling (client->process_thread,
+				client->engine->client_priority);
+#else
+		jack_acquire_real_time_scheduling (client->thread, 
+				client->engine->client_priority);
+#endif
+	}
 
 	if (control->freewheel_cb) {
 		control->freewheel_cb (0, control->freewheel_arg);
@@ -1491,16 +1476,18 @@ jack_start_thread (jack_client_t *client)
 
 #ifdef JACK_USE_MACH_THREADS
 /* Stephane Letz : letz@grame.fr
-On MacOSX, the normal thread does not need to be real-time.
+   On MacOSX, the normal thread does not need to be real-time.
 */
-	if (jack_create_thread (&client->thread,
+	if (jack_create_thread (client, 
+				&client->thread,
 				client->engine->client_priority,
-				0,
+				FALSE,
 				jack_client_thread, client)) {
 		return -1;
 	}
 #else
-	if (jack_create_thread (&client->thread,
+	if (jack_create_thread (client,
+				&client->thread,
 				client->engine->client_priority,
 				client->engine->real_time,
 				jack_client_thread, client)) {
@@ -1508,7 +1495,7 @@ On MacOSX, the normal thread does not need to be real-time.
 	}
 
 #endif
-	
+
 #ifdef JACK_USE_MACH_THREADS
 
 	/* a secondary thread that runs the process callback and uses
@@ -1521,10 +1508,11 @@ On MacOSX, the normal thread does not need to be real-time.
 
 	*/
 
-	if (jack_create_thread(&client->process_thread,
-				client->engine->client_priority,
-				client->engine->real_time,
-				jack_client_process_thread, client)) {
+	if (jack_create_thread(client,
+			       &client->process_thread,
+			       client->engine->client_priority,
+			       client->engine->real_time,
+			       jack_client_process_thread, client)) {
 		return -1;
 	}
 #endif /* JACK_USE_MACH_THREADS */
@@ -1569,6 +1557,7 @@ jack_activate (jack_client_t *client)
 
 		req.type = SetClientCapabilities;
 		req.x.client_id = client->control->id;
+		req.x.cap_pid = client->control->pid;
 
 		jack_client_deliver_request (client, &req);
 
@@ -1578,17 +1567,14 @@ jack_activate (jack_client_t *client)
 			   is using capabilities and has them
 			   (otherwise we would not get an error
 			   return) but for some reason it could not
-			   give the client the required capabilities,
-			   so for now downgrade the client so that it
-			   still runs, albeit non-realtime - nando
+			   give the client the required capabilities.
+			   For now, leave the client so that it
+			   still runs, albeit non-realtime.
 			*/
-
+			
 			jack_error ("could not receive realtime capabilities, "
 				    "client will run non-realtime");
-			/* XXX wrong, this is a property of the engine
-			client->engine->real_time = 0;
-			*/
-		}
+		} 
 	}
 #endif /* USE_CAPABILITIES */
 
@@ -1598,7 +1584,7 @@ jack_activate (jack_client_t *client)
 		pthread_cond_init (&client_ready, NULL);
 		
 		pthread_mutex_lock (&client_lock);
-		
+
 		if (jack_start_thread (client)) {
 			pthread_mutex_unlock (&client_lock);
 			return -1;

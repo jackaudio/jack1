@@ -24,6 +24,7 @@
 
 #include <config.h>
 
+#include <jack/jack.h>
 #include <jack/thread.h>
 #include <jack/internal.h>
 
@@ -32,6 +33,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+
+#include "local.h"
 
 #ifdef JACK_USE_MACH_THREADS
 #include <sysdeps/pThreadUtilities.h>
@@ -47,8 +50,85 @@ log_result (char *msg, int res)
 	jack_error(outbuf);
 }
 
+static void*
+jack_thread_proxy (jack_thread_arg_t* arg)
+{
+	void* (*work)(void*);
+	void* warg;
+	jack_client_t* client = arg->client;
+	int try_rt = 0;
+
+	if (arg->realtime) {
+
+#ifdef USE_CAPABILITIES
+
+		if (client == 0) {
+
+			/* we're creating a thread within jackd itself, don't
+			   bother trying to acquire capabilities because either
+			   jackd has them or it doesn't.
+			*/
+
+			try_rt = 1;
+
+		} else {
+
+			jack_request_t req;
+			
+			if (client->engine->has_capabilities != 0 &&
+			    client->control->pid != 0 && 
+			    client->engine->real_time != 0) {
+				
+				/* we need to ask the engine for realtime capabilities
+				   before trying to run the thread work function
+				*/
+				
+				req.type = SetClientCapabilities;
+				req.x.cap_pid = getpid();
+				
+				jack_client_deliver_request (client, &req);
+				
+				if (req.status) {
+					
+					/* what to do? engine is running realtime, it
+					   is using capabilities and has them
+					   (otherwise we would not get an error
+					   return) but for some reason it could not
+					   give the client the required capabilities.
+					   for now, allow the client to run, albeit
+					   non-realtime.
+					*/
+					
+					jack_error ("could not receive realtime capabilities, "
+						    "client will run non-realtime");
+				} else { 
+					try_rt = 1;
+				}
+			}
+		}
+		
+#else /* !USE_CAPABILITIES */
+
+		try_rt = 1;
+
+#endif /* USE_CAPABILITIES */
+			
+		if (try_rt) {
+			jack_acquire_real_time_scheduling (pthread_self(), arg->priority);
+		}
+	}
+
+	warg = arg->arg;
+	work = arg->work_function;
+
+	free (arg);
+	
+	return work (warg);
+}
+
 int
-jack_create_thread (pthread_t* thread,
+jack_create_thread (jack_client_t* client,
+		    pthread_t* thread,
 		    int priority,
 		    int realtime,
 		    void*(*start_routine)(void*),
@@ -60,6 +140,7 @@ jack_create_thread (pthread_t* thread,
 	struct sched_param param;
 	int actual_policy;
 	struct sched_param actual_param;
+	jack_thread_arg_t* thread_args;
 #endif /* !JACK_USE_MACH_THREADS */
 
 	int result = 0;
@@ -81,8 +162,6 @@ jack_create_thread (pthread_t* thread,
 #ifndef JACK_USE_MACH_THREADS
 
 	pthread_attr_init(&attr);
-	policy = SCHED_FIFO;
-	param.sched_priority = priority;
 	result = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
 	if (result) {
 		log_result("requesting explicit scheduling", result);
@@ -98,125 +177,18 @@ jack_create_thread (pthread_t* thread,
 		log_result("requesting system scheduling scope", result);
 		return result;
 	}
-	result = pthread_attr_setschedpolicy(&attr, policy);
+
+	thread_args = (jack_thread_arg_t *) malloc (sizeof (jack_thread_arg_t));
+
+	thread_args->client = client;
+	thread_args->work_function = start_routine;
+	thread_args->arg = arg;
+	thread_args->realtime = 1;
+	thread_args->priority = priority;
+
+	result = pthread_create (thread, &attr, jack_thread_proxy, thread_args);
 	if (result) {
-		log_result("requesting non-standard scheduling policy", result);
-		return result;
-	}
-	result = pthread_attr_setschedparam(&attr, &param);
-	if (result) {
-		log_result("requesting thread priority", result);
-		return result;
-	}
-	
-	/* with respect to getting scheduling class+priority set up
-	   correctly, there are three possibilities here: 
-
-	   a) the call sets them and returns zero
-	      ===================================
-
-	      this is great, obviously.
-
-	   b) the call fails to set them and returns an error code
-	      ====================================================
-
-  	      this could happen for a number of reasons,
-	      but the important one is that we do not have the
-	      priviledges required to create a realtime
-	      thread. this could be correct, or it could be
-	      bogus: there is at least one version of glibc
-	      that checks only for UID in
-	      pthread_attr_setschedpolicy(), and does not
-	      check capabilities.
-	      
-	   c) the call fails to set them and does not return an error code
-              ============================================================
-
-	      this last case is caused by a stupid workaround in NPTL 0.60
-	      where scheduling parameters are simply ignored, with no indication
-	      of an error.
-	*/
-
-	result = pthread_create (thread, &attr, start_routine, arg);
-
-	if (result) {
-
-		/* this workaround temporarily switches the
-		   current thread to the proper scheduler
-		   and priority, using a call that
-		   correctly checks for capabilities, then
-		   starts the realtime thread so that it
-		   can inherit them and finally switches
-		   the current thread back to what it was
-		   before.
-		*/
-		
-		int current_policy;
-		struct sched_param current_param;
-		pthread_attr_t inherit_attr;
-		
-		current_policy = sched_getscheduler (0);
-		sched_getparam (0, &current_param);
-		
-		result = sched_setscheduler (0, policy, &param);
-		if (result) {
-			log_result("switching current thread to rt for "
-				   "inheritance", result);
-			return result;
-		}
-		
-		pthread_attr_init (&inherit_attr);
-		result = pthread_attr_setscope (&inherit_attr,
-						PTHREAD_SCOPE_SYSTEM);
-		if (result) {
-			log_result("requesting system scheduling scope "
-				   "for inheritance", result);
-			return result;
-		}
-		result = pthread_attr_setinheritsched (&inherit_attr,
-						       PTHREAD_INHERIT_SCHED);
-		if (result) {
-			log_result("requesting inheritance of scheduling "
-				   "parameters", result);
-			return result;
-		}
-		result = pthread_create (thread, &inherit_attr, start_routine,
-					 arg);
-		if (result) {
-			log_result("creating real-time thread by inheritance",
-				   result);
-		}
-		
-		sched_setscheduler (0, current_policy, &current_param);
-		
-		if (result)
-			return result;
-	}
-	
-	/* Still here? Good. Let's see if this worked... */
-
-	result = pthread_getschedparam (*thread, &actual_policy, &actual_param);
-	if (result) {
-		log_result ("verifying scheduler parameters", result);
-		return result;
-	}
-
-	if (actual_policy == policy &&
-	    actual_param.sched_priority == param.sched_priority) {
-		return 0;		/* everything worked OK */
-	}
-
-	/* we failed to set the sched class and priority,
-	 * even though no error was returned by
-	 * pthread_create(). fix this by setting them
-	 * explicitly, which as far as is known will
-	 * work even when using thread attributes does not.
-	 */
-
-	result = pthread_setschedparam (*thread, policy, &param);
-	if (result) {
-		log_result("setting scheduler parameters after thread "
-			   "creation", result);
+		log_result ("creating realtime thread", result);
 		return result;
 	}
 
@@ -282,13 +254,14 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 	rtparam.sched_priority = priority;
 	
 	if ((x = pthread_setschedparam (thread, SCHED_FIFO, &rtparam)) != 0) {
-		jack_error ("cannot use real-time scheduling (FIFO/%d) "
+		jack_error ("cannot use real-time scheduling (FIFO at priority %d) "
 			    "[for thread %d, from thread %d] (%d: %s)", 
 			    rtparam.sched_priority, 
 			    thread, pthread_self(),
 			    x, strerror (x));
 		return -1;
 	}
+
         return 0;
 }
 

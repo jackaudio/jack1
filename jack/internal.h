@@ -354,6 +354,7 @@ struct _jack_request {
 	jack_client_id_t client_id;
 	jack_nframes_t nframes;
 	jack_time_t timeout;
+        pid_t cap_pid;
     } x;
     int32_t status;
 };
@@ -392,6 +393,15 @@ typedef struct _jack_client_internal {
 #endif /* JACK_USE_MACH_THREADS */
     
 } jack_client_internal_t;
+
+typedef struct _jack_thread_arg {
+	jack_client_t* client;
+	void* (*work_function)(void*);
+	int priority;
+	int realtime;
+	void* arg;
+	pid_t cap_pid;
+} jack_thread_arg_t;
 
 extern int  jack_client_handle_port_connection (jack_client_t *client,
 						jack_event_t *event);
