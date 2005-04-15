@@ -148,11 +148,11 @@ jack_driver_nt_start (jack_driver_nt_t * driver)
 	pthread_mutex_lock (&driver->nt_run_lock);
 	driver->nt_run = DRIVER_NT_RUN;
 
-	if ((err = jack_create_thread (NULL,
-				       &driver->nt_thread, 
-				       driver->engine->rtpriority,
-				       driver->engine->control->real_time,
-				       jack_driver_nt_thread, driver)) != 0) {
+	if ((err = jack_client_create_thread (NULL,
+					      &driver->nt_thread, 
+					      driver->engine->rtpriority,
+					      driver->engine->control->real_time,
+					      jack_driver_nt_thread, driver)) != 0) {
 		jack_error ("DRIVER NT: could not start driver thread!");
 		driver->nt_stop (driver);
 		return err;

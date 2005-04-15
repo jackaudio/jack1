@@ -1,3 +1,12 @@
+2005-04-15  Paul Davis  <paul>
+
+	* change the way threads get RT scheduling. it is now requested by
+	the thread rather than assigned by the thread's parent. in cases
+	where capabilities are used, the child is also given capabilities
+	so that it can release + re-acquire RT scheduling as needed.
+	
+	* prevent watchdog from killing anything is JACK is freewheeling.
+
 2004-12-31  Jack O'Quin  <joq@io.com>
 
 	* new header file: <jack/statistics.h>

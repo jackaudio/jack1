@@ -62,12 +62,12 @@ int jack_acquire_real_time_scheduling (pthread_t thread, int priority);
  *
  * @returns 0, if successful; otherwise some error number.
  */
-int jack_create_thread (jack_client_t* client,
-			pthread_t *thread,
-			int priority,
-			int realtime,	/* boolean */
-			void *(*start_routine)(void*),
-			void *arg);
+int jack_client_create_thread (jack_client_t* client,
+			       pthread_t *thread,
+			       int priority,
+			       int realtime,	/* boolean */
+			       void *(*start_routine)(void*),
+			       void *arg);
 
 /**
  * Drop realtime scheduling for a thread.

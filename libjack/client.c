@@ -1478,15 +1478,15 @@ jack_start_thread (jack_client_t *client)
 /* Stephane Letz : letz@grame.fr
    On MacOSX, the normal thread does not need to be real-time.
 */
-	if (jack_create_thread (client, 
-				&client->thread,
-				client->engine->client_priority,
-				FALSE,
-				jack_client_thread, client)) {
+	if (jack_client_create_thread (client, 
+				       &client->thread,
+				       client->engine->client_priority,
+				       FALSE,
+				       jack_client_thread, client)) {
 		return -1;
 	}
 #else
-	if (jack_create_thread (client,
+	if (jack_client_create_thread (client,
 				&client->thread,
 				client->engine->client_priority,
 				client->engine->real_time,
@@ -1508,11 +1508,11 @@ jack_start_thread (jack_client_t *client)
 
 	*/
 
-	if (jack_create_thread(client,
-			       &client->process_thread,
-			       client->engine->client_priority,
-			       client->engine->real_time,
-			       jack_client_process_thread, client)) {
+	if (jack_client_create_thread(client,
+				      &client->process_thread,
+				      client->engine->client_priority,
+				      client->engine->real_time,
+				      jack_client_process_thread, client)) {
 		return -1;
 	}
 #endif /* JACK_USE_MACH_THREADS */

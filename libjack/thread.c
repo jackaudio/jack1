@@ -45,77 +45,62 @@ log_result (char *msg, int res)
 {
 	char outbuf[500];
 	snprintf(outbuf, sizeof(outbuf),
-		 "jack_create_thread: error %d %s: %s",
+		 "jack_client_create_thread: error %d %s: %s",
 		 res, msg, strerror(res));
 	jack_error(outbuf);
 }
 
-static void*
-jack_thread_proxy (jack_thread_arg_t* arg)
+static void
+maybe_get_capabilities (jack_client_t* client)
 {
+#ifdef USE_CAPABILITIES
+
+	if (client != 0) {
+		
+		jack_request_t req;
+		
+		if (client->engine->has_capabilities != 0) {
+			
+			/* we need to ask the engine for realtime capabilities
+			   before trying to run the thread work function
+			*/
+			
+			req.type = SetClientCapabilities;
+			req.x.cap_pid = getpid();
+			
+			jack_client_deliver_request (client, &req);
+			
+			if (req.status) {
+				
+				/* what to do? engine is running realtime, it
+				   is using capabilities and has them
+				   (otherwise we would not get an error
+				   return) but for some reason it could not
+				   give the client the required capabilities.
+				   for now, allow the client to run, albeit
+				   non-realtime.
+				*/
+				
+				jack_error ("could not receive realtime capabilities, "
+					    "client will run non-realtime");
+				
+			}
+		}
+	}
+#endif /* USE_CAPABILITIES */
+}	
+
+static void*
+jack_thread_proxy (void* varg)
+{
+	jack_thread_arg_t* arg = (jack_thread_arg_t*) varg;
 	void* (*work)(void*);
 	void* warg;
 	jack_client_t* client = arg->client;
-	int try_rt = 0;
 
 	if (arg->realtime) {
-
-#ifdef USE_CAPABILITIES
-
-		if (client == 0) {
-
-			/* we're creating a thread within jackd itself, don't
-			   bother trying to acquire capabilities because either
-			   jackd has them or it doesn't.
-			*/
-
-			try_rt = 1;
-
-		} else {
-
-			jack_request_t req;
-			
-			if (client->engine->has_capabilities != 0 &&
-			    client->control->pid != 0 && 
-			    client->engine->real_time != 0) {
-				
-				/* we need to ask the engine for realtime capabilities
-				   before trying to run the thread work function
-				*/
-				
-				req.type = SetClientCapabilities;
-				req.x.cap_pid = getpid();
-				
-				jack_client_deliver_request (client, &req);
-				
-				if (req.status) {
-					
-					/* what to do? engine is running realtime, it
-					   is using capabilities and has them
-					   (otherwise we would not get an error
-					   return) but for some reason it could not
-					   give the client the required capabilities.
-					   for now, allow the client to run, albeit
-					   non-realtime.
-					*/
-					
-					jack_error ("could not receive realtime capabilities, "
-						    "client will run non-realtime");
-				} else { 
-					try_rt = 1;
-				}
-			}
-		}
-		
-#else /* !USE_CAPABILITIES */
-
-		try_rt = 1;
-
-#endif /* USE_CAPABILITIES */
-			
-		if (try_rt) {
-			jack_acquire_real_time_scheduling (pthread_self(), arg->priority);
-		}
+		maybe_get_capabilities (client);
+		jack_acquire_real_time_scheduling (pthread_self(), arg->priority);
 	}
 
 	warg = arg->arg;
@@ -127,19 +112,15 @@ jack_thread_proxy (jack_thread_arg_t* arg)
 }
 
 int
-jack_create_thread (jack_client_t* client,
-		    pthread_t* thread,
-		    int priority,
-		    int realtime,
-		    void*(*start_routine)(void*),
-		    void* arg)
+jack_client_create_thread (jack_client_t* client,
+			   pthread_t* thread,
+			   int priority,
+			   int realtime,
+			   void*(*start_routine)(void*),
+			   void* arg)
 {
 #ifndef JACK_USE_MACH_THREADS
 	pthread_attr_t attr;
-	int policy;
-	struct sched_param param;
-	int actual_policy;
-	struct sched_param actual_param;
 	jack_thread_arg_t* thread_args;
 #endif /* !JACK_USE_MACH_THREADS */
 

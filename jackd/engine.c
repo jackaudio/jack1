@@ -930,8 +930,8 @@ jack_start_watchdog (jack_engine_t *engine)
 	    (max_priority < watchdog_priority))
 		watchdog_priority = max_priority;
 	
-	if (jack_create_thread (NULL, &engine->watchdog_thread, watchdog_priority,
-				TRUE, jack_watchdog_thread, engine)) {
+	if (jack_client_create_thread (NULL, &engine->watchdog_thread, watchdog_priority,
+				       TRUE, jack_watchdog_thread, engine)) {
 		jack_error ("cannot start watchdog thread");
 		return -1;
 	}
@@ -1475,8 +1475,7 @@ jack_server_thread (void *arg)
 				     &client_addrlen)) < 0) {
 				jack_error ("cannot accept new connection (%s)",
 					    strerror (errno));
-			} else if (jack_client_create (engine, client_socket)
-				   < 0) {
+			} else if (jack_client_create (engine, client_socket) < 0) {
 				jack_error ("cannot complete client "
 					    "connection process");
 				close (client_socket);
@@ -1742,8 +1741,8 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	(void) jack_get_fifo_fd (engine, 0);
 
-	jack_create_thread (NULL, &engine->server_thread, 0, FALSE,
-			    &jack_server_thread, engine);
+	jack_client_create_thread (NULL, &engine->server_thread, 0, FALSE,
+				   &jack_server_thread, engine);
 
 	return engine;
 }
@@ -1855,8 +1854,8 @@ jack_start_freewheeling (jack_engine_t* engine)
 	event.type = StartFreewheel;
 	jack_deliver_event_to_all (engine, &event);
 	
-	if (jack_create_thread (NULL, &engine->freewheel_thread, 0, FALSE,
-				jack_engine_freewheel, engine)) {
+	if (jack_client_create_thread (NULL, &engine->freewheel_thread, 0, FALSE,
+				       jack_engine_freewheel, engine)) {
 		jack_error ("could not start create freewheel thread");
 		return -1;
 	}
