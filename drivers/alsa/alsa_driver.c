@@ -54,7 +54,6 @@ extern void show_work_times ();
 /* Delay (in process calls) before jackd will report an xrun */
 #define XRUN_REPORT_DELAY 0
 
-
 static void
 alsa_driver_release_channel_dependent_memory (alsa_driver_t *driver)
 {
@@ -358,7 +357,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		{"16bit", SND_PCM_FORMAT_S16},
 	};
 #define NOFORMATS (sizeof(formats)/sizeof(formats[0]))
-	
+
 	if ((err = snd_pcm_hw_params_any (handle, hw_params)) < 0)  {
 		jack_error ("ALSA: no playback configurations available (%s)",
 			    snd_strerror (err));
@@ -1728,10 +1727,7 @@ alsa_driver_attach (alsa_driver_t *driver)
 			break;
 		}
 
-		/* XXX fix this so that it can handle: systemic
-		 * (external) latency
-		*/
-		jack_port_set_latency (port, driver->frames_per_cycle);
+		jack_port_set_latency (port, driver->frames_per_cycle + driver->capture_frame_latency);
 
 		driver->capture_ports =
 			jack_slist_append (driver->capture_ports, port);
@@ -1751,11 +1747,7 @@ alsa_driver_attach (alsa_driver_t *driver)
 			break;
 		}
 		
-		/* XXX fix this so that it can handle: systemic
-		 * (external) latency
-		*/
-		jack_port_set_latency (port, driver->frames_per_cycle
-				       * driver->user_nperiods);
+		jack_port_set_latency (port, (driver->frames_per_cycle * (driver->user_nperiods - 1)) + driver->playback_frame_latency);
 
 		driver->playback_ports =
 			jack_slist_append (driver->playback_ports, port);
@@ -1948,7 +1940,9 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 		 int monitor,
 		 int user_capture_nchnls,
 		 int user_playback_nchnls,
-		 int shorts_first
+		 int shorts_first,
+		 jack_nframes_t capture_latency,
+		 jack_nframes_t playback_latency
 		 )
 {
 	int err;
@@ -1992,6 +1986,8 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 	driver->capture_nchannels = user_capture_nchnls;
 	driver->playback_sample_bytes = (shorts_first ? 2:4);
 	driver->capture_sample_bytes = (shorts_first ? 2:4);
+	driver->capture_frame_latency = capture_latency;
+	driver->playback_frame_latency = playback_latency;
 
 	driver->playback_addr = 0;
 	driver->capture_addr = 0;
@@ -2299,7 +2295,7 @@ driver_get_descriptor ()
 	desc = calloc (1, sizeof (jack_driver_desc_t));
 
 	strcpy (desc->name,"alsa");
-	desc->nparams = 15;
+	desc->nparams = 17;
   
 	params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
@@ -2433,6 +2429,23 @@ driver_get_descriptor ()
 	strcpy (params[i].short_desc, "Try 16-bit samples before 32-bit");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
+
+	i++;
+	strcpy (params[i].name, "input-latency");
+	params[i].character  = 'I';
+	params[i].type       = JackDriverParamUInt;
+	params[i].value.i    = 0;
+	strcpy (params[i].short_desc, "Extra input latency");
+	strcpy (params[i].long_desc, params[i].short_desc);
+
+	i++;
+	strcpy (params[i].name, "output-latency");
+	params[i].character  = 'O';
+	params[i].type       = JackDriverParamUInt;
+	params[i].value.i    = 0;
+	strcpy (params[i].short_desc, "Extra output latency");
+	strcpy (params[i].long_desc, params[i].short_desc);
+
 	desc->params = params;
 
 	return desc;
@@ -2456,6 +2469,8 @@ driver_initialize (jack_client_t *client, const JSList * params)
 	int user_capture_nchnls = 0;
 	int user_playback_nchnls = 0;
 	int shorts_first = FALSE;
+	jack_nframes_t systemic_input_latency = 0;
+	jack_nframes_t systemic_output_latency = 0;
 	const JSList * node;
 	const jack_driver_param_t * param;
 
@@ -2536,6 +2551,14 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			shorts_first = param->value.i;
 			break;
 
+		case 'I':
+			systemic_input_latency = param->value.ui;
+			break;
+
+		case 'O':
+			systemic_output_latency = param->value.ui;
+			break;
+
 		}
 	}
 			
@@ -2552,7 +2575,9 @@ driver_initialize (jack_client_t *client, const JSList * params)
 				hw_metering, capture, playback, dither,
 				soft_mode, monitor, 
 				user_capture_nchnls, user_playback_nchnls,
-				shorts_first);
+				shorts_first, 
+				systemic_input_latency,
+				systemic_output_latency);
 }
 
 void
