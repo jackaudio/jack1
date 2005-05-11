@@ -62,6 +62,9 @@ typedef struct {
 	AudioBufferList* output_list;
 	AudioDeviceID device_id;
 	
+	jack_nframes_t capture_frame_latency;
+	jack_nframes_t playback_frame_latency;
+	
 	int xrun_detected;
 	int null_cycle_occured;
 

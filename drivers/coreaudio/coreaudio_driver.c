@@ -34,6 +34,7 @@
  Dec 09, 2004: S.Letz: Dynamic buffer size change
  Dec 23, 2004: S.Letz: Correct bug in dynamic buffer size change : update period_usecs
  Jan 20, 2005: S.Letz: Almost complete rewrite using AUHAL.
+ May 20, 2005: S.Letz: Add "systemic" latencies management.
  
  TODO:
 	- fix cpu load behavior.
@@ -223,6 +224,7 @@ coreaudio_driver_attach(coreaudio_driver_t * driver,
 	char channel_name[64];
 	OSStatus err;
 	UInt32 size;
+	UInt32 value1,value2;
     Boolean isWritable;
 	
     driver->engine = engine;
@@ -258,10 +260,16 @@ coreaudio_driver_attach(coreaudio_driver_t * driver,
 			break;
 		}
 
-		/* XXX fix this so that it can handle: systemic (external) latency
-		 */
-
-		jack_port_set_latency(port, driver->frames_per_cycle);
+		size = sizeof(UInt32);
+		value1 = value2 = 0;
+		err = AudioDeviceGetProperty(driver->device_id, 0, true, kAudioDevicePropertyLatency, &size, &value1);	
+		if (err != noErr) 
+			JCALog("AudioDeviceGetProperty kAudioDevicePropertyLatency error \n");
+		err = AudioDeviceGetProperty(driver->device_id, 0, true, kAudioDevicePropertySafetyOffset, &size, &value2);	
+		if (err != noErr) 
+			JCALog("AudioDeviceGetProperty kAudioDevicePropertySafetyOffset error \n");
+		
+		jack_port_set_latency(port, driver->frames_per_cycle + value1 + value2 + driver->capture_frame_latency);
 		driver->capture_ports =
 			jack_slist_append(driver->capture_ports, port);
     }
@@ -288,10 +296,16 @@ coreaudio_driver_attach(coreaudio_driver_t * driver,
 			break;
 		}
 
-		/* XXX fix this so that it can handle: systemic (external) latency
-		 */
-
-		jack_port_set_latency(port, driver->frames_per_cycle);
+		size = sizeof(UInt32);
+		value1 = value2 = 0;
+		err = AudioDeviceGetProperty(driver->device_id, 0, false, kAudioDevicePropertyLatency, &size, &value1);	
+		if (err != noErr) 
+			JCALog("AudioDeviceGetProperty kAudioDevicePropertyLatency error \n");
+		err = AudioDeviceGetProperty(driver->device_id, 0, false, kAudioDevicePropertySafetyOffset, &size, &value2);	
+		if (err != noErr) 
+			JCALog("AudioDeviceGetProperty kAudioDevicePropertySafetyOffset error \n");
+	
+		jack_port_set_latency(port, driver->frames_per_cycle + value1 + value2 + driver->playback_frame_latency);
 		driver->playback_ports =
 			jack_slist_append(driver->playback_ports, port);
 	}
@@ -389,7 +403,9 @@ static jack_driver_t *coreaudio_driver_new(char *name,
 					   int chan_in,
 					   int chan_out,
 					   char *driver_name,
-					   AudioDeviceID deviceID)
+					   AudioDeviceID deviceID,
+					   jack_nframes_t capture_latency, 
+					   jack_nframes_t playback_latency)
 {
     coreaudio_driver_t *driver;
 	OSStatus err = noErr;
@@ -423,6 +439,8 @@ static jack_driver_t *coreaudio_driver_new(char *name,
     driver->bufsize = (JackDriverBufSizeFunction) coreaudio_driver_bufsize;
     driver->start = (JackDriverStartFunction) coreaudio_driver_audio_start;
     driver->stop = (JackDriverStopFunction) coreaudio_driver_audio_stop;
+	driver->capture_frame_latency = capture_latency;
+	driver->playback_frame_latency = playback_latency;
 
     if (!driver_name) {
 		if (get_device_name_from_id(deviceID, driver->driver_name) != noErr)
@@ -684,7 +702,7 @@ jack_driver_desc_t *driver_get_descriptor()
     desc = calloc(1, sizeof(jack_driver_desc_t));
 
     strcpy(desc->name, "coreaudio");
-    desc->nparams = 10;
+    desc->nparams = 12;
     desc->params = calloc(desc->nparams, sizeof(jack_driver_param_desc_t));
 
     i = 0;
@@ -766,6 +784,23 @@ jack_driver_desc_t *driver_get_descriptor()
     desc->params[i].value.i = 0;
     strcpy(desc->params[i].short_desc, "Audio Device ID");
     strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
+	
+	i++;
+	strcpy(desc->params[i].name, "input-latency");
+	desc->params[i].character  = 'l';
+	desc->params[i].type = JackDriverParamUInt;
+	desc->params[i].value.i = 0;
+	strcpy(desc->params[i].short_desc, "Extra input latency");
+	strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
+
+	i++;
+	strcpy(desc->params[i].name, "output-latency");
+	desc->params[i].character  = 'L';
+	desc->params[i].type = JackDriverParamUInt;
+	desc->params[i].value.i  = 0;
+	strcpy(desc->params[i].short_desc, "Extra output latency");
+	strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
+	
     return desc;
 }
 
@@ -782,6 +817,8 @@ jack_driver_t *driver_initialize(jack_client_t * client,
     AudioDeviceID deviceID = 0;
     const JSList *node;
     const jack_driver_param_t *param;
+	jack_nframes_t systemic_input_latency = 0;
+	jack_nframes_t systemic_output_latency = 0;
 	
 	get_device_id_from_num(0,&deviceID); // takes a default value (first device)
 
@@ -830,6 +867,14 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 		case 'I':
 			deviceID = (AudioDeviceID) param->value.ui;
 			break;
+			
+		case 'l':
+			systemic_input_latency = param->value.ui;
+			break;
+
+		case 'L':
+			systemic_output_latency = param->value.ui;
+			break;
 		}
     }
 
@@ -842,7 +887,7 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 
     return coreaudio_driver_new("coreaudio", client, frames_per_interrupt,
 				srate, capture, playback, chan_in,
-				chan_out, name, deviceID);
+				chan_out, name, deviceID, systemic_input_latency, systemic_output_latency);
 }
 
 void driver_finish(jack_driver_t * driver)
