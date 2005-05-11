@@ -121,6 +121,7 @@ static int jack_client_feeds_transitive (jack_client_internal_t *source,
 static int jack_client_sort (jack_client_internal_t *a,
 			     jack_client_internal_t *b);
 static void jack_check_acyclic (jack_engine_t* engine);
+static void jack_compute_all_port_total_latencies (jack_engine_t *engine);
 
 
 static inline int 
@@ -1281,6 +1282,13 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		jack_intclient_unload_request (engine, req);
 		break;
 
+	case RecomputeTotalLatencies:
+		jack_lock_graph (engine);
+		jack_compute_all_port_total_latencies (engine);
+		jack_unlock_graph (engine);
+		req->status = 0;
+		break;
+
 	default:
 		/* some requests are handled entirely on the client
 		 * side, by adjusting the shared memory area(s) */
@@ -2015,6 +2023,27 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	jack_nframes_t left;
 	jack_nframes_t b_size = engine->control->buffer_size;
 	jack_frame_timer_t* timer = &engine->control->frame_timer;
+	int no_increment = 0;
+
+	if (engine->first_wakeup) {
+
+		/* the first wakeup */
+
+		timer->next_wakeup = 
+			engine->driver->last_wait_ust +
+			engine->driver->period_usecs;
+		engine->first_wakeup = 0;
+		
+		/* if we got an xrun/delayed wakeup on the first cycle,
+		   reset the pending flag (we have no predicted wakeups
+		   to use), but avoid incrementing the frame timer.
+		*/
+
+		if (timer->reset_pending) {
+			timer->reset_pending = 0;
+			no_increment = 1;
+		}
+	}
 
 	if (timer->reset_pending) {
 
@@ -2036,20 +2065,13 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 
 		timer->reset_pending = 0;
 
-	} else if (engine->first_wakeup) {
-
-		/* the first wakeup */
-
-		timer->next_wakeup = 
-			engine->driver->last_wait_ust +
-			engine->driver->period_usecs;
-		engine->first_wakeup = 0;
-
 	} else {
 		
 		/* normal condition */
-		
-		jack_inc_frame_time (engine, nframes);
+
+		if (!no_increment) {
+			jack_inc_frame_time (engine, nframes);
+		}
 	}
 
 	if (engine->verbose) {
@@ -2475,6 +2497,7 @@ jack_get_port_total_latency (jack_engine_t *engine,
 	/* we don't prevent cyclic graphs, so we have to do something
 	   to bottom out in the event that they are created.
 	*/
+
 	if (hop_count > 8) {
 		return latency;
 	}

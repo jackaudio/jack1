@@ -317,7 +317,8 @@ typedef enum {
 	IntClientHandle = 19,
 	IntClientLoad = 20,
 	IntClientName = 21,
-	IntClientUnload = 22
+	IntClientUnload = 22,
+	RecomputeTotalLatencies = 23
 } RequestType;
 
 struct _jack_request {

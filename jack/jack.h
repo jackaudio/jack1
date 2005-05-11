@@ -555,6 +555,11 @@ jack_nframes_t jack_port_get_total_latency (jack_client_t *,
  * include both buffering by the audio interface *and* the converter. 
  */
 void jack_port_set_latency (jack_port_t *, jack_nframes_t);
+	
+/**
+ *
+ */
+int jack_recompute_total_latencies (jack_client_t*);
 
 /**
  * Modify a port's short name.  May be called at any time.  If the

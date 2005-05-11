@@ -985,6 +985,15 @@ jack_internal_client_close (const char *client_name)
 }
 
 int
+jack_recompute_total_latencies (jack_client_t* client)
+{
+	jack_request_t request;
+
+	request.type = RecomputeTotalLatencies;
+	return jack_client_deliver_request (client, &request);
+}
+
+int
 jack_set_freewheel (jack_client_t* client, int onoff)
 {
 	jack_request_t request;
