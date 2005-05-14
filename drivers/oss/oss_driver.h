@@ -1,7 +1,7 @@
 /*
 
 	OSS driver for Jack
-	Copyright (C) 2003-2004 Jussi Laako <jussi@sonarnerd.net>
+	Copyright (C) 2003-2005 Jussi Laako <jussi@sonarnerd.net>
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@
 #ifndef __JACK_OSS_DRIVER_H__
 #define __JACK_OSS_DRIVER_H__
 
+#include <sys/types.h>
 #include <pthread.h>
 #include <semaphore.h>
 
@@ -71,6 +72,8 @@ typedef struct _oss_driver
 	float iodelay;
 	jack_time_t last_periodtime;
 	jack_time_t next_periodtime;
+	jack_nframes_t sys_in_latency;
+	jack_nframes_t sys_out_latency;
 
 	JSList *capture_ports;
 	JSList *playback_ports;

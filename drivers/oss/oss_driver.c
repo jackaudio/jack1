@@ -1,7 +1,7 @@
 /*
 
 	OSS driver for Jack
-	Copyright (C) 2003-2004 Jussi Laako <jussi@sonarnerd.net>
+	Copyright (C) 2003-2005 Jussi Laako <jussi@sonarnerd.net>
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -33,6 +33,12 @@
  */
 #define _XOPEN_SOURCE	600
 #endif
+#ifndef _REENTRANT
+#define _REENTRANT
+#endif
+#ifndef _THREAD_SAFE
+#define _THREAD_SAFE
+#endif
 #include <unistd.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -60,7 +66,7 @@
 #include "oss_driver.h"
 
 
-#define OSS_DRIVER_N_PARAMS	9
+#define OSS_DRIVER_N_PARAMS	11
 const static jack_driver_param_desc_t oss_params[OSS_DRIVER_N_PARAMS] = {
 	{ "rate",
 	  'r',
@@ -124,6 +130,20 @@ const static jack_driver_param_desc_t oss_params[OSS_DRIVER_N_PARAMS] = {
 	  { },
 	  "ignore hardware period size",
 	  "ignore hardware period size"
+	},
+	{ "input latency",
+	  'I',
+	  JackDriverParamUInt,
+	  { .ui = 0 },
+	  "system input latency",
+	  "system input latency"
+	},
+	{ "output latency",
+	  'O',
+	  JackDriverParamUInt,
+	  { .ui = 0 },
+	  "system output latency",
+	  "system output latency"
 	}
 };
 
@@ -343,6 +363,8 @@ static int oss_driver_attach (oss_driver_t *driver, jack_engine_t *engine)
 				channel_name, __FILE__, __LINE__);
 			break;
 		}
+		jack_port_set_latency(port,
+			driver->period_size + driver->sys_in_latency);
 		driver->capture_ports = 
 			jack_slist_append(driver->capture_ports, port);
 	}
@@ -360,6 +382,8 @@ static int oss_driver_attach (oss_driver_t *driver, jack_engine_t *engine)
 				channel_name, __FILE__, __LINE__);
 			break;
 		}
+		jack_port_set_latency(port,
+			driver->period_size + driver->sys_out_latency);
 		driver->playback_ports =
 			jack_slist_append(driver->playback_ports, port);
 	}
@@ -1036,16 +1060,22 @@ jack_driver_desc_t * driver_get_descriptor ()
 	desc = (jack_driver_desc_t *) calloc(1, sizeof(jack_driver_desc_t));
 	if (desc == NULL)
 	{
-		printf("oss_driver: malloc() failed: %s@%i\n", 
-			__FILE__, __LINE__);
+		printf("oss_driver: calloc() failed: %s@%i, errno=%d\n",
+			__FILE__, __LINE__, errno);
 		return NULL;
 	}
 	strcpy(desc->name, driver_client_name);
 	desc->nparams = OSS_DRIVER_N_PARAMS;
 
 	params = calloc(desc->nparams, sizeof(jack_driver_param_desc_t));
+	if (params == NULL)
+	{
+		printf("oss_driver: calloc() failed: %s@%i, errno=%d\n",
+			__FILE__, __LINE__, errno);
+		return NULL;
+	}
 	memcpy(params, oss_params, 
-		OSS_DRIVER_N_PARAMS * sizeof(jack_driver_param_desc_t));
+		desc->nparams * sizeof(jack_driver_param_desc_t));
 	desc->params = params;
 
 	return desc;
@@ -1058,6 +1088,8 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	int bits = OSS_DRIVER_DEF_BITS;
 	jack_nframes_t sample_rate = OSS_DRIVER_DEF_FS;
 	jack_nframes_t period_size = OSS_DRIVER_DEF_BLKSIZE;
+	jack_nframes_t in_latency = 0;
+	jack_nframes_t out_latency = 0;
 	unsigned int nperiods = OSS_DRIVER_DEF_NPERIODS;
 	unsigned int capture_channels = OSS_DRIVER_DEF_INS;
 	unsigned int playback_channels = OSS_DRIVER_DEF_OUTS;
@@ -1068,7 +1100,8 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	driver = (oss_driver_t *) malloc(sizeof(oss_driver_t));
 	if (driver == NULL)
 	{
-		jack_error("OSS: malloc() failed: %s@%i", __FILE__, __LINE__);
+		jack_error("OSS: malloc() failed: %s@%i, errno=%d",
+			__FILE__, __LINE__, errno);
 		return NULL;
 	}
 	jack_driver_init((jack_driver_t *) driver);
@@ -1121,6 +1154,12 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 			case 'b':
 				driver->ignorehwbuf = 1;
 				break;
+			case 'I':
+				in_latency = param->value.ui;
+				break;
+			case 'O':
+				out_latency = param->value.ui;
+				break;
 		}
 		pnode = jack_slist_next(pnode);
 	}
@@ -1131,6 +1170,8 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	driver->bits = bits;
 	driver->capture_channels = capture_channels;
 	driver->playback_channels = playback_channels;
+	driver->sys_in_latency = in_latency;
+	driver->sys_out_latency = out_latency;
 
 	set_period_size(driver, period_size);
 	
@@ -1209,8 +1250,13 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 
 void driver_finish (jack_driver_t *driver)
 {
-	free(((oss_driver_t *) driver)->indev);
-	free(((oss_driver_t *) driver)->outdev);
+	oss_driver_t *oss_driver = (oss_driver_t *) driver;
+
+	oss_driver = (oss_driver_t *) driver;
+	if (oss_driver->indev != NULL)
+		free(oss_driver->indev);
+	if (oss_driver->outdev != NULL)
+		free(oss_driver->outdev);
 	free(driver);
 }
 
