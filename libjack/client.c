@@ -146,6 +146,36 @@ jack_client_deliver_request (const jack_client_t *client, jack_request_t *req)
 						 req);
 }
 
+#if JACK_USE_MACH_THREADS 
+
+jack_client_t *
+jack_client_alloc ()
+{
+	jack_client_t *client;
+
+	client = (jack_client_t *) malloc (sizeof (jack_client_t));
+	client->pollfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 1);
+	client->pollmax = 1;
+	client->request_fd = -1;
+	client->event_fd = -1;
+	client->upstream_is_jackd = 0;
+	client->graph_wait_fd = -1;
+	client->graph_next_fd = -1;
+	client->ports = NULL;
+	client->ports_ext = NULL;
+	client->engine = NULL;
+	client->control = NULL;
+	client->thread_ok = FALSE;
+	client->rt_thread_ok = FALSE;
+	client->first_active = TRUE;
+	client->on_shutdown = NULL;
+	client->n_port_types = 0;
+	client->port_segment = NULL;
+	return client;
+}
+
+#else
+
 jack_client_t *
 jack_client_alloc ()
 {
@@ -164,9 +194,6 @@ jack_client_alloc ()
 	client->engine = NULL;
 	client->control = NULL;
 	client->thread_ok = FALSE;
-#if JACK_USE_MACH_THREADS 
-	client->rt_thread_ok = FALSE;
-#endif
 	client->first_active = TRUE;
 	client->on_shutdown = NULL;
 	client->n_port_types = 0;
@@ -174,6 +201,8 @@ jack_client_alloc ()
 
 	return client;
 }
+
+#endif
 
 /*
  * Build the jack_client_t structure for an internal client.
@@ -285,6 +314,26 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 	return 0;
 }
 
+#if JACK_USE_MACH_THREADS
+
+static int 
+jack_handle_reorder (jack_client_t *client, jack_event_t *event)
+{	
+	client->pollmax = 1;
+
+	/* If the client registered its own callback for graph order events,
+	   execute it now.
+	*/
+
+	if (client->control->graph_order) {
+		client->control->graph_order (client->control->graph_order_arg);
+	}
+
+	return 0;
+}
+
+#else
+
 static int 
 jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 {	
@@ -303,13 +352,12 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 	}
 
 	sprintf (path, "%s-%" PRIu32, client->fifo_prefix, event->x.n);
-
+	
 	if ((client->graph_wait_fd = open (path, O_RDONLY|O_NONBLOCK)) < 0) {
 		jack_error ("cannot open specified fifo [%s] for reading (%s)",
 			    path, strerror (errno));
 		return -1;
 	}
-
 	DEBUG ("opened new graph_wait_fd %d (%s)", client->graph_wait_fd, path);
 
 	sprintf (path, "%s-%" PRIu32, client->fifo_prefix, event->x.n+1);
@@ -337,6 +385,8 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 
 	return 0;
 }
+
+#endif
 		
 static int
 server_connect (const char *server_name)
@@ -432,7 +482,7 @@ _start_server (const char *server_name)
 	int i = 0;
 	int good = 0;
 	int ret;
-
+	
 	snprintf(filename, 255, "%s/.jackdrc", getenv("HOME"));
 	fp = fopen(filename, "r");
 
@@ -501,7 +551,6 @@ _start_server (const char *server_name)
 		++i;
 	}
 	argv[i] = 0;
-
 	execv (command, argv);
 
 	/* If execv() succeeds, it does not return.  There's no point
@@ -784,8 +833,10 @@ jack_client_open (const char *client_name,
 	client->request_fd = req_fd;
 	client->pollfd[EVENT_POLL_INDEX].events =
 		POLLIN|POLLERR|POLLHUP|POLLNVAL;
+#ifndef JACK_USE_MACH_THREADS
 	client->pollfd[WAIT_POLL_INDEX].events =
 		POLLIN|POLLERR|POLLHUP|POLLNVAL;
+#endif
 
 	/* Don't access shared memory until server connected. */
 	if (jack_initialize_shm (va.server_name)) {
@@ -1095,17 +1146,20 @@ jack_client_thread (void *arg)
 		 * process() cycle. 
 		 */
 
+	#ifndef JACK_USE_MACH_THREADS 
 		if (client->graph_wait_fd >= 0
 		    && client->pollfd[WAIT_POLL_INDEX].revents & POLLIN) {
 			control->awake_at = jack_get_microseconds();
 		}
-
+	
 		DEBUG ("pfd[EVENT].revents = 0x%x pfd[WAIT].revents = 0x%x",
 		       client->pollfd[EVENT_POLL_INDEX].revents,
 		       client->pollfd[WAIT_POLL_INDEX].revents);
-
+	#endif
+	
 		pthread_testcancel();
 		
+	#ifndef JACK_USE_MACH_THREADS 
 		if (client->graph_wait_fd >= 0 &&
 		    (client->pollfd[WAIT_POLL_INDEX].revents & ~POLLIN)) {
 			
@@ -1136,10 +1190,12 @@ jack_client_thread (void *arg)
 				 * again until we get a
 				 * GraphReordered event.
 				 */
+				 
 				client->graph_wait_fd = -1;
 				client->pollmax = 1;
 			}
 		}
+	#endif
 
 		if (client->control->dead) {
 			goto zombie;
@@ -1243,7 +1299,9 @@ jack_client_thread (void *arg)
 				break;
 			}
 		}
+		
 
+#ifndef JACK_USE_MACH_THREADS 
 		if (client->pollfd[WAIT_POLL_INDEX].revents & POLLIN) {
 
 #ifdef WITH_TIMESTAMPS
@@ -1289,6 +1347,8 @@ jack_client_thread (void *arg)
 #ifdef WITH_TIMESTAMPS
 			jack_timestamp ("finished");
 #endif
+		
+#ifndef JACK_USE_MACH_THREADS 			
 			/* pass the execution token along */
 
 			DEBUG ("client finished processing at %" PRIu64
@@ -1310,12 +1370,14 @@ jack_client_thread (void *arg)
 			DEBUG ("client sent message to next stage by %" PRIu64
 			       ", client reading on graph_wait_fd==%d", 
 			       jack_get_microseconds(), client->graph_wait_fd);
+#endif
 
 #ifdef WITH_TIMESTAMPS
 			jack_timestamp ("read pending byte from wait");
 #endif
 			DEBUG("reading cleanup byte from pipe\n");
 
+#ifndef JACK_USE_MACH_THREADS
 			if ((read (client->graph_wait_fd, &c, sizeof (c))
 			     != sizeof (c))) {
 				DEBUG ("WARNING: READ FAILED!");
@@ -1327,6 +1389,7 @@ jack_client_thread (void *arg)
 				break;
 #endif
 			}
+#endif
 
 			/* check if we were killed during the process
 			 * cycle (or whatever) */
@@ -1342,6 +1405,8 @@ jack_client_thread (void *arg)
 #endif			
 
 		}
+#endif
+
 	}
 	
 	return (void *) ((intptr_t)err);
@@ -1351,7 +1416,7 @@ jack_client_thread (void *arg)
 		jack_error ("zombified - calling shutdown handler");
 		client->on_shutdown (client->on_shutdown_arg);
 	} else {
-		jack_error ("zombified - exiting from JACK");
+		jack_error ("jack_client_thread zombified - exiting from JACK");
 		jack_client_close (client);
 		/* Need a fix : possibly make client crash if
 		 * zombified without shutdown handler 
@@ -1362,7 +1427,6 @@ jack_client_thread (void *arg)
 	/*NOTREACHED*/
 	return 0;
 }
-
 
 #ifdef JACK_USE_MACH_THREADS
 /* real-time thread : separated from the normal client thread, it will
@@ -1388,53 +1452,53 @@ jack_client_process_thread (void *arg)
             
    	while (err == 0) {
 	
-                if (jack_client_suspend(client) < 0) {
-                        jack_error ("jack_client_process_thread :resume error");
-                        goto zombie;
-                }
-                
-                control->awake_at = jack_get_microseconds();
-                
-                DEBUG ("client resumed");
-                 
-                control->state = Running;
+		if (jack_client_suspend(client) < 0) {
+				jack_error ("jack_client_process_thread :resume error");
+				goto zombie;
+		}
+		
+		control->awake_at = jack_get_microseconds();
+		
+		DEBUG ("client resumed");
+		 
+		control->state = Running;
 
 		if (control->sync_cb)
 			jack_call_sync_client (client);
 
-                if (control->process) {
-                        if (control->process (control->nframes,
-					      control->process_arg) == 0) {
-                                control->state = Finished;
-                        }
-                } else {
-                        control->state = Finished;
-                }
+		if (control->process) {
+			if (control->process (control->nframes,
+				control->process_arg) == 0) {
+					control->state = Finished;
+			}
+		} else {
+			control->state = Finished;
+		}
 
 		if (control->timebase_cb)
 			jack_call_timebase_master (client);
                 
-                control->finished_at = jack_get_microseconds();
+		control->finished_at = jack_get_microseconds();
                 
 #ifdef WITH_TIMESTAMPS
-                jack_timestamp ("finished");
+		jack_timestamp ("finished");
 #endif
-                DEBUG ("client finished processing at %Lu (elapsed = %f usecs)",
-		       control->finished_at,
-		       ((float)(control->finished_at - control->awake_at)));
+		DEBUG ("client finished processing at %Lu (elapsed = %f usecs)",
+			control->finished_at,
+			((float)(control->finished_at - control->awake_at)));
                   
-                /* check if we were killed during the process cycle
+		/* check if we were killed during the process cycle
 		 * (or whatever) */
 
-                if (client->control->dead) {
-                        jack_error ("jack_client_process_thread: "
-				    "client->control->dead");
-                        goto zombie;
-                }
+		if (client->control->dead) {
+				jack_error ("jack_client_process_thread: "
+						"client->control->dead");
+				goto zombie;
+		}
 
-                DEBUG("process cycle fully complete\n");
+		DEBUG("process cycle fully complete\n");
 
-        }
+	}
         
  	return (void *) ((intptr_t)err);
 
@@ -1448,7 +1512,7 @@ jack_client_process_thread (void *arg)
 		jack_error ("zombified - calling shutdown handler");
 		client->on_shutdown (client->on_shutdown_arg);
 	} else {
-		jack_error ("zombified - exiting from JACK");
+		jack_error ("jack_client_process_thread zombified - exiting from JACK");
 		/* Need a fix : possibly make client crash if
 		 * zombified without shutdown handler */
 		jack_client_close (client); 
@@ -1463,7 +1527,6 @@ jack_client_process_thread (void *arg)
 static int
 jack_start_thread (jack_client_t *client)
 {
-
  	if (client->engine->real_time) {
 
 #ifdef USE_MLOCK
@@ -1623,7 +1686,7 @@ jack_deactivate (jack_client_t *client)
 {
 	jack_request_t req;
 	int rc = ESRCH;			/* already shut down */
-
+	
 	if (client && client->control) { /* not shut down? */
 		rc = 0;
 		if (client->control->active) { /* still active? */
@@ -1686,6 +1749,7 @@ jack_client_close (jack_client_t *client)
 			client->port_segment = NULL;
 		}
 
+#ifndef JACK_USE_MACH_THREADS
 		if (client->graph_wait_fd) {
 			close (client->graph_wait_fd);
 		}
@@ -1693,6 +1757,7 @@ jack_client_close (jack_client_t *client)
 		if (client->graph_next_fd) {
 			close (client->graph_next_fd);
 		}
+#endif		
 		
 		close (client->event_fd);
 
