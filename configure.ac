@@ -492,11 +492,11 @@ HAVE_ALSA="false"
 if test "x$TRY_ALSA" = "xyes"
 then
 	# check for ALSA >= 1.0.0
-	PKG_CHECK_MODULES(alsa, alsa >= 1.0.0,
+	PKG_CHECK_MODULES(ALSA, alsa >= 1.0.0,
 	     [HAVE_ALSA="true"
               ALSA_LIBS=-lasound
               JACK_DEFAULT_DRIVER=\"alsa\"
-             ], [], [-lm]
+             ], [true], [-lm]
 	)
 	AC_SUBST(ALSA_LIBS)
 fi
