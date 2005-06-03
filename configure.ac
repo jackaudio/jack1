@@ -533,6 +533,7 @@ AC_CHECK_LIB(readline, readline, [:],
 	 AC_CHECK_LIB(readline, readline,
 	    [READLINE_DEPS="-lncurses"], [HAVE_READLINE=false], "-lncurses")],
 	"-ltermcap")])
+AC_CHECK_HEADER(readline/chardefs.h, [], [HAVE_READLINE=false])
 if test x$HAVE_READLINE = xfalse; then
 	AC_MSG_WARN([*** the jack_transport example client will not be built])
 fi
