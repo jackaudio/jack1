@@ -32,6 +32,8 @@
     10-11-04 : S. Letz: Add management of -I option for use with JackPilot.
 	17-11-04 : S. Letz: Better debug code.
 	03-02-05 : S. Letz: fix several driver detection bugs on OSX.
+	06-08-05 : S.Letz: Remove the "-I" parameter, change the semantic of "-n" parameter on OSX : -n (driver name) now correctly uses the PropertyDeviceUID
+			  (persistent accross reboot...) as the identifier for the used coreaudio driver.
 
 */
 
@@ -41,7 +43,6 @@
 #include <stdarg.h>
 
 #include <jack/engine.h>
-
 #include "portaudio_driver.h"
 
 #ifdef JACK_USE_MACH_THREADS
@@ -77,6 +78,20 @@ static OSStatus get_device_id_from_num(int i, AudioDeviceID * id)
 
     *id = theDeviceList[i];
     return theStatus;
+}
+
+static OSStatus get_device_id_from_uid(char* UID, AudioDeviceID* id)
+{
+	UInt32 size = sizeof(AudioValueTranslation);
+	CFStringRef inIUD = CFStringCreateWithCString(NULL, UID, CFStringGetSystemEncoding());
+	AudioValueTranslation value = { &inIUD, sizeof(CFStringRef), id, sizeof(AudioDeviceID) };
+	if (inIUD == NULL) {
+		return kAudioHardwareUnspecifiedError;
+	} else {
+		OSStatus res = AudioHardwareGetProperty(kAudioHardwarePropertyDeviceForUID, &size, &value);
+		CFRelease(inIUD);
+		return res;
+	}
 }
 
 #else
@@ -508,8 +523,7 @@ portaudio_driver_new (char *name,
 				int chan_in, 
 				int chan_out,
 				DitherAlgorithm dither,
-				char* driver_name,
-				AudioDeviceID deviceID)
+				char* driver_name)
 {
 	portaudio_driver_t *driver;
 	PaError err = paNoError;
@@ -546,12 +560,18 @@ portaudio_driver_new (char *name,
 	driver->stream = NULL;
 
 #ifdef JACK_USE_MACH_THREADS	
-    if (!driver_name) {
-		if (get_device_name_from_id(deviceID, driver->driver_name) != noErr)
+	AudioDeviceID device_id;
+	if (driver_name) {
+		if (get_device_id_from_uid(driver_name, &device_id) != noErr)
 			goto error;
-    } else {
-		strcpy(driver->driver_name, driver_name);
-    }
+		if (get_device_name_from_id(device_id, driver->driver_name) != noErr)
+			goto error;
+	} else {
+		if (get_device_id_from_num(0, &device_id) != noErr)
+			goto error; 
+		if (get_device_name_from_id(device_id, driver->driver_name) != noErr)
+			goto error;
+	}
 #endif
        
 	err = Pa_Initialize();
@@ -662,7 +682,7 @@ driver_get_descriptor ()
 	desc = calloc (1, sizeof (jack_driver_desc_t));
 
 	strcpy (desc->name, "portaudio");
-	desc->nparams = 11;
+	desc->nparams = 10;
 	desc->params = calloc (desc->nparams,
 			       sizeof (jack_driver_param_desc_t));
 
@@ -751,15 +771,7 @@ driver_get_descriptor ()
 		"    s : shaped\n"
 		"    - : no dithering");
 	
-	i++;
-    strcpy(desc->params[i].name, "id");
-    desc->params[i].character = 'I';
-    desc->params[i].type = JackDriverParamInt;
-    desc->params[i].value.i = 0;
-    strcpy(desc->params[i].short_desc, "Audio Device ID");
-    strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
     return desc;
-	return desc;
 }
 
 const char driver_client_name[] = "portaudio";
@@ -827,10 +839,6 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			frames_per_interrupt = (unsigned int) param->value.ui;
 			break;
 			
-		case 'I':
-			deviceID = (AudioDeviceID) param->value.ui;
-			break;
-                                    
 		case 'z':
 			switch ((int) param->value.c) {
 			case '-':
@@ -862,7 +870,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 
 	return portaudio_driver_new ("portaudio", client, frames_per_interrupt,
 				     srate, capture, playback, chan_in,
-				     chan_out, dither, name, deviceID);
+				     chan_out, dither, name);
 }
 
 void

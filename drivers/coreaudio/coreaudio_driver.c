@@ -35,6 +35,8 @@
  Dec 23, 2004: S.Letz: Correct bug in dynamic buffer size change : update period_usecs
  Jan 20, 2005: S.Letz: Almost complete rewrite using AUHAL.
  May 20, 2005: S.Letz: Add "systemic" latencies management.
+ Jun 06, 2005: S.Letz: Remove the "-I" parameter, change the semantic of "-n" parameter : -n (driver name) now correctly uses the PropertyDeviceUID
+					   (persistent accross reboot...) as the identifier for the used coreaudio driver.
  
  TODO:
 	- fix cpu load behavior.
@@ -110,6 +112,20 @@ static OSStatus get_device_name_from_id(AudioDeviceID id, char name[60])
 					   &size,
 					   &name[0]);
     return res;
+}
+
+static OSStatus get_device_id_from_uid(char* UID, AudioDeviceID* id)
+{
+	UInt32 size = sizeof(AudioValueTranslation);
+	CFStringRef inIUD = CFStringCreateWithCString(NULL, UID, CFStringGetSystemEncoding());
+	AudioValueTranslation value = { &inIUD, sizeof(CFStringRef), id, sizeof(AudioDeviceID) };
+	if (inIUD == NULL) {
+		return kAudioHardwareUnspecifiedError;
+	} else {
+		OSStatus res = AudioHardwareGetProperty(kAudioHardwarePropertyDeviceForUID, &size, &value);
+		CFRelease(inIUD);
+		return res;
+	}
 }
 
 static OSStatus get_device_id_from_num(int i, AudioDeviceID * id)
@@ -199,7 +215,7 @@ static OSStatus render_input(void *inRefCon,
 	}
 }
 
-OSStatus notification(AudioDeviceID inDevice,
+static OSStatus notification(AudioDeviceID inDevice,
         UInt32 inChannel,
         Boolean	isInput,
         AudioDevicePropertyID inPropertyID,
@@ -394,18 +410,18 @@ coreaudio_driver_bufsize(coreaudio_driver_t * driver,
 
 /** create a new driver instance
 */
-static jack_driver_t *coreaudio_driver_new(char *name,
-					   jack_client_t * client,
+static jack_driver_t *coreaudio_driver_new(char* name,
+					   jack_client_t* client,
 					   jack_nframes_t frames_per_cycle,
 					   jack_nframes_t rate,
 					   int capturing,
 					   int playing,
 					   int chan_in,
 					   int chan_out,
-					   char *driver_name,
-					   AudioDeviceID deviceID,
+					   char* driver_uid,
 					   jack_nframes_t capture_latency, 
 					   jack_nframes_t playback_latency)
+
 {
     coreaudio_driver_t *driver;
 	OSStatus err = noErr;
@@ -442,13 +458,15 @@ static jack_driver_t *coreaudio_driver_new(char *name,
 	driver->capture_frame_latency = capture_latency;
 	driver->playback_frame_latency = playback_latency;
 
-    if (!driver_name) {
-		if (get_device_name_from_id(deviceID, driver->driver_name) != noErr)
-			goto error;
-    } else {
-		JCALog("Use driver name from command line \n");
-		strcpy(driver->driver_name, driver_name);
-    }
+	if (driver_uid) {
+		if (get_device_id_from_uid(driver_uid, &driver->device_id) != noErr)
+		return NULL;
+	} else {
+		get_device_id_from_num(0, &driver->device_id); // takes a default value (first device)
+	}
+		
+	if (get_device_name_from_id(driver->device_id, driver->driver_name) != noErr)
+		return NULL;
 
 	driver->client = client;
     driver->period_usecs =
@@ -457,7 +475,6 @@ static jack_driver_t *coreaudio_driver_new(char *name,
 
     driver->playback_nchannels = chan_out;
     driver->capture_nchannels = chan_in;
-	driver->device_id = deviceID;
 	
 	// Setting buffer size
     outSize = sizeof(UInt32);
@@ -702,7 +719,7 @@ jack_driver_desc_t *driver_get_descriptor()
     desc = calloc(1, sizeof(jack_driver_desc_t));
 
     strcpy(desc->name, "coreaudio");
-    desc->nparams = 12;
+    desc->nparams = 11;
     desc->params = calloc(desc->nparams, sizeof(jack_driver_param_desc_t));
 
     i = 0;
@@ -777,15 +794,7 @@ jack_driver_desc_t *driver_get_descriptor()
     strcpy(desc->params[i].short_desc, "Driver name");
     strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
 
-    i++;
-    strcpy(desc->params[i].name, "id");
-    desc->params[i].character = 'I';
-    desc->params[i].type = JackDriverParamInt;
-    desc->params[i].value.i = 0;
-    strcpy(desc->params[i].short_desc, "Audio Device ID");
-    strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
-	
-	i++;
+ 	i++;
 	strcpy(desc->params[i].name, "input-latency");
 	desc->params[i].character  = 'l';
 	desc->params[i].type = JackDriverParamUInt;
@@ -814,13 +823,10 @@ jack_driver_t *driver_initialize(jack_client_t * client,
     int chan_in = 2;
     int chan_out = 2;
     char *name = NULL;
-    AudioDeviceID deviceID = 0;
     const JSList *node;
     const jack_driver_param_t *param;
 	jack_nframes_t systemic_input_latency = 0;
 	jack_nframes_t systemic_output_latency = 0;
-	
-	get_device_id_from_num(0,&deviceID); // takes a default value (first device)
 
     for (node = params; node; node = jack_slist_next(node)) {
 	param = (const jack_driver_param_t *) node->data;
@@ -864,10 +870,6 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 			frames_per_interrupt = (unsigned int) param->value.ui;
 			break;
 
-		case 'I':
-			deviceID = (AudioDeviceID) param->value.ui;
-			break;
-			
 		case 'l':
 			systemic_input_latency = param->value.ui;
 			break;
@@ -884,10 +886,10 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 		capture = TRUE;
 		playback = TRUE;
     }
-
-    return coreaudio_driver_new("coreaudio", client, frames_per_interrupt,
+	
+	return coreaudio_driver_new("coreaudio", client, frames_per_interrupt,
 				srate, capture, playback, chan_in,
-				chan_out, name, deviceID, systemic_input_latency, systemic_output_latency);
+				chan_out, name, systemic_input_latency, systemic_output_latency);
 }
 
 void driver_finish(jack_driver_t * driver)
