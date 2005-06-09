@@ -366,7 +366,8 @@ usx2y_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 	snd_pcm_uframes_t contiguous, contiguous_;
 	int chn;
 
-	MESSAGE("usx2y_driver_null_cycle (%p, %i)\n", driver, nframes);
+	VERBOSE(driver->engine,
+		"usx2y_driver_null_cycle (%p, %i)\n", driver, nframes);
 
 	if (driver->capture_handle) {
 		nf = nframes;
