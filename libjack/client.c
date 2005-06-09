@@ -1098,7 +1098,6 @@ jack_client_thread (void *arg)
 	jack_client_control_t *control = client->control;
 	jack_event_t event;
 	char status = 0;
-	char c = 0;
 	int err = 0;
 
 	pthread_mutex_lock (&client_lock);
