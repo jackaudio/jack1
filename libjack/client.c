@@ -1099,6 +1099,9 @@ jack_client_thread (void *arg)
 	jack_event_t event;
 	char status = 0;
 	int err = 0;
+#ifndef JACK_USE_MACH_THREADS                   
+	char c = 0;
+#endif
 
 	pthread_mutex_lock (&client_lock);
 	client->thread_ok = TRUE;
