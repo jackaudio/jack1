@@ -37,6 +37,8 @@
  May 20, 2005: S.Letz: Add "systemic" latencies management.
  Jun 06, 2005: S.Letz: Remove the "-I" parameter, change the semantic of "-n" parameter : -n (driver name) now correctly uses the PropertyDeviceUID
 					   (persistent accross reboot...) as the identifier for the used coreaudio driver.
+ Jun 14, 2005: S.Letz: Since the "-I" parameter is not used anymore, rename the "systemic" latencies management parametes "-I" and "-O" like for the ALSA driver.
+
  
  TODO:
 	- fix cpu load behavior.
@@ -796,7 +798,7 @@ jack_driver_desc_t *driver_get_descriptor()
 
  	i++;
 	strcpy(desc->params[i].name, "input-latency");
-	desc->params[i].character  = 'l';
+	desc->params[i].character  = 'I';
 	desc->params[i].type = JackDriverParamUInt;
 	desc->params[i].value.i = 0;
 	strcpy(desc->params[i].short_desc, "Extra input latency");
@@ -804,7 +806,7 @@ jack_driver_desc_t *driver_get_descriptor()
 
 	i++;
 	strcpy(desc->params[i].name, "output-latency");
-	desc->params[i].character  = 'L';
+	desc->params[i].character  = 'O';
 	desc->params[i].type = JackDriverParamUInt;
 	desc->params[i].value.i  = 0;
 	strcpy(desc->params[i].short_desc, "Extra output latency");
@@ -870,11 +872,11 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 			frames_per_interrupt = (unsigned int) param->value.ui;
 			break;
 
-		case 'l':
+		case 'I':
 			systemic_input_latency = param->value.ui;
 			break;
 
-		case 'L':
+		case 'O':
 			systemic_output_latency = param->value.ui;
 			break;
 		}
