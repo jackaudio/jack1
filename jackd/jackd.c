@@ -61,7 +61,7 @@ static int realtime_priority = 10;
 static int do_mlock = 1;
 static int temporary = 0;
 static int verbose = 0;
-static int client_timeout = 500; /* msecs */
+static int client_timeout = 0; /* msecs; if zero, use period size. */
 static unsigned int port_max = 128;
 static int do_unlock = 0;
 
@@ -135,7 +135,10 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	 */
 
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
-	
+
+	if (!realtime && client_timeout == 0)
+		client_timeout = 500; /* 0.5 sec; usable when non realtime. */
+
 	/* get the engine/driver started */
 
 	if ((engine = jack_engine_new (realtime, realtime_priority, 

@@ -657,7 +657,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	if (engine->freewheeling) {
 		poll_timeout = 10000; /* 10 seconds */
 	} else {
-		poll_timeout = (engine->control->real_time == 0 ?
+		poll_timeout = (engine->client_timeout_msecs > 0 ?
 				engine->client_timeout_msecs :
 				1 + engine->driver->period_usecs/1000);
 	}
