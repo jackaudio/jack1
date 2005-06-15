@@ -1681,6 +1681,9 @@ alsa_driver_run_cycle (alsa_driver_t *driver)
 
 	DEBUG ("alsaback from wait, nframes = %lu", nframes);
 
+	if (wait_status < 0)
+		return -1;		/* driver failed */
+
 	if (nframes == 0) {
 
 		/* we detected an xrun and restarted: notify
@@ -1690,13 +1693,7 @@ alsa_driver_run_cycle (alsa_driver_t *driver)
 		return 0;
 	} 
 
-	if (wait_status == 0)
-		return engine->run_cycle (engine, nframes, delayed_usecs);
-
-	if (wait_status < 0)
-		return -1;		/* driver failed */
-	else
-		return 0;
+	return engine->run_cycle (engine, nframes, delayed_usecs);
 }
 
 static int
