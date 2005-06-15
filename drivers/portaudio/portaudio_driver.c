@@ -48,6 +48,7 @@
 #ifdef JACK_USE_MACH_THREADS
 
 #include <CoreAudio/CoreAudio.h>
+#include <CoreFoundation/CFString.h>
 
 static OSStatus get_device_name_from_id(AudioDeviceID id, char name[60])
 {
