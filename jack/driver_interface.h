@@ -30,7 +30,7 @@ extern "C" {
 
 #define JACK_DRIVER_NAME_MAX          15
 #define JACK_DRIVER_PARAM_NAME_MAX    15
-#define JACK_DRIVER_PARAM_STRING_MAX  31
+#define JACK_DRIVER_PARAM_STRING_MAX  63
 
 
 /** Driver parameter types */
