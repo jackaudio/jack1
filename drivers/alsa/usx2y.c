@@ -31,7 +31,12 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #endif
 
+//#define DBGHWDEP
 
+#ifdef DBGHWDEP
+int dbg_offset;
+char dbg_buffer[8096];
+#endif
 static 
 int usx2y_set_input_monitor_mask (jack_hardware_t *hw, unsigned long mask)
 {
@@ -118,7 +123,7 @@ usx2y_driver_get_channel_addresses_playback (alsa_driver_t *driver,
 	if (dbg_offset < (sizeof(dbg_buffer) - 256))
 		dbg_offset += sprintf(dbg_buffer + dbg_offset, "avail %li@%p\n", *playback_avail, driver->playback_addr[0]);
 	else {
-		jack_error(dbg_buffer);
+		printf(dbg_buffer);
 		return -1;
 	}
 #endif
@@ -143,7 +148,7 @@ usx2y_driver_get_channel_addresses_capture (alsa_driver_t *driver,
 			return 0; /* FIXME: return -1; */
 		h->capture_iso_bytes_done = 0;
 #ifdef DBGHWDEP
-		dbg_offset = sprintf(dbg_buffer, "first iso = %i %i@%p:%i\n",
+		dbg_offset = sprintf(dbg_buffer, "cfirst iso = %i %i@%p:%i\n",
 					iso, h->hwdep_pcm_shm->captured_iso[iso].length,
 					h->hwdep_pcm_shm->capture0x8,
 					h->hwdep_pcm_shm->captured_iso[iso].offset);
@@ -152,7 +157,7 @@ usx2y_driver_get_channel_addresses_capture (alsa_driver_t *driver,
 		iso = h->capture_iso_start;
 	}
 #ifdef DBGHWDEP
-	dbg_offset += sprintf(dbg_buffer + dbg_offset, "iso = %i(%i;%i); ", iso,
+	dbg_offset += sprintf(dbg_buffer + dbg_offset, "ciso = %i(%i;%i); ", iso,
 				h->hwdep_pcm_shm->captured_iso[iso].offset,
 				h->hwdep_pcm_shm->captured_iso[iso].frame);
 #endif
@@ -178,10 +183,21 @@ usx2y_driver_get_channel_addresses_capture (alsa_driver_t *driver,
 			((chn & 1) ? driver->capture_sample_bytes : 0);
 	}
 #ifdef DBGHWDEP
+ {
+	int f = 0;
+	unsigned *u = driver->capture_addr[0];
+	static unsigned last;
+	dbg_offset += sprintf(dbg_buffer + dbg_offset, "\nvon %6u  bis %6u\n", last, u[0]);
+	while (f < *capture_avail && dbg_offset < (sizeof(dbg_buffer) - 256)) {
+		if (u[f] != last + 1)
+			 dbg_offset += sprintf(dbg_buffer + dbg_offset, "\nooops %6u  %6u\n", last, u[f]);
+		last = u[f++];
+	}
+ }
 	if (dbg_offset < (sizeof(dbg_buffer) - 256))
 		dbg_offset += sprintf(dbg_buffer + dbg_offset, "avail %li@%p\n", *capture_avail, driver->capture_addr[0]);
 	else {
-		jack_error(dbg_buffer);
+		printf(dbg_buffer);
 		return -1;
 	}
 #endif
@@ -196,6 +212,12 @@ usx2y_driver_start (alsa_driver_t *driver)
 	snd_pcm_uframes_t poffset, pavail;
 
 	usx2y_t *h = (usx2y_t *) driver->hw->private;
+
+	if (driver->capture_nchannels == 4) {
+		// US428 channels 3+4 are on a seperate 2 channel stream.
+		// ALSA thinks its 1 stream with 4 channels, so we have to hack here.
+		driver->capture_interleave_skip = 2 * driver->capture_sample_bytes;
+	}
 
 	driver->poll_last = 0;
 	driver->poll_next = 0;

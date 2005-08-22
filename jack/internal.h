@@ -445,5 +445,13 @@ jack_port_t *jack_port_by_id_int (const jack_client_t *client,
 jack_port_t *jack_port_by_name_int (jack_client_t *client,
 				    const char *port_name);
 
+#ifdef __GNUC__
+#  define likely(x)	__builtin_expect((x),1)
+#  define unlikely(x)	__builtin_expect((x),0)
+#else
+#  define likely(x)	(x)
+#  define unlikely(x)	(x)
+#endif
+
 #endif /* __jack_internal_h__ */
 
