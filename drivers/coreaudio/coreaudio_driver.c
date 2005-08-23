@@ -38,11 +38,9 @@
  Jun 06, 2005: S.Letz: Remove the "-I" parameter, change the semantic of "-n" parameter : -n (driver name) now correctly uses the PropertyDeviceUID
 					   (persistent accross reboot...) as the identifier for the used coreaudio driver.
  Jun 14, 2005: S.Letz: Since the "-I" parameter is not used anymore, rename the "systemic" latencies management parametes "-I" and "-O" like for the ALSA driver.
-
+ Aug 16, 2005: S.Letz: Remove get_device_id_from_num, use get_default_device instead. If the -n option is not used or the device name cannot
+					   be found, the default device is used. Note: the default device can be used only if both default input and default output are the same.
  
- TODO:
-	- fix cpu load behavior.
-	- multiple-device processing.
  */
 
 #include <stdio.h>
@@ -100,15 +98,15 @@ static void printError1(OSStatus err)
             JCALog("error code : kAudioDevicePermissionsError\n");
             break;
         default:
-            JCALog("error code : unknown\n");
+            JCALog("error code : unknown %ld\n", err);
             break;
     }
 #endif
 }
 
-static OSStatus get_device_name_from_id(AudioDeviceID id, char name[60])
+static OSStatus get_device_name_from_id(AudioDeviceID id, char name[256])
 {
-    UInt32 size = sizeof(char) * 60;
+    UInt32 size = sizeof(char) * 256;
     OSStatus res = AudioDeviceGetProperty(id, 0, false,
 					   kAudioDevicePropertyDeviceName,
 					   &size,
@@ -126,27 +124,35 @@ static OSStatus get_device_id_from_uid(char* UID, AudioDeviceID* id)
 	} else {
 		OSStatus res = AudioHardwareGetProperty(kAudioHardwarePropertyDeviceForUID, &size, &value);
 		CFRelease(inIUD);
-		return res;
+		JCALog("get_device_id_from_uid %s %ld \n", UID, *id);
+		return (*id == kAudioDeviceUnknown) ? kAudioHardwareBadDeviceError : res;
 	}
 }
 
-static OSStatus get_device_id_from_num(int i, AudioDeviceID * id)
+static OSStatus get_default_device(AudioDeviceID * id)
 {
-    OSStatus theStatus;
-    UInt32 theSize;
-    int nDevices;
-    AudioDeviceID* theDeviceList;
-
-    theStatus = AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDevices,
-				     &theSize, NULL);
-    nDevices = theSize / sizeof(AudioDeviceID);
-    theDeviceList =
-	(AudioDeviceID*) malloc(nDevices * sizeof(AudioDeviceID));
-    theStatus = AudioHardwareGetProperty(kAudioHardwarePropertyDevices, 
-					&theSize, theDeviceList);
-
-    *id = theDeviceList[i];
-    return theStatus;
+    OSStatus res;
+    UInt32 theSize = sizeof(UInt32);
+	AudioDeviceID inDefault;
+	AudioDeviceID outDefault;
+  
+	if ((res = AudioHardwareGetProperty(kAudioHardwarePropertyDefaultInputDevice, 
+					&theSize, &inDefault)) != noErr)
+		return res;
+	
+	if ((res = AudioHardwareGetProperty(kAudioHardwarePropertyDefaultOutputDevice, 
+					&theSize, &outDefault)) != noErr)
+		return res;
+		
+	JCALog("get_default_device: input %ld output %ld\n", inDefault, outDefault);
+	
+	// Get the device only if default input and ouput are the same
+	if (inDefault == outDefault) {
+		*id = inDefault;
+		return noErr;
+	} else {
+		return kAudioHardwareBadDeviceError;
+	}
 }
 
 static OSStatus render(void *inRefCon, 
@@ -259,8 +265,6 @@ coreaudio_driver_attach(coreaudio_driver_t * driver,
 	*/
 
     for (chn = 0; chn < driver->capture_nchannels; chn++) {
-		//snprintf (buf, sizeof(buf) - 1, "capture_%lu", chn+1);
-		
 		err = AudioDeviceGetPropertyInfo(driver->device_id, chn + 1, true, kAudioDevicePropertyChannelName, &size, &isWritable);
 		if (err == noErr && size > 0)  {
 			err = AudioDeviceGetProperty(driver->device_id, chn + 1, true, kAudioDevicePropertyChannelName, &size, channel_name);	
@@ -295,8 +299,6 @@ coreaudio_driver_attach(coreaudio_driver_t * driver,
     port_flags = JackPortIsInput | JackPortIsPhysical | JackPortIsTerminal;
 
 	for (chn = 0; chn < driver->playback_nchannels; chn++) {
-		//snprintf (buf, sizeof(buf) - 1, "playback_%lu", chn+1);
-		
 		err = AudioDeviceGetPropertyInfo(driver->device_id, chn + 1, false, kAudioDevicePropertyChannelName, &size, &isWritable);
 		if (err == noErr && size > 0)  {
 			err = AudioDeviceGetProperty(driver->device_id, chn + 1, false, kAudioDevicePropertyChannelName, &size, channel_name);	
@@ -430,8 +432,9 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 	ComponentResult err1;
     UInt32 outSize;
     Boolean isWritable;
-	AudioStreamBasicDescription srcFormat, dstFormat, sampleRate;
+	AudioStreamBasicDescription srcFormat, dstFormat;
 	int in_nChannels, out_nChannels, i;
+	Float64 nominalSampleRate;
 
     driver = (coreaudio_driver_t *) calloc(1, sizeof(coreaudio_driver_t));
     jack_driver_init((jack_driver_t *) driver);
@@ -461,14 +464,17 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 	driver->playback_frame_latency = playback_latency;
 
 	if (driver_uid) {
-		if (get_device_id_from_uid(driver_uid, &driver->device_id) != noErr)
-		return NULL;
+		if (get_device_id_from_uid(driver_uid, &driver->device_id) != noErr) {
+			if (get_default_device(&driver->device_id) != noErr) 
+				goto error;
+		}
 	} else {
-		get_device_id_from_num(0, &driver->device_id); // takes a default value (first device)
+		if (get_default_device(&driver->device_id) != noErr) 
+			goto error;
 	}
 		
 	if (get_device_name_from_id(driver->device_id, driver->driver_name) != noErr)
-		return NULL;
+		goto error;
 
 	driver->client = client;
     driver->period_usecs =
@@ -483,31 +489,42 @@ static jack_driver_t *coreaudio_driver_new(char* name,
     err = AudioDeviceSetProperty(driver->device_id, NULL, 0, false, 
 		kAudioDevicePropertyBufferFrameSize, outSize, &frames_per_cycle);
     if (err != noErr) {
-        jack_error("Cannot set buffer size %ld\n", frames_per_cycle);
+        JCALog("Cannot set buffer size %ld\n", frames_per_cycle);
         printError1(err);
-        return NULL;
+		goto error;
     }
-
-    // Setting sample rate
-    outSize = sizeof(AudioStreamBasicDescription);
+	
+	outSize = sizeof(Float64);
     err = AudioDeviceGetProperty(driver->device_id, 0, false, 
-		kAudioDevicePropertyStreamFormat, &outSize, &sampleRate);
+		kAudioDevicePropertyNominalSampleRate, &outSize, &nominalSampleRate);
     if (err != noErr) {
-        jack_error("Cannot get sample rate\n");
+        JCALog("Cannot get sample rate\n");
         printError1(err);
-        return NULL;
-    }
+		goto error;
+    } else {
+		JCALog("Read nominalSampleRate %f\n", nominalSampleRate);
+	}
 
-    if (rate != (unsigned long)sampleRate.mSampleRate) {
-        sampleRate.mSampleRate = (Float64)rate;
+    if (rate != (jack_nframes_t)nominalSampleRate) {
+        nominalSampleRate = (Float64)rate;
         err = AudioDeviceSetProperty(driver->device_id, NULL, 0, 
-			false, kAudioDevicePropertyStreamFormat, outSize, &sampleRate);
+			false, kAudioDevicePropertyNominalSampleRate, outSize, &nominalSampleRate);
         if (err != noErr) {
-            jack_error("Cannot set sample rate %ld\n", rate);
+            JCALog("Cannot set sample rate %ld\n", rate);
             printError1(err);
-            return NULL;
+ 			goto error;
         }
     }
+	
+	err = AudioDeviceGetProperty(driver->device_id, 0, false, 
+		kAudioDevicePropertyNominalSampleRate, &outSize, &nominalSampleRate);
+    if (err != noErr) {
+        JCALog("Cannot get sample rate\n");
+        printError1(err);
+ 		goto error;
+    } else {
+		JCALog("Read again nominalSampleRate %f\n", nominalSampleRate);
+	}
 
 	// AUHAL
 	ComponentDescription cd = {kAudioUnitType_Output, 
@@ -518,22 +535,18 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 	if (err1 != noErr)
         goto error;
 
-	err1 = AudioUnitSetProperty(driver->au_hal, kAudioOutputUnitProperty_CurrentDevice, 
-		kAudioUnitScope_Global, 0, &driver->device_id, sizeof(AudioDeviceID));
-	if (err1 != noErr) { 
-		JCALog("error: calling AudioUnitSetProperty - kAudioOutputUnitProperty_CurrentDevice\n"); 
-		return NULL; 
-	}
-	
 	err1 = AudioUnitInitialize(driver->au_hal); 
-	if (err1 != noErr)
+	if (err1 != noErr) {
+		printError1(err1);
         goto error;
+	}
 	
 	outSize = 1;
 	err1 = AudioUnitSetProperty(driver->au_hal, kAudioOutputUnitProperty_EnableIO,
 		kAudioUnitScope_Output, 0, &outSize, sizeof(outSize));
 	if (err1 != noErr) { 
 		JCALog("error: calling AudioUnitSetProperty - kAudioOutputUnitProperty_EnableIO,kAudioUnitScope_Output\n"); 
+		printError1(err1);
 		goto error; 
 	}
 	
@@ -543,28 +556,42 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 			kAudioUnitScope_Input, 1, &outSize, sizeof(outSize));
 		if (err1 != noErr) { 
 			JCALog("error: calling AudioUnitSetProperty - kAudioOutputUnitProperty_EnableIO,kAudioUnitScope_Input\n"); 
+			printError1(err1);
 			goto error; 
 		}
+	}
+	
+	err1 = AudioUnitSetProperty(driver->au_hal, kAudioOutputUnitProperty_CurrentDevice, 
+		kAudioUnitScope_Global, 0, &driver->device_id, sizeof(AudioDeviceID));
+	if (err1 != noErr) { 
+		JCALog("error: calling AudioUnitSetProperty - kAudioOutputUnitProperty_CurrentDevice\n"); 
+		printError1(err1);
+		goto error;
 	}
 	
 	err1 = AudioUnitSetProperty(driver->au_hal, kAudioUnitProperty_MaximumFramesPerSlice, 
 		kAudioUnitScope_Global, 0, (UInt32*)&frames_per_cycle, sizeof(UInt32));
 	if (err1 != noErr) { 
 		JCALog("error: calling AudioUnitSetProperty - kAudioUnitProperty_MaximumFramesPerSlice\n"); 
+		printError1(err1);
 		goto error; 
 	}
 
 	err1 = AudioUnitGetPropertyInfo(driver->au_hal, kAudioOutputUnitProperty_ChannelMap, 
 		kAudioUnitScope_Input, 1, &outSize, &isWritable);
-	if (err1 != noErr) 
+	if (err1 != noErr) {
 		JCALog("error: calling AudioUnitSetProperty - kAudioOutputUnitProperty_ChannelMap-INFO 1\n");
+		printError1(err1);
+	}
 	
 	in_nChannels = outSize / sizeof(SInt32);
 	
 	err1 = AudioUnitGetPropertyInfo(driver->au_hal, kAudioOutputUnitProperty_ChannelMap, 
 		kAudioUnitScope_Output, 0, &outSize, &isWritable);
-	if (err1 != noErr) 
+	if (err1 != noErr) {
 		JCALog("error: calling AudioUnitSetProperty - kAudioOutputUnitProperty_ChannelMap-INFO 0\n");
+		printError1(err1);
+	}
 
 	out_nChannels = outSize / sizeof(SInt32);
 	
@@ -578,7 +605,7 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 	}
 
 	if (chan_out < out_nChannels) {
-		SInt32 chanArr[out_nChannels]; // ???
+		SInt32 chanArr[out_nChannels]; 
 		for (i = 0;i < out_nChannels; i++) {
 			chanArr[i] = -1;
 		}
@@ -587,8 +614,10 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 		}
 		err1 = AudioUnitSetProperty(driver->au_hal, kAudioOutputUnitProperty_ChannelMap, 
 			kAudioUnitScope_Output, 0, chanArr, sizeof(SInt32) * out_nChannels);
-		if (err1 != noErr) 
+		if (err1 != noErr) {
 			JCALog("error: calling AudioUnitSetProperty - kAudioOutputUnitProperty_ChannelMap 0\n");
+			printError1(err1);
+		}
 	}
 	
 	if (chan_in < in_nChannels) {
@@ -601,8 +630,10 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 		}
 		AudioUnitSetProperty(driver->au_hal, kAudioOutputUnitProperty_ChannelMap, 
 			kAudioUnitScope_Input, 1, chanArr, sizeof(SInt32) * in_nChannels);
-		if (err1 != noErr) 
+		if (err1 != noErr) {
 			JCALog("error: calling AudioUnitSetProperty - kAudioOutputUnitProperty_ChannelMap 1\n");
+			printError1(err1);
+		}
 	}
 
 	srcFormat.mSampleRate = rate;
@@ -619,8 +650,10 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 
 	err1 = AudioUnitSetProperty(driver->au_hal, kAudioUnitProperty_StreamFormat, 
 		kAudioUnitScope_Input, 0, &srcFormat, sizeof(AudioStreamBasicDescription));
-	if (err1 != noErr) 
+	if (err1 != noErr) {
 		JCALog("error: calling AudioUnitSetProperty - kAudioUnitProperty_StreamFormat kAudioUnitScope_Input\n");
+		printError1(err1);
+	}
 		
 	dstFormat.mSampleRate = rate;
     dstFormat.mFormatID = kAudioFormatLinearPCM;
@@ -636,8 +669,10 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 	
 	err1 = AudioUnitSetProperty(driver->au_hal, kAudioUnitProperty_StreamFormat, 
 		kAudioUnitScope_Output, 1, &dstFormat, sizeof(AudioStreamBasicDescription));
-	if (err1 != noErr) 
+	if (err1 != noErr) {
 		JCALog("error: calling AudioUnitSetProperty - kAudioUnitProperty_StreamFormat kAudioUnitScope_Output\n");
+		printError1(err1);
+	}
 	
 	if (chan_in > 0 && chan_out== 0) {
 		AURenderCallbackStruct output;
@@ -647,6 +682,7 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 			kAudioUnitScope_Output, 1, &output, sizeof(output));
 		if (err1 != noErr) { 
 			JCALog("AudioUnitSetProperty - kAudioUnitProperty_SetRenderCallback 1\n"); 
+			printError1(err1);
 			goto error; 
 		}
 	} else {
@@ -657,6 +693,7 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 			kAudioUnitScope_Input, 0, &output, sizeof(output));
 		if (err1 != noErr) { 
 			JCALog("AudioUnitSetProperty - kAudioUnitProperty_SetRenderCallback 0\n"); 
+			printError1(err1);
 			goto error; 
 		}
 	}
@@ -691,7 +728,7 @@ static jack_driver_t *coreaudio_driver_new(char* name,
   error:
 	AudioUnitUninitialize(driver->au_hal);
 	CloseComponent(driver->au_hal);
-    jack_error("Cannot open the coreaudio driver\n");
+    jack_error("Cannot open the coreaudio driver");
     free(driver);
     return NULL;
 }
@@ -883,7 +920,6 @@ jack_driver_t *driver_initialize(jack_client_t * client,
     }
 
     /* duplex is the default */
-
     if (!capture && !playback) {
 		capture = TRUE;
 		playback = TRUE;
