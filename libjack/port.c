@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2001-2003 Paul Davis
+    Copyright (C) 2005 Jussi Laako
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -31,6 +32,7 @@
 #include <jack/pool.h>
 #include <jack/port.h>
 #include <jack/jslist.h>
+#include <jack/intsimd.h>
 
 #include "local.h"
 
@@ -55,6 +57,256 @@ jack_port_type_info_t jack_builtin_port_types[] = {
 	},
 	{ .type_name = "", }
 };
+
+/* these functions have been taken from libDSP X86.c  -jl */
+
+#ifdef ARCH_X86
+
+static void
+x86_3dnow_add2f (float *dest, const float *src, int length)
+{
+	int i, n;
+	pv2sf m64p_dest = (pv2sf) dest;
+	pv2sf m64p_src = (pv2sf) src;
+
+	n = (length >> 1);
+	for (i = 0; i < n; i++)
+	{
+		asm volatile (
+			"movq %1, %%mm0\n\t" \
+			"pfadd %2, %%mm0\n\t" \
+			"movq %%mm0, %0\n\t"
+			: "=m" (m64p_dest[i])
+			: "m0" (m64p_dest[i]),
+			  "m" (m64p_src[i])
+			: "mm0", "memory");
+	}
+	if (n & 0x1)
+	{
+		asm volatile (
+			"movd %1, %%mm0\n\t" \
+			"movd %2, %%mm1\n\t" \
+			"pfadd %%mm1, %%mm0\n\t" \
+			"movd %%mm0, %0\n\t"
+			: "=m" (dest[length - 1])
+			: "m0" (dest[length - 1]),
+			  "m" (src[length - 1])
+			: "mm0", "mm1", "memory");
+	}
+	asm volatile (
+		"femms\n\t" \
+		"sfence\n\t");
+}
+
+static void
+x86_3dnow_copyf (float *dest, const float *src, int length)
+{
+	int i, n1, n2;
+	pv2sf m64p_src = (pv2sf) src;
+	pv2sf m64p_dest = (pv2sf) dest;
+
+	n1 = (length >> 4);
+	n2 = ((length & 0xf) >> 1);
+	for (i = 0; i < n1; i++)
+	{
+		asm volatile ("movq %0, %%mm0\n\t"
+			: : "m" (*m64p_src++) : "mm0", "memory");
+		asm volatile ("movq %0, %%mm1\n\t"
+			: : "m" (*m64p_src++) : "mm1", "memory");
+		asm volatile ("movq %0, %%mm2\n\t"
+			: : "m" (*m64p_src++) : "mm2", "memory");
+		asm volatile ("movq %0, %%mm3\n\t"
+			: : "m" (*m64p_src++) : "mm3", "memory");
+		asm volatile ("movq %0, %%mm4\n\t"
+			: : "m" (*m64p_src++) : "mm4", "memory");
+		asm volatile ("movq %0, %%mm5\n\t"
+			: : "m" (*m64p_src++) : "mm5", "memory");
+		asm volatile ("movq %0, %%mm6\n\t"
+			: : "m" (*m64p_src++) : "mm6", "memory");
+		asm volatile ("movq %0, %%mm7\n\t"
+			: : "m" (*m64p_src++) : "xmm7", "memory");
+
+		asm volatile ("movq %%mm0, %0\n\t"
+			: "=m" (*m64p_dest++) : : "mm0", "memory");
+		asm volatile ("movq %%mm1, %0\n\t"
+			: "=m" (*m64p_dest++) : : "mm1", "memory");
+		asm volatile ("movq %%mm2, %0\n\t"
+			: "=m" (*m64p_dest++) : : "mm2", "memory");
+		asm volatile ("movq %%mm3, %0\n\t"
+			: "=m" (*m64p_dest++) : : "mm3", "memory");
+		asm volatile ("movq %%mm4, %0\n\t"
+			: "=m" (*m64p_dest++) : : "mm4", "memory");
+		asm volatile ("movq %%mm5, %0\n\t"
+			: "=m" (*m64p_dest++) : : "mm5", "memory");
+		asm volatile ("movq %%mm6, %0\n\t"
+			: "=m" (*m64p_dest++) : : "mm6", "memory");
+		asm volatile ("movq %%mm7, %0\n\t"
+			: "=m" (*m64p_dest++) : : "mm7", "memory");
+	}
+	for (i = 0; i < n2; i++)
+	{
+		asm volatile (
+			"movq %1, %%mm0\n\t" \
+			"movq %%mm0, %0\n\t"
+			: "=m" (*m64p_dest++)
+			: "m" (*m64p_src++)
+			: "mm0", "memory");
+	}
+	if (length & 0x1)
+	{
+		asm volatile (
+			"movd %1, %%mm0\n\t" \
+			"movd %%mm0, %0\n\t"
+			: "=m" (dest[length - 1])
+			: "m" (src[length - 1])
+			: "mm0", "memory");
+	}
+	asm volatile (
+		"femms\n\t" \
+		"sfence\n\t");
+}
+
+static void
+x86_sse_copyf (float *dest, const float *src, int length)
+{
+	int i, n1, n2, si3;
+	pv4sf m128p_src = (pv4sf) src;
+	pv4sf m128p_dest = (pv4sf) dest;
+
+	n1 = (length >> 5);
+	n2 = ((length & 0x1f) >> 2);
+	si3 = (length & ~0x3);
+	for (i = 0; i < n1; i++)
+	{
+		asm volatile ("movaps %0, %%xmm0\n\t"
+			: : "m" (*m128p_src++) : "xmm0", "memory");
+		asm volatile ("movaps %0, %%xmm1\n\t"
+			: : "m" (*m128p_src++) : "xmm1", "memory");
+		asm volatile ("movaps %0, %%xmm2\n\t"
+			: : "m" (*m128p_src++) : "xmm2", "memory");
+		asm volatile ("movaps %0, %%xmm3\n\t"
+			: : "m" (*m128p_src++) : "xmm3", "memory");
+		asm volatile ("movaps %0, %%xmm4\n\t"
+			: : "m" (*m128p_src++) : "xmm4", "memory");
+		asm volatile ("movaps %0, %%xmm5\n\t"
+			: : "m" (*m128p_src++) : "xmm5", "memory");
+		asm volatile ("movaps %0, %%xmm6\n\t"
+			: : "m" (*m128p_src++) : "xmm6", "memory");
+		asm volatile ("movaps %0, %%xmm7\n\t"
+			: : "m" (*m128p_src++) : "xmm7", "memory");
+
+		asm volatile ("movaps %%xmm0, %0\n\t"
+			: "=m" (*m128p_dest++) : : "xmm0", "memory");
+		asm volatile ("movaps %%xmm1, %0\n\t"
+			: "=m" (*m128p_dest++) : : "xmm1", "memory");
+		asm volatile ("movaps %%xmm2, %0\n\t"
+			: "=m" (*m128p_dest++) : : "xmm2", "memory");
+		asm volatile ("movaps %%xmm3, %0\n\t"
+			: "=m" (*m128p_dest++) : : "xmm3", "memory");
+		asm volatile ("movaps %%xmm4, %0\n\t"
+			: "=m" (*m128p_dest++) : : "xmm4", "memory");
+		asm volatile ("movaps %%xmm5, %0\n\t"
+			: "=m" (*m128p_dest++) : : "xmm5", "memory");
+		asm volatile ("movaps %%xmm6, %0\n\t"
+			: "=m" (*m128p_dest++) : : "xmm6", "memory");
+		asm volatile ("movaps %%xmm7, %0\n\t"
+			: "=m" (*m128p_dest++) : : "xmm7", "memory");
+	}
+	for (i = 0; i < n2; i++)
+	{
+		asm volatile (
+			"movaps %1, %%xmm0\n\t" \
+			"movaps %%xmm0, %0\n\t"
+			: "=m" (*m128p_dest++)
+			: "m" (*m128p_src++)
+			: "xmm0", "memory");
+	}
+	for (i = si3; i < length; i++)
+	{
+		asm volatile (
+			"movss %1, %%xmm0\n\t" \
+			"movss %%xmm0, %0\n\t"
+			: "=m" (dest[i])
+			: "m" (src[i])
+			: "xmm0", "memory");
+	}
+}
+
+static void
+x86_sse_add2f (float *dest, const float *src, int length)
+{
+	int i, n, si2;
+	pv4sf m128p_src = (pv4sf) src;
+	pv4sf m128p_dest = (pv4sf) dest;
+
+	if (__builtin_expect(((long) src & 0xf) || ((long) dest & 0xf), 0))
+	{
+		/*fprintf(stderr, "x86_sse_add2f(): non aligned pointers!\n");*/
+		si2 = 0;
+		goto sse_nonalign;
+	}
+	si2 = (length & ~0x3);
+	n = (length >> 2);
+	for (i = 0; i < n; i++)
+	{
+		asm volatile (
+			"movaps %1, %%xmm0\n\t" \
+			"addps %2, %%xmm0\n\t" \
+			"movaps %%xmm0, %0\n\t"
+			: "=m" (m128p_dest[i])
+			: "m0" (m128p_dest[i]),
+			  "m" (m128p_src[i])
+			: "xmm0", "memory");
+	}
+sse_nonalign:
+	for (i = si2; i < length; i++)
+	{
+		asm volatile (
+			"movss %1, %%xmm0\n\t" \
+			"addss %2, %%xmm0\n\t" \
+			"movss %%xmm0, %0\n\t"
+			: "=m" (dest[i])
+			: "m0" (dest[i]),
+			  "m" (src[i])
+			: "xmm0", "memory");
+	}
+}
+
+static inline void
+x86_copy (float *dest, const float *src, int length)
+{
+	if (ARCH_X86_HAVE_SSE2(cpu_type))
+		x86_sse_copyf(dest, src, length);
+	else if (ARCH_X86_HAVE_3DNOW(cpu_type))
+		x86_3dnow_copyf(dest, src, length);
+	else
+		memcpy(dest, src, length * sizeof(float));
+}
+
+static inline void
+x86_mix (float *dest, const float *src, int length)
+{
+	int n;
+
+	/*if (ARCH_X86_HAVE_3DNOW(cpu_type))
+		x86_3dnow_add2f(dest, src, length);
+	else if (ARCH_X86_HAVE_SSE2(cpu_type))
+		x86_sse_add2f(dest, src, length);*/
+	if (ARCH_X86_HAVE_SSE2(cpu_type))
+		x86_sse_add2f(dest, src, length);
+	else if (ARCH_X86_HAVE_3DNOW(cpu_type))
+		x86_3dnow_add2f(dest, src, length);
+	else
+	{
+		n = length;
+		while (n--)
+			*dest++ += *src++;
+		/*for (iSample = 0; iSample < iDataLength; iSample++)
+			fpDest[iSample] += fpSrc[iSample];*/
+	}
+}
+
+#endif /* ARCH_X86 */
 
 jack_port_t *
 jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
@@ -651,9 +903,11 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 {
 	JSList *node;
 	jack_port_t *input;
+#ifndef ARCH_X86
 	jack_nframes_t n;
-	jack_default_audio_sample_t *buffer;
 	jack_default_audio_sample_t *dst, *src;
+#endif
+	jack_default_audio_sample_t *buffer;
 
 	/* by the time we've called this, we've already established
 	   the existence of more than one connection to this input
@@ -670,14 +924,19 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 	input = (jack_port_t *) node->data;
 	buffer = port->mix_buffer;
 
+#ifndef ARCH_X86
 	memcpy (buffer, jack_output_port_buffer (input),
 		sizeof (jack_default_audio_sample_t) * nframes);
+#else /* ARCH_X86 */
+	x86_copy (buffer, jack_output_port_buffer (input), nframes);
+#endif /* ARCH_X86 */
 
 	for (node = jack_slist_next (node); node;
 	     node = jack_slist_next (node)) {
 
 		input = (jack_port_t *) node->data;
 
+#ifndef ARCH_X86
 		n = nframes;
 		dst = buffer;
 		src = jack_output_port_buffer (input);
@@ -685,5 +944,8 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 		while (n--) {
 			*dst++ += *src++;
 		}
+#else /* ARCH_X86 */
+		x86_mix (buffer, jack_output_port_buffer (input), nframes);
+#endif /* ARCH_X86 */
 	}
 }

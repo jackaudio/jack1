@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=100
-JACK_MICRO_VERSION=4
+JACK_MICRO_VERSION=5
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -268,6 +268,14 @@ if test "x$enable_mmx" = xyes; then
 
 elif test "$target_cpu" = "x86_64"; then
       JACK_OPT_CFLAGS="-DREENTRANT -O3 -march=k8 -fomit-frame-pointer -ffast-math -funroll-loops -fmove-all-movables"
+fi
+
+AC_ARG_ENABLE(dynsimd,
+    [  --enable-dynsimd        enable dynamic SIMD selection (default=no)],,
+    enable_dynsimd=no)
+
+if test "x$enable_dynsimd" = xyes; then
+	AC_DEFINE(USE_DYNSIMD, 1, [Define to 1 to use dynamic SIMD selection.])
 fi
 
 AC_ARG_ENABLE(optimize,

@@ -1,6 +1,7 @@
 /* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
+    Copyright (C) 2005 Jussi Laako
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -46,6 +47,7 @@
 #include <jack/unlock.h>
 #include <jack/thread.h>
 #include <jack/varargs.h>
+#include <jack/intsimd.h>
 
 #include <sysdeps/time.h>
 JACK_TIME_GLOBAL_DECL;			/* One instance per process. */
@@ -66,17 +68,101 @@ JACK_TIME_GLOBAL_DECL;			/* One instance per process. */
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
 void *jack_zero_filled_buffer = NULL;
+#ifdef ARCH_X86
+int cpu_type = 0;
+#endif /* ARCH_X86 */
 
 #define EVENT_POLL_INDEX 0
 #define WAIT_POLL_INDEX 1
 #define event_fd pollfd[EVENT_POLL_INDEX].fd
 #define graph_wait_fd pollfd[WAIT_POLL_INDEX].fd
 
+
 typedef struct {
     int status;
     struct _jack_client *client;
     const char *client_name;
 } client_info;
+
+#ifdef ARCH_X86
+
+static int
+have_3dnow ()
+{
+	int res = 0;
+
+	asm volatile (
+		"pushl %%ebx\n\t" \
+		"movl $0x80000000, %%eax\n\t" \
+		"cpuid\n\t" \
+		"cmpl $0x80000001, %%eax\n\t" \
+		"jl tdnow_testexit\n\t" \
+		\
+		"movl $0x80000001, %%eax\n\t" \
+		"cpuid\n\t" \
+		\
+		"movl $1, %%ecx\n\t" \
+		"shll $31, %%ecx\n\t" \
+		"testl %%ecx, %%edx\n\t" \
+		"jz tdnow_testexit\n\t" \
+		"movl $1, %0\n\t" \
+		\
+		"movl $1, %%ecx\n\t" \
+		"shll $30, %%ecx\n\t" \
+		"testl %%ecx, %%edx\n\t" \
+		"jz tdnow_testexit\n\t" \
+		"movl $2, %0\n\t" \
+		\
+		"tdnow_testexit:\n\t" \
+		"popl %%ebx\n\t"
+		: "=m" (res)
+		:
+		: "eax", "ecx", "edx", "memory");
+	return res;
+}
+
+static int
+have_sse ()
+{
+	int res = 0;
+
+	asm volatile (
+		"pushl %%ebx\n\t" \
+		"movl $1, %%eax\n\t" \
+		"cpuid\n\t" \
+		\
+		"movl $1, %%ebx\n\t" \
+		"shll $25, %%ebx\n\t" \
+		"testl %%ebx, %%edx\n\t" \
+		"jz sse_testexit\n\t" \
+		"movl $1, %0\n\t" \
+		\
+		"movl $1, %%ebx\n\t" \
+		"shll $26, %%ebx\n\t" \
+		"testl %%ebx, %%edx\n\t" \
+		"jz sse_testexit\n\t" \
+		"movl $2, %0\n\t" \
+		\
+		"movl $1, %%ebx\n\t" \
+		"testl %%ebx, %%ecx\n\t" \
+		"jz sse_testexit\n\t" \
+		"movl $3, %0\n\t" \
+		\
+		"sse_testexit:\n\t" \
+		"popl %%ebx\n\t"
+		: "=m" (res)
+		:
+		: "eax", "ecx", "edx", "memory");
+	return res;
+}
+
+static void
+init_cpu ()
+{
+	cpu_type = ((have_3dnow() << 8) | have_sse());
+}
+
+#endif /* ARCH_X86 */
 
 void 
 jack_error (const char *fmt, ...)
@@ -198,6 +284,10 @@ jack_client_alloc ()
 	client->on_shutdown = NULL;
 	client->n_port_types = 0;
 	client->port_segment = NULL;
+
+#ifdef ARCH_X86
+	init_cpu();
+#endif /* ARCH_X86 */
 
 	return client;
 }
