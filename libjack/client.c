@@ -89,70 +89,77 @@ typedef struct {
 static int
 have_3dnow ()
 {
-	int res = 0;
+	unsigned int res = 0;
 
 	asm volatile (
 		"pushl %%ebx\n\t" \
 		"movl $0x80000000, %%eax\n\t" \
 		"cpuid\n\t" \
 		"cmpl $0x80000001, %%eax\n\t" \
-		"jl tdnow_testexit\n\t" \
+		"jl tdnow_prexit\n\t" \
 		\
 		"movl $0x80000001, %%eax\n\t" \
 		"cpuid\n\t" \
+		\
+		"xorl %%eax, %%eax\n\t" \
 		\
 		"movl $1, %%ecx\n\t" \
 		"shll $31, %%ecx\n\t" \
 		"testl %%ecx, %%edx\n\t" \
 		"jz tdnow_testexit\n\t" \
-		"movl $1, %0\n\t" \
+		"movl $1, %%eax\n\t" \
 		\
 		"movl $1, %%ecx\n\t" \
 		"shll $30, %%ecx\n\t" \
 		"testl %%ecx, %%edx\n\t" \
 		"jz tdnow_testexit\n\t" \
-		"movl $2, %0\n\t" \
+		"movl $2, %%eax\n\t" \
+		"jmp tdnow_testexit\n\t" \
 		\
+		"tdnow_prexit:\n\t" \
+		"xorl %%eax, %%eax\n\t" \
 		"tdnow_testexit:\n\t" \
 		"popl %%ebx\n\t"
-		: "=m" (res)
+		: "=a" (res)
 		:
-		: "eax", "ecx", "edx", "memory");
+		: "ecx", "edx", "memory");
 	return res;
 }
 
 static int
 have_sse ()
 {
-	int res = 0;
+	unsigned int res = 0;
 
 	asm volatile (
 		"pushl %%ebx\n\t" \
 		"movl $1, %%eax\n\t" \
 		"cpuid\n\t" \
 		\
+		"xorl %%eax, %%eax\n\t" \
+		\
 		"movl $1, %%ebx\n\t" \
 		"shll $25, %%ebx\n\t" \
 		"testl %%ebx, %%edx\n\t" \
 		"jz sse_testexit\n\t" \
-		"movl $1, %0\n\t" \
+		"movl $1, %%eax\n\t" \
 		\
 		"movl $1, %%ebx\n\t" \
 		"shll $26, %%ebx\n\t" \
 		"testl %%ebx, %%edx\n\t" \
 		"jz sse_testexit\n\t" \
-		"movl $2, %0\n\t" \
+		"movl $2, %%eax\n\t" \
 		\
 		"movl $1, %%ebx\n\t" \
 		"testl %%ebx, %%ecx\n\t" \
 		"jz sse_testexit\n\t" \
-		"movl $3, %0\n\t" \
+		"movl $3, %%eax\n\t" \
 		\
 		"sse_testexit:\n\t" \
 		"popl %%ebx\n\t"
-		: "=m" (res)
+		: "=a" (res)
 		:
-		: "eax", "ecx", "edx", "memory");
+		: "ecx", "edx", "memory");
 	return res;
 }
 
@@ -164,6 +171,9 @@ init_cpu ()
 		fprintf(stderr, "Enhanced3DNow! detected\n");
 	if (ARCH_X86_HAVE_SSE2(cpu_type))
 		fprintf(stderr, "SSE2 detected\n");
+	if ((!ARCH_X86_HAVE_3DNOW(cpu_type)) && (!ARCH_X86_HAVE_SSE2(cpu_type)))
+		fprintf(stderr,
+			"No supported SIMD instruction sets detected\n");
 }
 
 #endif /* ARCH_X86 */
