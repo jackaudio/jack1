@@ -160,6 +160,10 @@ static void
 init_cpu ()
 {
 	cpu_type = ((have_3dnow() << 8) | have_sse());
+	if (ARCH_X86_HAVE_3DNOW(cpu_type))
+		fprintf(stderr, "Enhanced3DNow! detected\n");
+	if (ARCH_X86_HAVE_SSE2(cpu_type))
+		fprintf(stderr, "SSE2 detected\n");
 }
 
 #endif /* ARCH_X86 */
