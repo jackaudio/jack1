@@ -4,10 +4,11 @@
 
 Version: $Id$
 
-Note to developers! A web-based bug tracker for JACK was put online in 
-Oct 2003. It is now the preferred way to report and track bugs and 
-feature requests. This TODO file is now used only for tracking release 
-issues (mapping features and other todo-items to release roadmap, etc).
+NOTE: web-based bug tracker for JACK was put online in Oct 2003. It is 
+      now the preferred way to report and track bugs and feature 
+      requests. This TODO file is now used only for tracking release 
+      issues (mapping features and other todo-items to release 
+      roadmap, etc).
 
 The new bug tracker can be found at:
 
@@ -16,7 +17,7 @@ The new bug tracker can be found at:
 -----------------------------------------------------------------------
 
 You can update this list directly via CVS or alternatively
-send a change request to Kai Vehmanen (mailto:k_at_eca.cx).
+send a change request to jackit-devel mailing list.
 
 -----------------------------------------------------------------------
 
@@ -40,7 +41,7 @@ TODO post-1.0
 TODO general - no agreed timeline
 
 - better scheme for handling machine and system dependencies (joq)
-- proper handling of client return values in libjack (kaiv)
+- proper handling of client return values in libjack
 - pool based malloc for rt client-local mem allocation (paul, moved back here)
 
 TO BE DECIDED - no agreed timeline
