@@ -21,6 +21,7 @@ noinst_HEADERS =		\
 	engine.h		\
 	hardware.h 		\
 	internal.h 		\
+	intsimd.h 		\
 	jslist.h		\
 	memops.h		\
 	messagebuffer.h		\

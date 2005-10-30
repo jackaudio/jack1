@@ -1,6 +1,6 @@
 /*
     Copyright (C) 2001 Paul Davis 
-    Copyright (C) 2004 Karsten Wiese, Rui Nuno Capela
+    Copyright (C) 2005 Karsten Wiese, Rui Nuno Capela
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -465,9 +465,9 @@ usx2y_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 static int
 usx2y_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 {
-	snd_pcm_sframes_t contiguous;
+	snd_pcm_uframes_t contiguous;
 	snd_pcm_sframes_t nread;
-	snd_pcm_sframes_t offset;
+	snd_pcm_uframes_t offset;
 	jack_default_audio_sample_t* buf[4];
 	channel_t chn;
 	JSList *node;
@@ -480,61 +480,55 @@ usx2y_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 	}
 
 	nread = 0;
-	contiguous = 0;
+
+	if (snd_pcm_mmap_begin (driver->capture_handle,
+				&driver->capture_areas,
+				&offset, &nframes_) < 0) {
+		jack_error ("ALSA/USX2Y: %s: mmap areas info error",
+			    driver->alsa_name_capture);
+		return -1;
+	}
+
+	for (chn = 0, node = driver->capture_ports;
+	     node; node = jack_slist_next (node), chn++) {
+		port = (jack_port_t *) node->data;
+		if (!jack_port_connected (port)) {
+			continue;
+		}
+		buf[chn] = jack_port_get_buffer (port, nframes_);
+	}
 
 	while (nframes) {
 
-		contiguous = (nframes > driver->frames_per_cycle) ?
-			driver->frames_per_cycle : nframes;
-
-		if (snd_pcm_mmap_begin (
-				driver->capture_handle, &driver->capture_areas,
-				(snd_pcm_uframes_t *) &offset,
-				(snd_pcm_uframes_t *) &nframes_) < 0) {
-			jack_error ("ALSA/USX2Y: %s: mmap areas info error",
-				driver->alsa_name_capture);
+		contiguous = nframes;
+		if (usx2y_driver_get_channel_addresses_capture (
+			    driver, &contiguous) < 0) {
 			return -1;
 		}
-
 		for (chn = 0, node = driver->capture_ports;
-				node && chn < 4;
-					node = jack_slist_next (node), chn++) {
+		     node; node = jack_slist_next (node), chn++) {
 			port = (jack_port_t *) node->data;
 			if (!jack_port_connected (port)) {
+				/* no-copy optimization */
 				continue;
 			}
-			buf[chn] = jack_port_get_buffer (port, nframes_);
+			alsa_driver_read_from_channel (driver, chn,
+						       buf[chn] + nread,
+						       contiguous);
+/* 			sample_move_dS_s24(buf[chn] + nread, */
+/* 					   driver->capture_addr[chn], */
+/* 					   contiguous, */
+/* 					   driver->capture_interleave_skip); */
 		}
+		nread += contiguous;
+		nframes -= contiguous;
+	}
 
-		while (nframes) {
-			contiguous = nframes;
-			if (usx2y_driver_get_channel_addresses_capture (
-					driver, &contiguous) < 0) {
-				return -1;
-			}
-			for (chn = 0, node = driver->capture_ports;
-					node && chn < 4;
-						node = jack_slist_next (node), chn++) {
-				port = (jack_port_t *) node->data;
-				if (!jack_port_connected (port)) {
-					/* no-copy optimization */
-					continue;
-				}
-				alsa_driver_read_from_channel (driver, chn,
-					buf[chn] + nread, contiguous);
-			}
-			nread += contiguous;
-			nframes -= contiguous;
-		}
-
-		if ((err = snd_pcm_mmap_commit (driver->capture_handle,
-				offset, nframes_)) < 0) {
-			jack_error ("ALSA/USX2Y: could not complete read of %"
-				PRIu32 " frames: error = %d", nframes_, err);
-			return -1;
-		}
-
-//		nframes -= contiguous;
+	if ((err = snd_pcm_mmap_commit (driver->capture_handle,
+					offset, nframes_)) < 0) {
+		jack_error ("ALSA/USX2Y: could not complete read of %"
+			    PRIu32 " frames: error = %d", nframes_, err);
+		return -1;
 	}
 
 	return 0;
@@ -547,11 +541,10 @@ usx2y_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 	JSList *node;
 	jack_default_audio_sample_t* buf[2];
 	snd_pcm_sframes_t nwritten;
-	snd_pcm_sframes_t contiguous;
-	snd_pcm_sframes_t offset;
+	snd_pcm_uframes_t contiguous;
+	snd_pcm_uframes_t offset;
 	jack_port_t *port;
 	int err;
-	int dbg_loops = 1;
 	snd_pcm_uframes_t nframes_ = nframes;
 
 	driver->process_count++;
@@ -561,7 +554,6 @@ usx2y_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 	}
 
 	nwritten = 0;
-	contiguous = 0;
 
 	/* check current input monitor request status */
 
@@ -583,83 +575,45 @@ usx2y_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 		}
 	}
 
-	while (nframes) {
-
-		if (--dbg_loops)
-			return dbg_loops;
-
-		contiguous = (nframes > driver->frames_per_cycle) ?
-			driver->frames_per_cycle : nframes;
-
-		if (snd_pcm_mmap_begin(
-				driver->playback_handle, &driver->playback_areas,
-				&offset, &nframes_) < 0) {
-			jack_error ("ALSA/USX2Y: %s: mmap areas info error",
-				driver->alsa_name_capture);
-			return -1;
-		}
-
-		for (chn = 0, node = driver->playback_ports;
-				node && chn < 2;
-					node = jack_slist_next (node), chn++) {
-			port = (jack_port_t *) node->data;
-			if (!jack_port_connected (port)) {
-				continue;
-			}
-			buf[chn] = jack_port_get_buffer (port, nframes_);
-		}
-
-		while (nframes) {
-			contiguous = nframes;
-			if (usx2y_driver_get_channel_addresses_playback (
-					driver, &contiguous) < 0) {
-				return -1;
-			}
-			for (chn = 0, node = driver->playback_ports;
-					node && chn < 2;
-						node = jack_slist_next (node), chn++) {
-				port = (jack_port_t *) node->data;
-				if (!jack_port_connected (port)) {
-					continue;
-				}
-				alsa_driver_write_to_channel (driver, chn,
-					buf[chn] + nwritten,
-					contiguous);
-			}
-			nwritten += contiguous;
-			if (driver->channels_not_done) {
-				alsa_driver_silence_untouched_channels (driver,
-					contiguous);
-			}
-			nframes -= contiguous;
-		}
-
-		if ((err = snd_pcm_mmap_commit (driver->playback_handle,
-				offset, nframes_)) < 0) {
-			jack_error ("ALSA/USX2Y: could not complete playback of %"
-				PRIu32 " frames: error = %d", nframes_, err);
-			if (err != EPIPE && err != ESTRPIPE)
-				return -1;
-		}
-//		nframes -= contiguous;
+	if (snd_pcm_mmap_begin(driver->playback_handle,
+			       &driver->playback_areas,
+			       &offset, &nframes_) < 0) {
+		jack_error ("ALSA/USX2Y: %s: mmap areas info error",
+			    driver->alsa_name_capture);
+		return -1;
 	}
 
-/* 	{ */
-/*      usx2y_t *h = (usx2y_t *) driver->hw->private; */
-/* 		unsigned *pu = (unsigned *)h->hwdep_pcm_shm->playback; */
-/* 		int i = sizeof(h->hwdep_pcm_shm->playback) / sizeof(*pu); */
+	for (chn = 0, node = driver->playback_ports;
+	     node; node = jack_slist_next (node), chn++) {
+		port = (jack_port_t *) node->data;
+		buf[chn] = jack_port_get_buffer (port, nframes_);
+	}
 
-/* 		while (i) { */
-/* 			if (*(pu)) { */
-/* 				jack_error("%p;error %u(=0x%X)@%p", */
-/* 					   h->hwdep_pcm_shm->playback, */
-/* 					   *pu, *pu, pu); */
-/* 				return -1; */
-/* 			} */
-/* 			--i; */
-/* 			++pu; */
-/* 		} */
-/* 	} */
+	while (nframes) {
+
+		contiguous = nframes;
+		if (usx2y_driver_get_channel_addresses_playback (
+			    driver, &contiguous) < 0) {
+			return -1;
+		}
+		for (chn = 0, node = driver->playback_ports;
+		     node; node = jack_slist_next (node), chn++) {
+			port = (jack_port_t *) node->data;
+			alsa_driver_write_to_channel (driver, chn,
+						      buf[chn] + nwritten,
+						      contiguous);
+		}
+		nwritten += contiguous;
+		nframes -= contiguous;
+	}
+
+	if ((err = snd_pcm_mmap_commit (driver->playback_handle,
+					offset, nframes_)) < 0) {
+		jack_error ("ALSA/USX2Y: could not complete playback of %"
+			    PRIu32 " frames: error = %d", nframes_, err);
+		if (err != EPIPE && err != ESTRPIPE)
+			return -1;
+	}
 
 	return 0;
 }

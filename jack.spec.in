@@ -1,8 +1,10 @@
 # $Id$
 # set to 0 to build rpms without capabilities support
-%define enable_capabilities 1
-# set to 1 to enable alternate jack temporary directory
-# mounted as tmpfs
+%define enable_capabilities 0
+# strip binaries 
+%define strip_jackd 0
+# set to 1 to enable alternate jack temporary
+# directory mounted as tmpfs
 %define enable_tmpdir 1
 %if %{enable_tmpdir}
 %define jack_tmpdir /var/lib/jack/tmp
@@ -11,21 +13,19 @@
 %define port_audio 0
 # use oss
 %define oss 1
-# strip binaries 
-%define strip_jackd 1
-# use premmption check
-%define preemption_check 1
+# use preemption check
+%define preemption_check 0
 
 
 Summary:	the Jack Audio Connection Kit
 Name:		@PACKAGE@
 Version:	@VERSION@
-Release:	1
+Release:	2
 License:	GPL
 Group:		System Environment/Daemons
 Source0:	%{name}-%{version}.tar.gz
 URL:		http://jackit.sourceforge.net
-BuildRoot:	 %{_tmppath}/%{name}-%{version}-root-%(id -u -n)
+BuildRoot:	%{_tmppath}/%{name}-%{version}-root-%(id -u -n)
 
 BuildRequires: automake >= 1.6 libsndfile-devel >= 1.0.0
 
@@ -66,25 +66,26 @@ Small example clients that use the Jack Audio Connection Kit.
 %setup -q
 
 %build
-%configure      --enable-optimize \
-%if %{enable_tmpdir}
-                --with-default-tmpdir=%{jack_tmpdir} \
-%endif
+%configure \
 %if %{enable_capabilities}
-                 --enable-capabilities \
+	--enable-capabilities \
+%if %{strip_jackd}
+	--enable-stripped-jackd \
 %endif
-%if %{preemption_check}
-                 --enable-preemption-check \
+%endif
+%if %{enable_tmpdir}
+	--with-default-tmpdir=%{jack_tmpdir} \
 %endif
 %if ! %{port_audio}
-		--disable-portaudio \
+	--disable-portaudio \
 %endif
 %if ! %{oss}
-		--disable-oss \
+	--disable-oss \
 %endif
-%if %{strip_jackd}
-                 --enable-stripped-jackd
+%if %{preemption_check}
+	--enable-preemption-check \
 %endif
+	--enable-optimize
 make
 
 
@@ -240,6 +241,10 @@ fi
 
 
 %changelog
+
+* Thu Oct 30 2005 Rui Nuno Capela <rncbc@rncbc.org> - 0.100.7-2
+- omitted enable-capabilities, stripped-binaries and preemption
+  check from default.
 
 * Thu Jan  3 2005 Rui Nuno Capela <rncbc@rncbc.org> - 0.99.44-1
 - add jack/statistics.h to devel package

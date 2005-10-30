@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=100
-JACK_MICRO_VERSION=6
+JACK_MICRO_VERSION=7
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -254,7 +254,7 @@ if test "x$enable_mmx" = xyes; then
   fi
 
   AC_DEFINE(x86, 1, "Nope it's intel")
-  COMMON_X86_OPT_FLAGS="-DREENTRANT -O3 -fomit-frame-pointer -ffast-math -funroll-loops -fmove-all-movables"
+  COMMON_X86_OPT_FLAGS="-DREENTRANT -O3 -fomit-frame-pointer -ffast-math -funroll-loops"
 
   if test "$target_cpu" = "i586"; then
       JACK_OPT_CFLAGS="-march=i586 "
@@ -267,7 +267,7 @@ if test "x$enable_mmx" = xyes; then
   JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS $JACK_OPT_CFLAGS $MMX_FLAGS $SSE_FLAGS"
 
 elif test "$target_cpu" = "x86_64"; then
-      JACK_OPT_CFLAGS="-DREENTRANT -O3 -march=k8 -fomit-frame-pointer -ffast-math -funroll-loops -fmove-all-movables"
+      JACK_OPT_CFLAGS="-DREENTRANT -O3 -march=k8 -fomit-frame-pointer -ffast-math -funroll-loops"
 fi
 
 AC_ARG_ENABLE(dynsimd,
