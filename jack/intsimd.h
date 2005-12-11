@@ -22,9 +22,10 @@
 #define __jack_intsimd_h__
 
 #ifdef USE_DYNSIMD
-#if (defined(__i386__) || defined(__x86_64__))
+/* TODO: fix the code for __x86_64__ */
+#if defined(__i386__)
 #define ARCH_X86
-#endif /* __i386__ || __x86_64__ */
+#endif /* __i386__ */
 #endif /* USE_DYNSIMD */
 
 #ifdef ARCH_X86
