@@ -40,6 +40,7 @@
  Jun 14, 2005: S.Letz: Since the "-I" parameter is not used anymore, rename the "systemic" latencies management parametes "-I" and "-O" like for the ALSA driver.
  Aug 16, 2005: S.Letz: Remove get_device_id_from_num, use get_default_device instead. If the -n option is not used or the device name cannot
 					   be found, the default device is used. Note: the default device can be used only if both default input and default output are the same.
+ Dec 19, 2005: S.Letz: Add -d option (display_device_names).
  
  */
 
@@ -50,7 +51,7 @@
 
 const int CAVersion = 3;
 
-#define PRINTDEBUG 1
+//#define PRINTDEBUG 1
 
 static void JCALog(char *fmt, ...)
 {
@@ -153,6 +154,54 @@ static OSStatus get_default_device(AudioDeviceID * id)
 	} else {
 		return kAudioHardwareBadDeviceError;
 	}
+}
+
+static OSStatus display_device_names()
+{
+	UInt32 size;
+	Boolean isWritable;
+	int i, deviceNum;
+	OSStatus err;
+	CFStringRef UIname;
+	
+	err = AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDevices, &size, &isWritable);
+    if (err != noErr) 
+		return err;
+		
+	deviceNum = size/sizeof(AudioDeviceID);
+	AudioDeviceID devices[deviceNum];
+	
+	err = AudioHardwareGetProperty(kAudioHardwarePropertyDevices, &size, devices);
+    if (err != noErr) 
+		return err;
+	
+	for (i = 0; i < deviceNum; i++) {
+        char device_name[256];
+		char internal_name[256];
+		
+		size = sizeof(CFStringRef);
+		UIname = NULL;
+		err = AudioDeviceGetProperty(devices[i], 0, false, kAudioDevicePropertyDeviceUID, &size, &UIname);
+		if (err == noErr) {
+			CFStringGetCString(UIname, internal_name, 256, CFStringGetSystemEncoding());
+		} else {
+			goto error;
+		}
+		
+		size = 256;
+		err = AudioDeviceGetProperty(devices[i], 0, false, kAudioDevicePropertyDeviceName, &size, device_name);
+		if (err != noErr) 
+			return err; 
+	
+		printf("Device name = \'%s\', internal_name = \'%s\' (to be used as -n parameter)\n", device_name, internal_name); 
+	}
+	
+	return noErr;
+
+error:
+	if (UIname != NULL)
+		CFRelease(UIname);
+	return err;
 }
 
 static OSStatus render(void *inRefCon, 
@@ -758,7 +807,7 @@ jack_driver_desc_t *driver_get_descriptor()
     desc = calloc(1, sizeof(jack_driver_desc_t));
 
     strcpy(desc->name, "coreaudio");
-    desc->nparams = 11;
+    desc->nparams = 12;
     desc->params = calloc(desc->nparams, sizeof(jack_driver_param_desc_t));
 
     i = 0;
@@ -849,6 +898,14 @@ jack_driver_desc_t *driver_get_descriptor()
 	strcpy(desc->params[i].short_desc, "Extra output latency");
 	strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
 	
+	i++;
+	strcpy(desc->params[i].name, "devices");
+	desc->params[i].character  = 'd';
+	desc->params[i].type = JackDriverParamBool;
+	desc->params[i].value.i  = TRUE;
+	strcpy(desc->params[i].short_desc, "Display available CoreAudio devices");
+	strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
+	
     return desc;
 }
 
@@ -915,6 +972,10 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 
 		case 'O':
 			systemic_output_latency = param->value.ui;
+			break;
+			
+		case 'd':
+			display_device_names();
 			break;
 		}
     }
