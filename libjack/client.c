@@ -84,6 +84,8 @@ typedef struct {
     const char *client_name;
 } client_info;
 
+#ifdef USE_DYNSIMD
+
 #ifdef ARCH_X86
 
 static int
@@ -91,8 +93,12 @@ have_3dnow ()
 {
 	unsigned int res = 0;
 
+#ifdef __x86_64__
+	asm volatile ("pushq %%rbx\n\t" : : : "memory");
+#else
+	asm volatile ("pushl %%ebx\n\t" : : : "memory");
+#endif
 	asm volatile (
-		"pushl %%ebx\n\t" \
 		"movl $0x80000000, %%eax\n\t" \
 		"cpuid\n\t" \
 		"cmpl $0x80000001, %%eax\n\t" \
@@ -118,11 +124,15 @@ have_3dnow ()
 		\
 		"tdnow_prexit:\n\t" \
 		"xorl %%eax, %%eax\n\t" \
-		"tdnow_testexit:\n\t" \
-		"popl %%ebx\n\t"
+		"tdnow_testexit:\n\t"
 		: "=a" (res)
 		:
 		: "ecx", "edx", "memory");
+#ifdef __x86_64__
+	asm volatile ("popq %%rbx\n\t" : : : "memory");
+#else
+	asm volatile ("popl %%ebx\n\t" : : : "memory");
+#endif
 	return res;
 }
 
@@ -131,8 +141,12 @@ have_sse ()
 {
 	unsigned int res = 0;
 
+#ifdef __x86_64__
+	asm volatile ("pushq %%rbx\n\t" : : : "memory");
+#else
+	asm volatile ("pushl %%ebx\n\t" : : : "memory");
+#endif
 	asm volatile (
-		"pushl %%ebx\n\t" \
 		"movl $1, %%eax\n\t" \
 		"cpuid\n\t" \
 		\
@@ -155,11 +169,15 @@ have_sse ()
 		"jz sse_testexit\n\t" \
 		"movl $3, %%eax\n\t" \
 		\
-		"sse_testexit:\n\t" \
-		"popl %%ebx\n\t"
+		"sse_testexit:\n\t"
 		: "=a" (res)
 		:
 		: "ecx", "edx", "memory");
+#ifdef __x86_64__
+	asm volatile ("popq %%rbx\n\t" : : : "memory");
+#else
+	asm volatile ("popl %%ebx\n\t" : : : "memory");
+#endif
 	return res;
 }
 
@@ -174,9 +192,20 @@ init_cpu ()
 	if ((!ARCH_X86_HAVE_3DNOW(cpu_type)) && (!ARCH_X86_HAVE_SSE2(cpu_type)))
 		fprintf(stderr,
 			"No supported SIMD instruction sets detected\n");
+	jack_port_set_funcs();
+}
+
+#else /* ARCH_X86 */
+
+static void
+init_cpu ()
+{
+	jack_port_set_funcs();
 }
 
 #endif /* ARCH_X86 */
+
+#endif /* USE_DYNSIMD */
 
 void 
 jack_error (const char *fmt, ...)
@@ -299,9 +328,9 @@ jack_client_alloc ()
 	client->n_port_types = 0;
 	client->port_segment = NULL;
 
-#ifdef ARCH_X86
+#ifdef USE_DYNSIMD
 	init_cpu();
-#endif /* ARCH_X86 */
+#endif /* USE_DYNSIMD */
 
 	return client;
 }

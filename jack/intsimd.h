@@ -22,10 +22,9 @@
 #define __jack_intsimd_h__
 
 #ifdef USE_DYNSIMD
-/* TODO: fix the code for __x86_64__ */
-#if defined(__i386__)
+#if (defined(__i386__) || defined(__x86_64__))
 #define ARCH_X86
-#endif /* __i386__ */
+#endif /* __i386__ || __x86_64__ */
 #endif /* USE_DYNSIMD */
 
 #ifdef ARCH_X86
@@ -42,6 +41,8 @@ typedef v4sf * pv4sf;
 extern int cpu_type;
 
 #endif /* ARCH_X86 */
+
+extern void jack_port_set_funcs (void);
 
 #endif /* __jack_intsimd_h__ */
 

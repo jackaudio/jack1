@@ -60,6 +60,29 @@ jack_port_type_info_t jack_builtin_port_types[] = {
 
 /* these functions have been taken from libDSP X86.c  -jl */
 
+#ifdef USE_DYNSIMD
+
+static void (*opt_copy) (float *, const float *, int);
+static void (*opt_mix) (float *, const float *, int);
+
+static void
+gen_copyf (float *dest, const float *src, int length)
+{
+	memcpy(dest, src, length * sizeof(float));
+}
+
+static void
+gen_mixf (float *dest, const float *src, int length)
+{
+	int n;
+
+	n = length;
+	while (n--)
+		*dest++ += *src++;
+	/*for (iSample = 0; iSample < iDataLength; iSample++)
+		fpDest[iSample] += fpSrc[iSample];*/
+}
+
 #ifdef ARCH_X86
 
 static void
@@ -272,41 +295,33 @@ sse_nonalign:
 	}
 }
 
-static inline void
-x86_copy (float *dest, const float *src, int length)
+void jack_port_set_funcs ()
 {
-	if (ARCH_X86_HAVE_SSE2(cpu_type))
-		x86_sse_copyf(dest, src, length);
-	else if (ARCH_X86_HAVE_3DNOW(cpu_type))
-		x86_3dnow_copyf(dest, src, length);
-	else
-		memcpy(dest, src, length * sizeof(float));
-}
-
-static inline void
-x86_mix (float *dest, const float *src, int length)
-{
-	int n;
-
-	/*if (ARCH_X86_HAVE_3DNOW(cpu_type))
-		x86_3dnow_add2f(dest, src, length);
-	else if (ARCH_X86_HAVE_SSE2(cpu_type))
-		x86_sse_add2f(dest, src, length);*/
-	if (ARCH_X86_HAVE_SSE2(cpu_type))
-		x86_sse_add2f(dest, src, length);
-	else if (ARCH_X86_HAVE_3DNOW(cpu_type))
-		x86_3dnow_add2f(dest, src, length);
-	else
-	{
-		n = length;
-		while (n--)
-			*dest++ += *src++;
-		/*for (iSample = 0; iSample < iDataLength; iSample++)
-			fpDest[iSample] += fpSrc[iSample];*/
+	if (ARCH_X86_HAVE_SSE2(cpu_type)) {
+		opt_copy = x86_sse_copyf;
+		opt_mix = x86_sse_add2f;
+	}
+	else if (ARCH_X86_HAVE_3DNOW(cpu_type)) {
+		opt_copy = x86_3dnow_copyf;
+		opt_mix = x86_3dnow_add2f;
+	}
+	else {
+		opt_copy = gen_copyf;
+		opt_mix = gen_mixf;
 	}
 }
 
+#else /* ARCH_X86 */
+
+void jack_port_set_funcs ()
+{
+	opt_copy = gen_copyf;
+	opt_mix = gen_mixf;
+}
+
 #endif /* ARCH_X86 */
+
+#endif /* USE_DYNSIMD */
 
 jack_port_t *
 jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
@@ -924,19 +939,19 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 	input = (jack_port_t *) node->data;
 	buffer = port->mix_buffer;
 
-#ifndef ARCH_X86
+#ifndef USE_DYNSIMD
 	memcpy (buffer, jack_output_port_buffer (input),
 		sizeof (jack_default_audio_sample_t) * nframes);
-#else /* ARCH_X86 */
-	x86_copy (buffer, jack_output_port_buffer (input), nframes);
-#endif /* ARCH_X86 */
+#else /* USE_DYNSIMD */
+	opt_copy (buffer, jack_output_port_buffer (input), nframes);
+#endif /* USE_DYNSIMD */
 
 	for (node = jack_slist_next (node); node;
 	     node = jack_slist_next (node)) {
 
 		input = (jack_port_t *) node->data;
 
-#ifndef ARCH_X86
+#ifndef USE_DYNSIMD
 		n = nframes;
 		dst = buffer;
 		src = jack_output_port_buffer (input);
@@ -944,8 +959,8 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 		while (n--) {
 			*dst++ += *src++;
 		}
-#else /* ARCH_X86 */
-		x86_mix (buffer, jack_output_port_buffer (input), nframes);
-#endif /* ARCH_X86 */
+#else /* USE_DYNSIMD */
+		opt_mix (buffer, jack_output_port_buffer (input), nframes);
+#endif /* USE_DYNSIMD */
 	}
 }
