@@ -516,12 +516,12 @@ HAVE_FREEBOB="false"
 if test "x$TRY_FREEBOB" = "xyes"
 then
 	# check for FreeBob libraries
-	PKG_CHECK_MODULES(LIBFREEBOB, libfreebob >= 0.5.1)
-	
+	PKG_CHECK_MODULES(LIBFREEBOB, libfreebob >= 0.5.1,
+	     [HAVE_FREEBOB="true"], AC_MSG_RESULT([no]))
+
 	AC_SUBST([LIBFREEBOB_CFLAGS])
 	AC_SUBST([LIBFREEBOB_LIBS])
-	
-	HAVE_FREEBOB="true"
+
 fi
 AM_CONDITIONAL(HAVE_FREEBOB,$HAVE_FREEBOB)
 
