@@ -24,5 +24,11 @@ else
 CA_DIR =
 endif
 
-SUBDIRS = $(ALSA_DIR) dummy $(OSS_DIR) $(PA_DIR) $(CA_DIR)
-DIST_SUBDIRS = alsa dummy oss portaudio coreaudio
+if HAVE_FREEBOB
+FREEBOB_DIR = freebob
+else
+FREEBOB_DIR =
+endif
+
+SUBDIRS = $(ALSA_DIR) dummy $(OSS_DIR) $(PA_DIR) $(CA_DIR) $(FREEBOB_DIR)
+DIST_SUBDIRS = alsa dummy oss portaudio coreaudio freebob

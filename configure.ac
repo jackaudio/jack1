@@ -14,8 +14,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=100
-JACK_MICRO_VERSION=9
+JACK_MINOR_VERSION=101
+JACK_MICRO_VERSION=0
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -510,6 +510,21 @@ then
 fi
 AM_CONDITIONAL(HAVE_ALSA, $HAVE_ALSA)
 
+AC_ARG_ENABLE(freebob, [  --disable-freebob          ignore FreeBob driver ],
+			TRY_FREEBOB=$enableval , TRY_FREEBOB=yes ) 
+HAVE_FREEBOB="false"
+if test "x$TRY_FREEBOB" = "xyes"
+then
+	# check for FreeBob libraries
+	PKG_CHECK_MODULES(LIBFREEBOB, libfreebob >= 0.5.1)
+	
+	AC_SUBST([LIBFREEBOB_CFLAGS])
+	AC_SUBST([LIBFREEBOB_LIBS])
+	
+	HAVE_FREEBOB="true"
+fi
+AM_CONDITIONAL(HAVE_FREEBOB,$HAVE_FREEBOB)
+
 if test "$JACK_DEFAULT_DRIVER" = \"dummy\"; then
   AC_MSG_WARN([Only the dummy driver can be built])
 fi
@@ -571,6 +586,7 @@ drivers/dummy/Makefile
 drivers/oss/Makefile
 drivers/portaudio/Makefile
 drivers/coreaudio/Makefile
+drivers/freebob/Makefile
 example-clients/Makefile
 jack.pc
 jack.spec
@@ -592,6 +608,7 @@ echo \| Build with ALSA support............................... : $HAVE_ALSA
 echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
+echo \| Build with FreeBob support............................ : $HAVE_FREEBOB
 echo \|
 echo \| Default driver backend................................ : $JACK_DEFAULT_DRIVER
 echo \| Shared memory interface............................... : $JACK_SHM_TYPE
