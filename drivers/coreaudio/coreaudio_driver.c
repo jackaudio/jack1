@@ -687,10 +687,8 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 
 	srcFormat.mSampleRate = rate;
     srcFormat.mFormatID = kAudioFormatLinearPCM;
-    srcFormat.mFormatFlags = kLinearPCMFormatFlagIsBigEndian |
-							kLinearPCMFormatFlagIsNonInterleaved | 
-							kLinearPCMFormatFlagIsPacked | 
-							kLinearPCMFormatFlagIsFloat;
+    srcFormat.mFormatFlags = kAudioFormatFlagsNativeFloatPacked |
+                             kLinearPCMFormatFlagIsNonInterleaved; 
     srcFormat.mBytesPerPacket = sizeof(float);
     srcFormat.mFramesPerPacket = 1;
     srcFormat.mBytesPerFrame = sizeof(float);
@@ -706,10 +704,8 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 		
 	dstFormat.mSampleRate = rate;
     dstFormat.mFormatID = kAudioFormatLinearPCM;
-    dstFormat.mFormatFlags = kLinearPCMFormatFlagIsBigEndian |
-							kLinearPCMFormatFlagIsNonInterleaved | 
-							kLinearPCMFormatFlagIsPacked | 
-							kLinearPCMFormatFlagIsFloat;
+    dstFormat.mFormatFlags = kAudioFormatFlagsNativeFloatPacked |
+	                     kLinearPCMFormatFlagIsNonInterleaved; 
     dstFormat.mBytesPerPacket = sizeof(float);
     dstFormat.mFramesPerPacket = 1;
     dstFormat.mBytesPerFrame = sizeof(float);
