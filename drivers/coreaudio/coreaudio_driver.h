@@ -55,11 +55,11 @@ typedef struct {
     JSList *capture_ports;
     JSList *playback_ports;
 
-	char driver_name[256];
+	char capture_driver_name[256];
+	char playback_driver_name[256];
  	
 	AudioUnit au_hal;
 	AudioBufferList* input_list;
-	AudioBufferList* output_list;
 	AudioDeviceID device_id;
 	
 	jack_nframes_t capture_frame_latency;
