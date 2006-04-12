@@ -556,7 +556,8 @@ freebob_driver_new (jack_client_t * client,
 
 	driver->client = client;
 	driver->engine = NULL;
-	
+
+	memset(&device_options,0,sizeof(device_options));	
 	device_options.sample_rate=params->sample_rate;
 	device_options.period_size=params->period_size;
 	device_options.nb_buffers=params->buffer_size;
