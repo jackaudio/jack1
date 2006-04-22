@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=101
-JACK_MICRO_VERSION=3
+JACK_MICRO_VERSION=4
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -446,7 +446,7 @@ if test "x$USE_BARRIER" = "xyes"; then
 		AC_DEFINE(USE_BARRIER, 1, [Use pthread barrier functions]))
 fi
 
-# Check which drivers can be built.  The last one successfully
+# Check which backend drivers can be built.  The last one successfully
 # configured becomes the default JACK driver; so the order of
 # precedence is: alsa, oss, coreaudio, portaudio, dummy.
 
@@ -494,6 +494,23 @@ then
 fi
 AM_CONDITIONAL(HAVE_OSS, $HAVE_OSS)
 
+AC_ARG_ENABLE(freebob, [  --disable-freebob          ignore FreeBob driver ],
+			TRY_FREEBOB=$enableval , TRY_FREEBOB=yes ) 
+HAVE_FREEBOB="false"
+if test "x$TRY_FREEBOB" = "xyes"
+then
+	# check for FreeBob libraries
+	PKG_CHECK_MODULES(LIBFREEBOB, libfreebob >= 0.5.1,
+	     [HAVE_FREEBOB="true"
+              JACK_DEFAULT_DRIVER=\"freebob\"
+	     ], AC_MSG_RESULT([no]))
+
+	AC_SUBST([LIBFREEBOB_CFLAGS])
+	AC_SUBST([LIBFREEBOB_LIBS])
+
+fi
+AM_CONDITIONAL(HAVE_FREEBOB,$HAVE_FREEBOB)
+
 AC_ARG_ENABLE(alsa, [  --disable-alsa          ignore ALSA driver ],
 			TRY_ALSA=$enableval , TRY_ALSA=yes ) 
 HAVE_ALSA="false"
@@ -504,26 +521,11 @@ then
 	     [HAVE_ALSA="true"
               ALSA_LIBS=-lasound
               JACK_DEFAULT_DRIVER=\"alsa\"
-             ], [true], [-lm]
+             ], AC_MSG_RESULT([no]), [-lm]
 	)
 	AC_SUBST(ALSA_LIBS)
 fi
 AM_CONDITIONAL(HAVE_ALSA, $HAVE_ALSA)
-
-AC_ARG_ENABLE(freebob, [  --disable-freebob          ignore FreeBob driver ],
-			TRY_FREEBOB=$enableval , TRY_FREEBOB=yes ) 
-HAVE_FREEBOB="false"
-if test "x$TRY_FREEBOB" = "xyes"
-then
-	# check for FreeBob libraries
-	PKG_CHECK_MODULES(LIBFREEBOB, libfreebob >= 0.5.1,
-	     [HAVE_FREEBOB="true"], AC_MSG_RESULT([no]))
-
-	AC_SUBST([LIBFREEBOB_CFLAGS])
-	AC_SUBST([LIBFREEBOB_LIBS])
-
-fi
-AM_CONDITIONAL(HAVE_FREEBOB,$HAVE_FREEBOB)
 
 if test "$JACK_DEFAULT_DRIVER" = \"dummy\"; then
   AC_MSG_WARN([Only the dummy driver can be built])
@@ -605,10 +607,10 @@ echo
 echo $PACKAGE $VERSION :
 echo
 echo \| Build with ALSA support............................... : $HAVE_ALSA
+echo \| Build with FreeBob support............................ : $HAVE_FREEBOB
 echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
-echo \| Build with FreeBob support............................ : $HAVE_FREEBOB
 echo \|
 echo \| Default driver backend................................ : $JACK_DEFAULT_DRIVER
 echo \| Shared memory interface............................... : $JACK_SHM_TYPE

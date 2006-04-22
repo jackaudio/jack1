@@ -368,11 +368,11 @@ static void usage (FILE *file)
 "             [ --verbose OR -v ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
-"         -d driver [ ... driver args ... ]\n"
-"             where driver can be `alsa', `coreaudio', `dummy',\n"
-"                                 `oss' or `portaudio'\n\n"
-"       jackd -d driver --help\n"
-"             to display options for each driver\n\n");
+"         -d backend [ ... backend args ... ]\n"
+"             The backend can be `alsa', `coreaudio', `dummy',\n"
+"                                `freebob', `oss' or `portaudio'.\n\n"
+"       jackd -d backend --help\n"
+"             to display options for each backend\n\n");
 }	
 
 static jack_driver_desc_t *
@@ -471,7 +471,7 @@ main (int argc, char *argv[])
 		{ "help", 0, 0, 'h' },
 		{ "port-max", 1, 0, 'p' },
 		{ "no-mlock", 0, 0, 'm' },
-		{ "name", 0, 0, 'n' },
+		{ "name", 1, 0, 'n' },
 		{ "unlock", 0, 0, 'u' },
 		{ "realtime", 0, 0, 'R' },
 		{ "realtime-priority", 1, 0, 'P' },

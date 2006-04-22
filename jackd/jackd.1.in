@@ -1,4 +1,4 @@
-.TH "JACKD" "1" "@VERSION@" "November 2004" ""
+.TH "JACKD" "1" "@VERSION@" "April 2006" ""
 .SH "NAME"
 jackd, jackstart \- JACK Audio Connection Kit sound server
 .SH "SYNOPSYS"
@@ -10,9 +10,10 @@ jackd, jackstart \- JACK Audio Connection Kit sound server
 .br
 \fBjackd \-\-help\fR
 .SH "DESCRIPTION"
-\fBjackd\fR invokes the JACK audio server daemon.  When using JACK's
-built\-in support for realtime capabilities, use the \fBjackstart\fR
-command, instead.  All parameters are the same.
+\fBjackd\fR invokes the JACK audio server daemon.  The \fBjackstart\fR
+command provides JACK's built\-in support for Linux 2.4.x kernels with
+the realtime capabilities patch.  Use \fBjackd\fR for Linux 2.6.x and
+all other systems.  All parameters are the same.
 
 JACK is a low\-latency audio server.  Originally written for the
 GNU/Linux operating system, it also supports Mac OS X and various Unix
@@ -27,15 +28,16 @@ ground up for professional audio work.  It focuses on two key areas:
 synchronous execution of all clients, and low latency operation.
 
 For the latest JACK information, please consult the web site,
-<\fBhttp://jackit.sourceforge.net\fR>.
+<\fBhttp://www.jackaudio.org\fR>.
 .SH "OPTIONS"
 .TP
 \fB\-d, \-\-driver \fIbackend\fR [\fIbackend\-parameters\fR ]
 .br
 Select the audio interface backend.  The current list of supported
-backends is: \fBalsa\fR, \fBcoreaudio\fR, \fBdummy\fR, \fBoss\fR and
-\fBportaudio\fR.  They are not all available on all platforms.  All
-\fIbackend\-parameters\fR are optional.
+backends is: \fBalsa\fR, \fBcoreaudio\fR, \fBdummy\fR, \fBfreebob\fR,
+\fBoss\fR and \fBportaudio\fR.  They are not all available on all
+platforms.  All \fIbackend\-parameters\fR are optional.
+
 .TP
 \fB\-h, \-\-help\fR
 .br
@@ -321,6 +323,8 @@ Print usage message for the parameters specific to each backend.
 .br
 \fBjackd \-d dummy \-\-help\fR
 .br
+\fBjackd \-d freebob \-\-help\fR
+.br
 \fBjackd \-d oss \-\-help\fR
 .br
 \fBjackd \-d portaudio \-\-help\fR
@@ -387,7 +391,7 @@ name to \fBjack_client_open()\fR.
 
 .SH "SEE ALSO:"
 .PP
-.I http://jackit.sourceforge.net
+.I http://www.jackaudio.org
 .br
 The official JACK website with news, docs and a list of JACK clients.
 .PP
@@ -395,7 +399,7 @@ The official JACK website with news, docs and a list of JACK clients.
 .br
 The JACK developers' mailing list.  Subscribe, to take part in
 development of JACK or JACK clients.  User questions are also welcome,
-there is currently no user-specific mailing list.
+there is no user-specific mailing list.
 .PP
 .I http://www.jackosx.com/
 .br
