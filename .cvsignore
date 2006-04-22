@@ -16,4 +16,6 @@ config.status
 configure
 jack.spec
 libtool
+stamp-h
+stamp-h.in
 stamp-h1

@@ -1,3 +1,7 @@
+*.lo
 .deps
-Makefile.in
+.libs
 Makefile
+Makefile.in
+jack_freebob.la
+
