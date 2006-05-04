@@ -42,6 +42,9 @@
  */              
 #define JACK_MAX_PORT_TYPES 4
 #define JACK_AUDIO_PORT_TYPE 0
+#define JACK_MIDI_PORT_TYPE 1
+
+/* these should probably go somewhere else, but not in <jack/types.h> */
 #define JACK_CLIENT_NAME_SIZE 33
 typedef uint32_t jack_client_id_t;
 

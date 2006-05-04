@@ -31,6 +31,7 @@
 #include <jack/engine.h>
 #include <jack/pool.h>
 #include <jack/port.h>
+#include <jack/midiport.h>
 #include <jack/jslist.h>
 #include <jack/intsimd.h>
 
@@ -39,6 +40,9 @@
 static void    jack_audio_port_mixdown (jack_port_t *port,
 					jack_nframes_t nframes);
 
+extern void jack_midi_port_mixdown (jack_port_t *port,
+ 					jack_nframes_t nframes);
+ 
 /* These function pointers are local to each address space.  For
  * internal clients they reside within jackd; for external clients in
  * the application process. */
@@ -46,13 +50,20 @@ jack_port_functions_t jack_builtin_audio_functions = {
 	.mixdown = jack_audio_port_mixdown, 
 };
 
+jack_port_functions_t jack_builtin_midi_functions = {
+	.mixdown = jack_midi_port_mixdown, 
+};
+
 jack_port_functions_t jack_builtin_NULL_functions = {
 	.mixdown = NULL, 
 };
 
-/* Only the Audio port type is currently built in. */
+/* Only the Audio and MIDI port types are currently built in. */
 jack_port_type_info_t jack_builtin_port_types[] = {
 	{ .type_name = JACK_DEFAULT_AUDIO_TYPE, 
+	  .buffer_scale_factor = 1,
+	},
+	{ .type_name = JACK_DEFAULT_MIDI_TYPE, 
 	  .buffer_scale_factor = 1,
 	},
 	{ .type_name = "", }
@@ -349,6 +360,11 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 		if (ptid == JACK_AUDIO_PORT_TYPE) {
 
 			port->fptr = jack_builtin_audio_functions;
+			port->shared->has_mixdown = TRUE;
+
+		} else if (ptid == JACK_MIDI_PORT_TYPE) {
+
+			port->fptr = jack_builtin_midi_functions;
 			port->shared->has_mixdown = TRUE;
 
 		} else {	/* no other builtin functions */
@@ -734,7 +750,7 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 				* nframes);
 	}
 	port->fptr.mixdown (port, nframes);
-	return (jack_default_audio_sample_t *) port->mix_buffer;
+	return (void *) port->mix_buffer;
 }
 
 int
@@ -964,3 +980,8 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 #endif /* USE_DYNSIMD */
 	}
 }
+
+
+
+
+

@@ -13,7 +13,8 @@ DOXSOURCES=mainpage.dox transport.dox porting.dox fsm.png fsm.eps \
 	../jack/ringbuffer.h \
 	../jack/thread.h \
 	../jack/transport.h \
-	../jack/types.h
+	../jack/types.h \
+	../jack/midiport.h
 
 EXTRA_DIST=mainpage.dox transport.dox fsm.png fsm.eps porting.dox
 

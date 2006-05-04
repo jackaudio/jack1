@@ -10,7 +10,8 @@ libjackinclude_HEADERS = 	\
 	thread.h                \
 	timestamps.h		\
 	transport.h		\
-	types.h	
+	types.h	\
+	midiport.h
 
 noinst_HEADERS =		\
 	atomicity.h		\

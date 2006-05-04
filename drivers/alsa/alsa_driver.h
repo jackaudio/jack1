@@ -25,9 +25,11 @@
 #include <jack/bitset.h>
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-	#define	SND_PCM_FORMAT_S24_3 SND_PCM_FORMAT_S24_3LE
+#define IS_LE 0
+#define IS_BE 1
 #elif __BYTE_ORDER == __BIG_ENDIAN
-	#define	SND_PCM_FORMAT_S24_3 SND_PCM_FORMAT_S24_3BE
+#define IS_LE 1
+#define IS_BE 0
 #endif
 
 
@@ -65,8 +67,8 @@ typedef struct _alsa_driver {
     unsigned int                  playback_nfds;
     unsigned int                  capture_nfds;
     unsigned long                 interleave_unit;
-    unsigned long                 capture_interleave_skip;
-    unsigned long                 playback_interleave_skip;
+    unsigned long                *capture_interleave_skip;
+    unsigned long                *playback_interleave_skip;
     channel_t                     max_nchannels;
     channel_t                     user_nchannels;
     channel_t                     playback_nchannels;
@@ -108,14 +110,18 @@ typedef struct _alsa_driver {
 
     unsigned long input_monitor_mask;
 
-    char   soft_mode : 1;
-    char   hw_monitoring : 1;
-    char   hw_metering : 1;
-    char   all_monitor_in : 1;
-    char   capture_and_playback_not_synced : 1;
-    char   playback_interleaved : 1;
-    char   capture_interleaved : 1;
-    char   with_monitor_ports : 1;
+    char soft_mode;
+    char hw_monitoring;
+    char hw_metering;
+    char all_monitor_in;
+    char capture_and_playback_not_synced;
+    char playback_interleaved;
+    char capture_interleaved;
+    char with_monitor_ports;
+    char has_clock_sync_reporting;
+    char has_hw_monitoring;
+    char has_hw_metering;
+    char quirk_bswap;
 
     ReadCopyFunction read_via_copy;
     WriteCopyFunction write_via_copy;
@@ -128,9 +134,6 @@ typedef struct _alsa_driver {
     JSList *clock_sync_listeners;
     pthread_mutex_t clock_sync_lock;
     unsigned long next_clock_sync_listener_id;
-    char has_clock_sync_reporting : 1;
-    char has_hw_monitoring : 1;
-    char has_hw_metering : 1;
 
     int running;
     int run;
@@ -155,7 +158,7 @@ alsa_driver_silence_on_channel (alsa_driver_t *driver, channel_t chn,
 			(driver->playback_addr[chn],
 			 0, nframes * driver->playback_sample_bytes,
 			 driver->interleave_unit,
-			 driver->playback_interleave_skip);
+			 driver->playback_interleave_skip[chn]);
 	} else {
 		memset (driver->playback_addr[chn], 0,
 			nframes * driver->playback_sample_bytes);
@@ -171,7 +174,7 @@ alsa_driver_silence_on_channel_no_mark (alsa_driver_t *driver, channel_t chn,
 			(driver->playback_addr[chn],
 			 0, nframes * driver->playback_sample_bytes,
 			 driver->interleave_unit,
-			 driver->playback_interleave_skip);
+			 driver->playback_interleave_skip[chn]);
 	} else {
 		memset (driver->playback_addr[chn], 0,
 			nframes * driver->playback_sample_bytes);
@@ -187,7 +190,7 @@ alsa_driver_read_from_channel (alsa_driver_t *driver,
 	driver->read_via_copy (buf, 
 			       driver->capture_addr[channel],
 			       nsamples, 
-			       driver->capture_interleave_skip);
+			       driver->capture_interleave_skip[channel]);
 }
 
 static inline void 
@@ -199,7 +202,7 @@ alsa_driver_write_to_channel (alsa_driver_t *driver,
 	driver->write_via_copy (driver->playback_addr[channel],
 				buf, 
 				nsamples, 
-				driver->playback_interleave_skip,
+				driver->playback_interleave_skip[channel],
 				driver->dither_state+channel);
 	alsa_driver_mark_channel_done (driver, channel);
 }
@@ -213,8 +216,8 @@ alsa_driver_copy_channel (alsa_driver_t *driver,
 	driver->channel_copy (driver->playback_addr[output_channel],
 			      driver->capture_addr[input_channel],
 			      nsamples * driver->playback_sample_bytes,
-			      driver->playback_interleave_skip,
-			      driver->capture_interleave_skip);
+			      driver->playback_interleave_skip[output_channel],
+			      driver->capture_interleave_skip[input_channel]);
 	alsa_driver_mark_channel_done (driver, output_channel);
 }
 

@@ -27,7 +27,7 @@
 #include <jack/driver_interface.h>
 
 typedef float         gain_t;
-typedef long          channel_t;
+typedef unsigned long channel_t;
 
 typedef	enum  {
 	Lock = 0x1,

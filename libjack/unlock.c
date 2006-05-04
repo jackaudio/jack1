@@ -37,6 +37,7 @@ static char* blacklist[] = {
 
 static char* whitelist[] = {
 	"/libc-",
+	"/libardour",
 	NULL
 };
 
@@ -73,7 +74,7 @@ cleanup_mlock ()
 
 		unlock = 0;
 
-		if (fscanf (map, "%x-%x %*s %*x %*d:%*d %d",
+		if (fscanf (map, "%zx-%zx %*s %*x %*d:%*d %d",
 			    &start, &end, &whoknows) != 3) {
 			break;
 		}

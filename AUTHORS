@@ -10,21 +10,66 @@ contributions to those discussions came from (in alphabetical order):
 Many other members of LAD contributed ideas to JACK, particularly
 Richard Guenther.
 
-Paul Davis was the principal author of the JACK API and of the
-implementation contained here.  Andy Wingo and Kai Vehmanen provided
-many small patches and documentation.  Fernando Pablo Lopez-Lezcano
-contributed the capabilities-based code.  Jeremy Hall, Steve Harris,
-and Martin Boer contributed sample clients and utilities.  Jack O'Quin
-contributed many new interfaces and bug fixes.  Taybin Rutkin helps
-with patch management and releases.  Melanie Thielker contributed
-significantly to JACK's interaction with aspects of both POSIX and
-System V APIs.  Stephane Letz ported JACK to Mac OS X.  Jussi Laako
-wrote the OSS driver interface.  Tilman Linneweh ported JACK to
-FreeBSD.  Johnny Petrantoni wrote the Mac OS X CoreAudio driver
-interface.  Rui Nuno Capela designed and implemented JACK improvements
-to work with his QJackCtl graphical interface for JACK.  He and
-Karsten Wiese added US-X2Y USB device support to the ALSA backend.
-Lee Revell contributed statistical interfaces and much low-latency
-realtime testing.
+CONTRIBUTORS
 
-Many others have contributed patches and/or test results.
+Paul Davis 
+	the principal author of the JACK API and of the
+	implementation contained here.  
+
+Jack O'Quin 
+	frequently acted as the primary maintainer of JACK for long
+	periods, and has contributed many new interfaces and bug fixes.  
+
+Andy Wingo 
+Kai Vehmanen
+	provided many small patches and documentation.  
+
+Fernando Pablo Lopez-Lezcano 
+	contributed the capabilities-based code for Linux 2.4,
+	and the RPM specfile.
+
+Jeremy Hall
+Steve Harris 
+Martin Boer 
+	contributed sample clients and utilities.  
+
+Taybin Rutkin 
+	manages releases and patch handling.
+
+Melanie Thielker 
+	contributed significantly to JACK's interaction with
+	aspects of both POSIX and System V APIs.  
+
+Stephane Letz 
+	ported JACK toMac OS X.  
+
+Jussi Laako 
+	wrote the OSS driver interface.  
+
+Tilman Linneweh 
+	ported JACK to FreeBSD.  
+
+Johnny Petrantoni 
+	wrote the Mac OS X CoreAudio driver interface.  
+
+Rui Nuno Capela 
+	designed and implemented JACK improvements to work with his
+	QJackCtl graphical interface for JACK.  
+
+Karsten Wiese 
+	(with Rui) added US-X2Y USB device support to the
+	ALSA backend.  
+
+Lee Revell 
+	contributed statistical interfaces and much low-latency realtime testing.
+
+Ian Esten
+	wrote JACK's MIDI port handling and API, along with example
+	MIDI clients.
+
+Frank van der Pol
+	wrote the COMPLEX_MMAP patch for ALSA, allowing JACK to run
+	on multi-device PCM configurations.
+
+Many others have contributed patches and/or test results, and we thank
+them all.

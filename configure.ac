@@ -14,8 +14,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=101
-JACK_MICRO_VERSION=4
+JACK_MINOR_VERSION=102
+JACK_MICRO_VERSION=0
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -101,6 +101,9 @@ if test "x$JACK_USE_MACH_THREADS" != "x"; then
 	[$JACK_USE_MACH_THREADS],
 	[Use MACH threads where possible])
 fi
+
+# Harsh? necessary ....
+CFLAGS=""
 
 # headers
 AC_CHECK_HEADERS(string.h strings.h)
@@ -206,68 +209,104 @@ if test "$target_cpu" = "powerpc"; then
     
     JACK_OPT_CFLAGS="-D_REENTRANT -O2 -mcpu=7400 $ALTIVEC_OPT_FLAGS_FLAGS -mhard-float -mpowerpc-gfxopt"
 
-elif echo $target_cpu | grep "i.86" >/dev/null; then
+elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 
-dnl Check for MMX assembly
-
-AC_ARG_ENABLE(mmx,
-    [  --enable-mmx            enable MMX support (default=auto)],,
-    enable_mmx=yes)
-
-AC_ARG_ENABLE(sse,
-    [  --enable-sse            enable SSE support (default=auto)],,
-    enable_sse=$enable_mmx)
-
-if test "x$enable_mmx" = xyes; then
+    dnl Check for MMX/SSE assembly
     
-    AC_MSG_CHECKING(whether we can compile MMX code)
+    if test -r /proc/cpuinfo ; then
+	procflags=`grep '^flags' /proc/cpuinfo`
+	if echo $procflags | grep -s mmx ; then
+	    cpu_supports_mmx=yes
+	fi
+	if echo $procflags | grep -s sse ; then
+	    cpu_supports_sse=yes
+	fi
+    fi
     
-    AC_COMPILE_IFELSE([asm ("movq 0, %mm0");],
+    AC_ARG_ENABLE(optimization-by-compiler,
+	[  --enable-optimization-by-compiler  use compiler (NOT processor) capabilities to determine optimization flags],,
+	optimization_by_compiler=no
+    )
+    
+    AC_ARG_ENABLE(optimization-by-cpu,
+	[  --enable-optimization-by-cpu  use processor capabilities to determine optimization flags],,
+	optimization_by_cpu=yes
+    )
+    
+    AC_ARG_ENABLE(mmx,
+	[  --enable-mmx            enable MMX support (default=auto)],,
+	enable_mmx=yes)
+    
+    AC_ARG_ENABLE(sse,
+	[  --enable-sse            enable SSE support (default=auto)],,
+	enable_sse=$enable_mmx)
+    
+    if test "x$enable_mmx" = xyes; then
 	
-	AC_DEFINE(USE_MMX, 1, [Define to 1 if MMX assembly is available.])
-	AC_MSG_RESULT(yes)
-	MMX_FLAGS="-mmmx"
+	AC_MSG_CHECKING(whether we can compile MMX code)
 	
-	if test "x$enable_sse" = xyes; then
-	      
-	      AC_MSG_CHECKING(whether we can compile SSE code)
-	      
-	      AC_COMPILE_IFELSE([asm ("movntps %xmm0, 0");],
-		  AC_DEFINE(USE_SSE, 1,
-                            [Define to 1 if SSE assembly is available.])
-		  SSE_FLAGS="-msse -mfpmath=sse"
-		  AC_MSG_RESULT(yes)
-		  ,
-		  enable_sse=no
-		  AC_MSG_RESULT(no)
-		  AC_MSG_WARN(
-                      [The assembler does not support the SSE command set.]
-                  )
-	      )
-	      
-	  fi
-	  ,
-	  enable_mmx=no
-	  AC_MSG_RESULT(no)
-	  AC_MSG_WARN([The assembler does not support the MMX command set.])
-      )
-  fi
+	AC_COMPILE_IFELSE([asm ("movq 0, %mm0");],
+	    
+	    AC_DEFINE(USE_MMX, 1, [Define to 1 if MMX assembly is available.])
+	    AC_MSG_RESULT(yes)
+	    
+	    if test x$optimization_by_cpu = xyes ; then
+		if test x$cpu_supports_mmx = xyes ; then
+		    MMX_FLAGS="-mmmx"
+		fi
+	    else 
+		MMX_FLAGS="-mmmx"
+	    fi
+	    
+	    AC_MSG_RESULT(yes)
+	    ,
+	    enable_mmx=no
+	    AC_MSG_RESULT(no)
+	    AC_MSG_WARN([The assembler does not support the MMX command set.])
+	)
+    fi
+        
+    if test "x$enable_sse" = xyes; then
+	
+	AC_MSG_CHECKING(whether we can compile SSE code)
+	
+	AC_COMPILE_IFELSE([asm ("movntps %xmm0, 0");],
+	    AC_DEFINE(USE_SSE, 1,
+		[Define to 1 if SSE assembly is available.])
+	    
+	    if test x$optimization_by_cpu = xyes ; then
+		if test x$cpu_supports_sse = xyes ; then
+		    SSE_FLAGS="-msse -mfpmath=sse"
+		fi
+	    else 
+		SSE_FLAGS="-msse -mfpmath=sse"
+	    fi
+	    
+	    AC_MSG_RESULT(yes)
+	    ,
+	    enable_sse=no
+	    AC_MSG_RESULT(no)
+	    AC_MSG_WARN(
+		[The assembler does not support the SSE command set.]
+	    )
+	)
+    fi
 
-  AC_DEFINE(x86, 1, "Nope it's intel")
-  COMMON_X86_OPT_FLAGS="-DREENTRANT -O3 -fomit-frame-pointer -ffast-math -funroll-loops"
+    AC_DEFINE(x86, 1, "Nope it's intel")
+    COMMON_X86_OPT_FLAGS="-DREENTRANT -O3 -fomit-frame-pointer -ffast-math -funroll-loops"
+    
+    if test "$target_cpu" = "i586"; then
+	JACK_OPT_CFLAGS="-march=i586 "
+    elif test "$target_cpu" = "i686"; then
+	JACK_OPT_CFLAGS="-march=i686"
+    elif test "$target_cpu" = "x86_64"; then
+	JACK_OPT_CFLAGS="-march=k8"
+    else
+	:
+    fi
+    
+    JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS $JACK_OPT_CFLAGS $MMX_FLAGS $SSE_FLAGS"
 
-  if test "$target_cpu" = "i586"; then
-      JACK_OPT_CFLAGS="-march=i586 "
-  elif test "$target_cpu" = "i686"; then
-      JACK_OPT_CFLAGS="-march=i686"
-  else
-      :
-  fi
-
-  JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS $JACK_OPT_CFLAGS $MMX_FLAGS $SSE_FLAGS"
-
-elif test "$target_cpu" = "x86_64"; then
-      JACK_OPT_CFLAGS="-DREENTRANT -O3 -march=k8 -fomit-frame-pointer -ffast-math -funroll-loops"
 fi
 
 AC_ARG_ENABLE(dynsimd,
@@ -280,9 +319,13 @@ fi
 
 AC_ARG_ENABLE(optimize,
     AC_HELP_STRING([--enable-optimize],
-		   [ask the compiler for its best optimizations]),
+	[ask the compiler for its best optimizations]),
     [ if test x$enable_optimize != xno ; then
-	JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS" ;
+	JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS"
+	AC_MSG_WARN([optimization in use.........................])
+      else
+	JACK_OPT_CFLAGS=""
+	AC_MSG_WARN([no optimization.........................])
       fi 
     ]
 )
@@ -611,6 +654,8 @@ echo \| Build with FreeBob support............................ : $HAVE_FREEBOB
 echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
+echo \| Compiler optimization flags........................... : $JACK_OPT_CFLAGS
+echo \| Compiler full flags................................... : $CFLAGS
 echo \|
 echo \| Default driver backend................................ : $JACK_DEFAULT_DRIVER
 echo \| Shared memory interface............................... : $JACK_SHM_TYPE

@@ -37,7 +37,9 @@ bin_PROGRAMS = jack_load \
 	       jack_lsp \
 	       jack_freewheel \
 	       $(JACKREC) \
-	       $(JACK_TRANSPORT)
+	       $(JACK_TRANSPORT) \
+		   jack_midisine \
+		   jack_midiseq
 
 if HAVE_SNDFILE
 # note! jackrec_CFLAGS syntax not supported by automake-1.4
@@ -110,6 +112,14 @@ jack_load_LDADD = ../libjack/libjack.la
 jack_unload_SOURCES = ipunload.c
 jack_unload_LDFLAGS = @OS_LDFLAGS@
 jack_unload_LDADD = ../libjack/libjack.la
+
+jack_midiseq_SOURCES = midiseq.c
+jack_midiseq_LDFLAGS = -lrt -ldl -lpthread
+jack_midiseq_LDADD = ../libjack/libjack.la
+
+jack_midisine_SOURCES = midisine.c
+jack_midisine_LDFLAGS = -lrt -ldl -lpthread -lm
+jack_midisine_LDADD = ../libjack/libjack.la
 
 #
 # sample in-process client(s)

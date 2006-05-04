@@ -16,6 +16,7 @@ SOURCE_FILES = \
 	     messagebuffer.c \
 	     pool.c \
 	     port.c \
+		 midiport.c \
 	     ringbuffer.c \
 	     shm.c \
 	     thread.c \

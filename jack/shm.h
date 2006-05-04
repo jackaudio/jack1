@@ -101,8 +101,7 @@ extern void jack_unregister_server (const char *server_name);
 extern int  jack_initialize_shm (const char *server_name);
 extern int  jack_cleanup_shm (void);
 
-extern int  jack_shmalloc (const char *shm_name, jack_shmsize_t size,
-			   jack_shm_info_t* result);
+extern int  jack_shmalloc (jack_shmsize_t size, jack_shm_info_t* result);
 extern void jack_release_shm (jack_shm_info_t*);
 extern void jack_destroy_shm (jack_shm_info_t*);
 extern int  jack_attach_shm (jack_shm_info_t*);

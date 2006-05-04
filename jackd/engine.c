@@ -415,23 +415,17 @@ jack_resize_port_segment (jack_engine_t *engine,
 
 	if (shm_info->attached_at == 0) {
 
-		char name[64];
-
-		/* no segment allocated, yet */
-		snprintf (name, sizeof(name), "jck-[%s]",
-			  port_type->type_name);
-
-		if (jack_shmalloc (name, size, shm_info)) {
+		if (jack_shmalloc (size, shm_info)) {
 			jack_error ("cannot create new port segment of %d"
-				    " bytes, name = %s (%s)", 
-				    size, name,
+				    " bytes (%s)", 
+				    size,
 				    strerror (errno));
 			return;
 		}
 		
 		if (jack_attach_shm (shm_info)) {
 			jack_error ("cannot attach to new port segment "
-				    "(name=%s) (%s)", name, strerror (errno));
+				    "(%s)", strerror (errno));
 			return;
 		}
 
@@ -1533,7 +1527,7 @@ jack_engine_t *
 jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 		 const char *server_name, int temporary, int verbose,
 		 int client_timeout, unsigned int port_max, pid_t wait_pid,
-		 JSList *drivers)
+		 jack_nframes_t frame_time_offset, JSList *drivers)
 {
 	jack_engine_t *engine;
 	unsigned int i;
@@ -1598,8 +1592,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	srandom (time ((time_t *) 0));
 
-	if (jack_shmalloc ("jack-engine",
-			   sizeof (jack_control_t)
+	if (jack_shmalloc (sizeof (jack_control_t)
 			   + ((sizeof (jack_port_shared_t) * engine->port_max)),
 			   &engine->control_shm)) {
 		jack_error ("cannot create engine control shared memory "
@@ -1679,7 +1672,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->control->xrun_delayed_usecs = 0;
 	engine->control->max_delayed_usecs = 0;
 
-	engine->control->frame_timer.frames = 0;
+	engine->control->frame_timer.frames = frame_time_offset;
 	engine->control->frame_timer.reset_pending = 0;
 	engine->control->frame_timer.current_wakeup = 0;
 	engine->control->frame_timer.next_wakeup = 0;
@@ -2490,6 +2483,17 @@ jack_get_port_total_latency (jack_engine_t *engine,
 	jack_nframes_t latency;
 	jack_nframes_t max_latency = 0;
 
+#ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
+	char prefix[32];
+	int i;
+
+	for (i = 0; i < hop_count; ++i) {
+		prefix[i] = '\t';
+	}
+
+	prefix[i] = '\0';
+#endif
+
 	/* call tree must hold engine->client_lock. */
 
 	latency = port->shared->latency;
@@ -2502,6 +2506,10 @@ jack_get_port_total_latency (jack_engine_t *engine,
 		return latency;
 	}
 
+#ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
+	fprintf (stderr, "\n%sFor port %s (%s)\n", prefix, port->shared->name, (toward_port ? "toward" : "away"));
+#endif
+	
 	for (node = port->connections; node; node = jack_slist_next (node)) {
 
 		jack_nframes_t this_latency;
@@ -2514,12 +2522,27 @@ jack_get_port_total_latency (jack_engine_t *engine,
 		     (connection->source->shared == port->shared)) ||
 		    (!toward_port &&
 		     (connection->destination->shared == port->shared))) {
+
+#ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
+			fprintf (stderr, "%s\tskip connection %s->%s\n",
+				 prefix,
+				 connection->source->shared->name,
+				 connection->destination->shared->name);
+#endif
+
 			continue;
 		}
 
+#ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
+		fprintf (stderr, "%s\tconnection %s->%s ... ", 
+			 prefix,
+			 connection->source->shared->name,
+			 connection->destination->shared->name);
+#endif
 		/* if we're a destination in the connection, recurse
 		   on the source to get its total latency
 		*/
+
 		if (connection->destination == port) {
 
 			if (connection->source->shared->flags
@@ -2556,6 +2579,10 @@ jack_get_port_total_latency (jack_engine_t *engine,
 			max_latency = this_latency;
 		}
 	}
+
+#ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
+	fprintf (stderr, "%s\treturn %lu + %lu = %lu\n", prefix, latency, max_latency, latency + max_latency);
+#endif	
 
 	return latency + max_latency;
 }

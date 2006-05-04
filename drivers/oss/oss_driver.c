@@ -663,7 +663,7 @@ static int oss_driver_start (oss_driver_t *driver)
 		driver->outdevbuf = NULL;
 	}
 
-	printf("oss_driver: indevbuf %u B, outdevbuf %u B\n",
+	printf("oss_driver: indevbuf %zd B, outdevbuf %zd B\n",
 		driver->indevbufsize, driver->outdevbufsize);
 
 	pthread_mutex_init(&driver->mutex_in, NULL);

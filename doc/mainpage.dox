@@ -97,6 +97,8 @@ The JACK programming interfaces are described in several header files:
   - @ref types.h "<jack/types.h>" defines the main JACK data types.
   - @ref thread.h "<jack/thread.h>" functions standardize thread
   creation for JACK and its clients.
+  - @ref midiport.h "<jack/midiport.h>" functions to handle writing
+  of midi data to a port
 
 In addition, the example-clients directory provides numerous examples
 of simple JACK clients that nevertheless use the API to do something

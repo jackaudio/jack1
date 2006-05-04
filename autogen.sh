@@ -19,7 +19,7 @@ $LIBTOOLIZE --force 2>&1 | sed '/^You should/d' || {
     exit 1
 }
 
-aclocal $ACLOCAL_FLAGS -I config || {
+aclocal $ACLOCAL_FLAGS || {
     echo "aclocal \$ACLOCAL_FLAGS where \$ACLOCAL_FLAGS= failed, exiting..."
     exit 1
 }

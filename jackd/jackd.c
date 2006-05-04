@@ -64,6 +64,7 @@ static int verbose = 0;
 static int client_timeout = 0; /* msecs; if zero, use period size. */
 static unsigned int port_max = 128;
 static int do_unlock = 0;
+static jack_nframes_t frame_time_offset = 0;
 
 static void 
 do_nothing_handler (int sig)
@@ -144,7 +145,7 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	if ((engine = jack_engine_new (realtime, realtime_priority, 
 				       do_mlock, do_unlock, server_name,
 				       temporary, verbose, client_timeout,
-				       port_max, getpid(), drivers)) == 0) {
+				       port_max, getpid(), frame_time_offset, drivers)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
 		return -1;
 	}
@@ -365,6 +366,7 @@ static void usage (FILE *file)
 "             [ --unlock OR -u ]\n"
 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
 "             [ --port-max OR -p maximum-number-of-ports]\n"
+"             [ --debug-timer OR -D ]\n"
 "             [ --verbose OR -v ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
@@ -458,6 +460,45 @@ jack_cleanup_files (const char *server_name)
 	}
 }
 
+static void
+maybe_use_capabilities ()
+{
+#ifdef USE_CAPABILITIES
+	int status;
+
+	/* check to see if there is a pipe in the right descriptor */
+	if ((status = fstat (PIPE_WRITE_FD, &pipe_stat)) == 0 &&
+	    S_ISFIFO(pipe_stat.st_mode)) {
+
+		/* tell jackstart we are up and running */
+  	        char c = 1;
+
+	        if (write (PIPE_WRITE_FD, &c, 1) != 1) {
+		        fprintf (stderr, "cannot write to jackstart sync "
+				 "pipe %d (%s)\n", PIPE_WRITE_FD,
+				 strerror (errno));
+	        }
+
+		if (close(PIPE_WRITE_FD) != 0) {
+			fprintf(stderr,
+				"jackd: error on startup pipe close: %s\n",
+				strerror (errno));
+		} else {
+			/* wait for jackstart process to set our capabilities */
+			if (wait (&status) == -1) {
+				fprintf (stderr, "jackd: wait for startup "
+					 "process exit failed\n");
+			}
+			if (!WIFEXITED (status) || WEXITSTATUS (status)) {
+				fprintf(stderr, "jackd: jackstart did not "
+					"exit cleanly\n");
+				exit (1);
+			}
+		}
+	}
+#endif /* USE_CAPABILITIES */
+}
+
 int	       
 main (int argc, char *argv[])
 
@@ -491,45 +532,10 @@ main (int argc, char *argv[])
 	int show_version = 0;
 	int i;
 	int rc;
-#ifdef USE_CAPABILITIES
-	int status;
-#endif
 
 	setvbuf (stdout, NULL, _IOLBF, 0);
 
-#ifdef USE_CAPABILITIES
-
-	/* check to see if there is a pipe in the right descriptor */
-	if ((status = fstat (PIPE_WRITE_FD, &pipe_stat)) == 0 &&
-	    S_ISFIFO(pipe_stat.st_mode)) {
-
-		/* tell jackstart we are up and running */
-  	        char c = 1;
-
-	        if (write (PIPE_WRITE_FD, &c, 1) != 1) {
-		        fprintf (stderr, "cannot write to jackstart sync "
-				 "pipe %d (%s)\n", PIPE_WRITE_FD,
-				 strerror (errno));
-	        }
-
-		if (close(PIPE_WRITE_FD) != 0) {
-			fprintf(stderr,
-				"jackd: error on startup pipe close: %s\n",
-				strerror (errno));
-		} else {
-			/* wait for jackstart process to set our capabilities */
-			if (wait (&status) == -1) {
-				fprintf (stderr, "jackd: wait for startup "
-					 "process exit failed\n");
-			}
-			if (!WIFEXITED (status) || WEXITSTATUS (status)) {
-				fprintf(stderr, "jackd: jackstart did not "
-					"exit cleanly\n");
-				exit (1);
-			}
-		}
-	}
-#endif /* USE_CAPABILITIES */
+	maybe_use_capabilities ();
 
 	opterr = 0;
 	while (!seen_driver &&
@@ -542,20 +548,16 @@ main (int argc, char *argv[])
 			driver_name = optarg;
 			break;
 
-		case 'v':
-			verbose = 1;
-			break;
-
-		case 's':
-			jack_set_error_function (silent_jack_error_callback);
-			break;
-
-		case 'n':
-			server_name = optarg;
+		case 'D':
+			frame_time_offset = JACK_MAX_FRAMES - atoi(optarg); 
 			break;
 
 		case 'm':
 			do_mlock = 0;
+			break;
+
+		case 'n':
+			server_name = optarg;
 			break;
 
 		case 'p':
@@ -570,6 +572,10 @@ main (int argc, char *argv[])
 			realtime = 1;
 			break;
 
+		case 's':
+			jack_set_error_function (silent_jack_error_callback);
+			break;
+
 		case 'T':
 			temporary = 1;
 			break;
@@ -580,6 +586,10 @@ main (int argc, char *argv[])
 
 		case 'u':
 			do_unlock = 1;
+			break;
+
+		case 'v':
+			verbose = 1;
 			break;
 
 		case 'V':

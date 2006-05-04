@@ -25,7 +25,8 @@ show_usage (void)
 	fprintf (stderr, "List active Jack ports, and optionally display extra information.\n\n");
 	fprintf (stderr, "Display options:\n");
 	fprintf (stderr, "        -c, --connections     List connections to/from each port\n");
-	fprintf (stderr, "        -l, --latency         Display total latency in frames at each port\n");
+	fprintf (stderr, "        -l, --latency         Display per-port latency in frames at each port\n");
+	fprintf (stderr, "        -L, --latency         Display total latency in frames at each port\n");
 	fprintf (stderr, "        -p, --properties      Display port properties. Output may include:\n"
 			 "                              input|output, can-monitor, physical, terminal\n\n");
 	fprintf (stderr, "        -h, --help            Display this help message\n");
@@ -41,14 +42,16 @@ main (int argc, char *argv[])
 	const char **ports, **connections;
 	unsigned int i, j;
 	int show_con = 0;
-	int show_latency = 0;
+	int show_port_latency = 0;
+	int show_total_latency = 0;
 	int show_properties = 0;
 	int c;
 	int option_index;
 
 	struct option long_options[] = {
 		{ "connections", 0, 0, 'c' },
-		{ "latency", 0, 0, 'l' },
+		{ "port-latency", 0, 0, 'l' },
+		{ "total-latency", 0, 0, 'L' },
 		{ "properties", 0, 0, 'p' },
 		{ "help", 0, 0, 'h' },
 		{ "version", 0, 0, 'v' },
@@ -62,13 +65,16 @@ main (int argc, char *argv[])
 		my_name ++;
 	}
 
-	while ((c = getopt_long (argc, argv, "clphv", long_options, &option_index)) >= 0) {
+	while ((c = getopt_long (argc, argv, "clLphv", long_options, &option_index)) >= 0) {
 		switch (c) {
 		case 'c':
 			show_con = 1;
 			break;
 		case 'l':
-			show_latency = 1;
+			show_port_latency = 1;
+			break;
+		case 'L':
+			show_total_latency = 1;
 			break;
 		case 'p':
 			show_properties = 1;
@@ -116,12 +122,18 @@ main (int argc, char *argv[])
 				free (connections);
 			} 
 		}
-		if (show_latency) {
+		if (show_port_latency) {
 			jack_port_t *port = jack_port_by_name (client, ports[i]);
 			if (port) {
-				printf ("	latency = %" PRIu32 " frames\n",
+				printf ("	port latency = %" PRIu32 " frames\n",
+					jack_port_get_latency (port));
+			}
+		}
+		if (show_total_latency) {
+			jack_port_t *port = jack_port_by_name (client, ports[i]);
+			if (port) {
+				printf ("	total latency = %" PRIu32 " frames\n",
 					jack_port_get_total_latency (client, port));
-				free (port);
 			}
 		}
 		if (show_properties) {

@@ -435,12 +435,7 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 
 	} else {
 
-		char shm_name[PATH_MAX+1];
-
-                snprintf (shm_name, sizeof (shm_name), "jack-c-%s", name);
-                
-                if (jack_shmalloc (shm_name,
-				   sizeof (jack_client_control_t), 
+                if (jack_shmalloc (sizeof (jack_client_control_t), 
 				   &client->control_shm)) {
                         jack_error ("cannot create client control block for %s",
 				    name);

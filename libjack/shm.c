@@ -530,15 +530,10 @@ jack_cleanup_shm ()
 int
 jack_resize_shm (jack_shm_info_t* si, jack_shmsize_t size)
 {
-	jack_shm_id_t id;
-
-	/* The underlying type of `id' differs for SYSV and POSIX */
-	memcpy (&id, &jack_shm_registry[si->index].id, sizeof (id));
-
 	jack_release_shm (si);
 	jack_destroy_shm (si);
 
-	if (jack_shmalloc ((char *) id, size, si)) {
+	if (jack_shmalloc (size, si)) {
 		return -1;
 	}
 
@@ -667,7 +662,7 @@ jack_release_shm (jack_shm_info_t* si)
 
 /* allocate a POSIX shared memory segment */
 int
-jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
+jack_shmalloc (jack_shmsize_t size, jack_shm_info_t* si)
 {
 	jack_shm_registry_t* registry;
 	int shm_fd;
@@ -686,8 +681,7 @@ jack_shmalloc (const char *shm_name, jack_shmsize_t size, jack_shm_info_t* si)
 	 * defined by the standard).  Unfortunately, Apple sets this
 	 * value so small (about 31 bytes) that it is useless for
 	 * actual names.  So, we construct a short name from the
-	 * registry index for uniqueness and ignore the shm_name
-	 * parameter.  Bah!
+	 * registry index for uniqueness.
 	 */
 	snprintf (name, sizeof (name), "/jack-%d", registry->index);
 
@@ -858,8 +852,7 @@ jack_release_shm (jack_shm_info_t* si)
 }
 
 int
-jack_shmalloc (const char* name_not_used, jack_shmsize_t size,
-	       jack_shm_info_t* si) 
+jack_shmalloc (jack_shmsize_t size, jack_shm_info_t* si) 
 {
 	int shmflags;
 	int shmid;
@@ -882,8 +875,8 @@ jack_shmalloc (const char* name_not_used, jack_shmsize_t size,
 			rc = 0;
 
 		} else {
-			jack_error ("cannot create shm segment %s (%s)",
-				    name_not_used, strerror (errno));
+			jack_error ("cannot create shm segment (%s)",
+				    strerror (errno));
 		}
 	}
 
