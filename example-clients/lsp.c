@@ -7,6 +7,7 @@
 #include <config.h>
 
 #include <jack/jack.h>
+#include <jack/port.h>
 
 char * my_name;
 
@@ -29,6 +30,7 @@ show_usage (void)
 	fprintf (stderr, "        -L, --latency         Display total latency in frames at each port\n");
 	fprintf (stderr, "        -p, --properties      Display port properties. Output may include:\n"
 			 "                              input|output, can-monitor, physical, terminal\n\n");
+	fprintf (stderr, "        -t, --type            Display port type\n");
 	fprintf (stderr, "        -h, --help            Display this help message\n");
 	fprintf (stderr, "        --version             Output version information and exit\n\n");
 	fprintf (stderr, "For more information see http://jackit.sourceforge.net/\n");
@@ -45,6 +47,7 @@ main (int argc, char *argv[])
 	int show_port_latency = 0;
 	int show_total_latency = 0;
 	int show_properties = 0;
+	int show_type = 0;
 	int c;
 	int option_index;
 
@@ -53,6 +56,7 @@ main (int argc, char *argv[])
 		{ "port-latency", 0, 0, 'l' },
 		{ "total-latency", 0, 0, 'L' },
 		{ "properties", 0, 0, 'p' },
+		{ "type", 0, 0, 't' },
 		{ "help", 0, 0, 'h' },
 		{ "version", 0, 0, 'v' },
 		{ 0, 0, 0, 0 }
@@ -65,7 +69,7 @@ main (int argc, char *argv[])
 		my_name ++;
 	}
 
-	while ((c = getopt_long (argc, argv, "clLphv", long_options, &option_index)) >= 0) {
+	while ((c = getopt_long (argc, argv, "clLphvt", long_options, &option_index)) >= 0) {
 		switch (c) {
 		case 'c':
 			show_con = 1;
@@ -78,6 +82,9 @@ main (int argc, char *argv[])
 			break;
 		case 'p':
 			show_properties = 1;
+			break;
+		case 't':
+			show_type = 1;
 			break;
 		case 'h':
 			show_usage ();
@@ -114,6 +121,9 @@ main (int argc, char *argv[])
 
 	for (i = 0; ports[i]; ++i) {
 		printf ("%s\n", ports[i]);
+
+		jack_port_t *port = jack_port_by_name (client, ports[i]);
+
 		if (show_con) {
 			if ((connections = jack_port_get_all_connections (client, jack_port_by_name(client, ports[i]))) != 0) {
 				for (j = 0; connections[j]; j++) {
@@ -123,21 +133,18 @@ main (int argc, char *argv[])
 			} 
 		}
 		if (show_port_latency) {
-			jack_port_t *port = jack_port_by_name (client, ports[i]);
 			if (port) {
 				printf ("	port latency = %" PRIu32 " frames\n",
 					jack_port_get_latency (port));
 			}
 		}
 		if (show_total_latency) {
-			jack_port_t *port = jack_port_by_name (client, ports[i]);
 			if (port) {
 				printf ("	total latency = %" PRIu32 " frames\n",
 					jack_port_get_total_latency (client, port));
 			}
 		}
 		if (show_properties) {
-			jack_port_t *port = jack_port_by_name (client, ports[i]);
 			if (port) {
 				int flags = jack_port_flags (port);
 				printf ("	properties: ");
@@ -156,6 +163,13 @@ main (int argc, char *argv[])
 				if (flags & JackPortIsTerminal) {
 					fputs ("terminal,", stdout);
 				}
+				putc ('\n', stdout);
+			}
+		}
+		if (show_type) {
+			if (port) {
+				putc ('\t', stdout);
+				fputs (port->type_info->type_name, stdout);
 				putc ('\n', stdout);
 			}
 		}

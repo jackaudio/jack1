@@ -528,6 +528,8 @@ server_connect (const char *server_name)
 	struct sockaddr_un addr;
 	int which = 0;
 
+        char server_dir[PATH_MAX+1] = "";
+
 	if ((fd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
 		jack_error ("cannot create client socket (%s)",
 			    strerror (errno));
@@ -539,7 +541,7 @@ server_connect (const char *server_name)
 
 	addr.sun_family = AF_UNIX;
 	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d",
-		  jack_server_dir (server_name), which);
+                  jack_server_dir (server_name, server_dir) , which);
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		close (fd);
@@ -557,6 +559,8 @@ server_event_connect (jack_client_t *client, const char *server_name)
 	jack_client_connect_ack_request_t req;
 	jack_client_connect_ack_result_t res;
 
+        char server_dir[PATH_MAX+1] = "";
+
 	if ((fd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
 		jack_error ("cannot create client event socket (%s)",
 			    strerror (errno));
@@ -565,7 +569,7 @@ server_event_connect (jack_client_t *client, const char *server_name)
 
 	addr.sun_family = AF_UNIX;
 	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0",
-		  jack_server_dir (server_name));
+		  jack_server_dir (server_name,server_dir));
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server for events",
@@ -1117,7 +1121,7 @@ char *jack_tmpdir = DEFAULT_TMP_DIR;
 char *
 jack_user_dir (void)
 {
-	static char user_dir[PATH_MAX] = "";
+	static char user_dir[PATH_MAX+1] = "";
 
 	/* format the path name on the first call */
 	if (user_dir[0] == '\0') {
@@ -1130,15 +1134,13 @@ jack_user_dir (void)
 
 /* returns the name of the per-server subdirectory of jack_user_dir() */
 char *
-jack_server_dir (const char *server_name)
+jack_server_dir (const char *server_name, char *server_dir)
 {
-	static char server_dir[PATH_MAX] = "";
+	/* format the path name into the suppled server_dir char array,
+	 * assuming that server_dir is at least as large as PATH_MAX+1 */
 
-	/* format the path name on the first call */
-	if (server_dir[0] == '\0') {
-		snprintf (server_dir, sizeof (server_dir), "%s/%s",
-			  jack_user_dir (), server_name);
-	}
+	snprintf (server_dir, PATH_MAX+1, "%s/%s",
+		  jack_user_dir (), server_name);
 
 	return server_dir;
 }

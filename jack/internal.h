@@ -418,7 +418,7 @@ extern char *jack_tmpdir;
 
 extern char *jack_user_dir (void);
 
-extern char *jack_server_dir (const char *server_name);
+extern char *jack_server_dir (const char *server_name, char *server_dir);
 
 extern void *jack_zero_filled_buffer;
 

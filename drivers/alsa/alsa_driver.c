@@ -127,14 +127,10 @@ alsa_driver_check_card_type (alsa_driver_t *driver)
 	if ((err = snd_ctl_open (&driver->ctl_handle, ctl_name, 0)) < 0) {
 		jack_error ("control open \"%s\" (%s)", ctl_name,
 			    snd_strerror(err));
-		return -1;
-	}
-
-	if ((err = snd_ctl_card_info(driver->ctl_handle, card_info)) < 0) {
+	} else if ((err = snd_ctl_card_info(driver->ctl_handle, card_info)) < 0) {
 		jack_error ("control hardware info \"%s\" (%s)",
 			    driver->alsa_name_playback, snd_strerror (err));
 		snd_ctl_close (driver->ctl_handle);
-		return -1;
 	}
 
 	driver->alsa_driver = strdup(snd_ctl_card_info_get_driver (card_info));

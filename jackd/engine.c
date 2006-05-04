@@ -198,6 +198,7 @@ static int
 make_socket_subdirectories (const char *server_name)
 {
 	struct stat statbuf;
+        char server_dir[PATH_MAX+1] = "";
 
 	/* check tmpdir directory */
 	if (stat (jack_tmpdir, &statbuf)) {
@@ -218,7 +219,7 @@ make_socket_subdirectories (const char *server_name)
 	}
 
 	/* create server_name subdirectory */
-	if (make_directory (jack_server_dir (server_name)) < 0) {
+	if (make_directory (jack_server_dir (server_name, server_dir)) < 0) {
 		return -1;
 	}
 
@@ -230,6 +231,7 @@ make_sockets (const char *server_name, int fd[2])
 {
 	struct sockaddr_un addr;
 	int i;
+        char server_dir[PATH_MAX+1] = "";
 
 	if (make_socket_subdirectories (server_name) < 0) {
 		return -1;
@@ -246,7 +248,7 @@ make_sockets (const char *server_name, int fd[2])
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
 		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1,
-			  "%s/jack_%d", jack_server_dir (server_name), i);
+			  "%s/jack_%d", jack_server_dir (server_name, server_dir), i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -284,7 +286,7 @@ make_sockets (const char *server_name, int fd[2])
 	addr.sun_family = AF_UNIX;
 	for (i = 0; i < 999; i++) {
 		snprintf (addr.sun_path, sizeof (addr.sun_path) - 1,
-			  "%s/jack_ack_%d", jack_server_dir (server_name), i);
+			  "%s/jack_ack_%d", jack_server_dir (server_name, server_dir), i);
 		if (access (addr.sun_path, F_OK) != 0) {
 			break;
 		}
@@ -1531,6 +1533,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 {
 	jack_engine_t *engine;
 	unsigned int i;
+        char server_dir[PATH_MAX+1] = "";
 
 #ifdef USE_CAPABILITIES
 	uid_t uid = getuid ();
@@ -1738,7 +1741,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix),
 		  "%s/jack-ack-fifo-%d",
-		  jack_server_dir (engine->server_name), getpid ());
+		  jack_server_dir (engine->server_name, server_dir), getpid ());
 
 	(void) jack_get_fifo_fd (engine, 0);
 

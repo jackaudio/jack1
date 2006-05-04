@@ -282,7 +282,7 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 		}
 	}
 
-	strncpy (descriptor->file, filename, PATH_MAX);
+	snprintf (descriptor->file, sizeof(descriptor->file), "%s", filename);
 	free (filename);
 
 	return descriptor;
@@ -401,7 +401,8 @@ jack_cleanup_files (const char *server_name)
 {
 	DIR *dir;
 	struct dirent *dirent;
-	char *dir_name = jack_server_dir (server_name);
+	char dir_name[PATH_MAX+1] = "";
+        jack_server_dir (server_name, dir_name);
 
 	/* On termination, we remove all files that jackd creates so
 	 * subsequent attempts to start jackd will not believe that an
@@ -427,7 +428,7 @@ jack_cleanup_files (const char *server_name)
 	/* unlink all the files in this directory, they are mine */
 	while ((dirent = readdir (dir)) != NULL) {
 
-		char fullpath[PATH_MAX];
+		char fullpath[PATH_MAX+1];
 
 		if ((strcmp (dirent->d_name, ".") == 0)
 		    || (strcmp (dirent->d_name, "..") == 0)) {

@@ -30,7 +30,7 @@
 #define JACK_PORT_TYPE_SIZE 32
 
 /* The relatively low value of this constant reflects the fact that
- * JACK currently only knows about *1* port type.  (March 2003)
+ * JACK currently only knows about *2* port types.  (May 2006)
  *
  * Further, the 4 covers:
  *   - a single non-negotiated audio format
