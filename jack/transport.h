@@ -48,13 +48,15 @@ typedef uint64_t jack_unique_t;		/**< Unique ID (opaque) */
  */
 typedef enum {
 
-	JackPositionBBT =	0x10,	/**< Bar, Beat, Tick */
-	JackPositionTimecode =	0x20	/**< External timecode */
-
+	JackPositionBBT =	  0x10,	/**< Bar, Beat, Tick */
+	JackPositionTimecode =	  0x20,	/**< External timecode */
+	JackBBTFrameOffset =      0x40,	/**< Frame offset of BBT information */
+	JackAudioVideoRatio =     0x80, /**< audio frames per video frame */
+	JackVideoFrameOffset =   0x100  /**< frame offset of first video frame */
 } jack_position_bits_t;
 
 /** all valid position bits */
-#define JACK_POSITION_MASK (JackPositionBBT|JackPositionTimecode)
+#define JACK_POSITION_MASK (JackPositionBBT|JackPositionTimecode|JackBBTFrameOffset|JackAudioVideoRatio|JackVideoFrameOffset)
 #define EXTENDED_TIME_INFO
 
 /**
@@ -85,11 +87,43 @@ typedef struct {
     double		frame_time;	/**< current time in seconds */
     double		next_time;	/**< next sequential frame_time
 					     (unless repositioned) */
+  
+    /* JackBBTFrameOffset fields: */
+    jack_nframes_t	bbt_offset;	/**< frame offset for the BBT fields
+					     (the given bar, beat, and tick
+					     values actually refer to a time
+					     frame_offset frames before the
+					     start of the cycle), should 
+					     be assumed to be 0 if 
+					     JackBBTFrameOffset is not 
+					     set. If JackBBTFrameOffset is
+					     set and this value is zero, the BBT
+					     time refers to the first frame of this
+					     cycle. If the value is positive,
+					     the BBT time refers to a frame that
+					     many frames before the start of the
+					     cycle. */
+
+    /* JACK video positional data (experimental) */
+
+    float               audio_frames_per_video_frame; /**< number of audio frames
+					     per video frame. Should be assumed
+					     zero if JackAudioVideoRatio is not
+					     set. If JackAudioVideoRatio is set
+					     and the value is zero, no video
+					     data exists within the JACK graph */
+
+    jack_nframes_t      video_offset;   /**< audio frame at which the first video
+					     frame in this cycle occurs. Should
+					     be assumed to be 0 if JackVideoFrameOffset
+					     is not set. If JackVideoFrameOffset is
+					     set, but the value is zero, there is
+					     no video frame within this cycle. */
 
     /* For binary compatibility, new fields should be allocated from
      * this padding area with new valid bits controlling access, so
      * the existing structure size and offsets are preserved. */
-    int32_t		padding[10];
+    int32_t		padding[7];
 
     /* When (unique_1 == unique_2) the contents are consistent. */
     jack_unique_t	unique_2;	/**< unique ID */
