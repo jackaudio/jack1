@@ -50,12 +50,12 @@
 #include <jack/intsimd.h>
 
 #include <sysdeps/time.h>
-JACK_TIME_GLOBAL_DECL;			/* One instance per process. */
 
 #include "local.h"
 
 #include <sysdeps/poll.h>
 #include <sysdeps/ipc.h>
+#include <sysdeps/cycles.h>
 
 #ifdef JACK_USE_MACH_THREADS
 #include <sysdeps/pThreadUtilities.h>
@@ -76,7 +76,6 @@ int cpu_type = 0;
 #define WAIT_POLL_INDEX 1
 #define event_fd pollfd[EVENT_POLL_INDEX].fd
 #define graph_wait_fd pollfd[WAIT_POLL_INDEX].fd
-
 
 typedef struct {
     int status;
@@ -991,6 +990,9 @@ jack_client_open (const char *client_name,
 	}
 	
 	client->engine = (jack_control_t *) jack_shm_addr (&client->engine_shm);
+
+	/* initialize clock source as early as possible */
+	jack_set_clock_source (client->engine->clock_source);
 
 	/* now attach the client control block */
 	client->control_shm = res.client_shm;

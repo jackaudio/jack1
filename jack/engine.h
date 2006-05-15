@@ -169,6 +169,8 @@ int		internal_client_request (void* ptr, jack_request_t *request);
 int		jack_get_fifo_fd (jack_engine_t *engine,
 				  unsigned int which_fifo);
 
+extern jack_timer_type_t clock_source;
+
 extern jack_client_internal_t *
 jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
 

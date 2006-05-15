@@ -42,6 +42,17 @@ extern void jack_error (const char *fmt, ...);
 #include <jack/types.h>
 #include <jack/port.h>
 #include <jack/transport.h>
+
+typedef enum {
+	JACK_TIMER_SYSTEM_CLOCK,
+	JACK_TIMER_CYCLE_COUNTER,
+	JACK_TIMER_HPET,
+} jack_timer_type_t;
+
+void        jack_init_time ();
+void        jack_set_clock_source (jack_timer_type_t);
+const char* jack_clock_source_name (jack_timer_type_t);
+
 #include <sysdeps/time.h>
 #include <sysdeps/atomicity.h>
 
@@ -130,6 +141,7 @@ typedef struct {
     jack_time_t           sync_time_left;
     jack_frame_timer_t    frame_timer;
     int32_t		  internal;
+    jack_timer_type_t     clock_source;
     pid_t                 engine_pid;
     jack_nframes_t	  buffer_size;
     int8_t		  real_time;

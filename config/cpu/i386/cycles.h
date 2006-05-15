@@ -19,6 +19,16 @@
     $Id$
 */
 
-/* the i486 version of this header is compatible */
+#ifndef __jack_cycles_h__
+#define __jack_cycles_h__
 
-#include <config/cpu/i486/cycles.h>
+typedef unsigned long long cycles_t;
+
+static inline cycles_t get_cycles (void)
+{
+	unsigned long long ret;
+	__asm__ __volatile__("rdtsc" : "=A" (ret));
+	return ret;
+}
+
+#endif /* __jack_cycles_h__ */

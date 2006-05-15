@@ -22,6 +22,7 @@
 #include <config.h>
 
 #include <stdio.h>
+#include <ctype.h>
 #include <signal.h>
 #include <getopt.h>
 #include <sys/types.h>
@@ -368,6 +369,7 @@ static void usage (FILE *file)
 "             [ --port-max OR -p maximum-number-of-ports]\n"
 "             [ --debug-timer OR -D ]\n"
 "             [ --verbose OR -v ]\n"
+"             [ --clocksource OR -c [ c(ycle) | h(pet) | s(ystem) ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
 "         -d backend [ ... backend args ... ]\n"
@@ -505,7 +507,7 @@ main (int argc, char *argv[])
 
 {
 	jack_driver_desc_t * desc;
-	const char *options = "-ad:P:uvshVRTFl:t:mn:p:";
+	const char *options = "-ad:P:uvshVRTFl:t:mn:p:c:";
 	struct option long_options[] = 
 	{ 
 		{ "driver", 1, 0, 'd' },
@@ -521,6 +523,7 @@ main (int argc, char *argv[])
 		{ "temporary", 0, 0, 'T' },
 		{ "version", 0, 0, 'V' },
 		{ "silent", 0, 0, 's' },
+		{ "clock-source", 1, 0, 'c' },
 		{ 0, 0, 0, 0 }
 	};
 	int opt = 0;
@@ -543,6 +546,19 @@ main (int argc, char *argv[])
 	       (opt = getopt_long (argc, argv, options,
 				   long_options, &option_index)) != EOF) {
 		switch (opt) {
+
+		case 'c':
+			if (tolower (optarg[0]) == 'h') {
+				clock_source = JACK_TIMER_HPET;
+			} else if (tolower (optarg[0]) == 'c') {
+				clock_source = JACK_TIMER_CYCLE_COUNTER;
+			} else if (tolower (optarg[0]) == 's') {
+				clock_source = JACK_TIMER_SYSTEM_CLOCK;
+			} else {
+				usage (stderr);
+				return -1;
+			}
+			break;
 
 		case 'd':
 			seen_driver = 1;

@@ -114,11 +114,11 @@ jack_unload_LDFLAGS = @OS_LDFLAGS@
 jack_unload_LDADD = ../libjack/libjack.la
 
 jack_midiseq_SOURCES = midiseq.c
-jack_midiseq_LDFLAGS = -lrt -ldl -lpthread
+jack_midiseq_LDFLAGS = @OS_LDFLAGS@
 jack_midiseq_LDADD = ../libjack/libjack.la
 
 jack_midisine_SOURCES = midisine.c
-jack_midisine_LDFLAGS = -lrt -ldl -lpthread -lm
+jack_midisine_LDFLAGS = @OS_LDFLAGS@
 jack_midisine_LDADD = ../libjack/libjack.la
 
 #

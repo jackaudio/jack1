@@ -78,13 +78,46 @@ AM_PROG_LIBTOOL
 AC_PROG_LN_S
 AC_C_BIGENDIAN
 
-# configure CPU and OS dependencies for host platform
 AC_MSG_CHECKING([platform dependencies])
-source $srcdir/config/configure.host
-AC_MSG_RESULT([${os_include_dir}, ${cpu_include_dir}])
+
+case "${host_os}" in
+  freebsd*)
+    # current FreeBSD header files conflict with the OSS driver's
+    # barrier code, this may be fixed in 5.3, stay tuned.
+    USE_BARRIER="no"
+    ;;
+  darwin*)
+    JACK_THREAD_STACK_TOUCH=10000	# need small realtime stack
+    JACK_CPP_VARARGS_BROKEN=1
+    JACK_DO_NOT_MLOCK=1
+    JACK_USE_MACH_THREADS=1
+    OS_LDFLAGS="-framework CoreAudio -framework CoreServices -framework AudioUnit"
+    TRY_POSIX_SHM=yes			# POSIX shm works better
+    ;;
+esac
+
 AC_SUBST(OS_LDFLAGS)
-AC_SUBST(os_include_dir)
-AC_SUBST(cpu_include_dir)
+
+#
+# We need to establish suitable defaults for a 64-bit OS
+libnn=lib
+case "${host_os}" in
+    linux*)
+    case "${host_cpu}" in
+	x86_64|mips64|ppc64|sparc64|s390x)
+        libnn=lib64
+	;;
+    esac
+    ;;
+    solaris*)
+    ## libnn=lib/sparcv9 ## on 64-bit only, but that's compiler-specific
+    ;;  
+esac
+
+## take care not to  override the command-line setting
+if test "${libdir}" = '${exec_prefix}/lib'; then
+  libdir='${exec_prefix}/'${libnn}
+fi
 
 # system-dependent config.h values
 test "x$JACK_THREAD_STACK_TOUCH" = "x" && JACK_THREAD_STACK_TOUCH=1000000
@@ -129,6 +162,16 @@ AC_CHECK_FUNC(pthread_create, [],
 AC_CHECK_FUNCS(on_exit atexit)
 AC_CHECK_FUNCS(posix_memalign)
 AC_CHECK_LIB(m, sin)
+
+AC_CHECK_FUNC(clock_gettime, 
+       [
+           AC_DEFINE(HAVE_CLOCK_GETTIME,1,"Whether or not clock_gettime can be found in system libraries")
+       ], 
+       AC_CHECK_LIB(rt, clock_getttime, 
+           [
+              AC_DEFINE(HAVE_CLOCK_GETTIME,1,"Whether or not clock_gettime can be found in system libraries")
+	   ])
+)	  
 
 # should we use mlockall() on this platform?
 if test "x$JACK_DO_NOT_MLOCK" = "x"; then
@@ -448,9 +491,10 @@ AC_ARG_ENABLE(stripped-jackd,
 
 # plugins go in the addon dir.
 
-AS_AC_EXPAND(ADDON_DIR,${libdir}/jack)
+ADDON_DIR='${libdir}/jack'
 AC_SUBST(ADDON_DIR)
-AC_DEFINE_UNQUOTED(ADDON_DIR,"$ADDON_DIR",[Directory for plugins])
+AS_AC_EXPAND(ADDON_DIR_EXPANDED,${libdir}/jack)
+AC_DEFINE_UNQUOTED(ADDON_DIR,"$ADDON_DIR_EXPANDED",[Directory for plugins])
 
 AC_ARG_WITH(html-dir,
             [  --with-html-dir=PATH    where to install the html documentation])
@@ -622,7 +666,6 @@ AM_CONDITIONAL(STRIPPED_JACKD, $STRIPPED_JACKD)
 AC_OUTPUT(
 Makefile
 config/Makefile
-config/sysdeps/Makefile
 doc/Makefile
 doc/reference.doxygen
 drivers/Makefile
@@ -656,6 +699,7 @@ echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
 echo \| Compiler optimization flags........................... : $JACK_OPT_CFLAGS
 echo \| Compiler full flags................................... : $CFLAGS
+echo \| Install dir for libjack + backends.................... : $libdir/jack
 echo \|
 echo \| Default driver backend................................ : $JACK_DEFAULT_DRIVER
 echo \| Shared memory interface............................... : $JACK_SHM_TYPE

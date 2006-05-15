@@ -109,12 +109,8 @@ case "${host_cpu}" in
     ;;
 esac
 
-# Now look for the file(s) usually tied to a CPU model, and make
-# default choices for those if they haven't been explicitly set
-# already.  
-cpu_include_dir="cpu/${try_cpu}"
-atomicity_include_dir=$cpu_include_dir
-
+# set the CPU that will be used to select atomicity functionality
+ATOMICITY_TARGET=${try_cpu}
 
 # Set any OS-dependent bits.
 # Set the os_include_dir.
@@ -126,33 +122,33 @@ case "${host_os}" in
     # We set os_include_dir to os/aix only on AIX 4.3 and newer, but
     # os/aix/atomicity.h works on earlier versions of AIX 4.*, so we
     # explicitly duplicate the directory for 4.[<3].
-    os_include_dir="os/aix"
-    atomicity_include_dir="os/aix"
+    OSPLATFORM="AIX"
+    ATOMICITY_TARGET="AIX"
     OS_LDFLAGS="-Wl,-G"
     ;;
   aix4.*)
-    os_include_dir="os/generic"
-    atomicity_include_dir="os/aix"
+    OSPLATFORM="GENERIC"
+    ATOMICITY_TARGET="AIX"
     ;;
   aix*)
-    os_include_dir="os/generic"
-    atomicity_include_dir="cpu/generic"
+    OSPLATFORM="GENERIC"
+    ATOMICITY_TARGET="GENERIC"
     ;;
   gnu* | linux* | kfreebsd*-gnu | knetbsd*-gnu)
-    os_include_dir="os/gnu-linux"
+    OSPLATFORM="GNULINUX"
     ;;
   freebsd*)
     # current FreeBSD header files conflict with the OSS driver's
     # barrier code, this may be fixed in 5.3, stay tuned.
-    os_include_dir="os/generic"
+    OSPLATFORM="GENERIC"
     USE_BARRIER="no"
     ;;
   irix*)
-    os_include_dir="os/irix"
-    atomicity_include_dir=$os_include_dir
+    OSPLATFORM="IRIX"
+    ATOMICITY_TARGET="IRIX"
     ;;
   darwin*)
-    os_include_dir="os/macosx"
+    OSPLATFORM="MACOSX"    
     JACK_THREAD_STACK_TOUCH=10000	# need small realtime stack
     JACK_CPP_VARARGS_BROKEN=1
     JACK_DO_NOT_MLOCK=1
@@ -161,7 +157,7 @@ case "${host_os}" in
     TRY_POSIX_SHM=yes			# POSIX shm works better
     ;;
   *)
-    os_include_dir="os/generic"
+    OSPLATFORM="GENERIC"
     ;;
 esac
 

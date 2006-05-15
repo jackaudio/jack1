@@ -27,6 +27,10 @@ extern "C" {
 
 #include <pthread.h>
 
+/* use 512KB stack per thread - the default is way too high to be feasible 
+ * with mlockall() on many systems */
+#define THREAD_STACK 524288
+       
 /** @file thread.h
  *
  * Library functions to standardize thread creation for JACK and its

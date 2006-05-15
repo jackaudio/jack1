@@ -123,6 +123,7 @@ main (int argc, char *argv[])
 	char *client_name = 0;
 	char *bpm_string = "bpm";
 	int verbose = 0;
+	jack_status_t status;
 
 	const char *options = "f:A:D:a:d:b:n:thv";
 	struct option long_options[] =
@@ -208,7 +209,7 @@ main (int argc, char *argv[])
 		client_name = (char *) malloc (9 * sizeof (char));
 		strcpy (client_name, "metro");
 	}
-	if ((client = jack_client_new (client_name)) == 0) {
+	if ((client = jack_client_open (client_name, JackNoStartServer, &status)) == 0) {
 		fprintf (stderr, "jack server not running?\n");
 		return 1;
 	}

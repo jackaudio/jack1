@@ -21,32 +21,15 @@
 #ifndef __jack_time_h__
 #define __jack_time_h__
 
-/*
- *  This is the MacOSX version of <jack/time.h>.  It overrides the
- *  generic version via the configure.hosts mechanism.
- */
 #include <jack/types.h>
 #include <mach/mach_time.h>
 
-/* This is a kludge.  We need one global instantiation of this
- * variable in each address space.  So, libjack/client.c declares the
- * actual storage.  Other source files will see it as an extern. */
-#define JACK_TIME_GLOBAL_DECL double __jack_time_ratio
-extern JACK_TIME_GLOBAL_DECL;
+extern double __jack_time_ratio;
 
 static inline jack_time_t 
 jack_get_microseconds(void) 
 {  
-        return  mach_absolute_time () * __jack_time_ratio;
-}
-
-/* This should only be called ONCE per process. */
-static inline void 
-jack_init_time ()
-{
-        mach_timebase_info_data_t info; 
-        mach_timebase_info(&info);
-        __jack_time_ratio = ((float)info.numer/info.denom) / 1000;
+        return  (jack_time_t) mach_absolute_time () * __jack_time_ratio;
 }
 
 #endif /* __jack_time_h__ */

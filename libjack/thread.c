@@ -159,6 +159,12 @@ jack_client_create_thread (jack_client_t* client,
 		return result;
 	}
 
+        result = pthread_attr_setstacksize(&attr, THREAD_STACK); 
+        if (result) {
+                log_result("setting thread stack size", result);
+                return result;
+        }
+
 	thread_args = (jack_thread_arg_t *) malloc (sizeof (jack_thread_arg_t));
 
 	thread_args->client = client;

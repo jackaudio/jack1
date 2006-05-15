@@ -1,7 +1,7 @@
 #ifndef __jack_libjack_local_h__
 #define __jack_libjack_local_h__
 
-/* Client data structure, in the client's address space. */
+/* Client data structure, in the client address space. */
 struct _jack_client {
 
     jack_control_t        *engine;
@@ -51,5 +51,7 @@ extern jack_port_t *jack_port_new (const jack_client_t *client,
 				   jack_control_t *control);
 
 extern void *jack_zero_filled_buffer;
+
+extern void jack_set_clock_source (jack_timer_type_t);
 
 #endif /* __jack_libjack_local_h__ */

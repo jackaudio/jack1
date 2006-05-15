@@ -78,6 +78,8 @@ typedef struct _jack_driver_info {
     dlhandle       handle;
 } jack_driver_info_t;
 
+jack_timer_type_t clock_source = JACK_TIMER_SYSTEM_CLOCK;
+
 static int                    jack_port_assign_buffer (jack_engine_t *,
 						       jack_port_internal_t *);
 static jack_port_internal_t *jack_get_port_by_name (jack_engine_t *,
@@ -1540,6 +1542,30 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	uid_t euid = geteuid ();
 #endif /* USE_CAPABILITIES */
 
+	/* before we start allocating resources, make sure that if realtime was requested that we can 
+	   actually do it.
+	*/
+
+	if (realtime) {
+		if (jack_acquire_real_time_scheduling (pthread_self(), 10) != 0) {
+			/* can't run realtime - time to bomb */
+			return NULL;
+		}
+
+		jack_drop_real_time_scheduling (pthread_self());
+
+#ifdef USE_MLOCK
+
+		if (do_mlock && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
+			jack_error ("cannot lock down memory for jackd (%s)",
+				    strerror (errno));
+#ifdef ENSURE_MLOCK
+			return NULL;
+#endif /* ENSURE_MLOCK */
+		}
+#endif /* USE_MLOCK */
+	}
+
 	/* start a thread to display messages from realtime threads */
 	jack_messagebuffer_init();
 
@@ -1675,6 +1701,11 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->control->xrun_delayed_usecs = 0;
 	engine->control->max_delayed_usecs = 0;
 
+	jack_set_clock_source (clock_source);
+	engine->control->clock_source = clock_source;
+
+	VERBOSE (engine, "clock source = %s\n", jack_clock_source_name (clock_source));
+
 	engine->control->frame_timer.frames = frame_time_offset;
 	engine->control->frame_timer.reset_pending = 0;
 	engine->control->frame_timer.current_wakeup = 0;
@@ -1725,17 +1756,6 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 		}
 	}
 #endif /* USE_CAPABILITIES */
-
-#ifdef USE_MLOCK
-
-        if (realtime && do_mlock && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
-		jack_error ("cannot lock down memory for jackd (%s)",
-			    strerror (errno));
-#ifdef ENSURE_MLOCK
-		return NULL;
-#endif /* ENSURE_MLOCK */
-        }
-#endif /* USE_MLOCK */
 
 	engine->control->engine_ok = 1;
 

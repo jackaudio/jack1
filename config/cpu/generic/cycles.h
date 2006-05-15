@@ -1,6 +1,5 @@
 /*
     Copyright (C) 2001 Paul Davis
-    Code derived from various headers from the Linux kernel
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,20 +21,19 @@
 #ifndef __jack_cycles_h__
 #define __jack_cycles_h__
 
-/* generic solution */
+/* generic solution that is not really a solution at all */
 
-#warning You are compiling JACK on a platform for which jack/cycles.h needs work
+#warning You are compiling JACK on a platform for which jack/config/sysdep/cycles.h needs work
 #include <sys/time.h>
 
 typedef long cycles_t;
-extern cycles_t cacheflush_time;
 
 static inline cycles_t get_cycles(void)
 {
        struct timeval tv;
        gettimeofday (&tv, NULL);
 
-       return tv.tv_usec;
+       return ((cycles_t) tv.tv_sec * 1000000) + tv.tv_usec;
 }
 
 #endif /* __jack_cycles_h__ */
