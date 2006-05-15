@@ -66,14 +66,6 @@
 //#define DEBUG
 #endif
 
-#define FREEBOB_USE_RT 			1
-#define FREEBOB_RT_PRIORITY_PACKETIZER 	60
-// midi priority should be higher than the audio priority in order to
-// make sure events are not only delivered on period boundarys
-// but I think it should be smaller than the packetizer thread in order not 
-// to lose any packets
-#define FREEBOB_RT_PRIORITY_MIDI 	59
-
 // debug print control flags
 #define DEBUG_LEVEL_BUFFERS           	(1<<0)
 #define DEBUG_LEVEL_HANDLERS			(1<<1)
@@ -118,11 +110,28 @@
 	#define debugPrintWithTimeStamp(Level, format, args...)
 #endif
 
+// thread priority setup
+#define FREEBOB_RT_PRIORITY_PACKETIZER_RELATIVE	5
+
+#ifdef FREEBOB_DRIVER_WITH_MIDI
+
+	#define ALSA_SEQ_BUFF_SIZE 1024
+	#define MIDI_TRANSMIT_BUFFER_SIZE 1024
+	#define MIDI_THREAD_SLEEP_TIME_USECS 100
+	// midi priority should be higher than the audio priority in order to
+	// make sure events are not only delivered on period boundarys
+	// but I think it should be smaller than the packetizer thread in order not 
+	// to lose any packets
+	#define FREEBOB_RT_PRIORITY_MIDI_RELATIVE 	4
+
+#endif
+
+typedef struct _freebob_driver freebob_driver_t;
 
 /*
  * Jack Driver command line parameters
  */
- 
+
 typedef struct _freebob_jack_settings freebob_jack_settings_t;
 struct _freebob_jack_settings {
 	int period_size_set;
@@ -130,21 +139,6 @@ struct _freebob_jack_settings {
 	
 	int sample_rate_set;
 	int sample_rate;
-	
-	int fifo_size_set;
-	jack_nframes_t fifo_size;
-	
-	int table_size_set;
-	jack_nframes_t table_size;
-	
-	int iso_buffers_set;
-	jack_nframes_t iso_buffers;
-	
-	int iso_prebuffers_set;
-	jack_nframes_t iso_prebuffers;
-	
-	int iso_irq_interval_set;
-	int iso_irq_interval;
 	
 	int buffer_size_set;
 	jack_nframes_t buffer_size;
@@ -155,14 +149,14 @@ struct _freebob_jack_settings {
         int node_id_set;
         int node_id;
 
+	int playback_ports;
+	int capture_ports;
+
         freebob_handle_t fb_handle;
 };
 
 #ifdef FREEBOB_DRIVER_WITH_MIDI
 
-#define ALSA_SEQ_BUFF_SIZE 1024
-#define MIDI_TRANSMIT_BUFFER_SIZE 1024
-#define MIDI_THREAD_SLEEP_TIME_USECS 100
 
 typedef struct {
 	int stream_nr;
@@ -173,7 +167,8 @@ typedef struct {
 
 typedef struct _freebob_driver_midi_handle {
 	freebob_device_t *dev;
-	
+	freebob_driver_t *driver;
+
 	snd_seq_t *seq_handle;
 	
 	pthread_t queue_thread;
@@ -198,7 +193,6 @@ typedef struct _freebob_driver_midi_handle {
  * JACK driver structure
  */
  
-typedef struct _freebob_driver freebob_driver_t;
 
 struct _freebob_driver
 {
@@ -231,6 +225,8 @@ struct _freebob_driver
     channel_t                     playback_nchannels;
     channel_t                     capture_nchannels;
     	
+	freebob_device_info_t device_info;
+	freebob_options_t device_options;
 
 #ifdef FREEBOB_DRIVER_WITH_MIDI
 	freebob_driver_midi_handle_t *midi_handle;
