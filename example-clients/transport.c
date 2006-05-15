@@ -42,6 +42,8 @@ float time_beat_type = 4.0;
 double time_ticks_per_beat = 1920.0;
 double time_beats_per_minute = 120.0;
 volatile int time_reset = 1;		/* true when time values change */
+volatile int avr_set = 0;
+float audio_frames_per_video_frame;
 
 /* JACK timebase callback.
  *
@@ -67,7 +69,8 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
 		/* Compute BBT info from frame number.  This is relatively
 		 * simple here, but would become complex if we supported tempo
 		 * or time signature changes at specific locations in the
-		 * transport timeline. */
+		 * transport timeline. 
+		 */
 
 		min = pos->frame / ((double) pos->frame_rate * 60.0);
 		abs_tick = min * pos->beats_per_minute * pos->ticks_per_beat;
@@ -104,6 +107,11 @@ void timebase(jack_transport_state_t state, jack_nframes_t nframes,
 					* pos->ticks_per_beat;
 			}
 		}
+	}
+
+	if (avr_set) {
+		pos->valid |= JackAudioVideoRatio;
+		pos->audio_frames_per_video_frame = audio_frames_per_video_frame;
 	}
 }
 
@@ -204,6 +212,19 @@ void com_timeout(char *arg)
 }
 
 
+/* Change the tempo for the entire timeline, not just from the current
+ * location. */
+void com_av_ratio(char *arg)
+{
+	float avr = 0;
+
+	if (*arg != '\0')
+		avr = atof(arg);
+
+	audio_frames_per_video_frame = avr;
+	avr_set = 1;
+}
+
 /* Command parsing based on GNU readline info examples. */
 
 typedef void cmd_function_t(char *);	/* command function type */
@@ -218,6 +239,7 @@ typedef struct {
 /* command table must be in alphabetical order */
 command_t commands[] = {
 	{"activate",	com_activate,	"Call jack_activate()"},
+	{"avr",	        com_av_ratio,	"Set audio/video frame ratio <audio frames per video frame>"},
 	{"exit",	com_exit,	"Exit transport program"},
 	{"deactivate",	com_deactivate,	"Call jack_deactivate()"},
 	{"help",	com_help,	"Display help text [<command>]"},
