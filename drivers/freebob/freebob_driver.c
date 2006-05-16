@@ -995,7 +995,7 @@ driver_get_descriptor ()
 	strcpy (params[i].name, "period");
 	params[i].character  = 'p';
 	params[i].type       = JackDriverParamUInt;
-	params[i].value.ui   = 512;
+	params[i].value.ui   = 1024;
 	strcpy (params[i].short_desc, "Frames per period");
 	strcpy (params[i].long_desc, params[i].short_desc);
 	
@@ -1011,8 +1011,8 @@ driver_get_descriptor ()
 	strcpy (params[i].name, "rate");
 	params[i].character  = 'r';
 	params[i].type       = JackDriverParamUInt;
-	params[i].value.ui   = 44100U;
-	strcpy (params[i].short_desc, "The sample rate");
+	params[i].value.ui   = 48000U;
+	strcpy (params[i].short_desc, "Sample rate");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
 	i++;
@@ -1053,8 +1053,8 @@ driver_initialize (jack_client_t *client, JSList * params)
 	cmlparams.node_id_set=0;
 
 	/* default values */
-	cmlparams.period_size=512;
-	cmlparams.sample_rate=44100;
+	cmlparams.period_size=1024;
+	cmlparams.sample_rate=48000;
 	cmlparams.buffer_size=3;
 	cmlparams.port=0;
 	cmlparams.node_id=-1;
