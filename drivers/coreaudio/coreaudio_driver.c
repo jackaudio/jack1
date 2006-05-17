@@ -42,6 +42,7 @@
 					   be found, the default device is used. Note: the default device can be used only if both default input and default output are the same.
  Dec 19, 2005: S.Letz: Add -d option (display_device_names).
  Apri 7, 2006: S.Letz: Synchronization with the jackdmp coreaudio driver version: improve half-duplex management.
+ May 17, 2006: S/Letz: Minor fix in driver_initialize.
  
  */
 
@@ -232,7 +233,6 @@ OSStatus get_total_channels(AudioDeviceID device, int* channelCount, bool isInpu
     return err;
 }
 
-
 static OSStatus display_device_names()
 {
 	UInt32 size;
@@ -287,7 +287,6 @@ static OSStatus render(void *inRefCon,
 						UInt32 						inBusNumber, 
 						UInt32 						inNumberFrames, 
 						AudioBufferList 			*ioData)
-
 {
 	int res, i;
 	JSList *node;
@@ -301,7 +300,7 @@ static OSStatus render(void *inRefCon,
 		ca_driver->last_wait_ust = current_time;
 		ca_driver->xrun_detected = 0;
 		return 0;
-    }else{
+    } else {
 		ca_driver->last_wait_ust = jack_get_microseconds();
 		ca_driver->engine->transport_cycle_start(ca_driver->engine,
 					  jack_get_microseconds());
@@ -341,7 +340,7 @@ static OSStatus render_input(void *inRefCon,
 		ca_driver->last_wait_ust = current_time;
 		ca_driver->xrun_detected = 0;
 		return 0;
-    }else{
+    } else {
 		ca_driver->last_wait_ust = jack_get_microseconds();
 		ca_driver->engine->transport_cycle_start(ca_driver->engine,
 					  jack_get_microseconds());
@@ -518,7 +517,7 @@ static int coreaudio_driver_audio_start(coreaudio_driver_t * driver)
 
 static int coreaudio_driver_audio_stop(coreaudio_driver_t * driver)
 {
-   return (AudioOutputUnitStop(driver->au_hal) == noErr) ? 0 : -1;
+	return (AudioOutputUnitStop(driver->au_hal) == noErr) ? 0 : -1;
 }
 
 static int
@@ -549,7 +548,6 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 										   char* playback_driver_uid,
 										   jack_nframes_t capture_latency, 
 										   jack_nframes_t playback_latency)
-
 {
     coreaudio_driver_t *driver;
 	OSStatus err = noErr;
@@ -1041,7 +1039,7 @@ jack_driver_desc_t *driver_get_descriptor()
 	strcpy(desc->params[i].name, "devices");
 	desc->params[i].character  = 'd';
 	desc->params[i].type = JackDriverParamBool;
-	desc->params[i].value.i  = TRUE;
+	desc->params[i].value.i  = FALSE;
 	strcpy(desc->params[i].short_desc, "Display available CoreAudio devices");
 	strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
 	
