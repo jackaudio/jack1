@@ -43,6 +43,7 @@
  Dec 19, 2005: S.Letz: Add -d option (display_device_names).
  Apri 7, 2006: S.Letz: Synchronization with the jackdmp coreaudio driver version: improve half-duplex management.
  May 17, 2006: S/Letz: Minor fix in driver_initialize.
+ May 18, 2006: S/Letz: Document sample rate default value.
  
  */
 
@@ -1049,7 +1050,7 @@ jack_driver_desc_t *driver_get_descriptor()
 jack_driver_t *driver_initialize(jack_client_t * client,
 				 const JSList * params)
 {
-    jack_nframes_t srate = 44100;
+    jack_nframes_t srate = 44100; /* Some older Mac models only support this value */
     jack_nframes_t frames_per_interrupt = 128;
     int capture = FALSE;
     int playback = FALSE;
