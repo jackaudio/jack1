@@ -383,7 +383,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		{"24bit little-endian", SND_PCM_FORMAT_S24_3LE, IS_LE},
 		{"24bit big-endian", SND_PCM_FORMAT_S24_3BE, IS_BE},
 		{"16bit little-endian", SND_PCM_FORMAT_S16_LE, IS_LE},
-		{"16bit big-endian", SND_PCM_FORMAT_S16_LE, IS_BE},
+		{"16bit big-endian", SND_PCM_FORMAT_S16_BE, IS_BE},
 	};
 #define NUMFORMATS (sizeof(formats)/sizeof(formats[0]))
 #define FIRST_16BIT_FORMAT 4
