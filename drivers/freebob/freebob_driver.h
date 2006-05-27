@@ -62,10 +62,6 @@
 
 #include <alsa/asoundlib.h>
 
-#ifndef DEBUG
-//#define DEBUG
-#endif
-
 // debug print control flags
 #define DEBUG_LEVEL_BUFFERS           	(1<<0)
 #define DEBUG_LEVEL_HANDLERS			(1<<1)
@@ -78,28 +74,34 @@
 #define DEBUG_LEVEL_STARTUP				(1<<17)
 #define DEBUG_LEVEL_THREADS				(1<<18)
 
-// default debug level
-#define DEBUG_LEVEL (  DEBUG_LEVEL_RUN_CYCLE | (DEBUG_LEVEL_XRUN_RECOVERY)| DEBUG_LEVEL_STARTUP | DEBUG_LEVEL_WAIT | DEBUG_LEVEL_PACKETCOUNTER)
 
-#ifdef DEBUG
-	#define printMessage(format, args...) fprintf( stderr, "FBDRV MSG: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
-	#define printError(format, args...) fprintf( stderr, "FBDRV ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
+#ifdef DEBUG_ENABLED
+
+	// default debug level
+	#define DEBUG_LEVEL (  DEBUG_LEVEL_RUN_CYCLE | \
+	(DEBUG_LEVEL_XRUN_RECOVERY)| DEBUG_LEVEL_STARTUP | DEBUG_LEVEL_WAIT | DEBUG_LEVEL_PACKETCOUNTER)
+
+	#warning Building debug build!
+
+	#define printMessage(format, args...) jack_error( "FreeBoB MSG: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
+	#define printError(format, args...) jack_error( "FreeBoB ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
 	
-	//#define printEnter() fprintf( stderr, "FBDRV ENTERS: %s (%s)\n", __FUNCTION__,  __FILE__)
-	//#define printExit() fprintf( stderr, "FBDRV EXITS: %s (%s)\n", __FUNCTION__,  __FILE__)
+	//#define printEnter() jack_error( "FBDRV ENTERS: %s (%s)\n", __FUNCTION__,  __FILE__)
+	//#define printExit() jack_error( "FBDRV EXITS: %s (%s)\n", __FUNCTION__,  __FILE__)
 	#define printEnter() 
 	#define printExit() 
 	
-	#define debugError(format, args...) fprintf( stderr, "FREEBOB ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
-	#define debugPrint(Level, format, args...) if(DEBUG_LEVEL & (Level))  fprintf( stderr,"DEBUG %s:%d (%s) :"  format, __FILE__, __LINE__, __FUNCTION__, ##args );
-	#define debugPrintShort(Level, format, args...) if(DEBUG_LEVEL & (Level))  fprintf( stderr, format,##args );
-	#define debugPrintWithTimeStamp(Level, format, args...) if(DEBUG_LEVEL & (Level)) fprintf( stderr, "%16lu: "format, debugGetCurrentUTime(),##args );
+	#define debugError(format, args...) jack_error( "FREEBOB ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
+	#define debugPrint(Level, format, args...) if(DEBUG_LEVEL & (Level))  jack_error("DEBUG %s:%d (%s) :"  format, __FILE__, __LINE__, __FUNCTION__, ##args );
+	#define debugPrintShort(Level, format, args...) if(DEBUG_LEVEL & (Level))  jack_error( format,##args );
+	#define debugPrintWithTimeStamp(Level, format, args...) if(DEBUG_LEVEL & (Level)) jack_error( "%16lu: "format, debugGetCurrentUTime(),##args );
 	#define SEGFAULT int *test=NULL;	*test=1;
 #else
 	#define DEBUG_LEVEL
 	
-	#define printMessage(format, args...) fprintf( stderr, "FBDRV MSG: " format, ##args )
-	#define printError(format, args...)   fprintf( stderr, "FBDRV ERR: " format, ##args )
+	#define printMessage(format, args...) if(g_verbose) \
+	                                         jack_error("FreeBoB MSG: " format, ##args )
+	#define printError(format, args...)   jack_error("FreeBoB ERR: " format, ##args )
 	
 	#define printEnter() 
 	#define printExit() 
