@@ -997,12 +997,12 @@ driver_get_descriptor ()
 	desc->params = params;
 
 	i = 0;
-	strcpy (params[i].name, "port");
+	strcpy (params[i].name, "device");
 	params[i].character  = 'd';
-	params[i].type       = JackDriverParamUInt;
-	params[i].value.ui   = 0;
-	strcpy (params[i].short_desc, "The FireWire port to use");
-	strcpy (params[i].long_desc, params[i].short_desc);
+	params[i].type       = JackDriverParamString;
+	strcpy (params[i].value.str,  "hw:0");
+	strcpy (params[i].short_desc, "The FireWire device to use. Format is: 'hw:port[,node]'.");
+	strcpy (params[i].long_desc,  params[i].short_desc);
 	
 	i++;
 	strcpy (params[i].name, "period");
@@ -1053,12 +1053,17 @@ driver_initialize (jack_client_t *client, JSList * params)
 {
 	jack_driver_t *driver;
 
+    unsigned int port=0;
+    unsigned int node_id=-1;
+    int nbitems;
+      
 	const JSList * node;
 	const jack_driver_param_t * param;
-			
+
 	freebob_jack_settings_t cmlparams;
 	
-       
+    char *device_name="hw:0"; 
+      
 	cmlparams.period_size_set=0;
 	cmlparams.sample_rate_set=0;
 	cmlparams.buffer_size_set=0;
@@ -1081,8 +1086,7 @@ driver_initialize (jack_client_t *client, JSList * params)
 		switch (param->character)
 		{
 		case 'd':
-			cmlparams.port = param->value.ui;
-			cmlparams.port_set=1;
+			device_name = strdup (param->value.str);
 			break;
 		case 'p':
 			cmlparams.period_size = param->value.ui;
@@ -1105,6 +1109,31 @@ driver_initialize (jack_client_t *client, JSList * params)
 		}
 	}
 	
+    nbitems=sscanf(device_name,"hw:%u,%u",&port,&node_id);
+    if (nbitems<2) {
+        nbitems=sscanf(device_name,"hw:%u",&port);
+      
+        if(nbitems < 1) {
+            free(device_name);
+            printError("device (-d) argument not valid\n");
+            return NULL;
+        } else {
+            cmlparams.port = port;
+            cmlparams.port_set=1;
+            
+            cmlparams.node_id = -1;
+            cmlparams.node_id_set=0;
+        }
+     } else {
+        cmlparams.port = port;
+        cmlparams.port_set=1;
+        
+        cmlparams.node_id = node_id;
+        cmlparams.node_id_set=1;
+     }
+
+    jack_error("Freebob using Firewire port %d, node %d",cmlparams.port,cmlparams.node_id);
+    
 	driver=(jack_driver_t *)freebob_driver_new (client, "freebob_pcm", &cmlparams);
 
 	return driver;
