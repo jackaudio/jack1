@@ -42,9 +42,9 @@
 					   be found, the default device is used. Note: the default device can be used only if both default input and default output are the same.
  Dec 19, 2005: S.Letz: Add -d option (display_device_names).
  Apri 7, 2006: S.Letz: Synchronization with the jackdmp coreaudio driver version: improve half-duplex management.
- May 17, 2006: S/Letz: Minor fix in driver_initialize.
- May 18, 2006: S/Letz: Document sample rate default value.
- 
+ May 17, 2006: S.Letz: Minor fix in driver_initialize.
+ May 18, 2006: S.Letz: Document sample rate default value.
+ May 31, 2006: S.Letz: Apply Rui patch for more consistent driver parameter naming.
  */
 
 #include <stdio.h>
@@ -271,7 +271,7 @@ static OSStatus display_device_names()
 		if (err != noErr) 
 			return err; 
 	
-		printf("Device name = \'%s\', internal_name = \'%s\' (to be used as -n parameter)\n", device_name, internal_name); 
+		printf("Device name = \'%s\', internal_name = \'%s\' (to be used as -d parameter)\n", device_name, internal_name); 
 	}
 	
 	return noErr;
@@ -948,7 +948,7 @@ jack_driver_desc_t *driver_get_descriptor()
     desc->params = calloc(desc->nparams, sizeof(jack_driver_param_desc_t));
 
     i = 0;
-    strcpy(desc->params[i].name, "channel");
+    strcpy(desc->params[i].name, "channels");
     desc->params[i].character = 'c';
     desc->params[i].type = JackDriverParamInt;
     desc->params[i].value.ui = 2;
@@ -956,7 +956,7 @@ jack_driver_desc_t *driver_get_descriptor()
     strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
 
     i++;
-    strcpy(desc->params[i].name, "channelin");
+    strcpy(desc->params[i].name, "inchannels");
     desc->params[i].character = 'i';
     desc->params[i].type = JackDriverParamInt;
     desc->params[i].value.ui = 2;
@@ -964,11 +964,11 @@ jack_driver_desc_t *driver_get_descriptor()
     strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
 
     i++;
-    strcpy(desc->params[i].name, "channelout");
+    strcpy(desc->params[i].name, "outchannels");
     desc->params[i].character = 'o';
     desc->params[i].type = JackDriverParamInt;
     desc->params[i].value.ui = 2;
-    strcpy(desc->params[i].short_desc, "Maximum number of ouput channels");
+    strcpy(desc->params[i].short_desc, "Maximum number of output channels");
     strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
 
     i++;
@@ -1012,8 +1012,8 @@ jack_driver_desc_t *driver_get_descriptor()
     strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
 
     i++;
-	strcpy(desc->params[i].name, "name");
-	desc->params[i].character = 'n';
+	strcpy(desc->params[i].name, "device");
+	desc->params[i].character = 'd';
 	desc->params[i].type = JackDriverParamString;
 	desc->params[i].value.ui = 128U;
 	strcpy(desc->params[i].value.str, "will take default CoreAudio device name");
@@ -1037,8 +1037,8 @@ jack_driver_desc_t *driver_get_descriptor()
 	strcpy(desc->params[i].long_desc, desc->params[i].short_desc);
 	
 	i++;
-	strcpy(desc->params[i].name, "devices");
-	desc->params[i].character  = 'd';
+	strcpy(desc->params[i].name, "list-devices");
+	desc->params[i].character  = 'l';
 	desc->params[i].type = JackDriverParamBool;
 	desc->params[i].value.i  = FALSE;
 	strcpy(desc->params[i].short_desc, "Display available CoreAudio devices");
@@ -1068,7 +1068,7 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 
 	switch (param->character) {
 
-		case 'n':
+		case 'd':
 			capture_pcm_name = strdup(param->value.str);
 			playback_pcm_name = strdup(param->value.str);
 			break;
@@ -1120,7 +1120,7 @@ jack_driver_t *driver_initialize(jack_client_t * client,
 			systemic_output_latency = param->value.ui;
 			break;
 			
-		case 'd':
+		case 'l':
 			display_device_names();
 			break;
 		}
