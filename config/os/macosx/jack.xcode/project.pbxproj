@@ -83,6 +83,8 @@
 				4B117C6F05DD0C9900B5DA5A,
 				4B117C7205DD0C9D00B5DA5A,
 				4B117C7505DD0CA000B5DA5A,
+				4B6683E30A2D8B2E00E8ADF8,
+				4B6683EC0A2D8C2A00E8ADF8,
 			);
 			isa = PBXGroup;
 			name = Client;
@@ -484,6 +486,36 @@
 			settings = {
 			};
 		};
+		4B6683E30A2D8B2E00E8ADF8 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.c;
+			name = midiport.c;
+			path = ../../../libjack/midiport.c;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B6683E40A2D8B2E00E8ADF8 = {
+			fileRef = 4B6683E30A2D8B2E00E8ADF8;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B6683EC0A2D8C2A00E8ADF8 = {
+			fileEncoding = 30;
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.c;
+			name = time.c;
+			path = ../../../libjack/time.c;
+			refType = 2;
+			sourceTree = SOURCE_ROOT;
+		};
+		4B6683ED0A2D8C2A00E8ADF8 = {
+			fileRef = 4B6683EC0A2D8C2A00E8ADF8;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
 		4B6AF278041F4DBC00053105 = {
 			children = (
 				4B4DCBAE05DD23DE00DC3452,
@@ -857,6 +889,8 @@
 				4B117C7405DD0C9D00B5DA5A,
 				4B117C7705DD0CA000B5DA5A,
 				4B89C95A06F596060003AD09,
+				4B6683E40A2D8B2E00E8ADF8,
+				4B6683ED0A2D8C2A00E8ADF8,
 			);
 			isa = PBXSourcesBuildPhase;
 			runOnlyForDeploymentPostprocessing = 0;
@@ -916,7 +950,7 @@
 	<key>CFBundleExecutable</key>
 	<string>Jack</string>
 	<key>CFBundleGetInfoString</key>
-	<string>Jack Server 0.99.54, @03-05 Paul Davis, Grame</string>
+	<string>Jack Server 0.102.8, @03-06 Paul Davis, Grame</string>
 	<key>CFBundleIconFile</key>
 	<string></string>
 	<key>CFBundleIdentifier</key>
@@ -932,7 +966,7 @@
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>0.99.54</string>
+	<string>0.102.8</string>
 </dict>
 </plist>
 ";
