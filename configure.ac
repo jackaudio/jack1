@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=102
-JACK_MICRO_VERSION=10
+JACK_MICRO_VERSION=11
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -587,7 +587,7 @@ HAVE_FREEBOB="false"
 if test "x$TRY_FREEBOB" = "xyes"
 then
 	# check for FreeBob libraries
-	PKG_CHECK_MODULES(LIBFREEBOB, libfreebob >= 0.9.2,
+	PKG_CHECK_MODULES(LIBFREEBOB, libfreebob >= 1.0.0,
 	     [HAVE_FREEBOB="true"
               JACK_DEFAULT_DRIVER=\"freebob\"
 	     ], AC_MSG_RESULT([no]))

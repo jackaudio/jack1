@@ -591,6 +591,11 @@ freebob_driver_new (jack_client_t * client,
 
 	assert(params);
 
+	if(freebob_get_api_version() != 1) {
+		printMessage("Incompatible libfreebob version! (%s)", freebob_get_version());
+		return NULL;
+	}
+
 	printMessage("Starting Freebob backend (%s)", freebob_get_version());
 
 	driver = calloc (1, sizeof (freebob_driver_t));
