@@ -135,9 +135,6 @@ if test "x$JACK_USE_MACH_THREADS" != "x"; then
 	[Use MACH threads where possible])
 fi
 
-# Harsh? necessary ....
-CFLAGS=""
-
 # headers
 AC_CHECK_HEADERS(string.h strings.h)
 AC_CHECK_HEADERS(getopt.h, [], [
