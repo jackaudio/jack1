@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=102
-JACK_MICRO_VERSION=13
+JACK_MICRO_VERSION=14
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -120,7 +120,7 @@ if test "${libdir}" = '${exec_prefix}/lib'; then
 fi
 
 # system-dependent config.h values
-test "x$JACK_THREAD_STACK_TOUCH" = "x" && JACK_THREAD_STACK_TOUCH=1000000
+test "x$JACK_THREAD_STACK_TOUCH" = "x" && JACK_THREAD_STACK_TOUCH=500000
 AC_DEFINE_UNQUOTED(JACK_THREAD_STACK_TOUCH,
 	[$JACK_THREAD_STACK_TOUCH],
 	[Guaranteed size of realtime stack])

@@ -56,7 +56,7 @@ variable.  It will be "default" if that is not defined.
 .TP
 \fB\-p, \-\-port\-max \fI n\fR
 Set the maximum number of ports the JACK server can manage.  
-The default value is 128.
+The default value is 256.
 .TP
 \fB\-R, \-\-realtime\fR 
 .br

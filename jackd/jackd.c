@@ -63,7 +63,7 @@ static int do_mlock = 1;
 static int temporary = 0;
 static int verbose = 0;
 static int client_timeout = 0; /* msecs; if zero, use period size. */
-static unsigned int port_max = 128;
+static unsigned int port_max = 256;
 static int do_unlock = 0;
 static jack_nframes_t frame_time_offset = 0;
 
