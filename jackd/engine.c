@@ -907,7 +907,7 @@ jack_watchdog_thread (void *arg)
 			/* Kill the current client (guilt by association). */
 			if (engine->current_client) {
 					kill (engine->current_client->
-					      control->pgrp, SIGKILL);
+					      control->pid, SIGKILL);
 			}
 
 			/* kill our process group, try to get a dump */
