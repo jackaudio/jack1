@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=102
-JACK_MICRO_VERSION=14
+JACK_MICRO_VERSION=15
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -77,6 +77,9 @@ AC_PROG_LD
 AM_PROG_LIBTOOL
 AC_PROG_LN_S
 AC_C_BIGENDIAN
+
+# Required due to initialization bug in PKG_CHECK_MODULES()
+PKG_PROG_PKG_CONFIG([0.0.1])
 
 AC_MSG_CHECKING([platform dependencies])
 
