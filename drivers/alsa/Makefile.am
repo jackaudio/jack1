@@ -15,6 +15,7 @@ noinst_HEADERS = alsa_driver.h \
 		hammerfall.h \
 		hdsp.h \
 		ice1712.h \
+		memops.h \
 		usx2y.h
 
 jack_alsa_la_LIBADD = $(ALSA_LIBS)
