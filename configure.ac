@@ -15,7 +15,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=102
-JACK_MICRO_VERSION=15
+JACK_MICRO_VERSION=16
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -205,8 +205,8 @@ AC_DEFINE_UNQUOTED(JACK_SHM_TYPE, [$JACK_SHM_TYPE],
 	[JACK shared memory type])
 AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
 
-JACK_CORE_CFLAGS="-I\$(top_builddir)/config -I\$(top_srcdir) \
--I\$(top_builddir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall -g"
+JACK_CORE_CFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
+-I\$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall -g"
 JACK_OPT_CFLAGS="$JACK_CORE_CFLAGS -march=pentium2 -mcpu=pentium4 -O3 \
 -ffast-math -funroll-loops -fprefetch-loop-arrays"
 JACK_CFLAGS="$JACK_CORE_CFLAGS $CFLAGS"
