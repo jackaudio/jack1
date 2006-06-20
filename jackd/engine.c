@@ -899,7 +899,7 @@ jack_watchdog_thread (void *arg)
 	engine->watchdog_check = 0;
 
 	while (1) {
-		sleep (5);
+		usleep (1000 * JACKD_WATCHDOG_TIMEOUT);
 		if (!engine->freewheeling && engine->watchdog_check == 0) {
 
 			jack_error ("jackd watchdog: timeout - killing jackd");

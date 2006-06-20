@@ -86,8 +86,8 @@ Exit once all clients have closed their connections.
 .TP
 \fB\-t, \-\-timeout \fIint\fR
 .br
-Set client timeout limit in milliseconds.  The default is 500 msec
-when not in realtime mode (see: \-R).
+Set client timeout limit in milliseconds.  The default is 500 msec.
+In realtime mode the client timeout must be smaller than the watchdog timeout (5000 msec).
 .TP
 \fB\-u, \-\-unlock\fR
 .br

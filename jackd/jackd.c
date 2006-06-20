@@ -614,7 +614,7 @@ main (int argc, char *argv[])
 			break;
 
 		default:
-			fprintf (stderr, "unknown option character %c\n",
+			fprintf (stderr, "Unknown option character %c\n",
 				 optopt);
 			/*fallthru*/
 		case 'h':
@@ -629,6 +629,12 @@ main (int argc, char *argv[])
 				" protocol " PROTOCOL_VERSION
 				"\n");
 		return -1;
+	}
+
+	if (realtime && (client_timeout >= JACKD_WATCHDOG_TIMEOUT)) {
+		usage (stderr);
+		fprintf (stderr, "In realtime mode (-R) the client timeout must be smaller than the watchdog timeout (%ims).\n", JACKD_WATCHDOG_TIMEOUT);
+		exit (1);
 	}
 
 	if (!seen_driver) {

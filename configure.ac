@@ -1,4 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
+dnl $Id$
+
 AC_INIT(jackd/jackd.c)
 
 AC_CONFIG_AUX_DIR(config)
@@ -15,7 +17,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=102
-JACK_MICRO_VERSION=16
+JACK_MICRO_VERSION=17
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
