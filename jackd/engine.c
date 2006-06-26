@@ -618,7 +618,7 @@ static JSList *
 jack_process_external(jack_engine_t *engine, JSList *node)
 {
 	int status = 0;
-	char c;
+	char c = 0;
 	struct pollfd pfd[1];
 	int poll_timeout;
 	jack_client_internal_t *client;
