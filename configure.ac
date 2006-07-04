@@ -17,7 +17,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=102
-JACK_MICRO_VERSION=19
+JACK_MICRO_VERSION=20
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -668,6 +668,22 @@ AM_CONDITIONAL(STRIPPED_JACKD, $STRIPPED_JACKD)
 AC_OUTPUT(
 Makefile
 config/Makefile
+config/cpu/Makefile
+config/cpu/alpha/Makefile
+config/cpu/cris/Makefile
+config/cpu/generic/Makefile
+config/cpu/i386/Makefile
+config/cpu/i486/Makefile
+config/cpu/ia64/Makefile
+config/cpu/m68k/Makefile
+config/cpu/mips/Makefile
+config/cpu/powerpc/Makefile
+config/cpu/s390/Makefile
+config/os/Makefile
+config/os/generic/Makefile
+config/os/gnu-linux/Makefile
+config/os/macosx/Makefile
+config/sysdeps/Makefile
 doc/Makefile
 doc/reference.doxygen
 drivers/Makefile
