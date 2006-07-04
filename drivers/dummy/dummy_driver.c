@@ -38,19 +38,38 @@
 
 #undef DEBUG_WAKEUP
 
+/* this is used for calculate what counts as an xrun */
+#define PRETEND_BUFFER_SIZE 4096
 
 static jack_nframes_t 
 dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
 		   float *delayed_usecs)
 {
-	jack_time_t starting_time = jack_get_microseconds();
-	jack_time_t processing_time = (driver->last_wait_ust?
-				       starting_time - driver->last_wait_ust:
-				       0);
+	jack_time_t now = jack_get_microseconds();
 
-	/* wait until time for next cycle */
-	if (driver->wait_time > processing_time)
-		usleep (driver->wait_time - processing_time);
+	if (driver->next_time < now) {
+		if (driver->next_time == 0) {
+			/* first time through */
+			driver->next_time = now + driver->wait_time;
+		}  else if (now - driver->next_time
+			    > (PRETEND_BUFFER_SIZE * 1000000LL
+			       / driver->sample_rate)) {
+			/* xrun */
+			fprintf(stderr,"**** dummy: xrun of %ju usec\n",
+				(uintmax_t)now - driver->next_time);
+			driver->next_time = now + driver->wait_time;
+		} else {
+			/* late, but handled by our "buffer"; try to
+			 * get back on track */
+			driver->next_time += driver->wait_time;
+		}
+	} else {
+		jack_time_t wait = driver->next_time - now;
+		struct timespec ts = { .tv_sec = wait / 1000000,
+				       .tv_nsec = (wait % 1000000) * 1000 };
+		nanosleep(&ts,NULL);
+		driver->next_time += driver->wait_time;
+	}
 
 	driver->last_wait_ust = jack_get_microseconds ();
 	driver->engine->transport_cycle_start (driver->engine,
@@ -96,14 +115,6 @@ dummy_driver_null_cycle (dummy_driver_t* driver, jack_nframes_t nframes)
 static int
 dummy_driver_bufsize (dummy_driver_t* driver, jack_nframes_t nframes)
 {
-	/* This is a somewhat arbitrary size restriction.  The dummy
-	 * driver doesn't work well with smaller buffer sizes,
-	 * apparantly due to usleep() inaccuracy under Linux 2.4.  If
-	 * you can get it working with smaller buffers, lower the
-	 * limit.  (JOQ) */
-	if (nframes < 128)
-		return EINVAL;
-
 	driver->period_size = nframes;  
 	driver->period_usecs = driver->wait_time =
 		(jack_time_t) floor ((((float) nframes) / driver->sample_rate)
@@ -243,6 +254,7 @@ dummy_driver_new (jack_client_t * client,
 	driver->sample_rate = sample_rate;
 	driver->period_size = period_size;
 	driver->wait_time   = wait_time;
+	driver->next_time   = 0;
 	driver->last_wait_ust = 0;
 
 	driver->capture_channels  = capture_ports;

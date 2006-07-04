@@ -36,6 +36,7 @@ struct _dummy_driver
     jack_nframes_t  sample_rate;
     jack_nframes_t  period_size;
     unsigned long   wait_time;
+    jack_time_t     next_time;
 
     unsigned int    capture_channels;
     unsigned int    playback_channels;

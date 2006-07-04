@@ -17,7 +17,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=102
-JACK_MICRO_VERSION=18
+JACK_MICRO_VERSION=19
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -699,6 +699,7 @@ echo \| Build with FreeBob support............................ : $HAVE_FREEBOB
 echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
+echo \| Install prefix........................................ : $prefix
 echo \| Compiler optimization flags........................... : $JACK_OPT_CFLAGS
 echo \| Compiler full flags................................... : $CFLAGS
 echo \| Install dir for libjack + backends.................... : $libdir/jack
