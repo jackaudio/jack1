@@ -699,12 +699,12 @@ echo \| Build with FreeBob support............................ : $HAVE_FREEBOB
 echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
-echo \| Install prefix........................................ : $prefix
 echo \| Compiler optimization flags........................... : $JACK_OPT_CFLAGS
 echo \| Compiler full flags................................... : $CFLAGS
 echo \| Install dir for libjack + backends.................... : $libdir/jack
 echo \|
 echo \| Default driver backend................................ : $JACK_DEFAULT_DRIVER
 echo \| Shared memory interface............................... : $JACK_SHM_TYPE
+echo \| Install prefix........................................ : $prefix
 echo
 
