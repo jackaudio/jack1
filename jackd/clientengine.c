@@ -660,7 +660,7 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 
 		/* JACK protocol incompatibility */
 		res.status |= (JackFailure|JackVersionError);
-		jack_error ("JACK protocol mismatch");
+		jack_error ("JACK protocol mismatch (%d vs %d)", req.protocol_v, jack_protocol_version);
 		if (write (client_fd, &res, sizeof (res)) != sizeof (res)) {
 			jack_error ("cannot write client connection response");
 		}

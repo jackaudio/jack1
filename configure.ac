@@ -80,8 +80,8 @@ AM_PROG_LIBTOOL
 AC_PROG_LN_S
 AC_C_BIGENDIAN
 
-# Required due to initialization bug in PKG_CHECK_MODULES()
-PKG_PROG_PKG_CONFIG([0.0.1])
+dnl Required due to initialization bug in PKG_CHECK_MODULES()
+dnl PKG_PROG_PKG_CONFIG([0.0.1])
 
 AC_MSG_CHECKING([platform dependencies])
 

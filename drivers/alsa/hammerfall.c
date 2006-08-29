@@ -32,7 +32,7 @@ set_control_id (snd_ctl_elem_id_t *ctl, const char *name)
 {
 	snd_ctl_elem_id_set_name (ctl, name);
 	snd_ctl_elem_id_set_numid (ctl, 0);
-	snd_ctl_elem_id_set_interface (ctl, SND_CTL_ELEM_IFACE_PCM);
+	snd_ctl_elem_id_set_interface (ctl, SND_CTL_ELEM_IFACE_MIXER);
 	snd_ctl_elem_id_set_device (ctl, 0);
 	snd_ctl_elem_id_set_subdevice (ctl, 0);
 	snd_ctl_elem_id_set_index (ctl, 0);

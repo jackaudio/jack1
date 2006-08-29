@@ -41,6 +41,39 @@
 /* this is used for calculate what counts as an xrun */
 #define PRETEND_BUFFER_SIZE 4096
 
+void
+FakeVideoSync( dummy_driver_t *driver )
+{
+        static const int VIDEO_SYNC_PERIOD = 48000 / 30;
+        static int vidCounter = VIDEO_SYNC_PERIOD;
+        
+        int period = driver->period_size;
+        jack_position_t *position = &driver->engine->control->current_time;
+
+        if ( period >= VIDEO_SYNC_PERIOD ) {
+                printf("JACK driver period size too large for simple video sync emulation. Halting.\n");
+                exit(0);
+        }
+
+        //enable video sync, whether it occurs in this period or not
+        position->audio_frames_per_video_frame = VIDEO_SYNC_PERIOD;
+        position->valid = (jack_position_bits_t) (position->valid | JackAudioVideoRatio);
+
+        //no video pulse found in this period, just decrement the counter
+        if ( vidCounter > period ) {
+                vidCounter -= period;
+        }
+
+        //video pulse occurs in this period
+        if ( vidCounter <= period ) {
+                int remainder = period - vidCounter;
+                vidCounter = VIDEO_SYNC_PERIOD - remainder;
+
+                position->video_offset = vidCounter;
+                position->valid = (jack_position_bits_t) (position->valid | JackVideoFrameOffset);
+        }
+}
+
 static jack_nframes_t 
 dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
 		   float *delayed_usecs)
@@ -96,6 +129,8 @@ dummy_driver_run_cycle (dummy_driver_t *driver)
 		engine->delay (engine, delayed_usecs);
 		return 0;
 	} 
+
+	// FakeVideoSync (driver);
 
 	if (wait_status == 0)
 		return engine->run_cycle (engine, nframes, delayed_usecs);
@@ -386,3 +421,4 @@ driver_finish (jack_driver_t *driver)
 {
 	dummy_driver_delete ((dummy_driver_t *) driver);
 }
+

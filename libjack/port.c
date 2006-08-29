@@ -848,7 +848,7 @@ jack_port_request_monitor_by_name (jack_client_t *client,
 }
 
 int
-jack_ensure_port_monitor_input (jack_port_t *port, int yn)
+jack_port_ensure_monitor (jack_port_t *port, int yn)
 {
 	if (yn) {
 		if (port->shared->monitor_requests == 0) {
