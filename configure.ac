@@ -17,7 +17,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=102
-JACK_MICRO_VERSION=20
+JACK_MICRO_VERSION=21
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -79,9 +79,6 @@ AC_PROG_LD
 AM_PROG_LIBTOOL
 AC_PROG_LN_S
 AC_C_BIGENDIAN
-
-dnl Required due to initialization bug in PKG_CHECK_MODULES()
-dnl PKG_PROG_PKG_CONFIG([0.0.1])
 
 AC_MSG_CHECKING([platform dependencies])
 
@@ -535,6 +532,17 @@ if test "x$USE_BARRIER" = "xyes"; then
 		AC_DEFINE(USE_BARRIER, 1, [Use pthread barrier functions]))
 fi
 
+# some example-clients need libsndfile
+HAVE_SNDFILE=false
+PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
+if test x$HAVE_SNDFILE = xfalse; then
+             AC_MSG_WARN([*** the jackrec example client will not be built])
+fi
+# Note: A bug in pkg-config causes problems if the first occurence of
+# PKG_CHECK_MODULES can be disabled. So, if you're going to use
+# PKG_CHECK_MODULES inside a --disable-whatever check, you need to
+# do it somewhere *below* this comment.
+
 # Check which backend drivers can be built.  The last one successfully
 # configured becomes the default JACK driver; so the order of
 # precedence is: alsa, oss, coreaudio, portaudio, dummy.
@@ -622,13 +630,6 @@ fi
 AC_DEFINE_UNQUOTED(JACK_DEFAULT_DRIVER,
 	[$JACK_DEFAULT_DRIVER],
 	[Default JACK driver])
-
-# some example-clients need libsndfile
-HAVE_SNDFILE=false
-PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
-if test x$HAVE_SNDFILE = xfalse; then
-             AC_MSG_WARN([*** the jackrec example client will not be built])
-fi
 
 # On some systems, readline depends on termcap or ncurses.  But, the
 # MacOSX linker complains bitterly if these libraries are explicitly
