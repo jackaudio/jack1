@@ -623,6 +623,10 @@ _start_server (const char *server_name)
 	fp = fopen(filename, "r");
 
 	if (!fp) {
+		fp = fopen("/etc/jackdrc", "r");
+	}
+	/* if still not found, check old config name for backwards compatability */
+	if (!fp) {
 		fp = fopen("/etc/jackd.conf", "r");
 	}
 
