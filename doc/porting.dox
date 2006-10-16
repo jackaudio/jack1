@@ -75,17 +75,17 @@ files, found in subdirectories of @c config/os and referenced with a
 
 If conditional compilation must be used in mainline
 platform-independent code, avoid using the system name.  Instead, @c
-#define a descriptive name in @c <config.h>, and test it like this:
+\#define a descriptive name in @c <config.h>, and test it like this:
 
 @code
-  #ifdef JACK_USE_MACH_THREADS
+  \#ifdef JACK_USE_MACH_THREADS
           allocate_mach_serverport(engine, client);
           client->running = FALSE;
-  #endif
+  \#endif
 @endcode
 
 Be sure to place any generic implementation alternative in the @c
-#else or use an @c #ifndef, so no other code needs to know your
+\#else or use an @c \#ifndef, so no other code needs to know your
 conditional labels.
 
 @section portcpu Processor Dependencies

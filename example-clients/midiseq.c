@@ -56,6 +56,7 @@ int process(jack_nframes_t nframes, void *arg)
 			{
 				buffer = jack_midi_event_reserve(port_buf, i, 3, nframes);
 /*				printf("wrote a note on, port buffer = 0x%x, event buffer = 0x%x\n", port_buf, buffer);*/
+				buffer[2] = 64;		/* velocity */
 				buffer[1] = note_frqs[j];
 				buffer[0] = 0x90;	/* note on */
 			}
@@ -63,6 +64,7 @@ int process(jack_nframes_t nframes, void *arg)
 			{
 				buffer = jack_midi_event_reserve(port_buf, i, 3, nframes);
 /*				printf("wrote a note off, port buffer = 0x%x, event buffer = 0x%x\n", port_buf, buffer);*/
+				buffer[2] = 64;		/* velocity */
 				buffer[1] = note_frqs[j];
 				buffer[0] = 0x80;	/* note off */
 			}
