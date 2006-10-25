@@ -30,6 +30,11 @@ jack_time_t (*_jack_get_microseconds)(void) = 0;
 #define HPET_MMAP_SIZE	1024
 #define HPET_PERIOD	0x004
 #define HPET_COUNTER	0x0f0
+#if defined(__x86_64__)
+#define HPET_64BIT
+#else
+#define HPET_32BIT
+#endif
 static int hpet_fd;
 static unsigned char *hpet_ptr;
 static unsigned int hpet_period; /* period length in femto secs */
@@ -64,10 +69,18 @@ jack_hpet_init ()
 static jack_time_t
 jack_get_microseconds_from_hpet (void) 
 {
+#ifdef HPET_64BIT
 	unsigned long long hpet_counter;
+#else
+	unsigned int hpet_counter;
+#endif
 	long double hpet_time;
 
+#ifdef HPET_64BIT
 	hpet_counter = *((unsigned long long *) (hpet_ptr + HPET_COUNTER));
+#else
+	hpet_counter = *((unsigned int *) (hpet_ptr + HPET_COUNTER));
+#endif
 	hpet_time = (long double) hpet_counter * (long double) hpet_period *
 		(long double) 1e-9;
 	return ((jack_time_t) (hpet_time + 0.5));
