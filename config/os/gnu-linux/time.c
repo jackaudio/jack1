@@ -22,28 +22,37 @@
 
 #include <config.h>
 
+#include <stdint.h>
+
 static jack_time_t __jack_cpu_mhz = 0;
 jack_time_t (*_jack_get_microseconds)(void) = 0;
 
 #if defined(__gnu_linux__) && (defined(__i386__) || defined(__x86_64__))
 #define HPET_SUPPORT
-#define HPET_MMAP_SIZE	1024
-#define HPET_PERIOD	0x004
-#define HPET_COUNTER	0x0f0
+#define HPET_MMAP_SIZE			1024
+#define HPET_CAPS			0x000
+#define HPET_PERIOD			0x004
+#define HPET_COUNTER			0x0f0
+#define HPET_CAPS_COUNTER_64BIT		(1 << 13)
 #if defined(__x86_64__)
-#define HPET_64BIT
+typedef uint64_t hpet_counter_t;
 #else
-#define HPET_32BIT
+typedef uint32_t hpet_counter_t;
 #endif
 static int hpet_fd;
 static unsigned char *hpet_ptr;
-static unsigned int hpet_period; /* period length in femto secs */
+static uint32_t hpet_period; /* period length in femto secs */
+static uint64_t hpet_offset = 0;
+static uint64_t hpet_wrap;
+static hpet_counter_t hpet_previous = 0;
 #endif /* defined(__gnu_linux__) && (__i386__ || __x86_64__) */
 
 #ifdef HPET_SUPPORT
 int
 jack_hpet_init ()
 {
+	uint32_t hpet_caps;
+
 	hpet_fd = open("/dev/hpet", O_RDONLY);
 	if (hpet_fd < 0) {
 		jack_error ("This system has no accessible HPET device (%s)", strerror (errno));
@@ -61,28 +70,27 @@ jack_hpet_init ()
 	/* this assumes period to be constant. if needed,
 	   it can be moved to the clock access function 
 	*/
+	hpet_period = *((uint32_t *) (hpet_ptr + HPET_PERIOD));
+	hpet_caps = *((uint32_t *) (hpet_ptr + HPET_CAPS));
+	hpet_wrap = ((hpet_caps & HPET_CAPS_COUNTER_64BIT) &&
+		(sizeof(hpet_counter_t) == sizeof(uint64_t))) ?
+		0 : ((uint64_t) 1 << 32);
 
-	hpet_period = *((unsigned int *) (hpet_ptr + HPET_PERIOD));
 	return 0;
 }
 
 static jack_time_t
 jack_get_microseconds_from_hpet (void) 
 {
-#ifdef HPET_64BIT
-	unsigned long long hpet_counter;
-#else
-	unsigned int hpet_counter;
-#endif
+	hpet_counter_t hpet_counter;
 	long double hpet_time;
 
-#ifdef HPET_64BIT
-	hpet_counter = *((unsigned long long *) (hpet_ptr + HPET_COUNTER));
-#else
-	hpet_counter = *((unsigned int *) (hpet_ptr + HPET_COUNTER));
-#endif
-	hpet_time = (long double) hpet_counter * (long double) hpet_period *
-		(long double) 1e-9;
+	hpet_counter = *((hpet_counter_t *) (hpet_ptr + HPET_COUNTER));
+	if (unlikely(hpet_counter < hpet_previous))
+		hpet_offset += hpet_wrap;
+	hpet_previous = hpet_counter;
+	hpet_time = (long double) (hpet_offset + hpet_counter) *
+		(long double) hpet_period * (long double) 1e-9;
 	return ((jack_time_t) (hpet_time + 0.5));
 }
 
