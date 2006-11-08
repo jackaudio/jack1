@@ -207,9 +207,6 @@ run_disk_thread (jack_thread_info_t *info)
 			 PRIu32 ".\n", info->rb_size);
 		info->status = EPIPE;
 	}
-	if (info->status) {
-		unlink (info->path);
-	}
 }
 
 void
