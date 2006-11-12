@@ -235,9 +235,10 @@ jack_midi_port_mixdown(jack_port_t    *port,
 			/* If there are unread events left in this port.. */
 			if (in_info->info.event_count > in_info->last_write_loc) {
 				/* .. and this event is the new earliest .. */
+				/* NOTE: that's why we compare time with <, not <= */
 				if (earliest_info == NULL
 						|| in_events[in_info->last_write_loc].time
-					       <= earliest_event->time) {
+					       < earliest_event->time) {
 					/* .. then set this event as the next earliest */
 					earliest_info = in_info;
 					earliest_event = (jack_midi_port_internal_event_t *)
