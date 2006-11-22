@@ -42,33 +42,14 @@ typedef struct _jack_midi_event
 } jack_midi_event_t;
 
 
-/** Information about a Jack MIDI port/buffer. */
-typedef struct _jack_midi_port_info
-{
-	jack_nframes_t event_count; /**< Number of events stored in the port */
-} jack_midi_port_info_t;
-
-
-/** Initialise the port state.
- * 
- * @param port_buffer Port buffer to initialise.
- * @param nframes Number of valid frames this cycle.
- * 
- * This must be called after port_buffer is allocated.
- */
-void
-jack_midi_reset_new_port(void           *port_buffer,
-                         jack_nframes_t  nframes);
-
-
-/* Get a struct of information about a MIDI port.
+/* Get number of events in a port buffer.
  *
  * @param port_buffer Port buffer from which to retrieve event.
  * @param nframes Number of valid frames this cycle.
- * @return pointer to the @ref jack_midi_port_info_t structure that is inside @a port_buffer
+ * @return number of events inside @a port_buffer
  */
-jack_midi_port_info_t*
-jack_midi_port_get_info(void*          port_buffer,
+jack_nframes_t
+jack_midi_get_event_count(void*          port_buffer,
                         jack_nframes_t nframes);
 
 

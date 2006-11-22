@@ -67,7 +67,6 @@
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
-void *jack_zero_filled_buffer = NULL;
 #ifdef ARCH_X86
 int cpu_type = 0;
 #endif /* ARCH_X86 */
@@ -908,17 +907,6 @@ jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 		jack_error ("cannot attach port segment shared memory"
 			    " (%s)", strerror (errno));
 		return -1;
-	}
-
-	/* The first chunk of the audio port segment will be set by
-	 * the engine to be a zero-filled buffer.  This hasn't been
-	 * done yet, but it will happen before the process cycle
-	 * (re)starts. 
-	 */
-
-	if (ptid == JACK_AUDIO_PORT_TYPE) {
-		jack_zero_filled_buffer =
-			jack_shm_addr (&client->port_segment[ptid]);
 	}
 
 	return 0;

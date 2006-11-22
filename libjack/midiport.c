@@ -28,36 +28,41 @@
 
 
 typedef struct _jack_midi_port_info_private {
-	jack_midi_port_info_t info;
+ 	size_t                buffer_size; /**< Size of buffer in bytes */
+	jack_nframes_t        event_count; /**< Number of events stored in this buffer */
 	jack_nframes_t        last_write_loc; /**< Used for both writing and mixdown */
 	jack_nframes_t        events_lost;	  /**< Number of events lost in this buffer */
 } jack_midi_port_info_private_t;
 
-
 typedef struct _jack_midi_port_internal_event {
-	jack_nframes_t time;
-	size_t         size;
-	size_t         byte_offset;
+	int32_t        time;
+	jack_shmsize_t size;
+	jack_shmsize_t byte_offset;
 } jack_midi_port_internal_event_t;
 
 
-void
-jack_midi_reset_new_port(void           *port_buffer,
-                         jack_nframes_t  nframes)
+/* jack_midi_port_functions.buffer_init */
+static void
+jack_midi_buffer_init(void  *port_buffer,
+                       size_t buffer_size)
 {
 	jack_midi_port_info_private_t *info =
 		(jack_midi_port_info_private_t *) port_buffer;
-	info->info.event_count = 0;
+	/* We can also add some magic field to midi buffer to validate client calls */
+	info->buffer_size = buffer_size;
+	info->event_count = 0;
 	info->last_write_loc = 0;
 	info->events_lost = 0;
 }
 
 
-jack_midi_port_info_t*
-jack_midi_port_get_info(void           *port_buffer,
-                        jack_nframes_t  nframes)
+jack_nframes_t
+jack_midi_get_event_count(void           *port_buffer,
+                          jack_nframes_t  nframes)
 {
-	return (jack_midi_port_info_t *) port_buffer;
+	jack_midi_port_info_private_t *info =
+		(jack_midi_port_info_private_t *) port_buffer;
+	return info->event_count;
 }
 
 
@@ -71,7 +76,7 @@ jack_midi_event_get(jack_midi_event_t *event,
 	jack_midi_port_info_private_t *info =
 		(jack_midi_port_info_private_t *) port_buffer;
 	
-	if (event_idx >= info->info.event_count)
+	if (event_idx >= info->event_count)
 		return ENODATA;
 	
 	port_event = (jack_midi_port_internal_event_t *) (info + 1);
@@ -92,13 +97,13 @@ jack_midi_max_event_size(void           *port_buffer,
 	jack_midi_port_info_private_t *info =
 		(jack_midi_port_info_private_t *) port_buffer;
 	size_t buffer_size =
-		nframes * sizeof(jack_default_audio_sample_t) / sizeof(unsigned char);
+		info->buffer_size;
 	
 	/* (event_count + 1) below accounts for jack_midi_port_internal_event_t
 	 * which would be needed to store the next event */
 	size_t used_size = sizeof(jack_midi_port_info_private_t)
 		+ info->last_write_loc
-		+ ((info->info.event_count + 1)
+		+ ((info->event_count + 1)
 		   * sizeof(jack_midi_port_internal_event_t));
 	
 	if (used_size > buffer_size)
@@ -116,28 +121,34 @@ jack_midi_event_reserve(void           *port_buffer,
 {
 	jack_midi_data_t *retbuf = (jack_midi_data_t *) port_buffer;
 
-	/* FIXME: below line needs to know about buffer scale factor */
-	jack_nframes_t buffer_size =
-		nframes * sizeof(jack_default_audio_sample_t) / sizeof(unsigned char);
 	jack_midi_port_info_private_t *info =
 		(jack_midi_port_info_private_t *) port_buffer;
 	jack_midi_port_internal_event_t *event_buffer =
 		(jack_midi_port_internal_event_t *) (info + 1);
+	size_t buffer_size =
+		info->buffer_size;
 	
-	/* Check if there is enough space in the buffer for the event. */
-	if (info->last_write_loc + sizeof(jack_midi_port_info_private_t)
-			+ ((info->info.event_count + 1)
+	if (time < 0 || time >= nframes)
+ 		return NULL;
+ 
+ 	if (info->event_count > 0 && time < event_buffer[info->event_count-1].time)
+ 		return NULL;
+
+	/* Check if data_size is >0 and there is enough space in the buffer for the event. */
+	if (data_size <=0 ||
+	    info->last_write_loc + sizeof(jack_midi_port_info_private_t)
+			+ ((info->event_count + 1)
 			   * sizeof(jack_midi_port_internal_event_t))
 			+ data_size > buffer_size) {
 		return NULL;
 	} else {
 		info->last_write_loc += data_size;
 		retbuf = &retbuf[buffer_size - 1 - info->last_write_loc];
-		event_buffer[info->info.event_count].time = time;
-		event_buffer[info->info.event_count].size = data_size;
-		event_buffer[info->info.event_count].byte_offset =
+		event_buffer[info->event_count].time = time;
+		event_buffer[info->event_count].size = data_size;
+		event_buffer[info->event_count].byte_offset =
 			buffer_size - 1 - info->last_write_loc;
-		info->info.event_count += 1;
+		info->event_count += 1;
 		return retbuf;
 	}
 }
@@ -174,13 +185,14 @@ jack_midi_clear_buffer(void           *port_buffer,
 	jack_midi_port_info_private_t *info =
 		(jack_midi_port_info_private_t *) port_buffer;
 
-	info->info.event_count = 0;
+	info->event_count = 0;
 	info->last_write_loc = 0;
 	info->events_lost = 0;
 }
 
 
-void
+/* jack_midi_port_functions.mixdown */
+static void
 jack_midi_port_mixdown(jack_port_t    *port,
                        jack_nframes_t  nframes)
 {
@@ -215,7 +227,7 @@ jack_midi_port_mixdown(jack_port_t    *port,
 		input = (jack_port_t *) node->data;
 		in_info =
 			(jack_midi_port_info_private_t *) jack_output_port_buffer(input);
-		num_events += in_info->info.event_count;
+		num_events += in_info->event_count;
 		in_info->last_write_loc = 0;
 	}
 
@@ -233,7 +245,7 @@ jack_midi_port_mixdown(jack_port_t    *port,
 			in_events = (jack_midi_port_internal_event_t *) (in_info + 1);
 
 			/* If there are unread events left in this port.. */
-			if (in_info->info.event_count > in_info->last_write_loc) {
+			if (in_info->event_count > in_info->last_write_loc) {
 				/* .. and this event is the new earliest .. */
 				/* NOTE: that's why we compare time with <, not <= */
 				if (earliest_info == NULL
@@ -266,7 +278,7 @@ jack_midi_port_mixdown(jack_port_t    *port,
 			}
 		}
 	}
-	assert(out_info->info.event_count == num_events - out_info->events_lost);
+	assert(out_info->event_count == num_events - out_info->events_lost);
 }
 
 
@@ -277,3 +289,7 @@ jack_midi_get_lost_event_count(void           *port_buffer,
 	return ((jack_midi_port_info_private_t *) port_buffer)->events_lost;
 }
 
+jack_port_functions_t jack_builtin_midi_functions = {
+	.buffer_init    = jack_midi_buffer_init,
+	.mixdown = jack_midi_port_mixdown, 
+};

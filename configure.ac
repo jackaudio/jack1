@@ -17,7 +17,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=102
-JACK_MICRO_VERSION=26
+JACK_MICRO_VERSION=27
 
 dnl ---
 dnl HOWTO: updating the jack protocol version

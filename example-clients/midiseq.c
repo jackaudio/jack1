@@ -91,7 +91,6 @@ int main(int narg, char **args)
 	jack_set_process_callback (client, process, 0);
 	output_port = jack_port_register (client, "out", JACK_DEFAULT_MIDI_TYPE, JackPortIsOutput, 0);
 	nframes = jack_get_buffer_size(client);
-	jack_midi_reset_new_port(jack_port_get_buffer(output_port, nframes), nframes);
 	loop_index = 0;
 	num_notes = (narg - 3)/3;
 	note_frqs = malloc(num_notes*sizeof(unsigned char));

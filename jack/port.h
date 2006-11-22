@@ -87,6 +87,8 @@ typedef struct _jack_port_type_info {
 
     jack_shm_registry_index_t shm_registry_index;
 
+    jack_shmsize_t zero_buffer_offset;
+
 } jack_port_type_info_t;
 
 /* Allocated by the engine in shared memory. */
@@ -111,6 +113,14 @@ typedef struct _jack_port_shared {
 
 typedef struct _jack_port_functions {
 
+    /* Function to initialize port buffer. Cannot be NULL.
+     * NOTE: This must take a buffer rather than jack_port_t as it is called
+     * in jack_engine_place_buffers() before any port creation.
+     * A better solution is to make jack_engine_place_buffers to be type-specific,
+     * but this works.
+     */
+    void (*buffer_init)(void *buffer, size_t size);
+
     /* Function to mixdown multiple inputs to a buffer.  Can be NULL,
      * indicating that multiple input connections are not legal for
      * this data type. 
@@ -118,6 +128,16 @@ typedef struct _jack_port_functions {
     void (*mixdown)(jack_port_t *, jack_nframes_t);
 
 } jack_port_functions_t;
+
+/**
+ * Get port functions.
+ * @param ptid port type id.
+ *
+ * @return pointer to port type functions or NULL if port type is unknown.
+ */
+/*const*/ jack_port_functions_t *
+jack_get_port_functions(jack_port_type_id_t ptid);
+
 
 /* Allocated by the client in local memory. */
 struct _jack_port {

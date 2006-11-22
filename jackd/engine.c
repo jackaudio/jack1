@@ -330,7 +330,8 @@ jack_engine_place_port_buffers (jack_engine_t* engine,
 	jack_shmsize_t offset;		/* shared memory offset */
 	jack_port_buffer_info_t *bi;
 	jack_port_buffer_list_t* pti = &engine->port_buffers[ptid];
-	
+	jack_port_functions_t *pfuncs = jack_get_port_functions(ptid);
+
 	pthread_mutex_lock (&pti->lock);
 	offset = 0;
 	
@@ -364,6 +365,7 @@ jack_engine_place_port_buffers (jack_engine_t* engine,
 		}
 
 	} else {
+		jack_port_type_info_t* port_type = &engine->control->port_types[ptid];
 
 		/* Allocate an array of buffer info structures for all
 		 * the buffers in the segment.  Chain them to the free
@@ -380,16 +382,26 @@ jack_engine_place_port_buffers (jack_engine_t* engine,
 			++bi;
 		}
 
-		/* allocate the first buffer of the audio port segment
-		 * for a zero-filled area
+		/* Allocate the first buffer of the port segment
+		 * for an empy buffer area.
+		 * NOTE: audio buffer is zeroed in its buffer_init function.
 		 */
-		if (ptid == JACK_AUDIO_PORT_TYPE) {
-			engine->silent_buffer = (jack_port_buffer_info_t *)
-				pti->freelist->data;
-			pti->freelist =
-				jack_slist_remove_link (pti->freelist,
+		bi = (jack_port_buffer_info_t *) pti->freelist->data;
+		pti->freelist = jack_slist_remove_link (pti->freelist,
 							pti->freelist);
-		}
+		port_type->zero_buffer_offset = bi->offset;
+		if (ptid == JACK_AUDIO_PORT_TYPE)
+			engine->silent_buffer = bi;
+	}
+	/* initialize buffers */
+	{
+		int i;
+		jack_shm_info_t *shm_info = &engine->port_segment[ptid];
+		char* shm_segment = (char *) jack_shm_addr(shm_info);
+
+		bi = pti->info;
+		for (i=0; i<nports; ++i, ++bi)
+			pfuncs->buffer_init(shm_segment + bi->offset, one_buffer);
 	}
 
 	pthread_mutex_unlock (&pti->lock);
@@ -448,20 +460,6 @@ jack_resize_port_segment (jack_engine_t *engine,
 	}
 
 	jack_engine_place_port_buffers (engine, ptid, one_buffer, size, nports);
-
-	if (ptid == JACK_AUDIO_PORT_TYPE) {
-
-		/* Always zero `nframes' samples, it could have
-		 * changed.  The server's global variable
-		 * jack_zero_filled_buffer is for internal clients.
-		 * External clients will set their copies during the
-		 * AttachPortSegment event. */
-
-		jack_zero_filled_buffer =
-			jack_shm_addr (shm_info)
-			+ engine->silent_buffer->offset;
-		memset (jack_zero_filled_buffer, 0, one_buffer);
-	}
 
 #ifdef USE_MLOCK
 	if (engine->control->real_time) {

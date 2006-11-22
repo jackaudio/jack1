@@ -37,24 +37,24 @@
 
 #include "local.h"
 
+static void    jack_generic_buffer_init(void *port_buffer,
+                                      size_t buffer_size);
+
 static void    jack_audio_port_mixdown (jack_port_t *port,
 					jack_nframes_t nframes);
 
-extern void jack_midi_port_mixdown (jack_port_t *port,
- 					jack_nframes_t nframes);
- 
 /* These function pointers are local to each address space.  For
  * internal clients they reside within jackd; for external clients in
  * the application process. */
 jack_port_functions_t jack_builtin_audio_functions = {
+	.buffer_init    = jack_generic_buffer_init,
 	.mixdown = jack_audio_port_mixdown, 
 };
 
-jack_port_functions_t jack_builtin_midi_functions = {
-	.mixdown = jack_midi_port_mixdown, 
-};
+extern jack_port_functions_t jack_builtin_midi_functions;
 
 jack_port_functions_t jack_builtin_NULL_functions = {
+	.buffer_init    = jack_generic_buffer_init,
 	.mixdown = NULL, 
 };
 
@@ -334,6 +334,30 @@ void jack_port_set_funcs ()
 
 #endif /* USE_DYNSIMD */
 
+jack_port_functions_t *
+jack_get_port_functions(jack_port_type_id_t ptid)
+{
+	switch (ptid) {
+	case JACK_AUDIO_PORT_TYPE:
+		return &jack_builtin_audio_functions;
+	case JACK_MIDI_PORT_TYPE:
+		return &jack_builtin_midi_functions;
+	/* no other builtin functions */
+	default:
+		return NULL;
+	}
+}
+
+/*
+ * Fills buffer with zeroes. For audio ports, engine->silent_buffer relies on it.
+ */
+static void
+jack_generic_buffer_init(void *buffer, size_t size)
+{
+	memset(buffer, 0, size);
+}
+
+
 jack_port_t *
 jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	       jack_control_t *control)
@@ -356,22 +380,11 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 		 * functions within this address space.  These builtin
 		 * definitions can be overridden by the client. 
 		 */
-
-		if (ptid == JACK_AUDIO_PORT_TYPE) {
-
-			port->fptr = jack_builtin_audio_functions;
-			port->shared->has_mixdown = TRUE;
-
-		} else if (ptid == JACK_MIDI_PORT_TYPE) {
-
-			port->fptr = jack_builtin_midi_functions;
-			port->shared->has_mixdown = TRUE;
-
-		} else {	/* no other builtin functions */
-
-			port->fptr = jack_builtin_NULL_functions;
-			port->shared->has_mixdown = FALSE;
-		}
+		jack_port_functions_t *port_functions = jack_get_port_functions(ptid);
+		if (port_functions == NULL)
+			port_functions = &jack_builtin_NULL_functions;
+		port->fptr = *port_functions;
+		port->shared->has_mixdown = (port->fptr.mixdown ? TRUE : FALSE);
 	}
 
 	/* set up a base address so that port->offset can be used to
@@ -725,7 +738,7 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 	if ((node = port->connections) == NULL) {
 		
 		/* no connections; return a zero-filled buffer */
-		return jack_zero_filled_buffer;
+		return (void *) (*(port->client_segment_base) + port->type_info->zero_buffer_offset);
 	}
 
 	if ((next = jack_slist_next (node)) == NULL) {
@@ -743,11 +756,12 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 	   connection process.
 	*/
 	if (port->mix_buffer == NULL) {
-		port->mix_buffer =
-			jack_pool_alloc (
+		size_t buffer_size = 
 				port->type_info->buffer_scale_factor
 				* sizeof (jack_default_audio_sample_t)
-				* nframes);
+				* nframes;
+		port->mix_buffer = jack_pool_alloc (buffer_size);
+		port->fptr.buffer_init (port->mix_buffer, buffer_size);
 	}
 	port->fptr.mixdown (port, nframes);
 	return (void *) port->mix_buffer;

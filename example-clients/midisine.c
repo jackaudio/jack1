@@ -49,7 +49,7 @@ int process(jack_nframes_t nframes, void *arg)
 	jack_default_audio_sample_t *out = (jack_default_audio_sample_t *) jack_port_get_buffer (output_port, nframes);
 	jack_midi_event_t in_event;
 	jack_nframes_t event_index = 0;
-	jack_nframes_t event_count = jack_midi_port_get_info(port_buf, nframes)->event_count;
+	jack_nframes_t event_count = jack_midi_get_event_count(port_buf, nframes);
 	if(event_count > 1)
 	{
 		printf(" midisine: have %d events\n", event_count);
