@@ -145,16 +145,19 @@ struct _freebob_jack_settings {
 	int buffer_size_set;
 	jack_nframes_t buffer_size;
 
-        int port_set;
-        int port;
-       
-        int node_id_set;
-        int node_id;
+	int port_set;
+	int port;
+	
+	int node_id_set;
+	int node_id;
 
 	int playback_ports;
 	int capture_ports;
+	
+	jack_nframes_t capture_frame_latency;
+	jack_nframes_t playback_frame_latency;
 
-        freebob_handle_t fb_handle;
+	freebob_handle_t fb_handle;
 };
 
 #ifdef FREEBOB_DRIVER_WITH_MIDI
@@ -226,7 +229,10 @@ struct _freebob_driver
     JSList                       *monitor_ports;
     channel_t                     playback_nchannels;
     channel_t                     capture_nchannels;
-    	
+
+	jack_nframes_t  playback_frame_latency;
+	jack_nframes_t  capture_frame_latency;
+
 	freebob_device_info_t device_info;
 	freebob_options_t device_options;
 

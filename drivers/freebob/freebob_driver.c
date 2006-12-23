@@ -133,8 +133,7 @@ freebob_driver_attach (freebob_driver_t *driver)
 				jack_slist_append (driver->capture_ports, port);
 		}
 
-
-// 		jack_port_set_latency (port, driver->period_size);
+		jack_port_set_latency (port, driver->period_size + driver->capture_frame_latency);
 
 	}
 	
@@ -163,7 +162,7 @@ freebob_driver_attach (freebob_driver_t *driver)
 			driver->playback_ports =
 				jack_slist_append (driver->playback_ports, port);
 		}
-// 		jack_port_set_latency (port, (driver->period_size * (driver->user_nperiods - 1)) + driver->playback_frame_latency);
+		jack_port_set_latency (port, (driver->period_size * (driver->device_options.nb_buffers - 1)) + driver->playback_frame_latency); 
 
 	}
 
@@ -633,6 +632,8 @@ freebob_driver_new (jack_client_t * client,
 	driver->device_options.nb_buffers=params->buffer_size;
 	driver->device_options.node_id=params->node_id;
 	driver->device_options.port=params->port;
+	driver->capture_frame_latency = params->capture_frame_latency;
+	driver->playback_frame_latency = params->playback_frame_latency;
 
 	if(!params->capture_ports) {
 		driver->device_options.directions |= FREEBOB_IGNORE_CAPTURE;
@@ -1000,7 +1001,7 @@ driver_get_descriptor ()
 	desc = calloc (1, sizeof (jack_driver_desc_t));
 
 	strcpy (desc->name, "freebob");
-	desc->nparams = 6;
+	desc->nparams = 8;
   
 	params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 	desc->params = params;
@@ -1053,6 +1054,22 @@ driver_get_descriptor ()
 	strcpy (params[i].short_desc, "Provide playback ports.");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
+	i++;
+	strcpy (params[i].name, "input-latency");
+	params[i].character  = 'I';
+	params[i].type       = JackDriverParamUInt;
+	params[i].value.ui    = 0;
+	strcpy (params[i].short_desc, "Extra input latency (frames)");
+	strcpy (params[i].long_desc, params[i].short_desc);
+	
+	i++;
+	strcpy (params[i].name, "output-latency");
+	params[i].character  = 'O';
+	params[i].type       = JackDriverParamUInt;
+	params[i].value.ui    = 0;
+	strcpy (params[i].short_desc, "Extra output latency (frames)");
+	strcpy (params[i].long_desc, params[i].short_desc); 
+
 	return desc;
 }
 
@@ -1087,6 +1104,8 @@ driver_initialize (jack_client_t *client, JSList * params)
 	cmlparams.node_id=-1;
 	cmlparams.playback_ports=1;
 	cmlparams.capture_ports=1;
+	cmlparams.playback_frame_latency=0;
+	cmlparams.capture_frame_latency=0;
 	
 	for (node = params; node; node = jack_slist_next (node))
 	{
@@ -1114,6 +1133,12 @@ driver_initialize (jack_client_t *client, JSList * params)
 			break;
 		case 'o':
 			cmlparams.playback_ports = param->value.ui;
+			break;
+		case 'I':
+			cmlparams.capture_frame_latency = param->value.ui;
+			break;
+		case 'O':
+			cmlparams.playback_frame_latency = param->value.ui;
 			break;
 		}
 	}
