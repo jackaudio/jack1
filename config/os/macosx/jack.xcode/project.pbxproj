@@ -50,6 +50,7 @@
 			projectDirPath = "";
 			targets = (
 				4BA1CADE0470D14500053105,
+				4B7F53D00A470FE600075B93,
 				4BCA2602040B8B9400053105,
 				4BF8712F040BDE8200053105,
 				4BA1CB000470D38800053105,
@@ -67,6 +68,7 @@
 				4BA7165F0408DFF5004F4E3A,
 				08FB7795FE84155DC02AAC07,
 				1AB674ADFE9D54B511CA2CBB,
+				4B7F53E90A470FE600075B93,
 			);
 			isa = PBXGroup;
 			name = jackd;
@@ -110,6 +112,7 @@
 				4BA1CADF0470D14500053105,
 				4BA1CB010470D38800053105,
 				4B81402607240F550025D71C,
+				4B7F53EA0A470FE600075B93,
 			);
 			isa = PBXGroup;
 			name = Products;
@@ -706,6 +709,242 @@
 			isa = PBXBuildFile;
 			settings = {
 			};
+		};
+		4B7F53D00A470FE600075B93 = {
+			buildPhases = (
+				4B7F53D10A470FE600075B93,
+				4B7F53DB0A470FE600075B93,
+				4B7F53DC0A470FE600075B93,
+				4B7F53E70A470FE600075B93,
+				4B7F53E80A470FE600075B93,
+			);
+			buildRules = (
+			);
+			buildSettings = {
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				FRAMEWORK_VERSION = A;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				GCC_PREFIX_HEADER = ./JACK_LOCATION.h;
+				HEADER_SEARCH_PATHS = "../../ ../../../";
+				INFOPLIST_FILE = "Info-Jack_framework__Upgraded_.plist";
+				LIBRARY_SEARCH_PATHS = "";
+				OTHER_LDFLAGS = "-framework CoreAudio ";
+				OTHER_LIBTOOL_FLAGS = "";
+				OTHER_REZFLAGS = "";
+				PRINCIPAL_CLASS = "";
+				PRODUCT_NAME = Jack;
+				SECTORDER_FLAGS = "";
+				WARNING_CFLAGS = "-Wmost -Wno-four-char-constants -Wno-unknown-pragmas";
+				WRAPPER_EXTENSION = framework;
+			};
+			dependencies = (
+			);
+			isa = PBXNativeTarget;
+			name = "Jack framework (Upgraded)";
+			productInstallPath = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+			productName = Jack;
+			productReference = 4B7F53EA0A470FE600075B93;
+			productType = "com.apple.product-type.framework";
+		};
+		4B7F53D10A470FE600075B93 = {
+			buildActionMask = 2147483647;
+			files = (
+				4B7F53D20A470FE600075B93,
+				4B7F53D30A470FE600075B93,
+				4B7F53D40A470FE600075B93,
+				4B7F53D50A470FE600075B93,
+				4B7F53D60A470FE600075B93,
+				4B7F53D70A470FE600075B93,
+				4B7F53D80A470FE600075B93,
+				4B7F53D90A470FE600075B93,
+				4B7F53DA0A470FE600075B93,
+			);
+			isa = PBXHeadersBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4B7F53D20A470FE600075B93 = {
+			fileRef = 4B16FF900467B5A000053105;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53D30A470FE600075B93 = {
+			fileRef = 4BB9E091046FADED00053105;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53D40A470FE600075B93 = {
+			fileRef = 4B5B51EA047D353A00053105;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53D50A470FE600075B93 = {
+			fileRef = 4B117C7A05DD0CC000B5DA5A;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53D60A470FE600075B93 = {
+			fileRef = 4B4DCBA105DD234100DC3452;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					Public,
+				);
+			};
+		};
+		4B7F53D70A470FE600075B93 = {
+			fileRef = 4B4DCBA405DD234800DC3452;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					Public,
+				);
+			};
+		};
+		4B7F53D80A470FE600075B93 = {
+			fileRef = 4B4DCBA705DD235B00DC3452;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					Public,
+				);
+			};
+		};
+		4B7F53D90A470FE600075B93 = {
+			fileRef = 4BA39A1E05DD2C63008919E8;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					Public,
+				);
+			};
+		};
+		4B7F53DA0A470FE600075B93 = {
+			fileRef = 4BA39A2205DD2CA5008919E8;
+			isa = PBXBuildFile;
+			settings = {
+				ATTRIBUTES = (
+					Public,
+				);
+			};
+		};
+		4B7F53DB0A470FE600075B93 = {
+			buildActionMask = 2147483647;
+			files = (
+			);
+			isa = PBXResourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4B7F53DC0A470FE600075B93 = {
+			buildActionMask = 2147483647;
+			files = (
+				4B7F53DD0A470FE600075B93,
+				4B7F53DE0A470FE600075B93,
+				4B7F53DF0A470FE600075B93,
+				4B7F53E00A470FE600075B93,
+				4B7F53E10A470FE600075B93,
+				4B7F53E20A470FE600075B93,
+				4B7F53E30A470FE600075B93,
+				4B7F53E40A470FE600075B93,
+				4B7F53E50A470FE600075B93,
+				4B7F53E60A470FE600075B93,
+			);
+			isa = PBXSourcesBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4B7F53DD0A470FE600075B93 = {
+			fileRef = 4B117C6305DD0C8000B5DA5A;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53DE0A470FE600075B93 = {
+			fileRef = 4B117C6605DD0C8700B5DA5A;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53DF0A470FE600075B93 = {
+			fileRef = 4B117C6905DD0C8D00B5DA5A;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53E00A470FE600075B93 = {
+			fileRef = 4B117C6C05DD0C9400B5DA5A;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53E10A470FE600075B93 = {
+			fileRef = 4B117C6F05DD0C9900B5DA5A;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53E20A470FE600075B93 = {
+			fileRef = 4B117C7205DD0C9D00B5DA5A;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53E30A470FE600075B93 = {
+			fileRef = 4B117C7505DD0CA000B5DA5A;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53E40A470FE600075B93 = {
+			fileRef = 4B89C95906F596060003AD09;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53E50A470FE600075B93 = {
+			fileRef = 4B6683E30A2D8B2E00E8ADF8;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53E60A470FE600075B93 = {
+			fileRef = 4B6683EC0A2D8C2A00E8ADF8;
+			isa = PBXBuildFile;
+			settings = {
+			};
+		};
+		4B7F53E70A470FE600075B93 = {
+			buildActionMask = 2147483647;
+			files = (
+			);
+			isa = PBXFrameworksBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4B7F53E80A470FE600075B93 = {
+			buildActionMask = 2147483647;
+			files = (
+			);
+			isa = PBXRezBuildPhase;
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4B7F53E90A470FE600075B93 = {
+			isa = PBXFileReference;
+			lastKnownFileType = text.xml;
+			path = "Info-Jack_framework__Upgraded_.plist";
+			refType = 4;
+			sourceTree = "<group>";
+		};
+		4B7F53EA0A470FE600075B93 = {
+			explicitFileType = wrapper.framework;
+			includeInIndex = 0;
+			isa = PBXFileReference;
+			name = Jack.framework;
+			path = build/Jack.framework;
+			refType = 4;
+			sourceTree = "<group>";
 		};
 		4B813FF007240D000025D71C = {
 			fileRef = 4B89C95906F596060003AD09;
