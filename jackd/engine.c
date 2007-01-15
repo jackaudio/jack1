@@ -2165,7 +2165,7 @@ jack_engine_delete (jack_engine_t *engine)
 	 * The watchdog thread is not used on MacOSX since CoreAudio
 	 * drivers already contain a similar mechanism.
 	 */	
-	if (engine->control->real_time) {
+	if (engine->control->real_time && engine->watchdog_thread) {
 		VERBOSE (engine, "stopping watchdog thread\n");
 		pthread_cancel (engine->watchdog_thread);
 		pthread_join (engine->watchdog_thread, NULL);
