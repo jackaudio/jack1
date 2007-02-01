@@ -63,7 +63,7 @@ freebob_driver_attach (freebob_driver_t *driver)
 {
 	char buf[64];
 	channel_t chn;
-	jack_port_t *port;
+	jack_port_t *port=NULL;
 	int port_flags;
 
 	g_verbose=driver->engine->verbose;
@@ -1001,7 +1001,7 @@ driver_get_descriptor ()
 	desc = calloc (1, sizeof (jack_driver_desc_t));
 
 	strcpy (desc->name, "freebob");
-	desc->nparams = 8;
+	desc->nparams = 10;
   
 	params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 	desc->params = params;
@@ -1040,7 +1040,7 @@ driver_get_descriptor ()
 
 	i++;
 	strcpy (params[i].name, "capture");
-	params[i].character  = 'i';
+	params[i].character  = 'C';
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 1U;
 	strcpy (params[i].short_desc, "Provide capture ports.");
@@ -1048,7 +1048,7 @@ driver_get_descriptor ()
 
 	i++;
 	strcpy (params[i].name, "playback");
-	params[i].character  = 'o';
+	params[i].character  = 'P';
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui   = 1U;
 	strcpy (params[i].short_desc, "Provide playback ports.");
@@ -1068,6 +1068,22 @@ driver_get_descriptor ()
 	params[i].type       = JackDriverParamUInt;
 	params[i].value.ui    = 0;
 	strcpy (params[i].short_desc, "Extra output latency (frames)");
+	strcpy (params[i].long_desc, params[i].short_desc);
+
+	i++;
+	strcpy (params[i].name, "inchannels");
+	params[i].character  = 'i';
+	params[i].type       = JackDriverParamUInt;
+	params[i].value.ui    = 0;
+	strcpy (params[i].short_desc, "Number of input channels to provide (note: currently ignored)");
+	strcpy (params[i].long_desc, params[i].short_desc);
+	
+	i++;
+	strcpy (params[i].name, "outchannels");
+	params[i].character  = 'o';
+	params[i].type       = JackDriverParamUInt;
+	params[i].value.ui    = 0;
+	strcpy (params[i].short_desc, "Number of output channels to provide (note: currently ignored)");
 	strcpy (params[i].long_desc, params[i].short_desc); 
 
 	return desc;
@@ -1128,10 +1144,10 @@ driver_initialize (jack_client_t *client, JSList * params)
 			cmlparams.sample_rate = param->value.ui;
 			cmlparams.sample_rate_set = 1;
 			break;
-		case 'i':
+		case 'C':
 			cmlparams.capture_ports = param->value.ui;
 			break;
-		case 'o':
+		case 'P':
 			cmlparams.playback_ports = param->value.ui;
 			break;
 		case 'I':
@@ -1139,6 +1155,11 @@ driver_initialize (jack_client_t *client, JSList * params)
 			break;
 		case 'O':
 			cmlparams.playback_frame_latency = param->value.ui;
+			break;
+		// ignore these for now
+		case 'i':
+			break;
+		case 'o':
 			break;
 		}
 	}
