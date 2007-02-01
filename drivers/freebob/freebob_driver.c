@@ -1001,7 +1001,7 @@ driver_get_descriptor ()
 	desc = calloc (1, sizeof (jack_driver_desc_t));
 
 	strcpy (desc->name, "freebob");
-	desc->nparams = 10;
+	desc->nparams = 11;
   
 	params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 	desc->params = params;
@@ -1041,17 +1041,25 @@ driver_get_descriptor ()
 	i++;
 	strcpy (params[i].name, "capture");
 	params[i].character  = 'C';
-	params[i].type       = JackDriverParamUInt;
-	params[i].value.ui   = 1U;
+	params[i].type       = JackDriverParamBool;
+	params[i].value.i    = 0;
 	strcpy (params[i].short_desc, "Provide capture ports.");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
 	i++;
 	strcpy (params[i].name, "playback");
 	params[i].character  = 'P';
-	params[i].type       = JackDriverParamUInt;
-	params[i].value.ui   = 1U;
+	params[i].type       = JackDriverParamBool;
+	params[i].value.i    = 0;
 	strcpy (params[i].short_desc, "Provide playback ports.");
+	strcpy (params[i].long_desc, params[i].short_desc);
+
+	i++;
+	strcpy (params[i].name, "duplex");
+	params[i].character  = 'D';
+	params[i].type       = JackDriverParamBool;
+	params[i].value.i    = 1;
+	strcpy (params[i].short_desc, "Provide both capture and playback ports.");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
 	i++;
@@ -1118,8 +1126,8 @@ driver_initialize (jack_client_t *client, JSList * params)
 	cmlparams.buffer_size=3;
 	cmlparams.port=0;
 	cmlparams.node_id=-1;
-	cmlparams.playback_ports=1;
-	cmlparams.capture_ports=1;
+	cmlparams.playback_ports=0;
+	cmlparams.capture_ports=0;
 	cmlparams.playback_frame_latency=0;
 	cmlparams.capture_frame_latency=0;
 	
@@ -1145,10 +1153,14 @@ driver_initialize (jack_client_t *client, JSList * params)
 			cmlparams.sample_rate_set = 1;
 			break;
 		case 'C':
-			cmlparams.capture_ports = param->value.ui;
+			cmlparams.capture_ports = 1;
 			break;
 		case 'P':
-			cmlparams.playback_ports = param->value.ui;
+			cmlparams.playback_ports = 1;
+			break;
+		case 'D':
+			cmlparams.capture_ports = 1;
+			cmlparams.playback_ports = 1;
 			break;
 		case 'I':
 			cmlparams.capture_frame_latency = param->value.ui;
@@ -1163,7 +1175,13 @@ driver_initialize (jack_client_t *client, JSList * params)
 			break;
 		}
 	}
-	
+
+	/* duplex is the default */
+	if (!cmlparams.playback_ports && !cmlparams.capture_ports) {
+		cmlparams.playback_ports = TRUE;
+		cmlparams.capture_ports = TRUE;
+	}
+
     nbitems=sscanf(device_name,"hw:%u,%u",&port,&node_id);
     if (nbitems<2) {
         nbitems=sscanf(device_name,"hw:%u",&port);
