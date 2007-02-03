@@ -48,8 +48,6 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-#include <jack/internal.h>
-#include <jack/types.h>
 #include <jack/driver.h>
 #include <jack/engine.h>
 #include <jack/types.h>
