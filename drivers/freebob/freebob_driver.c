@@ -36,6 +36,8 @@
 #include <stdarg.h>
 #include <sys/mman.h>
 
+#include <assert.h>
+
 #include <jack/types.h>
 #include <jack/internal.h>
 #include <jack/engine.h>
@@ -203,8 +205,8 @@ freebob_driver_detach (freebob_driver_t *driver)
 	if(driver->midi_handle) {
 		freebob_driver_midi_finish(driver->midi_handle);	
 	}
-#endif	
 	driver->midi_handle=NULL;
+#endif
 
 	return 0;
 
@@ -248,6 +250,7 @@ freebob_driver_read (freebob_driver_t * driver, jack_nframes_t nframes)
 	jack_port_t* port;
 	
 	freebob_sample_t nullbuffer[nframes];
+	void *addr_of_nullbuffer=(void *)nullbuffer;
 
 	freebob_streaming_stream_type stream_type;
 	
@@ -259,7 +262,7 @@ freebob_driver_read (freebob_driver_t * driver, jack_nframes_t nframes)
 			port = (jack_port_t *) node->data;
 
 			buf = jack_port_get_buffer (port, nframes);
-			if(!buf) buf=(jack_default_audio_sample_t*)nullbuffer;
+			if(!buf) buf=(jack_default_audio_sample_t *)addr_of_nullbuffer;
 				
 			freebob_streaming_set_capture_stream_buffer(driver->dev, chn, (char *)(buf), freebob_buffer_type_float);
 		} else if(stream_type == freebob_stream_type_midi) {
@@ -325,6 +328,7 @@ freebob_driver_write (freebob_driver_t * driver, jack_nframes_t nframes)
 	freebob_streaming_stream_type stream_type;
 
 	freebob_sample_t nullbuffer[nframes];
+	void *addr_of_nullbuffer = (void*)nullbuffer;
 
 	memset(&nullbuffer,0,nframes*sizeof(freebob_sample_t));
 
@@ -344,7 +348,7 @@ freebob_driver_write (freebob_driver_t * driver, jack_nframes_t nframes)
 			port = (jack_port_t *) node->data;
 
 			buf = jack_port_get_buffer (port, nframes);
-			if(!buf) buf=(jack_default_audio_sample_t*)nullbuffer;
+			if(!buf) buf=(jack_default_audio_sample_t*)addr_of_nullbuffer;
 				
 			freebob_streaming_set_playback_stream_buffer(driver->dev, chn, (char *)(buf), freebob_buffer_type_float);
 
@@ -456,7 +460,7 @@ freebob_driver_null_cycle (freebob_driver_t* driver, jack_nframes_t nframes)
 {
 	channel_t chn;
 	JSList *node;
-	snd_pcm_sframes_t nwritten;
+	jack_nframes_t nwritten;
 
 	freebob_streaming_stream_type stream_type;
 

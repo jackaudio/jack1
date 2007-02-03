@@ -31,14 +31,10 @@
 #ifndef __JACK_FREEBOB_DRIVER_H__
 #define __JACK_FREEBOB_DRIVER_H__
 
-#define FREEBOB_DRIVER_WITH_MIDI
+// #define FREEBOB_DRIVER_WITH_MIDI
 
 #include <libfreebob/freebob.h>
 #include <libfreebob/freebob_streaming.h>
-
-#include <jack/driver.h>
-#include <jack/engine.h>
-#include <jack/types.h>
 
 #include <string.h>
 #include <stdlib.h>
@@ -54,13 +50,14 @@
 
 #include <jack/internal.h>
 #include <jack/types.h>
-#include <jack/ringbuffer.h>
 #include <jack/driver.h>
 #include <jack/engine.h>
 #include <jack/types.h>
-#include <jack/thread.h>
 
+#ifdef FREEBOB_DRIVER_WITH_MIDI
+#include <jack/thread.h>
 #include <alsa/asoundlib.h>
+#endif
 
 // debug print control flags
 #define DEBUG_LEVEL_BUFFERS           	(1<<0)
