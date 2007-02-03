@@ -31,7 +31,7 @@
 #ifndef __JACK_FREEBOB_DRIVER_H__
 #define __JACK_FREEBOB_DRIVER_H__
 
-// #define FREEBOB_DRIVER_WITH_MIDI
+#define FREEBOB_DRIVER_WITH_MIDI
 
 #include <libfreebob/freebob.h>
 #include <libfreebob/freebob_streaming.h>
