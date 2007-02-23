@@ -2062,21 +2062,15 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	if (timer->reset_pending) {
 
 		/* post xrun-handling */
-		
-		jack_nframes_t period_size_guess = 
-			engine->control->current_time.frame_rate * 
-			   ((timer->next_wakeup - timer->current_wakeup) / 1000000.0);
 
-		timer->frames += 
-			((engine->driver->last_wait_ust - 
-			 engine->control->frame_timer.next_wakeup) / 
-			period_size_guess) * 
-			period_size_guess;
+		/* don't bother to increment the frame counter, because we missed 1 or more 
+		   deadlines in the backend anyway.
+		 */
 
 		timer->current_wakeup = engine->driver->last_wait_ust;
 		timer->next_wakeup = engine->driver->last_wait_ust +
 			engine->driver->period_usecs;
-
+		
 		timer->reset_pending = 0;
 
 	} else {

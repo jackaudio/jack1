@@ -164,11 +164,15 @@ AC_CHECK_LIB(m, sin)
 
 AC_CHECK_FUNC(clock_gettime, 
        [
-           AC_DEFINE(HAVE_CLOCK_GETTIME,1,"Whether or not clock_gettime can be found in system libraries")
+           AC_DEFINE(HAVE_CLOCK_GETTIME,0,"Whether or not clock_gettime can be found in system libraries")
        ], 
+       #
+       # if not found, check librt specifically
+       #
        AC_CHECK_LIB(rt, clock_gettime, 
            [
               AC_DEFINE(HAVE_CLOCK_GETTIME,1,"Whether or not clock_gettime can be found in system libraries")
+	      OS_LDFLAGS="$OS_LDFLAGS -lrt"
 	   ])
 )	  
 
