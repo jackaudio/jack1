@@ -27,6 +27,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <limits.h>
 #ifdef HAVE_STDINT_H
 #include <stdint.h>
 #endif
@@ -204,6 +205,42 @@ init_cpu ()
 #endif /* ARCH_X86 */
 
 #endif /* USE_DYNSIMD */
+
+char *jack_tmpdir = DEFAULT_TMP_DIR;
+
+static int
+jack_get_tmpdir ()
+{
+	FILE* in;
+	size_t len;
+	char buf[PATH_MAX+2]; /* allow tmpdir to live anywhere, plus newline, plus null */
+
+	if ((in = popen ("jackd -l", "r")) == NULL) {
+		return -1;
+	}
+
+	if (fgets (buf, sizeof (buf), in) == NULL) {
+		fclose (in);
+		return -1;
+	}
+
+	len = strlen (buf);
+
+	if (buf[len-1] != '\n') {
+		/* didn't get a whole line */
+		fclose (in);
+		return -1;
+	}
+
+	jack_tmpdir = (char *) malloc (len);
+	memcpy (jack_tmpdir, buf, len-1);
+	jack_tmpdir[len-1] = '\0';
+	
+	fprintf (stderr, "JACK tmpdir identified as [%s]\n", jack_tmpdir);
+
+	fclose (in);
+	return 0;
+}
 
 void 
 jack_error (const char *fmt, ...)
@@ -694,7 +731,7 @@ _start_server (const char *server_name)
 
 	/* If execv() succeeds, it does not return.  There's no point
 	 * in calling jack_error() here in the child process. */
-	perror ("exec of JACK server failed");
+	fprintf (stderr, "exec of JACK server (command = \"%s\") failed: %s\n", command, strerror (errno));
 }
 
 int
@@ -943,6 +980,14 @@ jack_client_open (const char *client_name,
 	jack_varargs_parse (options, ap, &va);
 	va_end (ap);
 
+	/* External clients need to know where the tmpdir used for
+	   communication with the server lives
+	*/
+	if (jack_get_tmpdir ()) {
+		*status |= JackFailure;
+		return NULL;
+	}
+
 	/* External clients need this initialized.  It is already set
 	 * up in the server's address space for internal clients.
 	 */
@@ -1108,8 +1153,6 @@ jack_default_server_name (void)
 		server_name = "default";
 	return server_name;
 }
-
-char *jack_tmpdir = DEFAULT_TMP_DIR;
 
 /* returns the name of the per-user subdirectory of jack_tmpdir */
 char *
@@ -2232,3 +2275,4 @@ jack_port_type_size(void)
 {
 	return JACK_PORT_TYPE_SIZE;
 }
+

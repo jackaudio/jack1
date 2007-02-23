@@ -507,12 +507,13 @@ main (int argc, char *argv[])
 
 {
 	jack_driver_desc_t * desc;
-	const char *options = "-ad:P:uvshVRTFl:t:mn:p:c:";
+	const char *options = "-ad:P:uvshVRTFlt:mn:p:c:";
 	struct option long_options[] = 
 	{ 
 		{ "driver", 1, 0, 'd' },
 		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
+		{ "tmpdir-location", 0, 0, 'l' },
 		{ "port-max", 1, 0, 'p' },
 		{ "no-mlock", 0, 0, 'm' },
 		{ "name", 1, 0, 'n' },
@@ -568,6 +569,11 @@ main (int argc, char *argv[])
 		case 'D':
 			frame_time_offset = JACK_MAX_FRAMES - atoi(optarg); 
 			break;
+
+		case 'l':
+			/* special flag to allow libjack to determine jackd's idea of where tmpdir is */
+			printf ("%s\n", jack_tmpdir);
+			exit (0);
 
 		case 'm':
 			do_mlock = 0;

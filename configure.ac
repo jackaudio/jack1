@@ -166,7 +166,7 @@ AC_CHECK_FUNC(clock_gettime,
        [
            AC_DEFINE(HAVE_CLOCK_GETTIME,1,"Whether or not clock_gettime can be found in system libraries")
        ], 
-       AC_CHECK_LIB(rt, clock_getttime, 
+       AC_CHECK_LIB(rt, clock_gettime, 
            [
               AC_DEFINE(HAVE_CLOCK_GETTIME,1,"Whether or not clock_gettime can be found in system libraries")
 	   ])
