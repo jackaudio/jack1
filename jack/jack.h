@@ -198,6 +198,43 @@ int jack_set_process_callback (jack_client_t *client,
 			       void *arg);
 
 /**
+ * Block until this JACK client should process data.
+ * 
+ * This is an alternative API for clients whose internal
+ * architecture doesn't suit a callback model. They should
+ * instead contain a core loop that looks something like
+ * 
+ * \code
+ *    jack_nframes_t nframes;
+ *
+ *    // wait for the first time we should do something
+ * 
+ *    nframes = jack_thread_wait (client, 0);
+ * 
+ *    while (TRUE) {
+ *         nframes = jack_thread_wait (client, do_some_processing (nframes));
+ *    }
+ * \endcode
+ *
+ * The function do_some_processing() should return zero if
+ * the client should keep interacting with JACK, and non-zero
+ * if it is finished.  Note that passing a non-zero status
+ * will terminate the calling thread. Therefore, this loop should
+ * run in its own thread which should probably have
+ * been created with @function jack_client_create_thread().
+ *
+ * Clients using this call should probably not call 
+ * @function jack_set_process_callback although it is not
+ * an error for them to do so.
+ * 
+ * @param client - pointer to a JACK client structure
+ * @param status - if non-zero, calling thread should exit
+ *
+ * @return the number of frames of data to process
+ */
+jack_nframes_t jack_thread_wait (jack_client_t*, int status);
+
+/**
  * Tell JACK to call @a thread_init_callback once just after
  * the creation of the thread in which all other callbacks 
  * will be handled.

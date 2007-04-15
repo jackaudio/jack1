@@ -396,7 +396,7 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 
 	port->client_segment_base =
 		(void **) &client->port_segment[ptid].attached_at;
-	
+
 	return port;
 }
 

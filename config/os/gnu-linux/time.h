@@ -24,7 +24,7 @@
 #ifndef __jack_time_h__
 #define __jack_time_h__
 
-#include <jack/internal.h>
+#include <jack/types.h>
 
 extern jack_time_t (*_jack_get_microseconds)(void);
 

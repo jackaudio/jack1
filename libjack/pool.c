@@ -33,7 +33,7 @@ jack_pool_alloc (size_t bytes)
 {
 #ifdef HAVE_POSIX_MEMALIGN
 	void* m;
-	int	err = posix_memalign (&m, 16, bytes);
+	int	err = posix_memalign (&m, 64, bytes);
 	return (!err) ? m : 0;
 #else
 	return malloc (bytes);

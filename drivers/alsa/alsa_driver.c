@@ -2220,8 +2220,8 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 	driver->capture_and_playback_not_synced = FALSE;
 
 	if (driver->capture_handle && driver->playback_handle) {
-		if (snd_pcm_link (driver->capture_handle,
-				  driver->playback_handle) != 0) {
+		if (snd_pcm_link (driver->playback_handle,
+				  driver->capture_handle) != 0) {
 			driver->capture_and_playback_not_synced = TRUE;
 		} 
 	}

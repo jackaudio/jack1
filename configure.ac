@@ -554,7 +554,7 @@ fi
 JACK_DEFAULT_DRIVER=\"dummy\"
 
 AC_ARG_ENABLE(portaudio, [  --disable-portaudio     ignore PortAudio driver ],
-			TRY_PORTAUDIO=$enableval , TRY_PORTAUDIO=yes ) 
+			TRY_PORTAUDIO=$enableval , TRY_PORTAUDIO=no ) 
 HAVE_PA="false"
 if test "x$TRY_PORTAUDIO" = "xyes"
 then

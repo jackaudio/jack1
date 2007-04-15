@@ -62,10 +62,6 @@
 #include <sysdeps/pThreadUtilities.h>
 #endif
 
-#ifdef WITH_TIMESTAMPS
-#include <jack/timestamps.h>
-#endif /* WITH_TIMESTAMPS */
-
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
 #ifdef ARCH_X86
@@ -1263,17 +1259,334 @@ jack_stop_freewheel (jack_client_t* client)
 	}
 }
 
+static void
+jack_client_thread_suicide (jack_client_t* client)
+{
+	if (client->on_shutdown) {
+		jack_error ("zombified - calling shutdown handler");
+		client->on_shutdown (client->on_shutdown_arg);
+	} else {
+		jack_error ("jack_client_thread zombified - exiting from JACK");
+		jack_client_close (client);
+		/* Need a fix : possibly make client crash if
+		 * zombified without shutdown handler 
+		 */
+	}
+
+	pthread_exit (0);
+	/*NOTREACHED*/
+}
+
+static int
+jack_client_process_events (jack_client_t* client)
+{
+	jack_event_t event;
+	char status = 0;
+	jack_client_control_t *control = client->control;
+
+	if (client->pollfd[EVENT_POLL_INDEX].revents & POLLIN) {
+		
+		DEBUG ("client receives an event, "
+		       "now reading on event fd");
+                
+		/* server has sent us an event. process the
+		 * event and reply */
+		
+		if (read (client->event_fd, &event, sizeof (event))
+		    != sizeof (event)) {
+			jack_error ("cannot read server event (%s)",
+				    strerror (errno));
+			return -1;
+		}
+		
+		status = 0;
+		
+		switch (event.type) {
+		case PortRegistered:
+			if (control->port_register) {
+				control->port_register
+					(event.x.port_id, TRUE,
+					 control->port_register_arg);
+			} 
+			break;
+			
+		case PortUnregistered:
+			if (control->port_register) {
+				control->port_register
+					(event.x.port_id, FALSE,
+					 control->port_register_arg);
+			}
+			break;
+			
+		case GraphReordered:
+			status = jack_handle_reorder (client, &event);
+			break;
+			
+		case PortConnected:
+		case PortDisconnected:
+			status = jack_client_handle_port_connection
+				(client, &event);
+			break;
+			
+		case BufferSizeChange:
+			jack_client_invalidate_port_buffers (client);
+			if (control->bufsize) {
+				status = control->bufsize
+					(control->nframes,
+					 control->bufsize_arg);
+			} 
+			break;
+			
+		case SampleRateChange:
+			if (control->srate) {
+				status = control->srate
+					(control->nframes,
+					 control->srate_arg);
+			}
+			break;
+			
+		case XRun:
+			if (control->xrun) {
+				status = control->xrun
+					(control->xrun_arg);
+			}
+			break;
+			
+		case AttachPortSegment:
+			jack_attach_port_segment (client, event.y.ptid);
+			break;
+			
+		case StartFreewheel:
+			jack_start_freewheel (client);
+			break;
+			
+		case StopFreewheel:
+			jack_stop_freewheel (client);
+			break;
+		}
+		
+		DEBUG ("client has dealt with the event, writing "
+		       "response on event fd");
+		
+		if (write (client->event_fd, &status, sizeof (status))
+		    != sizeof (status)) {
+			jack_error ("cannot send event response to "
+				    "engine (%s)", strerror (errno));
+			return -1;
+		}
+	}
+
+	return 0;
+}
+		
+jack_nframes_t
+jack_thread_wait (jack_client_t* client, int status)
+{
+	/* this function waits for either event notifications from the server
+	   (all platforms) or process notifications from the server (with
+	   non-threaded backends like ALSA and OSS). it will process the
+	   event notifications, and return whenever a process notification
+	   arrives.
+
+	   if passed a non-zero status code, it will terminate the thread
+	   in which it is called.
+	*/
+
+	jack_client_control_t *control = client->control;
+
+	if (status || client->engine->engine_ok == 0) {
+		return 0;
+	}
+
+	DEBUG ("client polling on %s", client->pollmax == 2 ? 
+	       "event_fd and graph_wait_fd..." :
+	       "event_fd only");
+	
+	while (1) {
+		if (poll (client->pollfd, client->pollmax, 1000) < 0) {
+			if (errno == EINTR) {
+				continue;
+			}
+			jack_error ("poll failed in client (%s)",
+				    strerror (errno));
+			return 0;
+		}
+
+		pthread_testcancel();
+
+#ifndef JACK_USE_MACH_THREADS 
+		
+		/* get an accurate timestamp on waking from poll for a
+		 * process() cycle. 
+		 */
+		
+		if (client->graph_wait_fd >= 0
+		    && client->pollfd[WAIT_POLL_INDEX].revents & POLLIN) {
+			control->awake_at = jack_get_microseconds();
+		}
+		
+		DEBUG ("pfd[EVENT].revents = 0x%x pfd[WAIT].revents = 0x%x",
+		       client->pollfd[EVENT_POLL_INDEX].revents,
+		       client->pollfd[WAIT_POLL_INDEX].revents);
+		
+		if (client->graph_wait_fd >= 0 &&
+		    (client->pollfd[WAIT_POLL_INDEX].revents & ~POLLIN)) {
+			
+			/* our upstream "wait" connection
+			   closed, which either means that
+			   an intermediate client exited, or
+			   jackd exited, or jackd zombified
+			   us.
+			   
+			   we can discover the zombification
+			   via client->control->dead, but
+			   the other two possibilities are
+			   impossible to identify just from
+			   this situation. so we have to
+			   check what we are connected to,
+			   and act accordingly.
+			*/
+			
+			if (client->upstream_is_jackd) {
+				DEBUG ("WE DIE\n");
+				return 0;
+			} else {
+				DEBUG ("WE PUNT\n");
+				/* don't poll on the wait fd
+				 * again until we get a
+				 * GraphReordered event.
+				 */
+				
+				client->graph_wait_fd = -1;
+				client->pollmax = 1;
+			}
+		}
+#endif
+		
+		if (jack_client_process_events (client)) {
+			DEBUG ("event processing failed\n");
+			return 0;
+		}
+		
+		if ((client->pollfd[WAIT_POLL_INDEX].revents & POLLIN)) {
+			DEBUG ("time to run process()\n");
+			break;
+		}
+	}
+
+	if (client->control->dead || client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
+		DEBUG ("client appears dead or event pollfd has error status\n");
+		return 0;
+	}
+
+	DEBUG("thread wait returns %u\n", control->nframes);
+	return control->nframes;
+}
+
+static int
+jack_wake_next_client (jack_client_t* client)
+{
+	char c = 0;
+
+	if (write (client->graph_next_fd, &c, sizeof (c))
+	    != sizeof (c)) {
+		jack_error ("cannot continue execution of the "
+			    "processing graph (%s)",
+			    strerror(errno));
+		return -1;
+	}
+	
+	DEBUG ("client sent message to next stage by %" PRIu64
+	       ", client reading on graph_wait_fd==%d", 
+	       jack_get_microseconds(), client->graph_wait_fd);
+	
+	DEBUG("reading cleanup byte from pipe %d\n", client->graph_wait_fd);
+	
+	if ((read (client->graph_wait_fd, &c, sizeof (c))
+	     != sizeof (c))) {
+		jack_error ("cannot complete execution of the "
+			    "processing graph (%s)",
+			    strerror(errno));
+		return -1;
+	}
+	
+	return 0;
+}
+
+static int
+jack_client_run_process_callback (jack_client_t* client)
+{
+	jack_client_control_t *control = client->control;
+
+#ifdef JACK_USE_MACH_THREADS 
+	/* this is done in a dedicated thread on OS X */
+	return control->nframes;
+#endif
+
+	DEBUG ("client %d signalled at %" PRIu64
+	       ", awake for process at %" PRIu64
+	       " (delay = %" PRIu64
+	       " usecs) (wakeup on graph_wait_fd==%d)", 
+	       getpid(),
+	       control->signalled_at, 
+	       control->awake_at, 
+	       control->awake_at - control->signalled_at,
+	       client->pollfd[WAIT_POLL_INDEX].fd);
+	
+	control->state = Running;
+	
+	/* begin preemption checking */
+	CHECK_PREEMPTION (client->engine, TRUE);
+	
+	if (control->sync_cb)
+		jack_call_sync_client (client);
+	
+	if (control->process) {
+		if (control->process (control->nframes,
+				      control->process_arg)
+		    == 0) {
+			control->state = Finished;
+		}
+	} else {
+		control->state = Finished;
+	}
+	
+	if (control->timebase_cb) {
+		jack_call_timebase_master (client);
+	}
+	
+	/* end preemption checking */
+	CHECK_PREEMPTION (client->engine, FALSE);
+	
+	control->finished_at = jack_get_microseconds();
+	
+	DEBUG ("client finished processing at %" PRIu64
+	       " (elapsed = %" PRIu64
+	       " usecs), writing on graph_next_fd==%d", 
+	       control->finished_at, 
+	       control->finished_at - control->awake_at,
+	       client->graph_next_fd);
+	
+	/* wake the next client in the chain (could be the server), 
+	   and check if we were killed during the process
+	   cycle.
+	*/
+	
+	if (jack_wake_next_client (client) || client->control->dead) {
+		DEBUG("client cannot wake next, or is dead\n");
+		return -1;
+	}
+
+	DEBUG("process cycle fully complete\n");
+	
+	return 0;
+}
+
 static void *
 jack_client_thread (void *arg)
 {
 	jack_client_t *client = (jack_client_t *) arg;
 	jack_client_control_t *control = client->control;
-	jack_event_t event;
-	char status = 0;
-	int err = 0;
-#ifndef JACK_USE_MACH_THREADS                   
-	char c = 0;
-#endif
 
 	pthread_mutex_lock (&client_lock);
 	client->thread_ok = TRUE;
@@ -1291,315 +1604,15 @@ jack_client_thread (void *arg)
 		client->control->thread_init (client->control->thread_init_arg);
 	}
 
-	while (err == 0) {
-	
-		if (client->engine->engine_ok == 0) {
-		     if (client->on_shutdown)
-			     client->on_shutdown (client->on_shutdown_arg);
-		     else
-			     jack_error ("engine unexpectedly shutdown; "
-					 "thread exiting\n");
-		     pthread_exit (0);
-		}
+	/* wait for first wakeup from server */
 
-		DEBUG ("client polling on %s", client->pollmax == 2 ? 
-		       "event_fd and graph_wait_fd..." :
-		       "event_fd only");
-
-		if (poll (client->pollfd, client->pollmax, 1000) < 0) {
-			if (errno == EINTR) {
-				continue;
-			}
-			jack_error ("poll failed in client (%s)",
-				    strerror (errno));
-			status = -1;
-			break;
-		}
-                
-		/* get an accurate timestamp on waking from poll for a
-		 * process() cycle. 
-		 */
-
-	#ifndef JACK_USE_MACH_THREADS 
-		if (client->graph_wait_fd >= 0
-		    && client->pollfd[WAIT_POLL_INDEX].revents & POLLIN) {
-			control->awake_at = jack_get_microseconds();
-		}
-	
-		DEBUG ("pfd[EVENT].revents = 0x%x pfd[WAIT].revents = 0x%x",
-		       client->pollfd[EVENT_POLL_INDEX].revents,
-		       client->pollfd[WAIT_POLL_INDEX].revents);
-	#endif
-	
-		pthread_testcancel();
-		
-	#ifndef JACK_USE_MACH_THREADS 
-		if (client->graph_wait_fd >= 0 &&
-		    (client->pollfd[WAIT_POLL_INDEX].revents & ~POLLIN)) {
-			
-			DEBUG ("\n\n\n\n\n\n\n\nWAITFD ERROR,"
-			       " ZOMBIE\n\n\n\n\n");
-			
-			/* our upstream "wait" connection
-			   closed, which either means that
-			   an intermediate client exited, or
-			   jackd exited, or jackd zombified
-			   us.
-
-			   we can discover the zombification
-			   via client->control->dead, but
-			   the other two possibilities are
-			   impossible to identify just from
-			   this situation. so we have to
-			   check what we are connected to,
-			   and act accordingly.
-			*/
-			
-			if (client->upstream_is_jackd) {
-                                DEBUG ("WE DIE\n");
-				goto zombie;
-			} else {
-                                DEBUG ("WE PUNT\n");
-				/* don't poll on the wait fd
-				 * again until we get a
-				 * GraphReordered event.
-				 */
-				 
-				client->graph_wait_fd = -1;
-				client->pollmax = 1;
-			}
-		}
-	#endif
-
-		if (client->control->dead) {
-			goto zombie;
-		}
-
-		if (client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
-			/* jackd shutdown */
-			goto zombie;
-		}
-
-		if (client->pollfd[EVENT_POLL_INDEX].revents & POLLIN) {
-
-			DEBUG ("client receives an event, "
-			       "now reading on event fd");
-                
-			/* server has sent us an event. process the
-			 * event and reply */
-
-			if (read (client->event_fd, &event, sizeof (event))
-			    != sizeof (event)) {
-				jack_error ("cannot read server event (%s)",
-					    strerror (errno));
-				err++;
-				break;
-			}
-
-			status = 0;
-
-			switch (event.type) {
-			case PortRegistered:
-				if (control->port_register) {
-					control->port_register
-						(event.x.port_id, TRUE,
-						 control->port_register_arg);
-				} 
-				break;
-
-			case PortUnregistered:
-				if (control->port_register) {
-					control->port_register
-						(event.x.port_id, FALSE,
-						 control->port_register_arg);
-				}
-				break;
-
-			case GraphReordered:
-				status = jack_handle_reorder (client, &event);
-				break;
-
-			case PortConnected:
-			case PortDisconnected:
-				status = jack_client_handle_port_connection
-					(client, &event);
-				break;
-
-			case BufferSizeChange:
-				jack_client_invalidate_port_buffers (client);
-				if (control->bufsize) {
-					status = control->bufsize
-						(control->nframes,
-						 control->bufsize_arg);
-				} 
-				break;
-
-			case SampleRateChange:
-				if (control->srate) {
-					status = control->srate
-						(control->nframes,
-						 control->srate_arg);
-				}
-				break;
-
-			case XRun:
-				if (control->xrun) {
-					status = control->xrun
-						(control->xrun_arg);
-				}
-				break;
-
-			case AttachPortSegment:
-				jack_attach_port_segment (client, event.y.ptid);
-				break;
-				
-			case StartFreewheel:
-				jack_start_freewheel (client);
-				break;
-
-			case StopFreewheel:
-				jack_stop_freewheel (client);
-				break;
-			}
-
-			DEBUG ("client has dealt with the event, writing "
-			       "response on event fd");
-
-			if (write (client->event_fd, &status, sizeof (status))
-			    != sizeof (status)) {
-				jack_error ("cannot send event response to "
-					    "engine (%s)", strerror (errno));
-				err++;
-				break;
-			}
-		}
-		
-
-#ifndef JACK_USE_MACH_THREADS 
-		if (client->pollfd[WAIT_POLL_INDEX].revents & POLLIN) {
-
-#ifdef WITH_TIMESTAMPS
-			jack_reset_timestamps ();
-#endif
-
-			DEBUG ("client %d signalled at %" PRIu64
-			       ", awake for process at %" PRIu64
-			       " (delay = %" PRIu64
-			       " usecs) (wakeup on graph_wait_fd==%d)", 
-			       getpid(),
-			       control->signalled_at, 
-			       control->awake_at, 
-			       control->awake_at - control->signalled_at,
-			       client->pollfd[WAIT_POLL_INDEX].fd);
-
-			control->state = Running;
-
-			/* begin preemption checking */
-			CHECK_PREEMPTION (client->engine, TRUE);
-			
-			if (control->sync_cb)
-				jack_call_sync_client (client);
-
-			if (control->process) {
-				if (control->process (control->nframes,
-						      control->process_arg)
-				    == 0) {
-					control->state = Finished;
-				}
-			} else {
-				control->state = Finished;
-			}
-
-			if (control->timebase_cb)
-				jack_call_timebase_master (client);
-
-			/* end preemption checking */
-			CHECK_PREEMPTION (client->engine, FALSE);
-
-			control->finished_at = jack_get_microseconds();
-
-#ifdef WITH_TIMESTAMPS
-			jack_timestamp ("finished");
-#endif
-		
-#ifndef JACK_USE_MACH_THREADS 			
-			/* pass the execution token along */
-
-			DEBUG ("client finished processing at %" PRIu64
-			       " (elapsed = %" PRIu64
-			       " usecs), writing on graph_next_fd==%d", 
-			       control->finished_at, 
-			       control->finished_at - control->awake_at,
-			       client->graph_next_fd);
-
-			if (write (client->graph_next_fd, &c, sizeof (c))
-			    != sizeof (c)) {
-				jack_error ("cannot continue execution of the "
-					    "processing graph (%s)",
-					    strerror(errno));
-				err++;
-				break;
-			}
-
-			DEBUG ("client sent message to next stage by %" PRIu64
-			       ", client reading on graph_wait_fd==%d", 
-			       jack_get_microseconds(), client->graph_wait_fd);
-#endif
-
-#ifdef WITH_TIMESTAMPS
-			jack_timestamp ("read pending byte from wait");
-#endif
-			DEBUG("reading cleanup byte from pipe\n");
-
-#ifndef JACK_USE_MACH_THREADS
-			if ((read (client->graph_wait_fd, &c, sizeof (c))
-			     != sizeof (c))) {
-				DEBUG ("WARNING: READ FAILED!");
-#if 0
-				jack_error ("cannot complete execution of the "
-				            "processing graph (%s)",
-					    strerror(errno));
-				err++;
-				break;
-#endif
-			}
-#endif
-
-			/* check if we were killed during the process
-			 * cycle (or whatever) */
-			if (client->control->dead) {
-				goto zombie;
-			}
-
-			DEBUG("process cycle fully complete\n");
-
-#ifdef WITH_TIMESTAMPS
-			jack_timestamp ("read done");
-			jack_dump_timestamps (stdout);
-#endif			
-
-		}
-#endif
-
-	}
-	
-	return (void *) ((intptr_t)err);
-
-  zombie:
-	if (client->on_shutdown) {
-		jack_error ("zombified - calling shutdown handler");
-		client->on_shutdown (client->on_shutdown_arg);
-	} else {
-		jack_error ("jack_client_thread zombified - exiting from JACK");
-		jack_client_close (client);
-		/* Need a fix : possibly make client crash if
-		 * zombified without shutdown handler 
-		 */
+	if (jack_thread_wait (client, 0) == control->nframes) {
+		while (jack_thread_wait (client, jack_client_run_process_callback (client)) == control->nframes);
 	}
 
-	pthread_exit (0);
+	jack_client_thread_suicide (client);
 	/*NOTREACHED*/
-	return 0;
+	return (void *) 0;
 }
 
 #ifdef JACK_USE_MACH_THREADS
@@ -1654,9 +1667,6 @@ jack_client_process_thread (void *arg)
                 
 		control->finished_at = jack_get_microseconds();
                 
-#ifdef WITH_TIMESTAMPS
-		jack_timestamp ("finished");
-#endif
 		DEBUG ("client finished processing at %Lu (elapsed = %f usecs)",
 			control->finished_at,
 			((float)(control->finished_at - control->awake_at)));
