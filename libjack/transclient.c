@@ -231,8 +231,14 @@ jack_frames_since_cycle_start (const jack_client_t *client)
 					/ 1000000.0f) * usecs);
 }
 
+jack_time_t
+jack_get_time()
+{
+	return jack_get_microseconds();
+}
+
 jack_nframes_t
-jack_frame_time (const jack_client_t *client)
+jack_time_to_frames(const jack_client_t *client, jack_time_t now)
 {
 	jack_frame_timer_t time;
 	jack_control_t *ectl = client->engine;
@@ -240,8 +246,6 @@ jack_frame_time (const jack_client_t *client)
 	jack_read_frame_time (client, &time);
 
 	if (time.initialized) {
-		jack_time_t now = jack_get_microseconds();
-
 #if 0
 		fprintf (stderr, "now = %Lu current wakeup = %Lu next = %Lu frames = %lu + %f => %lu\n", 
 			 now, time.current_wakeup, time.next_wakeup, time.frames,
@@ -250,14 +254,20 @@ jack_frame_time (const jack_client_t *client)
 			 time.frames + 
 			 (long) rint (((double) (now - time.current_wakeup)/ 
 						 (time.next_wakeup - time.current_wakeup)) * ectl->buffer_size));
-#endif		
+#endif
 
 		return time.frames + 
 			(long) rint (((double) ((long long) (now - time.current_wakeup))/ 
 						((long long) (time.next_wakeup - time.current_wakeup))) * ectl->buffer_size);
-	} 
-
+	}
 	return 0;
+}
+
+jack_nframes_t
+jack_frame_time (const jack_client_t *client)
+{
+	jack_time_t now = jack_get_microseconds();
+	return jack_time_to_frames(client, now);
 }
 
 jack_nframes_t
@@ -266,6 +276,23 @@ jack_last_frame_time (const jack_client_t *client)
 	jack_frame_timer_t current;
 	jack_read_frame_time (client, &current);
 	return current.frames;
+}
+
+jack_time_t
+jack_frames_to_time(const jack_client_t *client, jack_nframes_t frames)
+{
+	jack_frame_timer_t time;
+	jack_control_t *ectl = client->engine;
+
+	jack_read_frame_time (client, &time);
+
+	if (time.initialized) {
+		return time.current_wakeup +
+			(long) rint (((double) ((long long) (frames - time.frames)) *
+						((long long) (time.next_wakeup - time.current_wakeup)) / ectl->buffer_size) );
+	} 
+
+	return 0;
 }
 
 jack_nframes_t

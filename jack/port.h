@@ -107,7 +107,7 @@ typedef struct _jack_port_shared {
 
     char		     has_mixdown; /* port has a mixdown function */
     char                     in_use;
-    char                     locked;
+    char                     unused; /* legacy locked field */
 
 } jack_port_shared_t;
 

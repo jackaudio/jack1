@@ -73,25 +73,9 @@ jack_client_t *jack_client_open (const char *client_name,
 				 jack_status_t *status, ...);
 
 /**
- * Attempt to become an external client of the Jack server.
+ * \bold THIS FUNCTION IS DEPRECATED AND SHOULD NOT BE USED IN
+ *  NEW JACK CLIENTS
  *
- * JACK is evolving a mechanism for automatically starting the server
- * when needed.  As a transition, jack_client_new() only does this
- * when \$JACK_START_SERVER is defined in the environment of the
- * calling process.  In the future this will become normal behavior.
- * For full control of this feature, use jack_client_open(), instead.
- * In either case, defining \$JACK_NO_START_SERVER disables this
- * feature.
- *
- * @param client_name of at most jack_client_name_size() characters.
- * If this name is already in use, the request fails.
- *
- * @return Opaque client handle if successful, otherwise NULL.
- *
- * @note Failure generally means that the JACK server is not running.
- * If there was some other problem, it will be reported via the @ref
- * jack_error_callback mechanism.  Use jack_client_open() and check
- * the @a status parameter for more detailed information.
  */
 jack_client_t *jack_client_new (const char *client_name);
 
@@ -545,22 +529,6 @@ int  jack_port_tie (jack_port_t *src, jack_port_t *dst);
  */
 int  jack_port_untie (jack_port_t *port);
 
-/**
- * A client may call this function to prevent other objects
- * from changing the connection status of a port. The port
- * must be owned by the calling client.
- *
- * @return 0 on success, otherwise a non-zero error code
- */
-int jack_port_lock (jack_client_t *, jack_port_t *);
-
-/**
- * This allows other objects to change the connection status of a port.
- *
- * @return 0 on success, otherwise a non-zero error code
- */
-int jack_port_unlock (jack_client_t *, jack_port_t *);
-
 /** 
  * @return the time (in frames) between data being available or
  * delivered at/to a port, and the time at which it arrived at or is
@@ -594,7 +562,17 @@ jack_nframes_t jack_port_get_total_latency (jack_client_t *,
 void jack_port_set_latency (jack_port_t *, jack_nframes_t);
 	
 /**
- *
+ * Request a complete recomputation of all port latencies. This
+ * can be called by a client that has just changed the internal
+ * latency of its port using @function jack_port_set_latency
+ * and wants to ensure that all signal pathways in the graph
+ * are updated with respect to the values that will be returned
+ * by @function jack_port_get_total_latency. It allows a client 
+ * to change multiple port latencies without triggering a 
+ * recompute for each change.
+ * 
+ * @return zero for successful execution of the request. non-zero
+ *         otherwise.
  */
 int jack_recompute_total_latencies (jack_client_t*);
 
@@ -787,6 +765,26 @@ jack_nframes_t jack_frame_time (const jack_client_t *);
  * jack_frame_time() in correlation to the current process cycle.
  */
 jack_nframes_t jack_last_frame_time (const jack_client_t *client);
+
+/**
+ * @return estimated time in microseconds of the specified frame time
+ */
+jack_time_t jack_frames_to_time(const jack_client_t *client, jack_nframes_t);
+
+/**
+ * @return estimated time in frames for the specified system time.
+ */
+jack_nframes_t jack_time_to_frames(const jack_client_t *client, jack_time_t);
+
+/**
+ * @return return JACK's current system time in microseconds,
+ *         using JACK clock source. 
+ * 
+ * The value returned is guaranteed to be monotonic, but not linear.
+ *
+ * This function is a client version of @function jack_get_microseconds().
+ */
+jack_time_t jack_get_time();
 
 /**
  * @return the current CPU load estimated by JACK.  This is a running

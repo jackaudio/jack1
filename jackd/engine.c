@@ -2914,18 +2914,6 @@ jack_port_do_connect (jack_engine_t *engine,
 		return -1;
 	}
 
-	if (srcport->shared->locked) {
-		jack_error ("source port %s is locked against connection"
-			    " changes", source_port);
-		return -1;
-	}
-
-	if (dstport->shared->locked) {
-		jack_error ("destination port %s is locked against connection"
-			    " changes", destination_port);
-		return -1;
-	}
-
 	if (srcport->shared->ptype_id != dstport->shared->ptype_id) {
 		jack_error ("ports used in attemped connection are not of "
 			    "the same data type");
@@ -3455,7 +3443,6 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	shared->flags = req->x.port_info.flags;
 	shared->latency = 0;
 	shared->monitor_requests = 0;
-	shared->locked = 0;
 
 	port = &engine->internal_ports[port_id];
 

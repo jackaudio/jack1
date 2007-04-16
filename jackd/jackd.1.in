@@ -180,11 +180,11 @@ playback device name.
 .TP
 \fB\-p, \-\-period \fIint\fR
 .br
-Specify the number of frames between JACK \fBprocess()\fR calls.  The
-default is 1024.  If you need low latency, set \fB\-p\fR as low as you
-can go without seeing xruns.  A larger period size yields higher
-latency, but makes xruns less likely.  The JACK capture latency in
-seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
+Specify the number of frames between JACK \fBprocess()\fR calls.  This
+value must be a power of 2, and the default is 1024.  If you need low 
+latency, set \fB\-p\fR as low as you can go without seeing xruns.  A larger 
+period size yields higher latency, but makes xruns less likely.  The JACK 
+capture latency in seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
 .TP
 \fB\-r, \-\-rate \fIint\fR
 Specify the sample rate.  The default is 48000.
@@ -222,7 +222,7 @@ Capture and playback (default: true)
 Sample rate (default: 44100)
 .TP
 \fB\-p \-\-period\fR
-Frames per period (default: 128)
+Frames per period (default: 128). Must be a power of 2.
 .TP
 \fB\-n \-\-name\fR
 Driver name (default: none)
@@ -241,11 +241,11 @@ Specify number of playback ports. The default value is 2.
 Specify sample rate. The default value is 48000.
 .TP
 \fB\-p, \-\-period \fIint\fR
-Specify number of frames per period. The default value is 1024.
-If you need low latency, set \fB\-p\fR as low as you
-can go without seeing xruns.  A larger period size yields higher
-latency, but makes xruns less likely.  The JACK capture latency in
-seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
+Specify the number of frames between JACK \fBprocess()\fR calls.  This
+value must be a power of 2, and the default is 1024.  If you need low 
+latency, set \fB\-p\fR as low as you can go without seeing xruns.  A larger 
+period size yields higher latency, but makes xruns less likely.  The JACK 
+capture latency in seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
 .TP
 \fB\-w, \-\-wait \fIint\fR 
 Specify number of usecs to wait between engine processes. 
@@ -256,11 +256,11 @@ The default value is 21333.
 Specify the sample rate.  The default is 48000.
 .TP
 \fB\-p, \-\-period \fIint\fR
-Specify number of frames between JACK \fBprocess()\fR calls.  The
-default is 1024.  If you need low latency, set \fB\-p\fR as low as you
-can go without seeing xruns.  A larger period size yields higher
-latency, but makes xruns less likely.  The JACK capture latency in
-seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
+Specify the number of frames between JACK \fBprocess()\fR calls.  This
+value must be a power of 2, and the default is 1024.  If you need low 
+latency, set \fB\-p\fR as low as you can go without seeing xruns.  A larger 
+period size yields higher latency, but makes xruns less likely.  The JACK 
+capture latency in seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
 .TP
 \fB\-n, \-\-nperiods \fIint\fR
 Specify the number of periods in the hardware buffer.  The default is
@@ -309,7 +309,7 @@ Capture and playback (default: true)
 Sample rate (default: 48000)
 .TP
 \fB\-p \-\-period\fR
-Frames per period (default: 1024)
+Frames per period (default: 1024). Must be a power of 2.
 .TP
 \fB\-n \-\-name\fR
 Driver name (default: none)

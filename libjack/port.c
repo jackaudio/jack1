@@ -463,26 +463,6 @@ jack_port_unregister (jack_client_t *client, jack_port_t *port)
 	return jack_client_deliver_request (client, &req);
 }
 
-int
-jack_port_lock (jack_client_t *client, jack_port_t *port)
-{
-	if (port) {
-		port->shared->locked = 1;
-		return 0;
-	}
-	return -1;
-}
-
-int
-jack_port_unlock (jack_client_t *client, jack_port_t *port)
-{
-	if (port) {
-		port->shared->locked = 0;
-		return 0;
-	}
-	return -1;
-}
-
 /* LOCAL (in-client) connection querying only */
 
 int
