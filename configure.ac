@@ -44,7 +44,7 @@ dnl slacker than this, and closer to those for the JACK version
 dnl number.
 dnl ---
 JACK_API_CURRENT=0
-JACK_API_REVISION=23
+JACK_API_REVISION=24
 JACK_API_AGE=0
 
 AC_SUBST(JACK_MAJOR_VERSION)
