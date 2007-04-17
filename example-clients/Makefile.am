@@ -41,6 +41,8 @@ bin_PROGRAMS = jack_load \
 		   jack_midisine \
 		   jack_midiseq
 
+noinst_PROGRAMS = jack_thread_wait
+
 if HAVE_SNDFILE
 # note! jackrec_CFLAGS syntax not supported by automake-1.4
 sndfile_cflags = @SNDFILE_CFLAGS@
@@ -68,6 +70,10 @@ jack_monitor_client_LDADD = ../libjack/libjack.la
 jack_metro_SOURCES = metro.c
 jack_metro_LDFLAGS = @OS_LDFLAGS@
 jack_metro_LDADD = ../libjack/libjack.la
+
+jack_thread_wait_SOURCES = tw.c
+jack_thread_wait_LDFLAGS = @OS_LDFLAGS@
+jack_thread_wait_LDADD = ../libjack/libjack.la
 
 jack_lsp_SOURCES = lsp.c
 jack_lsp_LDFLAGS = @OS_LDFLAGS@
