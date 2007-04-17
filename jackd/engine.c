@@ -174,7 +174,15 @@ make_directory (const char *path)
 	if (stat (path, &statbuf)) {
 
 		if (errno == ENOENT) {
-			if (mkdir (path, 0700) < 0){
+			int mode;
+
+			if (getenv ("JACK_PROMISCUOUS_SERVER")) {
+				mode = 0777;
+			} else {
+				mode = 0700;
+			}
+
+			if (mkdir (path, mode) < 0){
 				jack_error ("cannot create %s directory (%s)\n",
 					    path, strerror (errno));
 				return -1;
