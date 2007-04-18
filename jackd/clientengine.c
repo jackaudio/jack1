@@ -476,6 +476,8 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	client->control->port_register_arg = NULL;
 	client->control->graph_order = NULL;
 	client->control->graph_order_arg = NULL;
+	client->control->client_register = NULL;
+	client->control->client_register_arg = NULL;
 
 	jack_transport_client_new (client);
         
@@ -717,6 +719,8 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 		close (client_fd);
 	}
 
+	jack_client_registration_notify (engine, (const char*) client->control->name, 1);
+
 	return 0;
 }
 
@@ -856,6 +860,8 @@ jack_client_disconnect (jack_engine_t *engine, int fd)
 void
 jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 {
+	jack_client_registration_notify (engine, (const char*) client->control->name, 0);
+
 	if (jack_client_is_internal (client)) {
 
 		jack_client_unload (client);

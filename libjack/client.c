@@ -1323,6 +1323,22 @@ jack_client_process_events (jack_client_t* client)
 			}
 			break;
 			
+		case ClientRegistered:
+			if (control->client_register) {
+				control->client_register
+					(event.x.name, TRUE,
+					 control->client_register_arg);
+			} 
+			break;
+			
+		case ClientUnregistered:
+			if (control->client_register) {
+				control->client_register
+					(event.x.name, FALSE,
+					 control->client_register_arg);
+			}
+			break;
+			
 		case GraphReordered:
 			status = jack_handle_reorder (client, &event);
 			break;
@@ -2136,6 +2152,20 @@ jack_set_port_registration_callback(jack_client_t *client,
 	}
 	client->control->port_register_arg = arg;
 	client->control->port_register = callback;
+	return 0;
+}
+
+int
+jack_set_client_registration_callback(jack_client_t *client,
+				      JackClientRegistrationCallback callback,
+				      void *arg)
+{
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+	client->control->client_register_arg = arg;
+	client->control->client_register = callback;
 	return 0;
 }
 

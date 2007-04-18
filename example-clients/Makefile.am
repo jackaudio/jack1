@@ -36,6 +36,7 @@ bin_PROGRAMS = jack_load \
                jack_bufsize \
 	       jack_lsp \
 	       jack_freewheel \
+	       jack_evmon \
 	       $(JACKREC) \
 	       $(JACK_TRANSPORT) \
 		   jack_midisine \
@@ -74,6 +75,10 @@ jack_metro_LDADD = ../libjack/libjack.la
 jack_thread_wait_SOURCES = tw.c
 jack_thread_wait_LDFLAGS = @OS_LDFLAGS@
 jack_thread_wait_LDADD = ../libjack/libjack.la
+
+jack_evmon_SOURCES = evmon.c
+jack_evmon_LDFLAGS = @OS_LDFLAGS@
+jack_evmon_LDADD = ../libjack/libjack.la
 
 jack_lsp_SOURCES = lsp.c
 jack_lsp_LDFLAGS = @OS_LDFLAGS@

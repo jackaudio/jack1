@@ -3647,6 +3647,41 @@ jack_port_registration_notify (jack_engine_t *engine,
 	}
 }
 
+void
+jack_client_registration_notify (jack_engine_t *engine,
+				 const char* name, int yn)
+{
+	jack_event_t event;
+	jack_client_internal_t *client;
+	JSList *node;
+
+	event.type = (yn ? ClientRegistered : ClientUnregistered);
+	snprintf (event.x.name, sizeof (event.x.name), "%s", name);
+	
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		
+		client = (jack_client_internal_t *) node->data;
+
+		if (!client->control->active) {
+			continue;
+		}
+
+		if (strcmp ((char*) client->control->name, (char*) name) == 0) {
+			/* do not notify client of its own registration */
+			continue;
+		}
+
+		if (client->control->client_register) {
+			if (jack_deliver_event (engine, client, &event)) {
+				jack_error ("cannot send client registration"
+					    " notification to %s (%s)",
+					     client->control->name,
+					    strerror (errno));
+			}
+		}
+	}
+}
+
 int
 jack_port_assign_buffer (jack_engine_t *engine, jack_port_internal_t *port)
 {

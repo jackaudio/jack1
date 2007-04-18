@@ -27,7 +27,7 @@ dnl made to the way libjack communicates with jackd
 dnl that would break applications linked with an older
 dnl version of libjack.
 dnl ---
-JACK_PROTOCOL_VERSION=16
+JACK_PROTOCOL_VERSION=19
 
 dnl ---
 dnl HOWTO: updating the libjack interface version
@@ -44,7 +44,7 @@ dnl slacker than this, and closer to those for the JACK version
 dnl number.
 dnl ---
 JACK_API_CURRENT=0
-JACK_API_REVISION=24
+JACK_API_REVISION=25
 JACK_API_AGE=0
 
 AC_SUBST(JACK_MAJOR_VERSION)

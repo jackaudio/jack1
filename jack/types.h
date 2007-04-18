@@ -155,9 +155,23 @@ typedef int  (*JackSampleRateCallback)(jack_nframes_t nframes, void *arg);
  * Prototype for the client supplied function that is called 
  * whenever a port is registered or unregistered.
  *
+ * @parm  port the ID of the port 
+ * @param arg pointer to a client supplied structure
+ * @param register non-zero if the port is being registered,
+ *                     zero if the port is being unregistered
+ */ 
+typedef void (*JackPortRegistrationCallback)(jack_port_id_t port, int register, void *arg);
+
+/**
+ * Prototype for the client supplied function that is called 
+ * whenever a client is registered or unregistered.
+ *
+ * @param name a null-terminated string containing the client name 
+ * @param register non-zero if the client is being registered,
+ *                     zero if the client is being unregistered
  * @param arg pointer to a client supplied structure
  */ 
-typedef void (*JackPortRegistrationCallback)(jack_port_id_t port, int, void *arg);
+typedef void (*JackClientRegistrationCallback)(const char* name, int register, void *arg);
 
 /**
  * Prototype for the client supplied function that is called 

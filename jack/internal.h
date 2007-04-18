@@ -171,13 +171,16 @@ typedef enum  {
   PortUnregistered,
   XRun,
   StartFreewheel,
-  StopFreewheel
+  StopFreewheel,
+  ClientRegistered,
+  ClientUnregistered
 } JackEventType;
 
 typedef struct {
     JackEventType type;
     union {
 	uint32_t n;
+        char name[JACK_CLIENT_NAME_SIZE];    
 	jack_port_id_t port_id;
 	jack_port_id_t self_id;
     } x;
@@ -250,7 +253,9 @@ typedef volatile struct {
     void *timebase_arg;
     JackFreewheelCallback freewheel_cb;
     void *freewheel_arg;
-	
+    JackClientRegistrationCallback client_register;	
+    void *client_register_arg;
+
     /* external clients: set by libjack
      * internal clients: set by engine */
     int (*deliver_request)(void*, jack_request_t*); /* JOQ: 64/32 bug! */
