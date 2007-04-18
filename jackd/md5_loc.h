@@ -1,7 +1,6 @@
 /*
  * Local defines for the md5 functions.
  *
- * $Id$
  */
 
 /*

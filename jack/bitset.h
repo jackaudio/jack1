@@ -10,7 +10,6 @@
  * cardinality (number of elements allowed), followed by one or more
  * words containing bit vectors.
  *
- *  $Id$
  */
 
 /*

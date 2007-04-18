@@ -23,7 +23,6 @@
  * Written by Ulrich Drepper <drepper@gnu.ai.mit.edu>, 1995.
  * Modified by Gray Watson <http://256.com/gray/>, 1997.
  *
- * $Id$
  */
 
 /*
@@ -54,7 +53,6 @@
 #include "md5_loc.h"
 
 /* static	char	*rcs_id =
-   "$Id$"; */
 
 /* version id for the library */
 /* static char *version_id = "$MD5Version: 1.0.0 November-19-1997 $"; */
