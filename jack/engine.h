@@ -203,5 +203,6 @@ void	jack_port_clear_connections (jack_engine_t *engine,
 void	jack_port_registration_notify (jack_engine_t *, jack_port_id_t, int);
 void	jack_port_release (jack_engine_t *engine, jack_port_internal_t *);
 void	jack_sort_graph (jack_engine_t *engine);
+void    jack_engine_munge_backend_port_names (jack_engine_t* engine);
 
 #endif /* __jack_engine_h__ */

@@ -1751,7 +1751,7 @@ alsa_driver_attach (alsa_driver_t *driver)
 
 	for (chn = 0; chn < driver->capture_nchannels; chn++) {
 
-		snprintf (buf, sizeof(buf) - 1, "capture_%lu", chn+1);
+		snprintf (buf, sizeof(buf), "capture_%lu", chn+1);
 
 		if ((port = jack_port_register (driver->client, buf,
 						JACK_DEFAULT_AUDIO_TYPE,

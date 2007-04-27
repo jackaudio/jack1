@@ -158,6 +158,8 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 		goto error;
 	}
 
+	jack_engine_munge_backend_port_names (engine);
+
 	if (engine->driver->start (engine->driver) != 0) {
 		jack_error ("cannot start driver");
 		goto error;

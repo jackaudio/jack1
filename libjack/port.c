@@ -333,6 +333,14 @@ void jack_port_set_funcs ()
 
 #endif /* USE_DYNSIMD */
 
+int
+jack_port_name_equals (jack_port_shared_t* port, const char* target)
+{
+	return (strcmp (port->name, target) == 0 || 
+		strcmp (port->alias1, target) == 0 || 
+		strcmp (port->alias2, target) == 0);
+}
+		
 jack_port_functions_t *
 jack_get_port_functions(jack_port_type_id_t ptid)
 {
@@ -372,7 +380,7 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	pthread_mutex_init (&port->connection_lock, NULL);
 	port->connections = 0;
 	port->tied = NULL;
-	
+
 	if (client->control->id == port->shared->client_id) {
 			
 		/* It's our port, so initialize the pointers to port
@@ -488,7 +496,7 @@ jack_port_connected_to (const jack_port_t *port, const char *portname)
 	for (node = port->connections; node; node = jack_slist_next (node)) {
 		jack_port_t *other_port = (jack_port_t *) node->data;
 		
-		if (strcmp (other_port->shared->name, portname) == 0) {
+		if (jack_port_name_equals (other_port->shared, portname)) {
 			ret = TRUE;
 			break;
 		}
@@ -521,7 +529,8 @@ jack_port_get_connections (const jack_port_t *port)
 				* (jack_slist_length (port->connections) + 1));
 		for (n = 0, node = port->connections; node;
 		     node = jack_slist_next (node), ++n) {
-			ret[n] = ((jack_port_t *) node->data)->shared->name;
+			jack_port_t* other =(jack_port_t *) node->data;
+			ret[n] = other->shared->name;
 		}
 		ret[n] = NULL;
 	}
@@ -644,7 +653,7 @@ jack_port_by_name_int (jack_client_t *client, const char *port_name)
 	port = &client->engine->ports[0];
 	
 	for (i = 0; i < limit; i++) {
-		if (port[i].in_use && strcmp (port[i].name, port_name) == 0) {
+		if (port[i].in_use && jack_port_name_equals (&port[i], port_name)) {
 			return jack_port_new (client, port[i].id,
 					      client->engine);
 		}
@@ -660,7 +669,7 @@ jack_port_by_name (jack_client_t *client,  const char *port_name)
 	jack_port_t* port;
 	for (node = client->ports_ext; node; node = jack_slist_next (node)) {
 		port = node->data;
-		if (strcmp (port->shared->name, port_name) == 0) {
+		if (jack_port_name_equals (port->shared, port_name)) {
 			/* Found port, return the cached structure. */
 			return port;
 		}
@@ -766,7 +775,6 @@ jack_port_tie (jack_port_t *src, jack_port_t *dst)
 
 int
 jack_port_untie (jack_port_t *port)
-
 {
 	if (port->tied == NULL) {
 		jack_error ("port \"%s\" is not tied", port->shared->name);
@@ -868,6 +876,24 @@ jack_port_name (const jack_port_t *port)
 	return port->shared->name;
 }
 
+int
+jack_port_get_aliases (const jack_port_t *port, char* const aliases[2])
+{
+	int cnt = 0;
+	
+	if (port->shared->alias1[0] != '\0') {
+		snprintf (aliases[0], JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE, "%s", port->shared->alias1);
+		cnt++;
+	}
+
+	if (port->shared->alias2[0] != '\0') {
+		snprintf (aliases[1], JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE, "%s", port->shared->alias2);
+		cnt++;
+	}
+
+	return cnt;
+}
+
 const char *
 jack_port_short_name (const jack_port_t *port)
 {
@@ -909,6 +935,35 @@ jack_port_set_name (jack_port_t *port, const char *new_name)
 	
 	return 0;
 }
+
+int
+jack_port_set_alias (jack_port_t *port, const char *alias)
+{
+	if (port->shared->alias1[0] == '\0') {
+		snprintf (port->shared->alias1, sizeof (port->shared->alias1), "%s", alias);
+	} else if (port->shared->alias2[0] == '\0') {
+		snprintf (port->shared->alias2, sizeof (port->shared->alias2), "%s", alias);
+	} else {
+		return -1;
+	}
+
+	return 0;
+}
+
+int
+jack_port_unset_alias (jack_port_t *port, const char *alias)
+{
+	if (strcmp (port->shared->alias1, alias) == 0) {
+		port->shared->alias1[0] = '\0';
+	} else if (strcmp (port->shared->alias2, alias) == 0) {
+		port->shared->alias2[0] = '\0';
+	} else {
+		return -1;
+	}
+
+	return 0;
+}
+
 
 /* AUDIO PORT SUPPORT */
 

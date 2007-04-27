@@ -460,6 +460,7 @@ jack_port_t *jack_port_by_id_int (const jack_client_t *client,
 
 jack_port_t *jack_port_by_name_int (jack_client_t *client,
 				    const char *port_name);
+int jack_port_name_equals (jack_port_shared_t* port, const char* target);
 
 #ifdef __GNUC__
 #  define likely(x)	__builtin_expect((x),1)

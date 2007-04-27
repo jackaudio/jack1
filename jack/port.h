@@ -98,6 +98,8 @@ typedef struct _jack_port_shared {
     jack_port_id_t           id;	/* index into engine port array */
     enum JackPortFlags	     flags;    
     char                     name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
+    char                     alias1[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
+    char                     alias2[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
     jack_client_id_t         client_id;	/* who owns me */
 
     volatile jack_nframes_t  latency;

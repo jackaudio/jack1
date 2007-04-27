@@ -944,6 +944,44 @@ jack_start_watchdog (jack_engine_t *engine)
 }
 #endif /* !JACK_USE_MACH_THREADS */
 
+void
+jack_engine_munge_backend_port_names (jack_engine_t* engine)
+{
+	int out_cnt = 1;
+	int in_cnt = 1;
+	int i;
+	char* backend_client_name = (char*) engine->driver->internal_client->control->name;
+	size_t len = strlen (backend_client_name);
+
+	for (i = 0; i < engine->port_max; i++) {
+		jack_port_shared_t* port = &engine->control->ports[i];
+
+		if (strncmp (port->name, backend_client_name, len) == 0) {
+
+			/* save the backend's own name */
+
+			char name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
+			snprintf (name, sizeof (name), "%s", engine->control->ports[i].name);
+
+			/* replace input port names, and use backend's original as an alias */
+
+			if ((port->flags & (JackPortIsPhysical|JackPortIsInput)) == (JackPortIsPhysical|JackPortIsInput)) {
+				snprintf (port->name, sizeof (port->name), "system:playback_%d", out_cnt++);
+				strcpy (port->alias1, name);
+				continue;
+			} 
+
+			/* replace output port names, and use backend's original as an alias */
+
+			if ((port->flags & (JackPortIsPhysical|JackPortIsOutput)) == (JackPortIsPhysical|JackPortIsOutput)) {
+				snprintf (port->name, sizeof (port->name), "system:capture_%d", in_cnt++);
+				strcpy (port->alias1, name);
+				continue;
+			} 
+		}
+	}
+}
+
 static jack_driver_info_t *
 jack_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc)
 {
@@ -1678,6 +1716,8 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	for (i = 0; i < engine->port_max; i++) {
 		engine->control->ports[i].in_use = 0;
 		engine->control->ports[i].id = i;
+		engine->control->ports[i].alias1[0] = '\0';
+		engine->control->ports[i].alias2[0] = '\0';
 	}
 
 	/* allocate internal port structures so that we can keep track
@@ -3369,6 +3409,8 @@ jack_port_release (jack_engine_t *engine, jack_port_internal_t *port)
 {
 	pthread_mutex_lock (&engine->port_lock);
 	port->shared->in_use = 0;
+	port->shared->alias1[0] = '\0';
+	port->shared->alias2[0] = '\0';
 
 	if (port->buffer_info) {
 		jack_port_buffer_list_t *blist =
@@ -3391,7 +3433,7 @@ jack_get_port_internal_by_name (jack_engine_t *engine, const char *name)
 	pthread_mutex_lock (&engine->port_lock);
 
 	for (id = 0; id < engine->port_max; id++) {
-		if (strcmp (engine->control->ports[id].name, name) == 0) {
+		if (jack_port_name_equals (&engine->control->ports[id], name)) {
 			break;
 		}
 	}
@@ -3725,7 +3767,7 @@ jack_get_port_by_name (jack_engine_t *engine, const char *name)
 
 	for (id = 0; id < engine->port_max; id++) {
 		if (engine->control->ports[id].in_use &&
-		    strcmp (engine->control->ports[id].name, name) == 0) {
+		    jack_port_name_equals (&engine->control->ports[id], name)) {
 			return &engine->internal_ports[id];
 		}
 	}
