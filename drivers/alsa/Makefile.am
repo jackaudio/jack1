@@ -8,9 +8,13 @@ plugin_LTLIBRARIES = jack_alsa.la
 
 jack_alsa_la_LDFLAGS = -module -avoid-version
 jack_alsa_la_SOURCES = alsa_driver.c generic_hw.c memops.c \
+		       alsa_seqmidi.c alsa_rawmidi.c \
 		       hammerfall.c hdsp.c ice1712.c usx2y.c
 
 noinst_HEADERS = alsa_driver.h \
+		alsa_midi.h \
+		midi_pack.h \
+		midi_unpack.h \
 		generic.h \
 		hammerfall.h \
 		hdsp.h \

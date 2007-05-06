@@ -21,3 +21,6 @@ inprocess.la
 inprocess.lo
 intime.la
 intime.lo
+jack_alias
+jack_evmon
+jack_thread_wait

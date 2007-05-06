@@ -120,7 +120,7 @@ typedef struct _jack_port_functions {
      * A better solution is to make jack_engine_place_buffers to be type-specific,
      * but this works.
      */
-    void (*buffer_init)(void *buffer, size_t size);
+    void (*buffer_init)(void *buffer, size_t size, jack_nframes_t);
 
     /* Function to mixdown multiple inputs to a buffer.  Can be NULL,
      * indicating that multiple input connections are not legal for

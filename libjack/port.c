@@ -37,7 +37,8 @@
 #include "local.h"
 
 static void    jack_generic_buffer_init(void *port_buffer,
-                                      size_t buffer_size);
+                                      size_t buffer_size,
+				      jack_nframes_t nframes);
 
 static void    jack_audio_port_mixdown (jack_port_t *port,
 					jack_nframes_t nframes);
@@ -359,8 +360,8 @@ jack_get_port_functions(jack_port_type_id_t ptid)
  * Fills buffer with zeroes. For audio ports, engine->silent_buffer relies on it.
  */
 static void
-jack_generic_buffer_init(void *buffer, size_t size)
-{
+jack_generic_buffer_init(void *buffer, size_t size, jack_nframes_t nframes)
+{ 
 	memset(buffer, 0, size);
 }
 
@@ -749,7 +750,7 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 				* sizeof (jack_default_audio_sample_t)
 				* nframes;
 		port->mix_buffer = jack_pool_alloc (buffer_size);
-		port->fptr.buffer_init (port->mix_buffer, buffer_size);
+		port->fptr.buffer_init (port->mix_buffer, buffer_size, nframes);
 	}
 	port->fptr.mixdown (port, nframes);
 	return (void *) port->mix_buffer;

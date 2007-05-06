@@ -1022,6 +1022,9 @@ alsa_driver_start (alsa_driver_t *driver)
 		malloc (sizeof (struct pollfd) * 
 			(driver->playback_nfds + driver->capture_nfds + 2));
 
+	if (driver->midi)
+		(driver->midi->start)(driver->midi);
+
 	if (driver->playback_handle) {
 		/* fill playback buffer with zeroes, and mark 
 		   all fragments as having data.
@@ -1125,6 +1128,9 @@ alsa_driver_stop (alsa_driver_t *driver)
 	if (driver->hw_monitoring) {
 		driver->hw->set_input_monitor_mask (driver->hw, 0);
 	}
+
+	if (driver->midi)
+		(driver->midi->stop)(driver->midi);
 
 	return 0;
 }
@@ -1553,6 +1559,9 @@ alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 	if (nframes > driver->frames_per_cycle) {
 		return -1;
 	}
+
+	if (driver->midi)
+		(driver->midi->read)(driver->midi, nframes);
 	
 	nread = 0;
 	contiguous = 0;
@@ -1622,6 +1631,9 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 		return -1;
 	}
 
+	if (driver->midi)
+		(driver->midi->write)(driver->midi, nframes);
+	
 	nwritten = 0;
 	contiguous = 0;
 	orig_nframes = nframes;
@@ -1805,6 +1817,12 @@ alsa_driver_attach (alsa_driver_t *driver)
 		}
 	}
 
+	if (driver->midi) {
+		int err = (driver->midi->attach)(driver->midi);
+		if (err)
+			jack_error("ALSA: cannot attach midi: %d", err);
+	}
+	
 
 	return jack_activate (driver->client);
 }
@@ -1818,6 +1836,9 @@ alsa_driver_detach (alsa_driver_t *driver)
 		return 0;
 	}
 
+	if (driver->midi)
+		(driver->midi->detach)(driver->midi);
+	
 	for (node = driver->capture_ports; node;
 	     node = jack_slist_next (node)) {
 		jack_port_unregister (driver->client,
@@ -1904,6 +1925,9 @@ alsa_driver_delete (alsa_driver_t *driver)
 {
 	JSList *node;
 
+	if (driver->midi)
+		(driver->midi->destroy)(driver->midi);
+
 	for (node = driver->clock_sync_listeners; node;
 	     node = jack_slist_next (node)) {
 		free (node->data);
@@ -1975,7 +1999,8 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 		 int user_playback_nchnls,
 		 int shorts_first,
 		 jack_nframes_t capture_latency,
-		 jack_nframes_t playback_latency
+		 jack_nframes_t playback_latency,
+		 alsa_midi_t *midi_driver
 		 )
 {
 	int err;
@@ -2057,6 +2082,8 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 
 	driver->alsa_name_playback = strdup (playback_alsa_device);
 	driver->alsa_name_capture = strdup (capture_alsa_device);
+
+	driver->midi = midi_driver;
 
 	if (alsa_driver_check_card_type (driver)) {
 		alsa_driver_delete (driver);
@@ -2332,7 +2359,7 @@ driver_get_descriptor ()
 	desc = calloc (1, sizeof (jack_driver_desc_t));
 
 	strcpy (desc->name,"alsa");
-	desc->nparams = 17;
+	desc->nparams = 18;
   
 	params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
@@ -2483,6 +2510,18 @@ driver_get_descriptor ()
 	strcpy (params[i].short_desc, "Extra output latency (frames)");
 	strcpy (params[i].long_desc, params[i].short_desc);
 
+	i++;
+	strcpy (params[i].name, "midi");
+	params[i].character  = 'X';
+	params[i].type       = JackDriverParamString;
+	strcpy (params[i].value.str,  "none");
+	strcpy (params[i].short_desc, "ALSA MIDI driver (seq|raw)");
+	strcpy (params[i].long_desc,
+		"ALSA MIDI driver:\n"
+		" none - no MIDI driver\n"
+		" seq - ALSA Sequencer driver\n"
+		" raw - ALSA RawMIDI driver\n");
+
 	desc->params = params;
 
 	return desc;
@@ -2508,6 +2547,8 @@ driver_initialize (jack_client_t *client, const JSList * params)
 	int shorts_first = FALSE;
 	jack_nframes_t systemic_input_latency = 0;
 	jack_nframes_t systemic_output_latency = 0;
+	char *midi_driver_name = "none";
+	alsa_midi_t *midi = NULL;
 	const JSList * node;
 	const jack_driver_param_t * param;
 
@@ -2596,6 +2637,10 @@ driver_initialize (jack_client_t *client, const JSList * params)
 			systemic_output_latency = param->value.ui;
 			break;
 
+		case 'X':
+			midi_driver_name = strdup (param->value.str);
+			break;
+
 		}
 	}
 			
@@ -2603,6 +2648,12 @@ driver_initialize (jack_client_t *client, const JSList * params)
 	if (!capture && !playback) {
 		capture = TRUE;
 		playback = TRUE;
+	}
+
+	if (strcmp(midi_driver_name, "seq")==0) {
+		midi = alsa_seqmidi_new(client, NULL);
+	} else if (strcmp(midi_driver_name, "raw")==0) {
+		midi = alsa_rawmidi_new(client);
 	}
 
 	return alsa_driver_new ("alsa_pcm", playback_pcm_name,
@@ -2614,7 +2665,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 				user_capture_nchnls, user_playback_nchnls,
 				shorts_first, 
 				systemic_input_latency,
-				systemic_output_latency);
+				systemic_output_latency, midi);
 }
 
 void

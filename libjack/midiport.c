@@ -28,6 +28,7 @@
 
 
 typedef struct _jack_midi_port_info_private {
+	jack_nframes_t        nframes; /**< Number of frames in buffer */
  	size_t                buffer_size; /**< Size of buffer in bytes */
 	jack_nframes_t        event_count; /**< Number of events stored in this buffer */
 	jack_nframes_t        last_write_loc; /**< Used for both writing and mixdown */
@@ -44,11 +45,13 @@ typedef struct _jack_midi_port_internal_event {
 /* jack_midi_port_functions.buffer_init */
 static void
 jack_midi_buffer_init(void  *port_buffer,
-                       size_t buffer_size)
+                       size_t buffer_size,
+		       jack_nframes_t nframes)
 {
 	jack_midi_port_info_private_t *info =
 		(jack_midi_port_info_private_t *) port_buffer;
 	/* We can also add some magic field to midi buffer to validate client calls */
+	info->nframes = nframes;
 	info->buffer_size = buffer_size;
 	info->event_count = 0;
 	info->last_write_loc = 0;
@@ -57,8 +60,7 @@ jack_midi_buffer_init(void  *port_buffer,
 
 
 jack_nframes_t
-jack_midi_get_event_count(void           *port_buffer,
-                          jack_nframes_t  nframes)
+jack_midi_get_event_count(void           *port_buffer)
 {
 	jack_midi_port_info_private_t *info =
 		(jack_midi_port_info_private_t *) port_buffer;
@@ -69,8 +71,7 @@ jack_midi_get_event_count(void           *port_buffer,
 int
 jack_midi_event_get(jack_midi_event_t *event,
                     void              *port_buffer,
-                    jack_nframes_t     event_idx,
-                    jack_nframes_t     nframes)
+                    jack_nframes_t     event_idx)
 {
 	jack_midi_port_internal_event_t *port_event;
 	jack_midi_port_info_private_t *info =
@@ -91,8 +92,7 @@ jack_midi_event_get(jack_midi_event_t *event,
 
 
 size_t
-jack_midi_max_event_size(void           *port_buffer,
-                         jack_nframes_t  nframes)
+jack_midi_max_event_size(void           *port_buffer)
 {
 	jack_midi_port_info_private_t *info =
 		(jack_midi_port_info_private_t *) port_buffer;
@@ -116,8 +116,7 @@ jack_midi_max_event_size(void           *port_buffer,
 jack_midi_data_t*
 jack_midi_event_reserve(void           *port_buffer,
                         jack_nframes_t  time, 
-                        size_t          data_size,
-                        jack_nframes_t  nframes)
+                        size_t          data_size)
 {
 	jack_midi_data_t *retbuf = (jack_midi_data_t *) port_buffer;
 
@@ -128,11 +127,11 @@ jack_midi_event_reserve(void           *port_buffer,
 	size_t buffer_size =
 		info->buffer_size;
 	
-	if (time < 0 || time >= nframes)
- 		return NULL;
+	if (time < 0 || time >= info->nframes)
+ 		goto failed;
  
  	if (info->event_count > 0 && time < event_buffer[info->event_count-1].time)
- 		return NULL;
+ 		goto failed;
 
 	/* Check if data_size is >0 and there is enough space in the buffer for the event. */
 	if (data_size <=0 ||
@@ -140,7 +139,7 @@ jack_midi_event_reserve(void           *port_buffer,
 			+ ((info->event_count + 1)
 			   * sizeof(jack_midi_port_internal_event_t))
 			+ data_size > buffer_size) {
-		return NULL;
+		goto failed;
 	} else {
 		info->last_write_loc += data_size;
 		retbuf = &retbuf[buffer_size - 1 - info->last_write_loc];
@@ -151,6 +150,9 @@ jack_midi_event_reserve(void           *port_buffer,
 		info->event_count += 1;
 		return retbuf;
 	}
+ failed:
+ 	info->events_lost++;
+	return NULL;
 }
 
 
@@ -158,11 +160,10 @@ int
 jack_midi_event_write(void                   *port_buffer,
                       jack_nframes_t          time,
                       const jack_midi_data_t *data,
-                      size_t                  data_size,
-                      jack_nframes_t          nframes)
+                      size_t                  data_size)
 {
 	jack_midi_data_t *retbuf =
-		jack_midi_event_reserve(port_buffer, time, data_size, nframes);
+		jack_midi_event_reserve(port_buffer, time, data_size);
 
 	if (retbuf) {
 		memcpy(retbuf, data, data_size);
@@ -179,8 +180,7 @@ jack_midi_event_write(void                   *port_buffer,
  * been reset.
  */
 void
-jack_midi_clear_buffer(void           *port_buffer,
-                       jack_nframes_t  nframes)
+jack_midi_clear_buffer(void           *port_buffer)
 {
 	jack_midi_port_info_private_t *info =
 		(jack_midi_port_info_private_t *) port_buffer;
@@ -193,14 +193,14 @@ jack_midi_clear_buffer(void           *port_buffer,
 
 /* jack_midi_port_functions.mixdown */
 static void
-jack_midi_port_mixdown(jack_port_t    *port,
-                       jack_nframes_t  nframes)
+jack_midi_port_mixdown(jack_port_t    *port, jack_nframes_t nframes)
 {
 	JSList         *node;
 	jack_port_t    *input;
 	jack_nframes_t  num_events = 0;
 	jack_nframes_t  i          = 0;
 	int             err        = 0;
+	jack_nframes_t  lost_events = 0;
 
 	/* The next (single) event to mix in to the buffer */
 	jack_midi_port_info_private_t   *earliest_info;
@@ -211,7 +211,7 @@ jack_midi_port_mixdown(jack_port_t    *port,
 	jack_midi_port_internal_event_t *in_events; /* Corresponds to in_info */
 	jack_midi_port_info_private_t   *out_info;  /* Output 'buffer' */
 
-	jack_midi_clear_buffer(port->mix_buffer, nframes);
+	jack_midi_clear_buffer(port->mix_buffer);
 	
 	out_info = (jack_midi_port_info_private_t *) port->mix_buffer;
 
@@ -228,6 +228,7 @@ jack_midi_port_mixdown(jack_port_t    *port,
 		in_info =
 			(jack_midi_port_info_private_t *) jack_output_port_buffer(input);
 		num_events += in_info->event_count;
+		lost_events += in_info->events_lost;
 		in_info->last_write_loc = 0;
 	}
 
@@ -267,8 +268,7 @@ jack_midi_port_mixdown(jack_port_t    *port,
 				jack_port_buffer(port),
 				earliest_event->time,
 				&earliest_buffer[earliest_event->byte_offset],
-				earliest_event->size,
-				nframes);
+				earliest_event->size);
 			
 			earliest_info->last_write_loc++;
 
@@ -279,12 +279,14 @@ jack_midi_port_mixdown(jack_port_t    *port,
 		}
 	}
 	assert(out_info->event_count == num_events - out_info->events_lost);
+
+	// inherit total lost events count from all connected ports.
+	out_info->events_lost += lost_events;
 }
 
 
 jack_nframes_t
-jack_midi_get_lost_event_count(void           *port_buffer,
-                               jack_nframes_t  nframes)
+jack_midi_get_lost_event_count(void           *port_buffer)
 {
 	return ((jack_midi_port_info_private_t *) port_buffer)->events_lost;
 }

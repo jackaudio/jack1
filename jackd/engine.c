@@ -332,7 +332,8 @@ jack_engine_place_port_buffers (jack_engine_t* engine,
 				jack_port_type_id_t ptid,
 				jack_shmsize_t one_buffer,
 				jack_shmsize_t size,
-				unsigned long nports)
+				unsigned long nports,
+				jack_nframes_t nframes)
 {
 	jack_shmsize_t offset;		/* shared memory offset */
 	jack_port_buffer_info_t *bi;
@@ -408,7 +409,7 @@ jack_engine_place_port_buffers (jack_engine_t* engine,
 
 		bi = pti->info;
 		for (i=0; i<nports; ++i, ++bi)
-			pfuncs->buffer_init(shm_segment + bi->offset, one_buffer);
+			pfuncs->buffer_init(shm_segment + bi->offset, one_buffer, nframes);
 	}
 
 	pthread_mutex_unlock (&pti->lock);
@@ -466,7 +467,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 		}
 	}
 
-	jack_engine_place_port_buffers (engine, ptid, one_buffer, size, nports);
+	jack_engine_place_port_buffers (engine, ptid, one_buffer, size, nports, engine->control->buffer_size);
 
 #ifdef USE_MLOCK
 	if (engine->control->real_time) {
@@ -3475,12 +3476,19 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 						  req->x.port_info.client_id))
 	    == NULL) {
 		jack_error ("unknown client id in port registration request");
+		jack_unlock_graph (engine);
 		return -1;
 	}
-	jack_unlock_graph (engine);
+
+	if ((port = jack_get_port_by_name(engine, req->x.port_info.name)) != NULL) {
+		jack_error ("duplicate port name in port registration request");
+		jack_unlock_graph (engine);
+		return -1;
+	}
 
 	if ((port_id = jack_get_free_port (engine)) == (jack_port_id_t) -1) {
 		jack_error ("no ports available!");
+		jack_unlock_graph (engine);
 		return -1;
 	}
 
@@ -3501,10 +3509,11 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req)
 	
 	if (jack_port_assign_buffer (engine, port)) {
 		jack_error ("cannot assign buffer for port");
+		jack_port_release (engine, &engine->internal_ports[port_id]);
+		jack_unlock_graph (engine);
 		return -1;
 	}
 
-	jack_lock_graph (engine);
 	client->ports = jack_slist_prepend (client->ports, port);
 	jack_port_registration_notify (engine, port_id, TRUE);
 	jack_unlock_graph (engine);
