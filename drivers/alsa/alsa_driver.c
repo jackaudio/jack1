@@ -1022,7 +1022,7 @@ alsa_driver_start (alsa_driver_t *driver)
 		malloc (sizeof (struct pollfd) * 
 			(driver->playback_nfds + driver->capture_nfds + 2));
 
-	if (driver->midi)
+	if (driver->midi && !driver->xrun_recovery)
 		(driver->midi->start)(driver->midi);
 
 	if (driver->playback_handle) {
@@ -1129,7 +1129,7 @@ alsa_driver_stop (alsa_driver_t *driver)
 		driver->hw->set_input_monitor_mask (driver->hw, 0);
 	}
 
-	if (driver->midi)
+	if (driver->midi && !driver->xrun_recovery)
 		(driver->midi->stop)(driver->midi);
 
 	return 0;
@@ -1138,9 +1138,12 @@ alsa_driver_stop (alsa_driver_t *driver)
 static int
 alsa_driver_restart (alsa_driver_t *driver)
 {
- 	if (driver->nt_stop((struct _jack_driver_nt *) driver))
- 	    return -1;
- 	return driver->nt_start((struct _jack_driver_nt *) driver);
+	int res;
+	driver->xrun_recovery = 1;
+ 	if ((res = driver->nt_stop((struct _jack_driver_nt *) driver))==0)
+		res = driver->nt_start((struct _jack_driver_nt *) driver);
+	driver->xrun_recovery = 0;
+	return res;
 }
 
 static int
@@ -2084,6 +2087,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 	driver->alsa_name_capture = strdup (capture_alsa_device);
 
 	driver->midi = midi_driver;
+	driver->xrun_recovery = 0;
 
 	if (alsa_driver_check_card_type (driver)) {
 		alsa_driver_delete (driver);

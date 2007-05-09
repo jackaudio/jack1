@@ -144,6 +144,7 @@ typedef struct _alsa_driver {
     int process_count;
 
     alsa_midi_t *midi;
+    int xrun_recovery;
 
 } alsa_driver_t;
 

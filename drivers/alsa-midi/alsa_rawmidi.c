@@ -74,7 +74,6 @@ enum {
 #endif
 };
 
-
 enum PortState {
 	PORT_DESTROYED,
 	PORT_CREATED,
@@ -908,13 +907,13 @@ void *midi_thread(void *arg)
 		 * So, zero timeout will not cause busy-looping.
 		 */
 		if (proc.next_time < proc.cur_time) {
-			debug_log("%s: late: next_time = %d, cur_time = %d\n", str->name, proc.next_time, proc.cur_time);
+			debug_log("%s: late: next_time = %d, cur_time = %d\n", str->name, (int)proc.next_time, (int)proc.cur_time);
 			wait_nsec = 0; // we are late
 		} else if (proc.next_time != NFRAMES_INF) {
 			jack_time_t wait_frames = proc.next_time - proc.cur_time;
 			jack_nframes_t rate = jack_get_sample_rate(midi->client);
 			wait_nsec = (wait_frames * (1000*1000*1000)) / rate;
-			debug_log("midi_%s: timeout = %d\n", str->name, wait_frames);
+			debug_log("midi_%s: timeout = %d\n", str->name, (int)wait_frames);
 		} else
 			wait_nsec = 1000*1000*1000;
 		//debug_log("midi_thread(%s): wait_nsec = %lld\n", str->name, wait_nsec);
