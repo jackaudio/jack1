@@ -628,6 +628,9 @@ then
 fi
 AM_CONDITIONAL(HAVE_ALSA, $HAVE_ALSA)
 
+HAVE_ALSA_MIDI=$HAVE_ALSA
+AM_CONDITIONAL(HAVE_ALSA_MIDI, $HAVE_ALSA_MIDI)
+
 if test "$JACK_DEFAULT_DRIVER" = \"dummy\"; then
   AC_MSG_WARN([Only the dummy driver can be built])
 fi
@@ -693,6 +696,7 @@ doc/Makefile
 doc/reference.doxygen
 drivers/Makefile
 drivers/alsa/Makefile
+drivers/alsa-midi/Makefile
 drivers/dummy/Makefile
 drivers/oss/Makefile
 drivers/portaudio/Makefile

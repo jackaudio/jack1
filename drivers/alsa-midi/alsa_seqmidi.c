@@ -49,7 +49,7 @@
 #include <time.h>
 #include <ctype.h>
 
-#include "./alsa_midi.h"
+#include "alsa_midi.h"
 
 #ifdef STANDALONE
 #define MESSAGE(...) fprintf(stderr, __VA_ARGS__)

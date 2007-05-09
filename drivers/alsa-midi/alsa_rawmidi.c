@@ -21,7 +21,7 @@
 /* Required for clock_nanosleep(). Thanks, Nedko */
 #define _GNU_SOURCE
 
-#include "./alsa_midi.h"
+#include "alsa_midi.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -33,8 +33,8 @@
 #include <jack/thread.h>
 #include <jack/ringbuffer.h>
 #include <jack/midiport.h>
-#include "./midi_pack.h"
-#include "./midi_unpack.h"
+#include "midi_pack.h"
+#include "midi_unpack.h"
 
 #ifdef STANDALONE
 #define MESSAGE(...) fprintf(stderr, __VA_ARGS__)

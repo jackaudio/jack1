@@ -6,6 +6,12 @@ else
 ALSA_DIR =
 endif
 
+if HAVE_ALSA_MIDI
+ALSA_MIDI_DIR = alsa-midi
+else
+ALSA_MIDI_DIR =
+endif
+
 if HAVE_OSS
 OSS_DIR = oss
 else
@@ -30,5 +36,5 @@ else
 FREEBOB_DIR =
 endif
 
-SUBDIRS = $(ALSA_DIR) dummy $(OSS_DIR) $(PA_DIR) $(CA_DIR) $(FREEBOB_DIR)
-DIST_SUBDIRS = alsa dummy oss portaudio coreaudio freebob
+SUBDIRS = $(ALSA_MIDI_DIR) $(ALSA_DIR) dummy $(OSS_DIR) $(PA_DIR) $(CA_DIR) $(FREEBOB_DIR)
+DIST_SUBDIRS = alsa alsa-midi dummy oss portaudio coreaudio freebob

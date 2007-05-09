@@ -39,7 +39,7 @@
 #include <jack/memops.h>
 #include <jack/jack.h>
 
-#include "./alsa_midi.h"
+#include "../alsa-midi/alsa_midi.h"
 
 typedef void (*ReadCopyFunction)  (jack_default_audio_sample_t *dst, char *src,
 				   unsigned long src_bytes,

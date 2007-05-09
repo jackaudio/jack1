@@ -8,7 +8,11 @@ plugin_LTLIBRARIES = jack_freebob.la
 
 jack_freebob_la_SOURCES = freebob_driver.c
 
-jack_freebob_la_LIBADD = $(LIBFREEBOB_LIBS) $(ALSA_LIBS)
+jack_freebob_la_LIBADD = $(LIBFREEBOB_LIBS) $(ALSA_LIBS) 
+
+if HAVE_ALSA_MIDI
+jack_freebob_la_LIBADD += ../alsa-midi/libalsamidi.la
+endif
 
 jack_freebob_la_LDFLAGS = -module -avoid-version
 
