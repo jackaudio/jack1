@@ -182,8 +182,10 @@ freebob_driver_detach (freebob_driver_t *driver)
 
 	for (node = driver->capture_ports; node && node->data;
 	     node = jack_slist_next (node)) {
-		jack_port_unregister (driver->client,
+		if(node->data != NULL) {
+			jack_port_unregister (driver->client,
 				      ((jack_port_t *) node->data));
+		}
 	}
 
 	jack_slist_free (driver->capture_ports);
@@ -191,8 +193,10 @@ freebob_driver_detach (freebob_driver_t *driver)
 		
 	for (node = driver->playback_ports; node && node->data;
 	     node = jack_slist_next (node)) {
-		jack_port_unregister (driver->client,
+		if(node->data != NULL) {
+			jack_port_unregister (driver->client,
 				      ((jack_port_t *) node->data));
+		}
 	}
 
 	jack_slist_free (driver->playback_ports);
