@@ -17,7 +17,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=105
-JACK_MICRO_VERSION=0
+JACK_MICRO_VERSION=1
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -612,6 +612,23 @@ then
 fi
 AM_CONDITIONAL(HAVE_FREEBOB,$HAVE_FREEBOB)
 
+AC_ARG_ENABLE(firewire, [  --disable-firewire          ignore FireWire driver (FFADO) ],
+			TRY_FIREWIRE=$enableval , TRY_FIREWIRE=yes ) 
+HAVE_FIREWIRE="false"
+if test "x$TRY_FIREWIRE" = "xyes"
+then
+	# check for FFADO libraries
+	PKG_CHECK_MODULES(LIBFFADO, libffado >= 1.999.0,
+	     [HAVE_FIREWIRE="true"
+              JACK_DEFAULT_DRIVER=\"firewire\"
+	     ], AC_MSG_RESULT([no]))
+
+	AC_SUBST([LIBFFADO_CFLAGS])
+	AC_SUBST([LIBFFADO_LIBS])
+
+fi
+AM_CONDITIONAL(HAVE_FIREWIRE,$HAVE_FIREWIRE)
+
 AC_ARG_ENABLE(alsa, [  --disable-alsa          ignore ALSA driver ],
 			TRY_ALSA=$enableval , TRY_ALSA=yes ) 
 HAVE_ALSA="false"
@@ -702,6 +719,7 @@ drivers/oss/Makefile
 drivers/portaudio/Makefile
 drivers/coreaudio/Makefile
 drivers/freebob/Makefile
+drivers/firewire/Makefile
 example-clients/Makefile
 jack.pc
 jack.spec
@@ -720,7 +738,8 @@ echo
 echo $PACKAGE $VERSION :
 echo
 echo \| Build with ALSA support............................... : $HAVE_ALSA
-echo \| Build with FreeBob support............................ : $HAVE_FREEBOB
+echo \| Build with old FireWire \(FreeBob\) support............. : $HAVE_FREEBOB
+echo \| Build with new FireWire \(FFADO\) support............... : $HAVE_FIREWIRE
 echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA

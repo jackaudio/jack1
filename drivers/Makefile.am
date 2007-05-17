@@ -36,5 +36,11 @@ else
 FREEBOB_DIR =
 endif
 
-SUBDIRS = $(ALSA_MIDI_DIR) $(ALSA_DIR) dummy $(OSS_DIR) $(PA_DIR) $(CA_DIR) $(FREEBOB_DIR)
-DIST_SUBDIRS = alsa alsa-midi dummy oss portaudio coreaudio freebob
+if HAVE_FIREWIRE
+FIREWIRE_DIR = firewire
+else
+FIREWIRE_DIR =
+endif
+
+SUBDIRS = $(ALSA_MIDI_DIR) $(ALSA_DIR) dummy $(OSS_DIR) $(PA_DIR) $(CA_DIR) $(FREEBOB_DIR) $(FIREWIRE_DIR)
+DIST_SUBDIRS = alsa alsa-midi dummy oss portaudio coreaudio freebob firewire
