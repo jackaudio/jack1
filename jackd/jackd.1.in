@@ -169,6 +169,10 @@ For most ALSA devices, the hardware buffer has exactly
 a larger buffer.  If so, JACK will use the smallest possible buffer
 containing at least \fB\-\-nperiods\fR, but the playback latency does
 not increase.
+
+For USB audio devices it is recommended to use \fB\-n 3\fR. Firewire
+devices supported by FFADO (formerly Freebob) are configured with
+\fB\-n 3\fR by default.
 .TP
 \fB\-o, \-\-outchannels \fIint\fR
 .br

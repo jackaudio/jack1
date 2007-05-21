@@ -71,7 +71,7 @@ AM_INIT_AUTOMAKE(jack-audio-connection-kit,${JACK_VERSION})
 AM_MAINTAINER_MODE
 
 AM_CONFIG_HEADER(config.h)
-AC_ENABLE_STATIC(no)
+AC_ENABLE_STATIC(yes)
 AC_ENABLE_SHARED(yes)
 AC_PROG_CC
 AC_PROG_CXX
@@ -513,10 +513,10 @@ AC_SUBST(HTML_DIR)
 
 # allow specifying default tmpdir
 AC_ARG_WITH(default-tmpdir,
-            [  --with-default-tmpdir=PATH    where jackd and clients will put tmp files (/tmp)])
+            [  --with-default-tmpdir=PATH    where jackd and clients will put tmp files (/dev/shm)])
 
 if test "x$with_default_tmpdir" = "x" ; then
-	DEFAULT_TMP_DIR=/tmp
+	DEFAULT_TMP_DIR=/dev/shm
 else
 	DEFAULT_TMP_DIR=$with_default_tmpdir
 fi
