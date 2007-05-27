@@ -19,6 +19,9 @@
 #ifndef __jack_midi_unpack_h__
 #define __jack_midi_unpack_h__
 
+#include <jack/midiport.h>
+#include <jack/engine.h>
+
 enum {
 	MIDI_UNPACK_MAX_MSG = 1024
 };
@@ -75,7 +78,7 @@ int midi_unpack_buf(midi_unpack_t *buf, const unsigned char *data, int len, void
 		if (byte >= 0xF8) // system realtime
 		{
 			jack_midi_event_write(jack_port_buf, time, &data[i], 1);
-			//printf("midi_unpack: written system relatime event\n");
+			//jack_error("midi_unpack: written system relatime event\n");
 			//midi_input_write(in, &data[i], 1);
 		}
 		else if (byte < 0x80) // data
@@ -119,7 +122,7 @@ int midi_unpack_buf(midi_unpack_t *buf, const unsigned char *data, int len, void
 					jack_midi_event_write(jack_port_buf, time, temp, 3);
 				} else
 					jack_midi_event_write(jack_port_buf, time, &buf->data[0], buf->pos);
-				//printf("midi_unpack: written %d-byte event\n", buf->pos);
+				//jack_error("midi_unpack: written %d-byte event\n", buf->pos);
 				//midi_input_write(in, &buf->data[0], buf->pos);
 			}
 			/* keep running status */

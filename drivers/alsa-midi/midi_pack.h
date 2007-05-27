@@ -19,6 +19,9 @@
 #ifndef __jack_midi_pack_h__
 #define __jack_midi_pack_h__
 
+#include <jack/midiport.h>
+#include <jack/engine.h>
+
 typedef struct {
 	int running_status;
 } midi_pack_t;
