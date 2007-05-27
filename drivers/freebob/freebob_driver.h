@@ -6,7 +6,7 @@
  *   http://freebob.sf.net
  *   http://jackit.sf.net
  *
- *   Copyright (C) 2005 Pieter Palmers <pieterpalmers@users.sourceforge.net>
+ *   Copyright (C) 2005-2007 Pieter Palmers <pieter.palmers@ffado.org>
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -31,7 +31,19 @@
 #ifndef __JACK_FREEBOB_DRIVER_H__
 #define __JACK_FREEBOB_DRIVER_H__
 
-#define FREEBOB_DRIVER_WITH_MIDI
+// Only one of these !
+#define FREEBOB_DRIVER_WITH_ALSA_MIDI
+//#define FREEBOB_DRIVER_WITH_JACK_MIDI
+
+#ifdef FREEBOB_DRIVER_WITH_ALSA_MIDI
+	#ifdef FREEBOB_DRIVER_WITH_JACK_MIDI
+		#error "Can't have both ALSA midi and JACK midi defined for the FreeBoB backend"
+	#endif
+#endif
+
+#ifdef FREEBOB_DRIVER_WITH_JACK_MIDI
+	#warning "JACK midi for FreeBoB is experimental and has severe jitter issues."
+#endif
 
 #include <libfreebob/freebob.h>
 #include <libfreebob/freebob_streaming.h>
@@ -51,11 +63,6 @@
 #include <jack/driver.h>
 #include <jack/engine.h>
 #include <jack/types.h>
-
-#ifdef FREEBOB_DRIVER_WITH_MIDI
-#include <jack/thread.h>
-#include <alsa/asoundlib.h>
-#endif
 
 // debug print control flags
 #define DEBUG_LEVEL_BUFFERS           	(1<<0)
@@ -110,18 +117,45 @@
 // thread priority setup
 #define FREEBOB_RT_PRIORITY_PACKETIZER_RELATIVE	5
 
-#ifdef FREEBOB_DRIVER_WITH_MIDI
+// MIDI 
 
-	#define ALSA_SEQ_BUFF_SIZE 1024
-	#define MIDI_TRANSMIT_BUFFER_SIZE 1024
-	#define MIDI_THREAD_SLEEP_TIME_USECS 100
-	// midi priority should be higher than the audio priority in order to
-	// make sure events are not only delivered on period boundarys
-	// but I think it should be smaller than the packetizer thread in order not 
-	// to lose any packets
-	#define FREEBOB_RT_PRIORITY_MIDI_RELATIVE 	4
+#ifdef FREEBOB_DRIVER_WITH_ALSA_MIDI
 
-#endif
+#include <jack/thread.h>
+#include <alsa/asoundlib.h>
+
+#define ALSA_SEQ_BUFF_SIZE 1024
+#define MIDI_TRANSMIT_BUFFER_SIZE 1024
+#define MIDI_THREAD_SLEEP_TIME_USECS 100
+// midi priority should be higher than the audio priority in order to
+// make sure events are not only delivered on period boundarys
+// but I think it should be smaller than the packetizer thread in order not 
+// to lose any packets
+#define FREEBOB_RT_PRIORITY_MIDI_RELATIVE 	4
+
+#endif // FREEBOB_DRIVER_WITH_ALSA_MIDI
+
+#ifdef FREEBOB_DRIVER_WITH_JACK_MIDI
+
+#include "../alsa-midi/midi_pack.h"
+#include "../alsa-midi/midi_unpack.h"
+#include <jack/midiport.h>
+
+typedef struct freebob_midi_input_port_t {
+	// jack
+	midi_unpack_t unpack;
+	
+	// midi
+	int overruns;
+} freebob_midi_input_port_t;
+
+typedef struct freebob_midi_output_port_t {
+	// jack
+	midi_pack_t packer;
+} freebob_midi_output_port_t;
+
+#endif // FREEBOB_DRIVER_WITH_JACK_MIDI
+
 
 typedef struct _freebob_driver freebob_driver_t;
 
@@ -155,7 +189,7 @@ struct _freebob_jack_settings {
 	freebob_handle_t fb_handle;
 };
 
-#ifdef FREEBOB_DRIVER_WITH_MIDI
+#ifdef FREEBOB_DRIVER_WITH_ALSA_MIDI
 
 
 typedef struct {
@@ -202,8 +236,8 @@ struct _freebob_driver
 	jack_nframes_t  period_size;
 	unsigned long   wait_time;
 
-    jack_time_t                   wait_last;
-    jack_time_t                   wait_next;
+	jack_time_t                   wait_last;
+	jack_time_t                   wait_next;
 	int wait_late;
 	
 	jack_client_t  *client;
@@ -219,11 +253,11 @@ struct _freebob_driver
 	/* the freebob virtual device */
 	freebob_device_t *dev;
 	
-    JSList                       *capture_ports;
-    JSList                       *playback_ports;
-    JSList                       *monitor_ports;
-    channel_t                     playback_nchannels;
-    channel_t                     capture_nchannels;
+	JSList                       *capture_ports;
+	JSList                       *playback_ports;
+	JSList                       *monitor_ports;
+	channel_t                     playback_nchannels;
+	channel_t                     capture_nchannels;
 
 	jack_nframes_t  playback_frame_latency;
 	jack_nframes_t  capture_frame_latency;
@@ -231,9 +265,15 @@ struct _freebob_driver
 	freebob_device_info_t device_info;
 	freebob_options_t device_options;
 
-#ifdef FREEBOB_DRIVER_WITH_MIDI
+#ifdef FREEBOB_DRIVER_WITH_ALSA_MIDI
 	freebob_driver_midi_handle_t *midi_handle;
 #endif
+
+#ifdef FREEBOB_DRIVER_WITH_JACK_MIDI
+	freebob_midi_input_port_t  *midi_in_ports;
+	freebob_midi_output_port_t *midi_out_ports;
+#endif
+
 
 }; 
 
