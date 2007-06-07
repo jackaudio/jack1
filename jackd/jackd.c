@@ -65,6 +65,7 @@ static int client_timeout = 0; /* msecs; if zero, use period size. */
 static unsigned int port_max = 256;
 static int do_unlock = 0;
 static jack_nframes_t frame_time_offset = 0;
+static int nozombies = 0;
 
 static void 
 do_nothing_handler (int sig)
@@ -145,7 +146,8 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	if ((engine = jack_engine_new (realtime, realtime_priority, 
 				       do_mlock, do_unlock, server_name,
 				       temporary, verbose, client_timeout,
-				       port_max, getpid(), frame_time_offset, drivers)) == 0) {
+				       port_max, getpid(), frame_time_offset, 
+				       nozombies, drivers)) == 0) {
 		fprintf (stderr, "cannot create engine\n");
 		return -1;
 	}
@@ -373,6 +375,7 @@ static void usage (FILE *file)
 "             [ --clocksource OR -c [ c(ycle) | h(pet) | s(ystem) ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
+"             [ --nozombies OR -Z ]\n"
 "         -d backend [ ... backend args ... ]\n"
 "             The backend can be `alsa', `coreaudio', `dummy',\n"
 "                                `freebob', `oss' or `portaudio'.\n\n"
@@ -526,6 +529,7 @@ main (int argc, char *argv[])
 		{ "version", 0, 0, 'V' },
 		{ "silent", 0, 0, 's' },
 		{ "clock-source", 1, 0, 'c' },
+		{ "nozombies", 0, 0, 'Z' },
 		{ 0, 0, 0, 0 }
 	};
 	int opt = 0;
@@ -618,6 +622,10 @@ main (int argc, char *argv[])
 
 		case 'V':
 			show_version = 1;
+			break;
+
+		case 'Z':
+			nozombies = 1;
 			break;
 
 		default:

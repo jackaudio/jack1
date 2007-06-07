@@ -95,7 +95,7 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 	/* this stops jack_deliver_event() from doing anything */
 
 	client->control->dead = TRUE;
-	
+
 	jack_client_disconnect_ports (engine, client);
 	jack_client_do_deactivate (engine, client, FALSE);
 }
@@ -201,10 +201,12 @@ jack_remove_clients (jack_engine_t* engine)
 					 client->control->name,
 					 jack_client_state_name (client),
 					 client->error);
-				jack_zombify_client (engine,
-						     (jack_client_internal_t *)
-						     node->data);
-				client->error = 0;
+				if (!engine->nozombies) {
+					jack_zombify_client (engine,
+							     (jack_client_internal_t *)
+							     node->data);
+					client->error = 0;
+				}
 			}
 			
 			need_sort = TRUE;

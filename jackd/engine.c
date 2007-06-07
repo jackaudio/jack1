@@ -1575,7 +1575,7 @@ jack_engine_t *
 jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 		 const char *server_name, int temporary, int verbose,
 		 int client_timeout, unsigned int port_max, pid_t wait_pid,
-		 jack_nframes_t frame_time_offset, JSList *drivers)
+		 jack_nframes_t frame_time_offset, int nozombies, JSList *drivers)
 {
 	jack_engine_t *engine;
 	unsigned int i;
@@ -1640,6 +1640,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->freewheeling = 0;
 	engine->feedbackcount = 0;
 	engine->wait_pid = wait_pid;
+	engine->nozombies = nozombies;
 
 	jack_engine_reset_rolling_usecs (engine);
 	engine->max_usecs = 0.0f;

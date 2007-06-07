@@ -89,6 +89,12 @@ Exit once all clients have closed their connections.
 Set client timeout limit in milliseconds.  The default is 500 msec.
 In realtime mode the client timeout must be smaller than the watchdog timeout (5000 msec).
 .TP
+\fB\-Z, \-\-nozombies\fR
+.br
+Prevent JACK from ever kicking out clients because they were too slow.
+This cancels the effect any specified timeout value, but JACK and its clients are
+still subject to the supervision of the watchdog thread or its equivalent.
+.TP
 \fB\-u, \-\-unlock\fR
 .br
 Unlock libraries GTK+, QT, FLTK, Wine.
