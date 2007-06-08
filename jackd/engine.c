@@ -108,6 +108,10 @@ static int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *,
 				jack_event_t *);
 static void jack_deliver_event_to_all (jack_engine_t *engine,
 				       jack_event_t *event);
+static void jack_notify_all_port_interested_clients (jack_engine_t *engine,
+						     jack_port_id_t a,
+						     jack_port_id_t b,
+						     int connect);
 static void jack_engine_post_process (jack_engine_t *);
 static int  jack_use_driver (jack_engine_t *engine, jack_driver_t *driver);
 static int  jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
@@ -2276,6 +2280,34 @@ jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event)
 	jack_unlock_graph (engine);
 }
 
+static void
+jack_notify_all_port_interested_clients (jack_engine_t *engine, jack_port_id_t a, jack_port_id_t b, int connected)
+{
+	JSList *node;
+	jack_event_t event;
+
+	event.type = (connected ? PortConnected : PortDisconnected);
+	event.x.self_id = a;
+	event.y.other_id = b;
+	
+	/* GRAPH MUST BE LOCKED : see callers of jack_send_connection_notification() 
+	 */
+
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		jack_client_internal_t* client;
+
+		client = (jack_client_internal_t*) node->data;
+
+		if (client->control->port_connect != NULL) {
+			
+			/* one of the ports belong to this client or it has a port connect callback */
+			
+			jack_deliver_event (engine, client, &event);
+			
+		} 
+	}
+}
+
 static int
 jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 		    jack_event_t *event)
@@ -3128,10 +3160,16 @@ jack_port_do_connect (jack_engine_t *engine,
 		jack_send_connection_notification (engine,
 						   srcport->shared->client_id,
 						   src_id, dst_id, TRUE);
+		
+
 		jack_send_connection_notification (engine,
 						   dstport->shared->client_id,
 						   dst_id, src_id, TRUE);
 						   
+		/* send a port connection notification just once to everyone who cares */
+
+		jack_notify_all_port_interested_clients (engine, src_id, dst_id, 1);
+
 		jack_sort_graph (engine);
 	}
 
@@ -3192,6 +3230,10 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 			jack_send_connection_notification (
 				engine, dstport->shared->client_id, dst_id,
 				src_id, FALSE);
+
+			/* send a port connection notification just once to everyone who cares */
+			
+			jack_notify_all_port_interested_clients (engine, src_id, dst_id, 0);
 
 			if (connect->dir) {
 			
@@ -3812,8 +3854,8 @@ jack_send_connection_notification (jack_engine_t *engine,
 
 {
 	jack_client_internal_t *client;
-	jack_event_t event;
-
+ 	jack_event_t event;
+ 
 	if ((client = jack_client_internal_by_id (engine, client_id)) == NULL) {
 		jack_error ("no such client %" PRIu32
 			    " during connection notification", client_id);

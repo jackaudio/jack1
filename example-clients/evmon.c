@@ -31,6 +31,12 @@ port_callback (jack_port_id_t port, int yn, void* arg)
 }
 
 void
+connect_callback (jack_port_id_t a, jack_port_id_t b, int yn, void* arg)
+{
+	printf ("Ports %d and %d %s\n", a, b, (yn ? "connected" : "disconnected"));
+}
+
+void
 client_callback (const char* client, int yn, void* arg)
 {
 	printf ("Client %s %s\n", client, (yn ? "registered" : "unregistered"));
@@ -63,6 +69,10 @@ main (int argc, char *argv[])
 		fprintf (stderr, "cannot set port registration callback\n");
 		return 1;
 	}
+	if (jack_set_port_connect_callback (client, connect_callback, NULL)) {
+		fprintf (stderr, "cannot set port connect callback\n");
+		return 1;
+	}
 	if (jack_set_client_registration_callback (client, client_callback, NULL)) {
 		fprintf (stderr, "cannot set client registration callback\n");
 		return 1;
@@ -71,7 +81,6 @@ main (int argc, char *argv[])
 		fprintf (stderr, "cannot set graph order registration callback\n");
 		return 1;
 	}
-
 	if (jack_activate (client)) {
 		fprintf (stderr, "cannot activate client");
 		return 1;

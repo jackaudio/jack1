@@ -182,7 +182,7 @@ typedef void (*JackClientRegistrationCallback)(const char* name, int register, v
  *                    zero if ports were disconnected
  * @param arg pointer to a client supplied data
  */ 
-typedef void (*JackPortConnectCallback)(jack_port_t* a, jack_port_t* b, int connect, void* arg);
+typedef void (*JackPortConnectCallback)(jack_port_id_t a, jack_port_id_t b, int connect, void* arg);
 
 /**
  * Prototype for the client supplied function that is called 

@@ -311,7 +311,7 @@ int jack_set_port_registration_callback (jack_client_t *,
 
 /**
  * Tell the JACK server to call @a connect_callback whenever a
- * port is registered or unregistered, passing @a arg as a parameter.
+ * port is connected or disconnected, passing @a arg as a parameter.
  *
  * @return 0 on success, otherwise a non-zero error code
  */

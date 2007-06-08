@@ -426,62 +426,64 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 	JSList *node;
 	int need_free = FALSE;
 
-	switch (event->type) {
-	case PortConnected:
-		other = jack_port_new (client, event->y.other_id,
-				       client->engine);
-		/* jack_port_by_id_int() always returns an internal
-		 * port that does not need to be deallocated */
-		control_port = jack_port_by_id_int (client, event->x.self_id,
-						    &need_free);
-		pthread_mutex_lock (&control_port->connection_lock);
-		control_port->connections =
-			jack_slist_prepend (control_port->connections,
-					    (void *) other);
-		pthread_mutex_unlock (&control_port->connection_lock);
-		
-		if (client->control->port_connect) {
-			client->control->port_connect (control_port, other, 1, client->control->port_connect_arg);
-		}
+	if (client->engine->ports[event->x.self_id].client_id == client->control->id ||
+	    client->engine->ports[event->y.other_id].client_id == client->control->id) {
 
-		break;
+		/* its one of ours */
 
-	case PortDisconnected:
-		/* jack_port_by_id_int() always returns an internal
-		 * port that does not need to be deallocated */
-		control_port = jack_port_by_id_int (client, event->x.self_id,
-						    &need_free);
-		pthread_mutex_lock (&control_port->connection_lock);
+		switch (event->type) {
+		case PortConnected:
+			other = jack_port_new (client, event->y.other_id,
+					       client->engine);
+			/* jack_port_by_id_int() always returns an internal
+			 * port that does not need to be deallocated 
+			 */
+			control_port = jack_port_by_id_int (client, event->x.self_id,
+							    &need_free);
+			pthread_mutex_lock (&control_port->connection_lock);
+			control_port->connections =
+				jack_slist_prepend (control_port->connections,
+						    (void *) other);
+			pthread_mutex_unlock (&control_port->connection_lock);
+			break;
+			
+		case PortDisconnected:
+			/* jack_port_by_id_int() always returns an internal
+			 * port that does not need to be deallocated 
+			 */
+			control_port = jack_port_by_id_int (client, event->x.self_id,
+							    &need_free);
+			pthread_mutex_lock (&control_port->connection_lock);
+			
+			for (node = control_port->connections; node;
+			     node = jack_slist_next (node)) {
+				
+				other = (jack_port_t *) node->data;
 
-		for (node = control_port->connections; node;
-		     node = jack_slist_next (node)) {
-
-			other = (jack_port_t *) node->data;
-
-			if (other->shared->id == event->y.other_id) {
-				control_port->connections =
-					jack_slist_remove_link (
-						control_port->connections,
-						node);
-				break;
+				if (other->shared->id == event->y.other_id) {
+					control_port->connections =
+						jack_slist_remove_link (
+							control_port->connections,
+							node);
+					jack_slist_free_1 (node);
+					free (other);
+					break;
+				}
 			}
+			
+			pthread_mutex_unlock (&control_port->connection_lock);
+			break;
+			
+		default:
+			/* impossible */
+			break;
 		}
+	}
 
-		pthread_mutex_unlock (&control_port->connection_lock);
-
-		if (node) {
-			if (client->control->port_connect) {
-				client->control->port_connect (control_port, other, 0, client->control->port_connect_arg);
-			}
-			jack_slist_free_1 (node);
-			free (other);
-		}
-
-		break;
-
-	default:
-		/* impossible */
-		break;
+	if (client->control->port_connect) {
+		client->control->port_connect (event->x.self_id, event->y.other_id,
+					       (event->type == PortConnected ? 1 : 0), 
+					       client->control->port_connect_arg);
 	}
 
 	return 0;
