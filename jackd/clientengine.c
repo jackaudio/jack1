@@ -475,6 +475,8 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	client->control->xrun_arg = NULL;
 	client->control->port_register = NULL;
 	client->control->port_register_arg = NULL;
+	client->control->port_connect = NULL;
+	client->control->port_connect_arg = NULL;
 	client->control->graph_order = NULL;
 	client->control->graph_order_arg = NULL;
 	client->control->client_register = NULL;

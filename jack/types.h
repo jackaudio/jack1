@@ -81,7 +81,7 @@ typedef uint32_t	     jack_port_id_t;
  * @pre nframes == pow(2,x)
  *
  * @param nframes number of frames to process
- * @param arg pointer to a client supplied structure
+ * @param arg pointer to a client supplied data
  *
  * @return zero on success, non-zero on error
  */ 
@@ -105,7 +105,7 @@ typedef void  (*JackThreadInitCallback)(void *arg);
  * Prototype for the client supplied function that is called 
  * whenever the processing graph is reordered.
  *
- * @param arg pointer to a client supplied structure
+ * @param arg pointer to a client supplied data
  *
  * @return zero on success, non-zero on error
  */ 
@@ -117,7 +117,7 @@ typedef int  (*JackGraphOrderCallback)(void *arg);
  *
  * @see jack_get_xrun_delayed_usecs()
  *
- * @param arg pointer to a client supplied structure
+ * @param arg pointer to a client supplied data
  *
  * @return zero on success, non-zero on error
  */ 
@@ -144,7 +144,7 @@ typedef int  (*JackBufferSizeCallback)(jack_nframes_t nframes, void *arg);
  * when the engine sample rate changes.
  *
  * @param nframes new engine sample rate
- * @param arg pointer to a client supplied structure
+ * @param arg pointer to a client supplied data
  *
  * @return zero on success, non-zero on error
  */ 
@@ -155,7 +155,7 @@ typedef int  (*JackSampleRateCallback)(jack_nframes_t nframes, void *arg);
  * whenever a port is registered or unregistered.
  *
  * @parm  port the ID of the port 
- * @param arg pointer to a client supplied structure
+ * @param arg pointer to a client supplied data
  * @param register non-zero if the port is being registered,
  *                     zero if the port is being unregistered
  */ 
@@ -168,9 +168,21 @@ typedef void (*JackPortRegistrationCallback)(jack_port_id_t port, int register, 
  * @param name a null-terminated string containing the client name 
  * @param register non-zero if the client is being registered,
  *                     zero if the client is being unregistered
- * @param arg pointer to a client supplied structure
+ * @param arg pointer to a client supplied data
  */ 
 typedef void (*JackClientRegistrationCallback)(const char* name, int register, void *arg);
+
+/**
+ * Prototype for the client supplied function that is called 
+ * whenever a client is registered or unregistered.
+ *
+ * @param a one of two ports connected or disconnected
+ * @param b one of two ports connected or disconnected
+ * @param connect non-zero if ports were connected
+ *                    zero if ports were disconnected
+ * @param arg pointer to a client supplied data
+ */ 
+typedef void (*JackPortConnectCallback)(jack_port_t* a, jack_port_t* b, int connect, void* arg);
 
 /**
  * Prototype for the client supplied function that is called 

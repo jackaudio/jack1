@@ -231,8 +231,6 @@ jack_get_tmpdir ()
 	memcpy (jack_tmpdir, buf, len-1);
 	jack_tmpdir[len-1] = '\0';
 	
-	fprintf (stderr, "JACK tmpdir identified as [%s]\n", jack_tmpdir);
-
 	fclose (in);
 	return 0;
 }
@@ -424,7 +422,7 @@ int
 jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 {
 	jack_port_t *control_port;
-	jack_port_t *other;
+	jack_port_t *other = 0;
 	JSList *node;
 	int need_free = FALSE;
 
@@ -441,6 +439,11 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 			jack_slist_prepend (control_port->connections,
 					    (void *) other);
 		pthread_mutex_unlock (&control_port->connection_lock);
+		
+		if (client->control->port_connect) {
+			client->control->port_connect (control_port, other, 1, client->control->port_connect_arg);
+		}
+
 		break;
 
 	case PortDisconnected:
@@ -460,13 +463,20 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 					jack_slist_remove_link (
 						control_port->connections,
 						node);
-				jack_slist_free_1 (node);
-				free (other);
 				break;
 			}
 		}
 
 		pthread_mutex_unlock (&control_port->connection_lock);
+
+		if (node) {
+			if (client->control->port_connect) {
+				client->control->port_connect (control_port, other, 0, client->control->port_connect_arg);
+			}
+			jack_slist_free_1 (node);
+			free (other);
+		}
+
 		break;
 
 	default:
@@ -1213,6 +1223,16 @@ jack_recompute_total_latencies (jack_client_t* client)
 	jack_request_t request;
 
 	request.type = RecomputeTotalLatencies;
+	return jack_client_deliver_request (client, &request);
+}
+
+int
+jack_recompute_total_latency (jack_client_t* client, jack_port_t* port)
+{
+	jack_request_t request;
+
+	request.type = RecomputeTotalLatency;
+	request.x.port_info.port_id = port->shared->id;
 	return jack_client_deliver_request (client, &request);
 }
 
@@ -2151,6 +2171,20 @@ jack_set_port_registration_callback(jack_client_t *client,
 	}
 	client->control->port_register_arg = arg;
 	client->control->port_register = callback;
+	return 0;
+}
+
+int
+jack_set_port_connect_callback(jack_client_t *client,
+			       JackPortConnectCallback callback,
+			       void *arg)
+{
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+	client->control->port_connect_arg = arg;
+	client->control->port_connect = callback;
 	return 0;
 }
 

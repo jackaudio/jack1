@@ -310,6 +310,15 @@ int jack_set_port_registration_callback (jack_client_t *,
 					 registration_callback, void *arg);
 
 /**
+ * Tell the JACK server to call @a connect_callback whenever a
+ * port is registered or unregistered, passing @a arg as a parameter.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+int jack_set_port_connect_callback (jack_client_t *,
+				    JackPortConnectCallback
+				    connect_callback, void *arg);
+/**
  * Tell the JACK server to call @a graph_callback whenever the
  * processing graph is reordered, passing @a arg as a parameter.
  *
@@ -545,6 +554,19 @@ jack_nframes_t jack_port_get_total_latency (jack_client_t *,
  */
 void jack_port_set_latency (jack_port_t *, jack_nframes_t);
 	
+/**
+ * Request a complete recomputation of a port's total latency. This
+ * can be called by a client that has just changed the internal
+ * latency of its port using @function jack_port_set_latency
+ * and wants to ensure that all signal pathways in the graph
+ * are updated with respect to the values that will be returned
+ * by @function jack_port_get_total_latency. 
+ * 
+ * @return zero for successful execution of the request. non-zero
+ *         otherwise.
+ */
+int jack_recompute_total_latency (jack_client_t*, jack_port_t* port);
+
 /**
  * Request a complete recomputation of all port latencies. This
  * can be called by a client that has just changed the internal

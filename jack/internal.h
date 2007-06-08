@@ -242,6 +242,8 @@ typedef volatile struct {
     void *srate_arg;
     JackPortRegistrationCallback port_register;
     void *port_register_arg;
+    JackPortConnectCallback port_connect;
+    void *port_connect_arg;
     JackGraphOrderCallback graph_order;
     void *graph_order_arg;
     JackXRunCallback xrun;
@@ -334,7 +336,8 @@ typedef enum {
 	IntClientLoad = 20,
 	IntClientName = 21,
 	IntClientUnload = 22,
-	RecomputeTotalLatencies = 23
+	RecomputeTotalLatencies = 23,
+	RecomputeTotalLatency = 24
 } RequestType;
 
 struct _jack_request {

@@ -16,7 +16,7 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=106
+JACK_MINOR_VERSION=107
 JACK_MICRO_VERSION=0
 
 dnl ---
@@ -27,7 +27,7 @@ dnl made to the way libjack communicates with jackd
 dnl that would break applications linked with an older
 dnl version of libjack.
 dnl ---
-JACK_PROTOCOL_VERSION=20
+JACK_PROTOCOL_VERSION=21
 
 dnl ---
 dnl HOWTO: updating the libjack interface version
@@ -44,7 +44,7 @@ dnl slacker than this, and closer to those for the JACK version
 dnl number.
 dnl ---
 JACK_API_CURRENT=0
-JACK_API_REVISION=27
+JACK_API_REVISION=28
 JACK_API_AGE=0
 
 AC_SUBST(JACK_MAJOR_VERSION)
@@ -71,7 +71,7 @@ AM_INIT_AUTOMAKE(jack-audio-connection-kit,${JACK_VERSION})
 AM_MAINTAINER_MODE
 
 AM_CONFIG_HEADER(config.h)
-AC_ENABLE_STATIC(yes)
+AC_ENABLE_STATIC(no)
 AC_ENABLE_SHARED(yes)
 AC_PROG_CC
 AC_PROG_CXX
@@ -443,7 +443,7 @@ AC_ARG_ENABLE(preemption-check,
 USE_CAPABILITIES=false
 
 AC_ARG_ENABLE(capabilities,
-              [  --enable-capabilities   use libcap to gain realtime scheduling priviledges],
+              [  --enable-capabilities   !!! LINUX 2.4 KERNELS ONLY !!! use libcap to gain realtime scheduling priviledges],
               [ if test "x$enable_capabilities" != "xno" ; then
                     AC_CHECK_LIB(cap, capgetp,
                                  [AC_CHECK_HEADER(sys/capability.h,

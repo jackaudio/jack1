@@ -123,6 +123,7 @@ static int jack_client_sort (jack_client_internal_t *a,
 			     jack_client_internal_t *b);
 static void jack_check_acyclic (jack_engine_t* engine);
 static void jack_compute_all_port_total_latencies (jack_engine_t *engine);
+static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_shared_t*);
 
 
 static inline int 
@@ -1327,6 +1328,13 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 	case RecomputeTotalLatencies:
 		jack_lock_graph (engine);
 		jack_compute_all_port_total_latencies (engine);
+		jack_unlock_graph (engine);
+		req->status = 0;
+		break;
+
+	case RecomputeTotalLatency:
+		jack_lock_graph (engine);
+		jack_compute_port_total_latency (engine, &engine->control->ports[req->x.port_info.port_id]);
 		jack_unlock_graph (engine);
 		req->status = 0;
 		break;
@@ -2652,12 +2660,23 @@ jack_get_port_total_latency (jack_engine_t *engine,
 }
 
 static void
+jack_compute_port_total_latency (jack_engine_t* engine, jack_port_shared_t* port)
+{
+	if (port->in_use) {
+		port->total_latency =
+			jack_get_port_total_latency (
+				engine, &engine->internal_ports[port->id],
+				0, !(port->flags & JackPortIsOutput));
+	}
+}
+
+static void
 jack_compute_all_port_total_latencies (jack_engine_t *engine)
 {
 	jack_port_shared_t *shared = engine->control->ports;
 	unsigned int i;
-	int toward_port;
-
+ 	int toward_port;
+ 
 	for (i = 0; i < engine->control->port_max; i++) {
 		if (shared[i].in_use) {
 			if (shared[i].flags & JackPortIsOutput) {
