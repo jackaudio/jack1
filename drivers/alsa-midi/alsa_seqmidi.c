@@ -60,7 +60,7 @@
 #define info_log(...)  MESSAGE(__VA_ARGS__)
 #define error_log(...) MESSAGE(__VA_ARGS__)
 
-#ifdef DEBUG
+#ifdef JACK_MIDI_DEBUG
 #define debug_log(...) MESSAGE(__VA_ARGS__)
 #else
 #define debug_log(...)
@@ -640,6 +640,12 @@ void set_process_info(struct process_info *info, alsa_seqmidi_t *self, int dir, 
 	snd_seq_get_queue_status(self->seq, self->queue, status);
 	alsa_time = snd_seq_queue_status_get_real_time(status);
 	info->alsa_time = alsa_time->tv_sec * NSEC_PER_SEC + alsa_time->tv_nsec;
+
+	if (info->period_start + info->nframes < info->cur_frames) {
+		int periods_lost = (info->cur_frames - info->period_start) / info->nframes; 
+		info->period_start += periods_lost * info->nframes;
+		debug_log("xrun detected: %d periods lost\n", periods_lost);
+	}
 }
 
 static
@@ -822,7 +828,7 @@ void do_jack_output(alsa_seqmidi_t *self, port_t *port, struct process_info* inf
 	for (i=0; i<nevents; ++i) {
 		jack_midi_event_t jack_event;
 		snd_seq_event_t alsa_event;
-		jack_nframes_t frame_offset;
+		int64_t frame_offset;
 		int64_t out_time;
 		snd_seq_real_time_t out_rt;
 		int err;
@@ -837,13 +843,21 @@ void do_jack_output(alsa_seqmidi_t *self, port_t *port, struct process_info* inf
 		snd_seq_ev_set_source(&alsa_event, self->port_id);
 		snd_seq_ev_set_dest(&alsa_event, port->remote.client, port->remote.port);
 
-		frame_offset = jack_event.time + info->period_start + info->nframes - info->cur_frames;
+		/* NOTE: in case of xrun it could become negative, so it is essential to use signed type! */
+		frame_offset = (int64_t)jack_event.time + info->period_start + info->nframes - info->cur_frames;
+		if (frame_offset < 0) {
+			frame_offset = info->nframes + jack_event.time;
+			error_log("internal xrun detected: frame_offset = %lld\n", frame_offset);
+		}
+		assert (frame_offset < info->nframes*2);
+
 		out_time = info->alsa_time + (frame_offset * NSEC_PER_SEC) / info->sample_rate;
 
 		// we should use absolute time to prevent reordering caused by rounding errors
-		if (out_time < port->last_out_time)
+		if (out_time < port->last_out_time) {
+			debug_log("alsa_out: limiting out_time %lld at %lld\n", out_time, port->last_out_time);
 			out_time = port->last_out_time;
-		else
+		} else
 			port->last_out_time = out_time;
 
 		out_rt.tv_nsec = out_time % NSEC_PER_SEC;
@@ -851,7 +865,9 @@ void do_jack_output(alsa_seqmidi_t *self, port_t *port, struct process_info* inf
 		snd_seq_ev_schedule_real(&alsa_event, self->queue, 0, &out_rt);
 
 		err = snd_seq_event_output(self->seq, &alsa_event);
-		debug_log("alsa_out: written %d bytes to %s at +%d: %d\n", jack_event.size, port->name, (int)frame_offset, err);
+
+		debug_log("alsa_out: written %d bytes to %s at %d (%lld): %d %s\n",
+			jack_event.size, port->name, (int)frame_offset, out_time - info->alsa_time, err, err < 0 ? snd_strerror(err) : "bytes queued");
 	}
 }
 

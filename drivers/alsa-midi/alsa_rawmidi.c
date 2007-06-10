@@ -36,6 +36,7 @@
 #include "midi_pack.h"
 #include "midi_unpack.h"
 
+
 #ifdef STANDALONE
 #define MESSAGE(...) fprintf(stderr, __VA_ARGS__)
 #else
@@ -45,7 +46,7 @@
 #define info_log(...)  MESSAGE(__VA_ARGS__)
 #define error_log(...) MESSAGE(__VA_ARGS__)
 
-#ifdef DEBUG
+#ifdef JACK_MIDI_DEBUG
 #define debug_log(...) MESSAGE(__VA_ARGS__)
 #else
 #define debug_log(...)
@@ -522,8 +523,6 @@ void alsa_get_id(alsa_id_t *id, snd_rawmidi_info_t *info)
 	id->id[3] = snd_rawmidi_info_get_subdevice(info);
 }
 
-#include <stdio.h>
-
 static inline
 void alsa_error(const char *func, int err)
 {
@@ -765,6 +764,7 @@ void jack_process(midi_stream_t *str, jack_nframes_t nframes)
 {
 	int r, w;
 	process_jack_t proc;
+	jack_nframes_t cur_frames;
 
 	if (!str->owner->keep_walking)
 		return;
@@ -772,6 +772,12 @@ void jack_process(midi_stream_t *str, jack_nframes_t nframes)
 	proc.midi = str->owner;
 	proc.nframes = nframes;
 	proc.frame_time = jack_last_frame_time(proc.midi->client);
+	cur_frames = jack_frame_time(proc.midi->client);
+	if (proc.frame_time + proc.nframes < cur_frames) {
+		int periods_lost = (cur_frames - proc.frame_time) / proc.nframes;
+		proc.frame_time += periods_lost * proc.nframes;
+		debug_log("xrun detected: %d periods lost\n", periods_lost);
+	}
 
 	// process existing ports
 	for (r=0, w=0; r<str->jack.nports; ++r) {
