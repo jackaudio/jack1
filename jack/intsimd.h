@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2005 Jussi Laako
+    Copyright (C) 2005-2007 Jussi Laako
      
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -39,9 +39,16 @@ typedef v4sf * pv4sf;
 
 extern int cpu_type;
 
+int have_3dnow (void);
+int have_sse (void);
+void x86_3dnow_copyf (float *, const float *, int);
+void x86_3dnow_add2f (float *, const float *, int);
+void x86_sse_copyf (float *, const float *, int);
+void x86_sse_add2f (float *, const float *, int);
+
 #endif /* ARCH_X86 */
 
-extern void jack_port_set_funcs (void);
+void jack_port_set_funcs (void);
 
 #endif /* __jack_intsimd_h__ */
 

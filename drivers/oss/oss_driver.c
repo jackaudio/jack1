@@ -1,7 +1,7 @@
 /*
 
 	OSS driver for Jack
-	Copyright (C) 2003-2005 Jussi Laako <jussi@sonarnerd.net>
+	Copyright (C) 2003-2007 Jussi Laako <jussi@sonarnerd.net>
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -456,6 +456,7 @@ static int oss_driver_start (oss_driver_t *driver)
 			samplesize = sizeof(short);
 			break;
 	}
+	driver->trigger = 0;
 	if (strcmp(indev, outdev) != 0)
 	{
 		if (driver->capture_channels > 0)
@@ -529,6 +530,8 @@ static int oss_driver_start (oss_driver_t *driver)
 		}
 		if (infd >= 0 && outfd >= 0)
 		{
+			ioctl(outfd, SNDCTL_DSP_SETTRIGGER, &driver->trigger);
+			driver->trigger = (PCM_ENABLE_INPUT|PCM_ENABLE_OUTPUT);
 			if (ioctl(infd, SNDCTL_DSP_SETDUPLEX, 0) < 0)
 			{
 				if (errno != EINVAL) /* Dont care */
@@ -961,6 +964,13 @@ static void *io_thread (void *param)
 				__FILE__, __LINE__);
 			return NULL;
 		}
+		if (driver->trigger)
+		{
+			/* don't care too much if this fails */
+			memset(localbuf, 0x00, localsize);
+			write(driver->outfd, localbuf, localsize);
+			ioctl(driver->outfd, SNDCTL_DSP_SETTRIGGER, &driver->trigger);
+		}
 
 		while (driver->run)
 		{
@@ -991,6 +1001,13 @@ static void *io_thread (void *param)
 	{
 		jack_error("OSS: malloc() failed: %s@%i", __FILE__, __LINE__);
 		return NULL;
+	}
+	if (driver->trigger)
+	{
+		/* don't care too much if this fails */
+		memset(localbuf, 0x00, localsize);
+		write(driver->outfd, localbuf, driver->outdevbufsize);
+		ioctl(driver->outfd, SNDCTL_DSP_SETTRIGGER, &driver->trigger);
 	}
 
 	while (driver->run)
@@ -1119,6 +1136,7 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	driver->indev = NULL;
 	driver->outdev = NULL;
 	driver->ignorehwbuf = 0;
+	driver->trigger = 0;
 
 	pnode = params;
 	while (pnode != NULL)

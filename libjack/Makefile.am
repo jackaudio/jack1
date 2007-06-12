@@ -23,7 +23,8 @@ SOURCE_FILES = \
              time.c \
 	     timestamps.c \
 	     transclient.c \
-	     unlock.c
+	     unlock.c \
+	     simd.c
 
 lib_LTLIBRARIES	= libjack.la
 

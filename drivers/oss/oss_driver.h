@@ -1,7 +1,7 @@
 /*
 
 	OSS driver for Jack
-	Copyright (C) 2003-2005 Jussi Laako <jussi@sonarnerd.net>
+	Copyright (C) 2003-2007 Jussi Laako <jussi@sonarnerd.net>
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -62,6 +62,7 @@ typedef struct _oss_driver
 	int outfd;
 	int format;
 	int ignorehwbuf;
+	int trigger;
 
 	size_t indevbufsize;
 	size_t outdevbufsize;

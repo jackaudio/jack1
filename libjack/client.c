@@ -63,9 +63,6 @@
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
-#ifdef ARCH_X86
-int cpu_type = 0;
-#endif /* ARCH_X86 */
 
 #define EVENT_POLL_INDEX 0
 #define WAIT_POLL_INDEX 1
@@ -82,98 +79,7 @@ typedef struct {
 
 #ifdef ARCH_X86
 
-static int
-have_3dnow ()
-{
-	unsigned int res = 0;
-
-#ifdef __x86_64__
-	asm volatile ("pushq %%rbx\n\t" : : : "memory");
-#else
-	asm volatile ("pushl %%ebx\n\t" : : : "memory");
-#endif
-	asm volatile (
-		"movl $0x80000000, %%eax\n\t" \
-		"cpuid\n\t" \
-		"cmpl $0x80000001, %%eax\n\t" \
-		"jl tdnow_prexit\n\t" \
-		\
-		"movl $0x80000001, %%eax\n\t" \
-		"cpuid\n\t" \
-		\
-		"xorl %%eax, %%eax\n\t" \
-		\
-		"movl $1, %%ecx\n\t" \
-		"shll $31, %%ecx\n\t" \
-		"testl %%ecx, %%edx\n\t" \
-		"jz tdnow_testexit\n\t" \
-		"movl $1, %%eax\n\t" \
-		\
-		"movl $1, %%ecx\n\t" \
-		"shll $30, %%ecx\n\t" \
-		"testl %%ecx, %%edx\n\t" \
-		"jz tdnow_testexit\n\t" \
-		"movl $2, %%eax\n\t" \
-		"jmp tdnow_testexit\n\t" \
-		\
-		"tdnow_prexit:\n\t" \
-		"xorl %%eax, %%eax\n\t" \
-		"tdnow_testexit:\n\t"
-		: "=a" (res)
-		:
-		: "ecx", "edx", "memory");
-#ifdef __x86_64__
-	asm volatile ("popq %%rbx\n\t" : : : "memory");
-#else
-	asm volatile ("popl %%ebx\n\t" : : : "memory");
-#endif
-	return res;
-}
-
-static int
-have_sse ()
-{
-	unsigned int res = 0;
-
-#ifdef __x86_64__
-	asm volatile ("pushq %%rbx\n\t" : : : "memory");
-#else
-	asm volatile ("pushl %%ebx\n\t" : : : "memory");
-#endif
-	asm volatile (
-		"movl $1, %%eax\n\t" \
-		"cpuid\n\t" \
-		\
-		"xorl %%eax, %%eax\n\t" \
-		\
-		"movl $1, %%ebx\n\t" \
-		"shll $25, %%ebx\n\t" \
-		"testl %%ebx, %%edx\n\t" \
-		"jz sse_testexit\n\t" \
-		"movl $1, %%eax\n\t" \
-		\
-		"movl $1, %%ebx\n\t" \
-		"shll $26, %%ebx\n\t" \
-		"testl %%ebx, %%edx\n\t" \
-		"jz sse_testexit\n\t" \
-		"movl $2, %%eax\n\t" \
-		\
-		"movl $1, %%ebx\n\t" \
-		"testl %%ebx, %%ecx\n\t" \
-		"jz sse_testexit\n\t" \
-		"movl $3, %%eax\n\t" \
-		\
-		"sse_testexit:\n\t"
-		: "=a" (res)
-		:
-		: "ecx", "edx", "memory");
-#ifdef __x86_64__
-	asm volatile ("popq %%rbx\n\t" : : : "memory");
-#else
-	asm volatile ("popl %%ebx\n\t" : : : "memory");
-#endif
-	return res;
-}
+int cpu_type = 0;
 
 static void
 init_cpu ()
