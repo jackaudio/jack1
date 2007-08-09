@@ -1248,9 +1248,10 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 	
 	while (need_playback || need_capture) {
 
-		unsigned int p_timed_out, c_timed_out;
+		int poll_result;
 		unsigned int ci = 0;
 		unsigned int nfds;
+		unsigned short revents;
 
 		nfds = 0;
 
@@ -1294,7 +1295,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			driver->poll_late++;
 		}
 
-		if (poll (driver->pfd, nfds, driver->poll_timeout) < 0) {
+		poll_result = poll (driver->pfd, nfds, driver->poll_timeout);
+		if (poll_result < 0) {
 
 			if (errno == EINTR) {
 				printf ("poll interrupt\n");
@@ -1350,25 +1352,20 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			return (driver->pfd[nfds-1].revents == POLLIN) ? 0 : -1;
 		}
 
-		p_timed_out = 0;
-		
 		if (need_playback) {
-			for (i = 0; i < driver->playback_nfds; i++) {
-				if (driver->pfd[i].revents & POLLERR) {
-					xrun_detected = TRUE;
-				}
-				
-				if (driver->pfd[i].revents == 0) {
-					p_timed_out++;
-#ifdef DEBUG_WAKEUP
-					fprintf (stderr, "%" PRIu64
-						 " playback stream timed out\n",
-						 poll_ret);
-#endif
-				}
+			if (snd_pcm_poll_descriptors_revents
+			    (driver->playback_handle, &driver->pfd[0],
+			     driver->playback_nfds, &revents) < 0) {
+				jack_error ("ALSA: playback revents failed");
+				*status = -6;
+				return 0;
 			}
-			
-			if (p_timed_out == 0) {
+
+			if (revents & POLLERR) {
+				xrun_detected = TRUE;
+			}
+
+			if (revents & POLLOUT) {
 				need_playback = 0;
 #ifdef DEBUG_WAKEUP
 				fprintf (stderr, "%" PRIu64
@@ -1377,26 +1374,21 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 #endif
 			}
 		}
-		
-		c_timed_out = 0;
 
 		if (need_capture) {
-			for (i = ci; i < nfds; i++) {
-				if (driver->pfd[i].revents & POLLERR) {
-					xrun_detected = TRUE;
-				}
-				
-				if (driver->pfd[i].revents == 0) {
-					c_timed_out++;
-#ifdef DEBUG_WAKEUP
-					fprintf (stderr, "%" PRIu64
-						 " capture stream timed out\n",
-						 poll_ret);
-#endif
-				}
+			if (snd_pcm_poll_descriptors_revents
+			    (driver->capture_handle, &driver->pfd[ci],
+			     driver->capture_nfds, &revents) < 0) {
+				jack_error ("ALSA: capture revents failed");
+				*status = -6;
+				return 0;
 			}
-			
-			if (c_timed_out == 0) {
+
+			if (revents & POLLERR) {
+				xrun_detected = TRUE;
+			}
+
+			if (revents & POLLIN) {
 				need_capture = 0;
 #ifdef DEBUG_WAKEUP
 				fprintf (stderr, "%" PRIu64
@@ -1406,8 +1398,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			}
 		}
 		
-		if ((p_timed_out && (p_timed_out == driver->playback_nfds)) &&
-		    (c_timed_out && (c_timed_out == driver->capture_nfds))){
+		if (poll_result == 0) {
 			jack_error ("ALSA: poll time out, polled for %" PRIu64
 				    " usecs",
 				    poll_ret - poll_enter);
