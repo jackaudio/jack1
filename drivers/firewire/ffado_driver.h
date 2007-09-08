@@ -153,6 +153,9 @@ struct _ffado_jack_settings {
     int playback_ports;
     int capture_ports;
     
+    jack_nframes_t capture_frame_latency;
+    jack_nframes_t playback_frame_latency;
+    
     int slave_mode;
     int snoop_mode;
     
@@ -227,6 +230,9 @@ struct _ffado_driver
     JSList                       *monitor_ports;
     channel_t                     playback_nchannels;
     channel_t                     capture_nchannels;
+
+	jack_nframes_t  playback_frame_latency;
+	jack_nframes_t  capture_frame_latency;
     	
 	ffado_device_info_t device_info;
 	ffado_options_t device_options;
