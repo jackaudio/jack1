@@ -66,6 +66,15 @@
 #include "oss_driver.h"
 
 
+#ifndef SNDCTL_DSP_COOKEDMODE
+#ifdef _SIOWR
+#define SNDCTL_DSP_COOKEDMODE _SIOWR('P', 30, int)
+#else  /* _SIOWR */
+#warning "Unable to define cooked mode!"
+#define OSS_NO_COOKED_MODE
+#endif  /* _SIOWR */
+#endif  /* SNDCTL_DSP_COOKEDMODE */
+
 #define OSS_DRIVER_N_PARAMS	11
 const static jack_driver_param_desc_t oss_params[OSS_DRIVER_N_PARAMS] = {
 	{ "rate",
@@ -431,6 +440,7 @@ static int oss_driver_detach (oss_driver_t *driver, jack_engine_t *engine)
 
 static int oss_driver_start (oss_driver_t *driver)
 {
+	int flags = 0;
 	int format;
 	int channels;
 	int samplerate;
@@ -461,13 +471,16 @@ static int oss_driver_start (oss_driver_t *driver)
 	{
 		if (driver->capture_channels > 0)
 		{
-			infd = open(indev, O_RDONLY);
+			infd = open(indev, O_RDONLY|O_EXCL);
 			if (infd < 0)
 			{
 				jack_error(
 					"OSS: failed to open input device %s: %s@%i, errno=%d",
 					indev, __FILE__, __LINE__, errno);
 			}
+#ifndef OSS_NO_COOKED_MODE
+			ioctl(infd, SNDCTL_DSP_COOKEDMODE, &flags);
+#endif
 			fragsize = driver->period_size * 
 				driver->capture_channels * samplesize;
 			set_fragment(infd, fragsize, driver->nperiods);
@@ -476,13 +489,16 @@ static int oss_driver_start (oss_driver_t *driver)
 
 		if (driver->playback_channels > 0)
 		{
-			outfd = open(outdev, O_WRONLY);
+			outfd = open(outdev, O_WRONLY|O_EXCL);
 			if (outfd < 0)
 			{
 				jack_error(
 					"OSS: failed to open output device %s: %s@%i, errno=%d",
 					outdev, __FILE__, __LINE__, errno);
 			}
+#ifndef OSS_NO_COOKED_MODE
+			ioctl(outfd, SNDCTL_DSP_COOKEDMODE, &flags);
+#endif
 			fragsize = driver->period_size * 
 				driver->playback_channels * samplesize;
 			set_fragment(outfd, fragsize, driver->nperiods);
@@ -494,7 +510,7 @@ static int oss_driver_start (oss_driver_t *driver)
 		if (driver->capture_channels != 0 &&
 			driver->playback_channels == 0)
 		{
-			infd = open(indev, O_RDWR);
+			infd = open(indev, O_RDWR|O_EXCL);
 			outfd = -1;
 			if (infd < 0)
 			{
@@ -503,12 +519,15 @@ static int oss_driver_start (oss_driver_t *driver)
 					indev, __FILE__, __LINE__, errno);
 				return -1;
 			}
+#ifndef OSS_NO_COOKED_MODE
+			ioctl(infd, SNDCTL_DSP_COOKEDMODE, &flags);
+#endif
 		}
 		else if (driver->capture_channels == 0 &&
 			driver->playback_channels != 0)
 		{
 			infd = -1;
-			outfd = open(outdev, O_RDWR);
+			outfd = open(outdev, O_RDWR|O_EXCL);
 			if (outfd < 0)
 			{
 				jack_error(
@@ -516,10 +535,13 @@ static int oss_driver_start (oss_driver_t *driver)
 					outdev, __FILE__, __LINE__, errno);
 				return -1;
 			}
+#ifndef OSS_NO_COOKED_MODE
+			ioctl(outfd, SNDCTL_DSP_COOKEDMODE, &flags);
+#endif
 		}
 		else
 		{
-			infd = outfd = open(indev, O_RDWR);
+			infd = outfd = open(indev, O_RDWR|O_EXCL);
 			if (infd < 0)
 			{
 				jack_error(
@@ -527,6 +549,9 @@ static int oss_driver_start (oss_driver_t *driver)
 					indev, __FILE__, __LINE__, errno);
 				return -1;
 			}
+#ifndef OSS_NO_COOKED_MODE
+			ioctl(infd, SNDCTL_DSP_COOKEDMODE, &flags);
+#endif
 		}
 		if (infd >= 0 && outfd >= 0)
 		{

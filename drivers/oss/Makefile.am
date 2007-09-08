@@ -1,6 +1,6 @@
 MAINTAINCLEANFILES = Makefile.in
 
-AM_CFLAGS = $(JACK_CFLAGS) -I/opt/oss/include
+AM_CFLAGS = $(JACK_CFLAGS) -I/usr/lib/oss/include
 
 plugindir = $(ADDON_DIR)
 
