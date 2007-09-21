@@ -289,7 +289,7 @@ int alsa_seqmidi_attach(alsa_midi_t *m)
 	snd_seq_set_client_name(self->seq, self->alsa_name);
 	self->port_id = snd_seq_create_simple_port(self->seq, "port",
 		SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_WRITE
-#ifndef DEBUG
+#ifndef JACK_MIDI_DEBUG
 		|SND_SEQ_PORT_CAP_NO_EXPORT
 #endif
 		,SND_SEQ_PORT_TYPE_APPLICATION);
@@ -847,7 +847,7 @@ void do_jack_output(alsa_seqmidi_t *self, port_t *port, struct process_info* inf
 		frame_offset = (int64_t)jack_event.time + info->period_start + info->nframes - info->cur_frames;
 		if (frame_offset < 0) {
 			frame_offset = info->nframes + jack_event.time;
-			error_log("internal xrun detected: frame_offset = %lld\n", frame_offset);
+			error_log("internal xrun detected: frame_offset = %"PRId64"\n", frame_offset);
 		}
 		assert (frame_offset < info->nframes*2);
 
