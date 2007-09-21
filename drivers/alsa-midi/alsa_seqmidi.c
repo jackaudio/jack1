@@ -762,8 +762,8 @@ void input_event(alsa_seqmidi_t *self, snd_seq_event_t *alsa_event, struct proce
 		return;
 
 	// fixup NoteOn with vel 0
-	if (data[0] == 0x90 && data[2] == 0x00) {
-		data[0] = 0x80;
+	if ((data[0] & 0xF0) == 0x90 && data[2] == 0x00) {
+		data[0] = 0x80 + (data[0] & 0x0F);
 		data[2] = 0x40;
 	}
 
