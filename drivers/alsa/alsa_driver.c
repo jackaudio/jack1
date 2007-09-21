@@ -1552,16 +1552,21 @@ alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 	jack_port_t* port;
 	int err;
 
-	if (!driver->capture_handle || driver->engine->freewheeling) {
-		return 0;
-	}
 	if (nframes > driver->frames_per_cycle) {
 		return -1;
+	}
+	
+	if (driver->engine->freewheeling) {
+		return 0;
 	}
 
 	if (driver->midi)
 		(driver->midi->read)(driver->midi, nframes);
 	
+	if (!driver->capture_handle) {
+		return 0;
+	}
+
 	nread = 0;
 	contiguous = 0;
 	orig_nframes = nframes;
