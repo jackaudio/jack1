@@ -420,6 +420,8 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 {	
 	char path[PATH_MAX+1];
 
+	DEBUG ("graph reorder\n");
+
 	if (client->graph_wait_fd >= 0) {
 		DEBUG ("closing graph_wait_fd==%d", client->graph_wait_fd);
 		close (client->graph_wait_fd);
@@ -1402,7 +1404,8 @@ jack_client_core_wait (jack_client_t* client)
 			return 0;
 		}
 		
-		if ((client->pollfd[WAIT_POLL_INDEX].revents & POLLIN)) {
+		if (client->graph_wait_fd >= 0 &&
+		    (client->pollfd[WAIT_POLL_INDEX].revents & POLLIN)) {
 			DEBUG ("time to run process()\n");
 			break;
 		}
@@ -1423,6 +1426,7 @@ jack_wake_next_client (jack_client_t* client)
 
 	if (write (client->graph_next_fd, &c, sizeof (c))
 	    != sizeof (c)) {
+		DEBUG("cannot write byte to fd %d", client->graph_next_fd);
 		jack_error ("cannot continue execution of the "
 			    "processing graph (%s)",
 			    strerror(errno));
