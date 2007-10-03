@@ -77,12 +77,18 @@
 		4BA39A2005DD2C63008919E8 /* timestamps.h in Headers */ = {isa = PBXBuildFile; fileRef = 4BA39A1E05DD2C63008919E8 /* timestamps.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4BA39A2405DD2CA5008919E8 /* jack.h in Headers */ = {isa = PBXBuildFile; fileRef = 4BA39A2205DD2CA5008919E8 /* jack.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4BB9E097046FB05700053105 /* mach_port.h in Headers */ = {isa = PBXBuildFile; fileRef = 4BB9E091046FADED00053105 /* mach_port.h */; };
+		4BBB12790CB3C3DD00764FA8 /* intclient.h in Headers */ = {isa = PBXBuildFile; fileRef = 4BBB12780CB3C3DD00764FA8 /* intclient.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4BBB127A0CB3C3DD00764FA8 /* intclient.h in Headers */ = {isa = PBXBuildFile; fileRef = 4BBB12780CB3C3DD00764FA8 /* intclient.h */; };
+		4BBB12800CB3C42900764FA8 /* midiport.h in Headers */ = {isa = PBXBuildFile; fileRef = 4BBB127F0CB3C42900764FA8 /* midiport.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4BBB12810CB3C42900764FA8 /* midiport.h in Headers */ = {isa = PBXBuildFile; fileRef = 4BBB127F0CB3C42900764FA8 /* midiport.h */; };
+		4BBB12830CB3C43B00764FA8 /* statistics.h in Headers */ = {isa = PBXBuildFile; fileRef = 4BBB12820CB3C43B00764FA8 /* statistics.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		4BBB12840CB3C43B00764FA8 /* statistics.h in Headers */ = {isa = PBXBuildFile; fileRef = 4BBB12820CB3C43B00764FA8 /* statistics.h */; };
+		4BBB12910CB3C4B100764FA8 /* thread.h in Headers */ = {isa = PBXBuildFile; fileRef = 4B776793072D2B5700F14709 /* thread.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		4BE7704107A00B15001AA2F0 /* coreaudio_driver.c in Sources */ = {isa = PBXBuildFile; fileRef = 4BA736DC079FE7E00041E425 /* coreaudio_driver.c */; };
 		4BE7704207A00B15001AA2F0 /* coreaudio_driver.h in Headers */ = {isa = PBXBuildFile; fileRef = 4B1A736907252DDC007105CE /* coreaudio_driver.h */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		4B099343041FB67A00053105 /* fakepoll.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = fakepoll.h; sourceTree = "<group>"; };
 		4B117C5805DD0C3600B5DA5A /* jackd.c */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.c; name = jackd.c; path = ../../../jackd/jackd.c; sourceTree = SOURCE_ROOT; };
 		4B117C5A05DD0C4100B5DA5A /* engine.c */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.c; name = engine.c; path = ../../../jackd/engine.c; sourceTree = SOURCE_ROOT; };
 		4B117C5D05DD0C5B00B5DA5A /* transengine.c */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.c; name = transengine.c; path = ../../../jackd/transengine.c; sourceTree = SOURCE_ROOT; };
@@ -142,8 +148,11 @@
 		4BA736DC079FE7E00041E425 /* coreaudio_driver.c */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.c; name = coreaudio_driver.c; path = ../../../drivers/coreaudio/coreaudio_driver.c; sourceTree = SOURCE_ROOT; };
 		4BAA76A6047E0D5200053105 /* getopt.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = getopt.h; sourceTree = SOURCE_ROOT; };
 		4BB9E091046FADED00053105 /* mach_port.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = mach_port.h; sourceTree = "<group>"; };
+		4BBB12780CB3C3DD00764FA8 /* intclient.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = intclient.h; path = ../../../jack/intclient.h; sourceTree = SOURCE_ROOT; };
+		4BBB127F0CB3C42900764FA8 /* midiport.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = midiport.h; path = ../../../jack/midiport.h; sourceTree = SOURCE_ROOT; };
+		4BBB12820CB3C43B00764FA8 /* statistics.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = statistics.h; path = ../../../jack/statistics.h; sourceTree = SOURCE_ROOT; };
 		4BBB87310406EF300019BE76 /* jack_portaudio.so */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = jack_portaudio.so; sourceTree = BUILT_PRODUCTS_DIR; };
-		4BCA2603040B8B9400053105 /* jack_metro */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; path = jack_metro; sourceTree = BUILT_PRODUCTS_DIR; };
+		4BCA2603040B8B9400053105 /* jack_metro */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = jack_metro; sourceTree = BUILT_PRODUCTS_DIR; };
 		4BF87130040BDE8200053105 /* jack_connect */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; path = jack_connect; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -323,7 +332,6 @@
 			children = (
 				4B117C7A05DD0CC000B5DA5A /* config.h */,
 				4B16FF900467B5A000053105 /* pThreadUtilities.h */,
-				4B099343041FB67A00053105 /* fakepoll.h */,
 				4B5B51EA047D353A00053105 /* ipc.h */,
 				4BB9E091046FADED00053105 /* mach_port.h */,
 				4BAA76A6047E0D5200053105 /* getopt.h */,
@@ -356,6 +364,9 @@
 		4BA9D903040E0CC200053105 /* Headers */ = {
 			isa = PBXGroup;
 			children = (
+				4BBB12820CB3C43B00764FA8 /* statistics.h */,
+				4BBB127F0CB3C42900764FA8 /* midiport.h */,
+				4BBB12780CB3C3DD00764FA8 /* intclient.h */,
 				4B77679E072D2BAD00F14709 /* local.h */,
 				4B776799072D2B9500F14709 /* transengine.h */,
 				4B776780072D2B5700F14709 /* atomicity.h */,
@@ -398,6 +409,10 @@
 				4B7F53D80A470FE600075B93 /* types.h in Headers */,
 				4B7F53D90A470FE600075B93 /* timestamps.h in Headers */,
 				4B7F53DA0A470FE600075B93 /* jack.h in Headers */,
+				4BBB12790CB3C3DD00764FA8 /* intclient.h in Headers */,
+				4BBB12800CB3C42900764FA8 /* midiport.h in Headers */,
+				4BBB12830CB3C43B00764FA8 /* statistics.h in Headers */,
+				4BBB12910CB3C4B100764FA8 /* thread.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -424,6 +439,9 @@
 				4B4DCBA905DD235B00DC3452 /* types.h in Headers */,
 				4BA39A2005DD2C63008919E8 /* timestamps.h in Headers */,
 				4BA39A2405DD2CA5008919E8 /* jack.h in Headers */,
+				4BBB127A0CB3C3DD00764FA8 /* intclient.h in Headers */,
+				4BBB12810CB3C42900764FA8 /* midiport.h in Headers */,
+				4BBB12840CB3C43B00764FA8 /* statistics.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
