@@ -18,8 +18,16 @@
 		4B117C8005DD0D7700B5DA5A /* portaudio_driver.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B117C7F05DD0D7700B5DA5A /* portaudio_driver.c */; };
 		4B117C8205DD0D7D00B5DA5A /* portaudio_driver.h in Headers */ = {isa = PBXBuildFile; fileRef = 4B117C8105DD0D7D00B5DA5A /* portaudio_driver.h */; };
 		4B117C8305DD0DA700B5DA5A /* driver.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B117C6905DD0C8D00B5DA5A /* driver.c */; };
-		4B29A1C50B53A62E00C7ED2F /* Info-Jack_framework.plist in Resources */ = {isa = PBXBuildFile; fileRef = 4B29A1C40B53A62E00C7ED2F /* Info-Jack_framework.plist */; };
-		4B29A1C60B53A62E00C7ED2F /* Info-Jack_framework.plist in Resources */ = {isa = PBXBuildFile; fileRef = 4B29A1C40B53A62E00C7ED2F /* Info-Jack_framework.plist */; };
+		4B23C9310CB3B5CC00E87090 /* Jackframework-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 4B23C9300CB3B5CC00E87090 /* Jackframework-Info.plist */; };
+		4B23C9320CB3B5CC00E87090 /* Jackframework-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 4B23C9300CB3B5CC00E87090 /* Jackframework-Info.plist */; };
+		4B23C9380CB3B63800E87090 /* intclient.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B23C9370CB3B63800E87090 /* intclient.c */; };
+		4B23C9390CB3B63800E87090 /* intclient.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B23C9370CB3B63800E87090 /* intclient.c */; };
+		4B23C93B0CB3B63F00E87090 /* messagebuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B23C93A0CB3B63F00E87090 /* messagebuffer.c */; };
+		4B23C93C0CB3B63F00E87090 /* messagebuffer.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B23C93A0CB3B63F00E87090 /* messagebuffer.c */; };
+		4B23C93E0CB3B65400E87090 /* simd.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B23C93D0CB3B65400E87090 /* simd.c */; };
+		4B23C93F0CB3B65400E87090 /* simd.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B23C93D0CB3B65400E87090 /* simd.c */; };
+		4B23C9410CB3B65F00E87090 /* unlock.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B23C9400CB3B65F00E87090 /* unlock.c */; };
+		4B23C9420CB3B65F00E87090 /* unlock.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B23C9400CB3B65F00E87090 /* unlock.c */; };
 		4B4DCB9405DD229F00DC3452 /* port.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B117C6305DD0C8000B5DA5A /* port.c */; };
 		4B4DCB9505DD22AF00DC3452 /* pool.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B117C6605DD0C8700B5DA5A /* pool.c */; };
 		4B4DCB9805DD22C300DC3452 /* shm.c in Sources */ = {isa = PBXBuildFile; fileRef = 4B117C7205DD0C9D00B5DA5A /* shm.c */; };
@@ -90,7 +98,11 @@
 		4B117C8105DD0D7D00B5DA5A /* portaudio_driver.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = portaudio_driver.h; path = ../../../drivers/portaudio/portaudio_driver.h; sourceTree = SOURCE_ROOT; };
 		4B16FF900467B5A000053105 /* pThreadUtilities.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = pThreadUtilities.h; sourceTree = SOURCE_ROOT; };
 		4B1A736907252DDC007105CE /* coreaudio_driver.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = coreaudio_driver.h; path = ../../../drivers/coreaudio/coreaudio_driver.h; sourceTree = SOURCE_ROOT; };
-		4B29A1C40B53A62E00C7ED2F /* Info-Jack_framework.plist */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = text.xml; path = "Info-Jack_framework.plist"; sourceTree = SOURCE_ROOT; };
+		4B23C9300CB3B5CC00E87090 /* Jackframework-Info.plist */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = text.xml; path = "Jackframework-Info.plist"; sourceTree = SOURCE_ROOT; };
+		4B23C9370CB3B63800E87090 /* intclient.c */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.c; name = intclient.c; path = ../../../libjack/intclient.c; sourceTree = SOURCE_ROOT; };
+		4B23C93A0CB3B63F00E87090 /* messagebuffer.c */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.c; name = messagebuffer.c; path = ../../../libjack/messagebuffer.c; sourceTree = SOURCE_ROOT; };
+		4B23C93D0CB3B65400E87090 /* simd.c */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.c; name = simd.c; path = ../../../libjack/simd.c; sourceTree = SOURCE_ROOT; };
+		4B23C9400CB3B65F00E87090 /* unlock.c */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.c; name = unlock.c; path = ../../../libjack/unlock.c; sourceTree = SOURCE_ROOT; };
 		4B4DCBA105DD234100DC3452 /* ringbuffer.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = ringbuffer.h; path = ../../../jack/ringbuffer.h; sourceTree = SOURCE_ROOT; };
 		4B4DCBA405DD234800DC3452 /* transport.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = transport.h; path = ../../../jack/transport.h; sourceTree = SOURCE_ROOT; };
 		4B4DCBA705DD235B00DC3452 /* types.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = types.h; path = ../../../jack/types.h; sourceTree = SOURCE_ROOT; };
@@ -131,7 +143,7 @@
 		4BAA76A6047E0D5200053105 /* getopt.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = getopt.h; sourceTree = SOURCE_ROOT; };
 		4BB9E091046FADED00053105 /* mach_port.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = mach_port.h; sourceTree = "<group>"; };
 		4BBB87310406EF300019BE76 /* jack_portaudio.so */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.dylib"; path = jack_portaudio.so; sourceTree = BUILT_PRODUCTS_DIR; };
-		4BCA2603040B8B9400053105 /* jack_metro */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = jack_metro; sourceTree = BUILT_PRODUCTS_DIR; };
+		4BCA2603040B8B9400053105 /* jack_metro */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; path = jack_metro; sourceTree = BUILT_PRODUCTS_DIR; };
 		4BF87130040BDE8200053105 /* jack_connect */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; path = jack_connect; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -247,7 +259,7 @@
 		08FB7794FE84155DC02AAC07 /* jackd */ = {
 			isa = PBXGroup;
 			children = (
-				4B29A1C40B53A62E00C7ED2F /* Info-Jack_framework.plist */,
+				4B23C9300CB3B5CC00E87090 /* Jackframework-Info.plist */,
 				4BA9D903040E0CC200053105 /* Headers */,
 				4B6CBA33041F4DDF00053105 /* Porting_code */,
 				4B6AF278041F4DBC00053105 /* Samples */,
@@ -263,6 +275,9 @@
 			isa = PBXGroup;
 			children = (
 				4B89C95906F596060003AD09 /* thread.c */,
+				4B23C9370CB3B63800E87090 /* intclient.c */,
+				4B23C93D0CB3B65400E87090 /* simd.c */,
+				4B23C93A0CB3B63F00E87090 /* messagebuffer.c */,
 				4B117C6305DD0C8000B5DA5A /* port.c */,
 				4B117C6605DD0C8700B5DA5A /* pool.c */,
 				4B117C6905DD0C8D00B5DA5A /* driver.c */,
@@ -271,6 +286,7 @@
 				4B117C7205DD0C9D00B5DA5A /* shm.c */,
 				4B117C7505DD0CA000B5DA5A /* client.c */,
 				4B6683E30A2D8B2E00E8ADF8 /* midiport.c */,
+				4B23C9400CB3B65F00E87090 /* unlock.c */,
 				4B6683EC0A2D8C2A00E8ADF8 /* time.c */,
 			);
 			name = Client;
@@ -534,7 +550,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4B29A1C60B53A62E00C7ED2F /* Info-Jack_framework.plist in Resources */,
+				4B23C9310CB3B5CC00E87090 /* Jackframework-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -542,7 +558,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4B29A1C50B53A62E00C7ED2F /* Info-Jack_framework.plist in Resources */,
+				4B23C9320CB3B5CC00E87090 /* Jackframework-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -622,6 +638,10 @@
 				4B7F53E40A470FE600075B93 /* thread.c in Sources */,
 				4B7F53E50A470FE600075B93 /* midiport.c in Sources */,
 				4B7F53E60A470FE600075B93 /* time.c in Sources */,
+				4B23C9380CB3B63800E87090 /* intclient.c in Sources */,
+				4B23C93B0CB3B63F00E87090 /* messagebuffer.c in Sources */,
+				4B23C93E0CB3B65400E87090 /* simd.c in Sources */,
+				4B23C9410CB3B65F00E87090 /* unlock.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -653,6 +673,10 @@
 				4B89C95A06F596060003AD09 /* thread.c in Sources */,
 				4B6683E40A2D8B2E00E8ADF8 /* midiport.c in Sources */,
 				4B6683ED0A2D8C2A00E8ADF8 /* time.c in Sources */,
+				4B23C9390CB3B63800E87090 /* intclient.c in Sources */,
+				4B23C93C0CB3B63F00E87090 /* messagebuffer.c in Sources */,
+				4B23C93F0CB3B65400E87090 /* simd.c in Sources */,
+				4B23C9420CB3B65F00E87090 /* unlock.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -894,7 +918,7 @@
 					../../,
 					../../../,
 				);
-				INFOPLIST_FILE = "Info-Jack_framework.plist";
+				INFOPLIST_FILE = "Jackframework-Info.plist";
 				LIBRARY_SEARCH_PATHS = "";
 				OPTIMIZATION_CFLAGS = "-O0";
 				OTHER_LDFLAGS = (
@@ -934,7 +958,7 @@
 					../../,
 					../../../,
 				);
-				INFOPLIST_FILE = "Info-Jack_framework.plist";
+				INFOPLIST_FILE = "Jackframework-Info.plist";
 				LIBRARY_SEARCH_PATHS = "";
 				OTHER_LDFLAGS = (
 					"-framework",
@@ -971,7 +995,7 @@
 					../../,
 					../../../,
 				);
-				INFOPLIST_FILE = "Info-Jack_framework.plist";
+				INFOPLIST_FILE = "Jackframework-Info.plist";
 				LIBRARY_SEARCH_PATHS = "";
 				OTHER_LDFLAGS = (
 					"-framework",
