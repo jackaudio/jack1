@@ -1,5 +1,5 @@
 MAINTAINERCLEANFILES=Makefile.in
 
-#
-# nothing to do here
-#
+noinst_HEADERS = alsa_midi.h \
+		 midi_pack.h \
+		 midi_unpack.h
