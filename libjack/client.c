@@ -1217,6 +1217,8 @@ jack_client_process_events (jack_client_t* client)
 	jack_event_t event;
 	char status = 0;
 	jack_client_control_t *control = client->control;
+	JSList *node;
+	jack_port_t* port;
 
 	if (client->pollfd[EVENT_POLL_INDEX].revents & POLLIN) {
 		
@@ -1237,6 +1239,12 @@ jack_client_process_events (jack_client_t* client)
 		
 		switch (event.type) {
 		case PortRegistered:
+			for (node = client->ports_ext; node; node = jack_slist_next (node)) {
+				port = node->data;
+				if (port->shared->id == event.x.port_id) { // Found port, update port type
+					port->type_info = &client->engine->port_types[port->shared->ptype_id];
+				}
+			}
 			if (control->port_register) {
 				control->port_register
 					(event.x.port_id, TRUE,
