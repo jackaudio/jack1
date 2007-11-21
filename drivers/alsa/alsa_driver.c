@@ -622,8 +622,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	driver->user_nperiods = user_nperiods;
 
 	fprintf (stderr, "configuring for %" PRIu32 "Hz, period = %"
-		 PRIu32 " frames, buffer = %" PRIu32 " periods\n",
-		 rate, frames_per_cycle, user_nperiods);
+		 PRIu32 " frames (%.1f ms), buffer = %" PRIu32 " periods\n",
+		 rate, frames_per_cycle, (((float)frames_per_cycle / (float) rate) * 1000.0f), user_nperiods);
 	
 	if (driver->capture_handle) {
 		if (alsa_driver_configure_stream (
