@@ -64,9 +64,8 @@ static int
 freebob_driver_attach (freebob_driver_t *driver)
 {
 	char buf[64];
-#ifdef FREEBOB_DRIVER_WITH_JACK_MIDI
 	char buf2[64];
-#endif
+
 	channel_t chn;
 	jack_port_t *port=NULL;
 	int port_flags;
@@ -129,11 +128,12 @@ freebob_driver_attach (freebob_driver_t *driver)
 		freebob_streaming_get_capture_stream_name(driver->dev, chn, buf, sizeof(buf) - 1);
 		switch(freebob_streaming_get_capture_stream_type(driver->dev, chn)) {
 		case freebob_stream_type_audio:
-			printMessage ("Registering audio capture port %s", buf);
-			if ((port = jack_port_register (driver->client, buf,
+			snprintf(buf2, 64, "C%d_%s",(int)chn,buf); // needed to avoid duplicate names
+			printMessage ("Registering audio capture port %s", buf2);
+			if ((port = jack_port_register (driver->client, buf2,
 							JACK_DEFAULT_AUDIO_TYPE,
 							port_flags, 0)) == NULL) {
-				printError (" cannot register port for %s", buf);
+				printError (" cannot register port for %s", buf2);
 				error=1;
 				break;
 			}
@@ -143,7 +143,7 @@ freebob_driver_attach (freebob_driver_t *driver)
 
 #ifdef FREEBOB_DRIVER_WITH_JACK_MIDI
 		case freebob_stream_type_midi:
-			snprintf(buf2, 64, "midiin%d_%s",(int)chn,buf); // needed to avoid duplicate names
+			snprintf(buf2, 64, "CM%d_%s",(int)chn,buf); // needed to avoid duplicate names
 			printMessage ("Registering midi capture port %s", buf2);
 			if ((port = jack_port_register (driver->client, buf2,
 							JACK_DEFAULT_MIDI_TYPE,
@@ -191,11 +191,12 @@ freebob_driver_attach (freebob_driver_t *driver)
 		
 		switch(freebob_streaming_get_playback_stream_type(driver->dev, chn)){
 		case freebob_stream_type_audio:
-			printMessage ("Registering playback audio port %s", buf);
-			if ((port = jack_port_register (driver->client, buf,
+			snprintf(buf2, 64, "P%d_%s",(int)chn,buf); // needed to avoid duplicate names
+			printMessage ("Registering playback audio port %s", buf2);
+			if ((port = jack_port_register (driver->client, buf2,
 							JACK_DEFAULT_AUDIO_TYPE,
 							port_flags, 0)) == NULL) {
-				printError(" cannot register port for %s", buf);
+				printError(" cannot register port for %s", buf2);
 				error=1;
 				break;
 			}
@@ -204,7 +205,7 @@ freebob_driver_attach (freebob_driver_t *driver)
 			break;
 #ifdef FREEBOB_DRIVER_WITH_JACK_MIDI
 		case freebob_stream_type_midi:
-			snprintf(buf2, 64, "midiout%d_%s",(int)chn,buf); // needed to avoid duplicate names
+			snprintf(buf2, 64, "PM%d_%s",(int)chn,buf); // needed to avoid duplicate names
 			printMessage ("Registering playback midi port %s", buf2);
 			if ((port = jack_port_register (driver->client, buf2,
 							JACK_DEFAULT_MIDI_TYPE,

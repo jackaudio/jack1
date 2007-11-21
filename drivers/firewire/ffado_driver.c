@@ -63,6 +63,7 @@ static int
 ffado_driver_attach (ffado_driver_t *driver)
 {
 	char buf[64];
+	char buf2[64];
 	channel_t chn;
 	jack_port_t *port=NULL;
 	int port_flags;
@@ -123,24 +124,25 @@ ffado_driver_attach (ffado_driver_t *driver)
 			driver->capture_ports =
 				jack_slist_append (driver->capture_ports, NULL);
 		} else {
-			printMessage ("Registering capture port %s", buf);
-			if ((port = jack_port_register (driver->client, buf,
+			snprintf(buf2, 64, "C%d_%s",(int)chn,buf); // needed to avoid duplicate names
+			printMessage ("Registering capture port %s", buf2);
+			if ((port = jack_port_register (driver->client, buf2,
 							JACK_DEFAULT_AUDIO_TYPE,
 							port_flags, 0)) == NULL) {
-				printError (" cannot register port for %s", buf);
+				printError (" cannot register port for %s", buf2);
 				break;
 			}
 			driver->capture_ports =
 				jack_slist_append (driver->capture_ports, port);
 			// setup port parameters
 			if(ffado_streaming_set_capture_buffer_type(driver->dev, chn, ffado_buffer_type_float)) {
-				printError(" cannot set port buffer type for %s", buf);
+				printError(" cannot set port buffer type for %s", buf2);
 			}
 			if (ffado_streaming_set_capture_stream_buffer(driver->dev, chn, NULL)) {
-				printError(" cannot configure initial port buffer for %s", buf);
+				printError(" cannot configure initial port buffer for %s", buf2);
 			}
 			if(ffado_streaming_capture_stream_onoff(driver->dev, chn, 1)) {
-				printError(" cannot enable port %s", buf);
+				printError(" cannot enable port %s", buf2);
 			}
 		}
 		jack_port_set_latency (port, driver->period_size + driver->capture_frame_latency);
@@ -162,11 +164,12 @@ ffado_driver_attach (ffado_driver_t *driver)
 			driver->playback_ports =
 				jack_slist_append (driver->playback_ports, NULL);
 		} else {
-			printMessage ("Registering playback port %s", buf);
-			if ((port = jack_port_register (driver->client, buf,
+			snprintf(buf2, 64, "P%d_%s",(int)chn,buf); // needed to avoid duplicate names
+			printMessage ("Registering playback port %s", buf2);
+			if ((port = jack_port_register (driver->client, buf2,
 							JACK_DEFAULT_AUDIO_TYPE,
 							port_flags, 0)) == NULL) {
-				printError(" cannot register port for %s", buf);
+				printError(" cannot register port for %s", buf2);
 				break;
 			}
 			driver->playback_ports =
@@ -174,13 +177,13 @@ ffado_driver_attach (ffado_driver_t *driver)
 
 			// setup port parameters
 			if(ffado_streaming_set_playback_buffer_type(driver->dev, chn, ffado_buffer_type_float)) {
-				printError(" cannot set port buffer type for %s", buf);
+				printError(" cannot set port buffer type for %s", buf2);
 			}
 			if (ffado_streaming_set_playback_stream_buffer(driver->dev, chn, NULL)) {
-				printError(" cannot configure initial port buffer for %s", buf);
+				printError(" cannot configure initial port buffer for %s", buf2);
 			}
 			if(ffado_streaming_playback_stream_onoff(driver->dev, chn, 1)) {
-				printError(" cannot enable port %s", buf);
+				printError(" cannot enable port %s", buf2);
 			}
 		}
 		jack_port_set_latency (port, (driver->period_size * (driver->device_options.nb_buffers - 1)) + driver->playback_frame_latency);
