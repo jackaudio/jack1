@@ -82,15 +82,15 @@
 
 	#warning Building debug build!
 
-	#define printMessage(format, args...) jack_error( "FreeBoB MSG: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
-	#define printError(format, args...) jack_error( "FreeBoB ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
+	#define printMessage(format, args...) jack_error( "firewire MSG: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
+	#define printError(format, args...) jack_error( "firewire ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
 	
 	//#define printEnter() jack_error( "FBDRV ENTERS: %s (%s)\n", __FUNCTION__,  __FILE__)
 	//#define printExit() jack_error( "FBDRV EXITS: %s (%s)\n", __FUNCTION__,  __FILE__)
 	#define printEnter() 
 	#define printExit() 
 	
-	#define debugError(format, args...) jack_error( "FREEBOB ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
+	#define debugError(format, args...) jack_error( "firewire ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
 	#define debugPrint(Level, format, args...) if(DEBUG_LEVEL & (Level))  jack_error("DEBUG %s:%d (%s) :"  format, __FILE__, __LINE__, __FUNCTION__, ##args );
 	#define debugPrintShort(Level, format, args...) if(DEBUG_LEVEL & (Level))  jack_error( format,##args );
 	#define debugPrintWithTimeStamp(Level, format, args...) if(DEBUG_LEVEL & (Level)) jack_error( "%16lu: "format, debugGetCurrentUTime(),##args );
@@ -99,8 +99,8 @@
 	#define DEBUG_LEVEL
 	
 	#define printMessage(format, args...) if(g_verbose) \
-	                                         jack_error("FreeBoB MSG: " format, ##args )
-	#define printError(format, args...)   jack_error("FreeBoB ERR: " format, ##args )
+	                                         jack_error("firewire MSG: " format, ##args )
+	#define printError(format, args...)   jack_error("firewire ERR: " format, ##args )
 	
 	#define printEnter() 
 	#define printExit() 
@@ -135,6 +135,8 @@ typedef struct _ffado_driver ffado_driver_t;
 
 typedef struct _ffado_jack_settings ffado_jack_settings_t;
 struct _ffado_jack_settings {
+    int verbose_level;
+
     int period_size_set;
     jack_nframes_t period_size;
     
@@ -143,13 +145,7 @@ struct _ffado_jack_settings {
     
     int buffer_size_set;
     jack_nframes_t buffer_size;
-    
-    int port_set;
-    int port;
-   
-    int node_id_set;
-    int node_id;
-    
+
     int playback_ports;
     int capture_ports;
     
@@ -159,7 +155,7 @@ struct _ffado_jack_settings {
     int slave_mode;
     int snoop_mode;
     
-    ffado_handle_t fb_handle;
+    char *device_info;
 };
 
 #ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
@@ -202,7 +198,7 @@ typedef struct _ffado_driver_midi_handle {
 
 struct _ffado_driver
 {
-	JACK_DRIVER_NT_DECL
+	JACK_DRIVER_NT_DECL;
 	
 	jack_nframes_t  sample_rate;
 	jack_nframes_t  period_size;
@@ -222,7 +218,7 @@ struct _ffado_driver
 	/* settings from the command line */
 	ffado_jack_settings_t settings;
 	
-	/* the freebob virtual device */
+	/* the firewire virtual device */
 	ffado_device_t *dev;
 	
     JSList                       *capture_ports;

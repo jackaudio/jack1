@@ -56,6 +56,8 @@ static int ffado_driver_stop (ffado_driver_t *driver);
 	static int ffado_driver_midi_stop (ffado_driver_midi_handle_t *m);
 #endif
 
+#define FIREWIRE_REQUIRED_FFADO_API_VERSION 3
+
 // enable verbose messages
 static int g_verbose=0;
 
@@ -69,7 +71,6 @@ ffado_driver_attach (ffado_driver_t *driver)
 	int port_flags;
 
 	g_verbose=driver->engine->verbose;
-	driver->device_options.verbose=g_verbose;
 
 	driver->engine->set_buffer_size (driver->engine, driver->period_size);
 	driver->engine->set_sample_rate (driver->engine, driver->sample_rate);
@@ -83,7 +84,7 @@ ffado_driver_attach (ffado_driver_t *driver)
 		driver->device_options.packetizer_priority=98;
 	}
 
-	driver->dev=ffado_streaming_init(&driver->device_info,driver->device_options);
+	driver->dev=ffado_streaming_init(driver->device_info, driver->device_options);
 
 	if(!driver->dev) {
 		printError("Error creating FFADO streaming device");
@@ -606,12 +607,12 @@ ffado_driver_new (jack_client_t * client,
 
 	assert(params);
 
-	if(ffado_get_api_version() != 2) {
+	if(ffado_get_api_version() != FIREWIRE_REQUIRED_FFADO_API_VERSION) {
 		printError("Incompatible libffado version! (%s)", ffado_get_version());
 		return NULL;
 	}
 
-	printMessage("Starting Freebob backend (%s)", ffado_get_version());
+	printMessage("Starting firewire backend (%s)", ffado_get_version());
 
 	driver = calloc (1, sizeof (ffado_driver_t));
 
@@ -646,22 +647,18 @@ ffado_driver_new (jack_client_t * client,
 	driver->device_options.sample_rate=params->sample_rate;
 	driver->device_options.period_size=params->period_size;
 	driver->device_options.nb_buffers=params->buffer_size;
-	driver->device_options.node_id=params->node_id;
-	driver->device_options.port=params->port;
 	driver->capture_frame_latency = params->capture_frame_latency;
 	driver->playback_frame_latency = params->playback_frame_latency;
 	driver->device_options.slave_mode=params->slave_mode;
 	driver->device_options.snoop_mode=params->snoop_mode;
-
-	if(!params->capture_ports) {
-		driver->device_options.directions |= FFADO_IGNORE_CAPTURE;
-	}
-
-	if(!params->playback_ports) {
-		driver->device_options.directions |= FFADO_IGNORE_PLAYBACK;
-	}
-
-	debugPrint(DEBUG_LEVEL_STARTUP, " Driver compiled on %s %s", __DATE__, __TIME__);
+	driver->device_options.verbose=params->verbose_level;
+	
+	driver->device_info.nb_device_spec_strings=1;
+	driver->device_info.device_spec_strings=calloc(1, sizeof(char *));
+	driver->device_info.device_spec_strings[0]=strdup(params->device_info);
+	
+	debugPrint(DEBUG_LEVEL_STARTUP, " Driver compiled on %s %s for FFADO %s (API version %d)",
+	                                __DATE__, __TIME__, ffado_get_version(), ffado_get_api_version());
 	debugPrint(DEBUG_LEVEL_STARTUP, " Created driver %s", name);
 	debugPrint(DEBUG_LEVEL_STARTUP, "            period_size: %d", driver->period_size);
 	debugPrint(DEBUG_LEVEL_STARTUP, "            period_usecs: %d", driver->period_usecs);
@@ -674,7 +671,12 @@ ffado_driver_new (jack_client_t * client,
 static void
 ffado_driver_delete (ffado_driver_t *driver)
 {
+	unsigned int i;
 	jack_driver_nt_finish ((jack_driver_nt_t *) driver);
+	for (i=0; i < driver->device_info.nb_device_spec_strings; i++) {
+		free (driver->device_info.device_spec_strings[i]);
+	}
+	free (driver->device_info.device_spec_strings);
 	free (driver);
 }
 
@@ -811,7 +813,7 @@ static ffado_driver_midi_handle_t *ffado_driver_midi_init(ffado_driver_t *driver
 		return NULL;
 	}
 
-	snd_seq_set_client_name(m->seq_handle, "FreeBoB Jack MIDI");
+	snd_seq_set_client_name(m->seq_handle, "firewire Jack MIDI");
 
 	// find out the number of midi in/out ports we need to setup
 	nchannels=ffado_streaming_get_nb_capture_streams(dev);
@@ -1038,7 +1040,7 @@ driver_get_descriptor ()
 	desc = calloc (1, sizeof (jack_driver_desc_t));
 
 	strcpy (desc->name, "firewire");
-	desc->nparams = 10;
+	desc->nparams = 11;
   
 	params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 	desc->params = params;
@@ -1048,8 +1050,8 @@ driver_get_descriptor ()
 	params[i].character  = 'd';
 	params[i].type       = JackDriverParamString;
 	strcpy (params[i].value.str,  "hw:0");
-	strcpy (params[i].short_desc, "The FireWire device to use. Format is: 'hw:port[,node]'.");
-	strcpy (params[i].long_desc,  params[i].short_desc);
+	strcpy (params[i].short_desc, "The FireWire device to use.");
+	strcpy (params[i].long_desc,  "The FireWire device to use. Please consult the FFADO documentation for more info.");
 	
 	i++;
 	strcpy (params[i].name, "period");
@@ -1122,6 +1124,14 @@ driver_get_descriptor ()
 	params[i].value.ui   = 0U;
 	strcpy (params[i].short_desc, "Operate in snoop mode");
 	strcpy (params[i].long_desc, params[i].short_desc);
+	
+	i++;
+	strcpy (params[i].name, "verbose");
+	params[i].character  = 'v';
+	params[i].type       = JackDriverParamUInt;
+	params[i].value.ui   = 0U;
+	strcpy (params[i].short_desc, "Verbose level for the firewire backend");
+	strcpy (params[i].long_desc, params[i].short_desc);
 
 	return desc;
 }
@@ -1132,36 +1142,29 @@ driver_initialize (jack_client_t *client, JSList * params)
 {
 	jack_driver_t *driver;
 
-    unsigned int port=0;
-    unsigned int node_id=-1;
-    int nbitems;
-      
 	const JSList * node;
 	const jack_driver_param_t * param;
 
 	ffado_jack_settings_t cmlparams;
-	
-    char *device_name="hw:0"; 
-      
+
+	char *device_name="hw:0"; 
+
 	cmlparams.period_size_set=0;
 	cmlparams.sample_rate_set=0;
 	cmlparams.buffer_size_set=0;
-	cmlparams.port_set=0;
-	cmlparams.node_id_set=0;
 
 	/* default values */
 	cmlparams.period_size=1024;
 	cmlparams.sample_rate=48000;
 	cmlparams.buffer_size=3;
-	cmlparams.port=0;
-	cmlparams.node_id=-1;
 	cmlparams.playback_ports=1;
 	cmlparams.capture_ports=1;
 	cmlparams.playback_frame_latency=0;
 	cmlparams.capture_frame_latency=0;
 	cmlparams.slave_mode=0;
 	cmlparams.snoop_mode=0;
-	
+	cmlparams.verbose_level=0;
+
 	for (node = params; node; node = jack_slist_next (node))
 	{
 		param = (jack_driver_param_t *) node->data;
@@ -1178,7 +1181,7 @@ driver_initialize (jack_client_t *client, JSList * params)
 		case 'n':
 			cmlparams.buffer_size = param->value.ui;
 			cmlparams.buffer_size_set = 1;
-			break;        
+			break;
 		case 'r':
 			cmlparams.sample_rate = param->value.ui;
 			cmlparams.sample_rate_set = 1;
@@ -1201,34 +1204,15 @@ driver_initialize (jack_client_t *client, JSList * params)
 		case 'X':
 			cmlparams.snoop_mode = param->value.ui;
 			break;
+		case 'v':
+			cmlparams.verbose_level = param->value.ui;
+			break;
 		}
 	}
-	
-    nbitems=sscanf(device_name,"hw:%u,%u",&port,&node_id);
-    if (nbitems<2) {
-        nbitems=sscanf(device_name,"hw:%u",&port);
-      
-        if(nbitems < 1) {
-            free(device_name);
-            printError("device (-d) argument not valid\n");
-            return NULL;
-        } else {
-            cmlparams.port = port;
-            cmlparams.port_set=1;
-            
-            cmlparams.node_id = -1;
-            cmlparams.node_id_set=0;
-        }
-     } else {
-        cmlparams.port = port;
-        cmlparams.port_set=1;
-        
-        cmlparams.node_id = node_id;
-        cmlparams.node_id_set=1;
-     }
 
-    jack_error("FFADO using Firewire port %d, node %d",cmlparams.port,cmlparams.node_id);
-    
+        // temporary
+        cmlparams.device_info = device_name;
+
 	driver=(jack_driver_t *)ffado_driver_new (client, "ffado_pcm", &cmlparams);
 
 	return driver;
