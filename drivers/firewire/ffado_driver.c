@@ -56,7 +56,7 @@ static int ffado_driver_stop (ffado_driver_t *driver);
 	static int ffado_driver_midi_stop (ffado_driver_midi_handle_t *m);
 #endif
 
-#define FIREWIRE_REQUIRED_FFADO_API_VERSION 3
+#define FIREWIRE_REQUIRED_FFADO_API_VERSION 4
 
 // enable verbose messages
 static int g_verbose=0;
@@ -84,7 +84,7 @@ ffado_driver_attach (ffado_driver_t *driver)
 		driver->device_options.packetizer_priority=98;
 	}
 
-	driver->dev=ffado_streaming_init(driver->device_info, driver->device_options);
+	driver->dev = ffado_streaming_init(driver->device_info, driver->device_options);
 
 	if(!driver->dev) {
 		printError("Error creating FFADO streaming device");
@@ -191,7 +191,7 @@ ffado_driver_attach (ffado_driver_t *driver)
 
 	}
 
-	if(!ffado_streaming_prepare(driver->dev)) {
+	if(ffado_streaming_prepare(driver->dev)) {
 		printError("Could not prepare streaming device!");
 		return -1;
 	}
