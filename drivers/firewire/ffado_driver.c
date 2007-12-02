@@ -56,7 +56,7 @@ static int ffado_driver_stop (ffado_driver_t *driver);
 	static int ffado_driver_midi_stop (ffado_driver_midi_handle_t *m);
 #endif
 
-#define FIREWIRE_REQUIRED_FFADO_API_VERSION 4
+#define FIREWIRE_REQUIRED_FFADO_API_VERSION 5
 
 // enable verbose messages
 static int g_verbose=0;
