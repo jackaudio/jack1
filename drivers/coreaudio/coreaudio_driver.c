@@ -1,6 +1,6 @@
 /*
- Copyright © Grame, 2003.
- Copyright © Johnny Petrantoni, 2003.
+ Copyright ï¿½ Grame, 2003.
+ Copyright ï¿½ Johnny Petrantoni, 2003.
  
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -45,6 +45,7 @@
  May 17, 2006: S.Letz: Minor fix in driver_initialize.
  May 18, 2006: S.Letz: Document sample rate default value.
  May 31, 2006: S.Letz: Apply Rui patch for more consistent driver parameter naming.
+ Dec 04, 2007: S.Letz: Fix a bug in sample rate management (occuring in particular with "aggregate" devices).
  */
 
 #include <stdio.h>
@@ -270,7 +271,7 @@ static OSStatus display_device_names()
 		err = AudioDeviceGetProperty(devices[i], 0, false, kAudioDevicePropertyDeviceName, &size, device_name);
 		if (err != noErr) 
 			return err; 
-	
+		printf("ICI\n");
 		printf("Device name = \'%s\', internal_name = \'%s\' (to be used as -d parameter)\n", device_name, internal_name); 
 	}
 	
@@ -555,7 +556,8 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 	ComponentResult err1;
     UInt32 outSize;
 	UInt32 enableIO;
-	AudioStreamBasicDescription srcFormat, dstFormat, sampleRate;
+	AudioStreamBasicDescription srcFormat, dstFormat;
+	Float64 sampleRate;
 	int in_nChannels = 0;
 	int out_nChannels = 0;
 	int i;
@@ -695,43 +697,21 @@ static jack_driver_t *coreaudio_driver_new(char* name,
     }
 
 	// Set sample rate
-	if (capturing && inchannels > 0) {
-		outSize = sizeof(AudioStreamBasicDescription);
-		err = AudioDeviceGetProperty(driver->device_id, 0, true, kAudioDevicePropertyStreamFormat, &outSize, &sampleRate);
-		if (err != noErr) {
-			jack_error("Cannot get current sample rate");
-			printError(err);
-			goto error;
-		}
-
-		if (samplerate != (unsigned long)sampleRate.mSampleRate) {
-			sampleRate.mSampleRate = (Float64)samplerate;
-			err = AudioDeviceSetProperty(driver->device_id, NULL, 0, true, kAudioDevicePropertyStreamFormat, outSize, &sampleRate);
-			if (err != noErr) {
-				jack_error("Cannot set sample rate = %ld", samplerate);
-				printError(err);
-				goto error;
-			}
-		}
+	outSize =  sizeof(Float64);
+	err = AudioDeviceGetProperty(driver->device_id, 0, kAudioDeviceSectionGlobal, kAudioDevicePropertyNominalSampleRate, &outSize, &sampleRate);
+	if (err != noErr) {
+		jack_error("Cannot get current sample rate");
+		printError(err);
+		goto error;
 	}
-	
-	if (playing && outchannels > 0) {
-		outSize = sizeof(AudioStreamBasicDescription);
-		err = AudioDeviceGetProperty(driver->device_id, 0, false, kAudioDevicePropertyStreamFormat, &outSize, &sampleRate);
+
+	if (samplerate != (jack_nframes_t)sampleRate) {
+		sampleRate = (Float64)samplerate;
+		err = AudioDeviceSetProperty(driver->device_id, NULL, 0, kAudioDeviceSectionGlobal, kAudioDevicePropertyNominalSampleRate, outSize, &sampleRate);
 		if (err != noErr) {
-			jack_error("Cannot get current sample rate");
+			jack_error("Cannot set sample rate = %ld", samplerate);
 			printError(err);
 			goto error;
-		}
-
-		if (samplerate != (unsigned long)sampleRate.mSampleRate) {
-			sampleRate.mSampleRate = (Float64)samplerate;
-			err = AudioDeviceSetProperty(driver->device_id, NULL, 0, false, kAudioDevicePropertyStreamFormat, outSize, &sampleRate);
-			if (err != noErr) {
-				jack_error("Cannot set sample rate = %ld", samplerate);
-				printError(err);
-				goto error;
-			}
 		}
 	}
 

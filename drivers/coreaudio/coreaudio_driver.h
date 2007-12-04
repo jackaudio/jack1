@@ -1,6 +1,6 @@
 /*
-    Copyright © Grame, 2003.
-    Copyright © Johnny Petrantoni, 2003.
+    Copyright ï¿½ Grame, 2003.
+    Copyright ï¿½ Johnny Petrantoni, 2003.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -71,5 +71,11 @@ typedef struct {
 } coreaudio_driver_t;
 
 #define kVersion 01
+
+typedef	UInt8	CAAudioHardwareDeviceSectionID;
+#define	kAudioDeviceSectionInput	((CAAudioHardwareDeviceSectionID)0x01)
+#define	kAudioDeviceSectionOutput	((CAAudioHardwareDeviceSectionID)0x00)
+#define	kAudioDeviceSectionGlobal	((CAAudioHardwareDeviceSectionID)0x00)
+#define	kAudioDeviceSectionWildcard	((CAAudioHardwareDeviceSectionID)0xFF)
 
 #endif /* __jack_coreaudio_driver_h__ */
