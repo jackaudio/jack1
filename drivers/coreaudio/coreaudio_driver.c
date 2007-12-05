@@ -46,6 +46,7 @@
  May 18, 2006: S.Letz: Document sample rate default value.
  May 31, 2006: S.Letz: Apply Rui patch for more consistent driver parameter naming.
  Dec 04, 2007: S.Letz: Fix a bug in sample rate management (occuring in particular with "aggregate" devices).
+ Dec 05, 2007: S.Letz: Correct sample_rate management in Open. Better handling in sample_rate change listener.
  */
 
 #include <stdio.h>
@@ -350,15 +351,75 @@ static OSStatus render_input(void *inRefCon,
 	}
 }
 
+
+static OSStatus sr_notification(AudioDeviceID inDevice,
+        UInt32 inChannel,
+        Boolean	isInput,
+        AudioDevicePropertyID inPropertyID,
+        void* inClientData)
+{
+	coreaudio_driver_t* driver = (coreaudio_driver_t*)inClientData;
+	
+	switch (inPropertyID) {
+
+		case kAudioDevicePropertyNominalSampleRate: {
+			JCALog("JackCoreAudioDriver::SRNotificationCallback kAudioDevicePropertyNominalSampleRate \n");
+			driver->state = 1;
+			break;
+		}
+	}
+	
+	return noErr;
+}
+
 static OSStatus notification(AudioDeviceID inDevice,
 							UInt32 inChannel,
 							Boolean	isInput,
 							AudioDevicePropertyID inPropertyID,
 							void* inClientData)
 {
-    coreaudio_driver_t* ca_driver = (coreaudio_driver_t*)inClientData;
-    if (inPropertyID == kAudioDeviceProcessorOverload) {
-		ca_driver->xrun_detected = 1;
+    coreaudio_driver_t* driver = (coreaudio_driver_t*)inClientData;
+    switch (inPropertyID) {
+	
+		case kAudioDeviceProcessorOverload:
+			driver->xrun_detected = 1;
+			break;
+			
+		case kAudioDevicePropertyNominalSampleRate: {
+			UInt32 outSize =  sizeof(Float64);
+			Float64 sampleRate;
+			AudioStreamBasicDescription srcFormat, dstFormat;
+			OSStatus err = AudioDeviceGetProperty(driver->device_id, 0, kAudioDeviceSectionGlobal, kAudioDevicePropertyNominalSampleRate, &outSize, &sampleRate);
+			if (err != noErr) {
+				jack_error("Cannot get current sample rate");
+				return kAudioHardwareUnsupportedOperationError;
+			}
+			JCALog("JackCoreAudioDriver::NotificationCallback kAudioDevicePropertyNominalSampleRate %ld\n", (long)sampleRate);
+			outSize = sizeof(AudioStreamBasicDescription);
+			
+			// Update SR for input
+			err = AudioUnitGetProperty(driver->au_hal, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &srcFormat, &outSize);
+			if (err != noErr) {
+				jack_error("Error calling AudioUnitSetProperty - kAudioUnitProperty_StreamFormat kAudioUnitScope_Input");
+			}
+			srcFormat.mSampleRate = sampleRate;
+			err = AudioUnitSetProperty(driver->au_hal, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &srcFormat, outSize);
+			if (err != noErr) {
+				jack_error("Error calling AudioUnitSetProperty - kAudioUnitProperty_StreamFormat kAudioUnitScope_Input");
+			}
+		
+			// Update SR for output
+			err = AudioUnitGetProperty(driver->au_hal, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &dstFormat, &outSize);
+			if (err != noErr) {
+				jack_error("Error calling AudioUnitSetProperty - kAudioUnitProperty_StreamFormat kAudioUnitScope_Output");
+			}
+			dstFormat.mSampleRate = sampleRate;
+			err = AudioUnitSetProperty(driver->au_hal, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &dstFormat, outSize);
+			if (err != noErr) {
+				jack_error("Error calling AudioUnitSetProperty - kAudioUnitProperty_StreamFormat kAudioUnitScope_Output");
+			}
+			break;
+		}
     }
     return noErr;
 }
@@ -570,6 +631,7 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 		goto error;
     }
 
+	driver->state = 0;
     driver->frames_per_cycle = nframes;
     driver->frame_rate = samplerate;
     driver->capturing = capturing;
@@ -590,7 +652,7 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 	driver->playback_frame_latency = playback_latency;
 	
 	// Duplex
-    if (capture_driver_uid != NULL && playback_driver_uid != NULL) {
+    if (strcmp(capture_driver_uid, "") != 0 && strcmp(playback_driver_uid, "") != 0) {
 		JCALog("Open duplex \n");
         if (get_device_id_from_uid(playback_driver_uid, &driver->device_id) != noErr) {
             if (get_default_device(&driver->device_id) != noErr) {
@@ -604,7 +666,7 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 		}
 		
 	// Capture only
-	} else if (capture_driver_uid != NULL) {
+	} else if (strcmp(capture_driver_uid, "") != 0) {
 		JCALog("Open capture only \n");
 		if (get_device_id_from_uid(capture_driver_uid, &driver->device_id) != noErr) {
             if (get_default_input_device(&driver->device_id) != noErr) {
@@ -707,12 +769,30 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 
 	if (samplerate != (jack_nframes_t)sampleRate) {
 		sampleRate = (Float64)samplerate;
+		
+		// To get SR change notification
+		err = AudioDeviceAddPropertyListener(driver->device_id, 0, true, kAudioDevicePropertyNominalSampleRate, sr_notification, driver);
+		if (err != noErr) {
+			jack_error("Error calling AudioDeviceAddPropertyListener with kAudioDevicePropertyNominalSampleRate");
+			printError(err);
+			return -1;
+		}
 		err = AudioDeviceSetProperty(driver->device_id, NULL, 0, kAudioDeviceSectionGlobal, kAudioDevicePropertyNominalSampleRate, outSize, &sampleRate);
 		if (err != noErr) {
 			jack_error("Cannot set sample rate = %ld", samplerate);
 			printError(err);
-			goto error;
+			return -1;
 		}
+		
+		// Waiting for SR change notification
+		int count = 0;
+		while (!driver->state && count++ < 100) {
+			usleep(100000);
+			JCALog("Wait count = %ld\n", count);
+		}
+		
+		// Remove SR change notification
+		AudioDeviceRemovePropertyListener(driver->device_id, 0, true, kAudioDevicePropertyNominalSampleRate, sr_notification);
 	}
 
     // AUHAL
@@ -814,38 +894,34 @@ static jack_driver_t *coreaudio_driver_new(char* name,
     }
 
 	// Setup stream converters
-    if (capturing && inchannels > 0) {
-		srcFormat.mSampleRate = samplerate;
-		srcFormat.mFormatID = kAudioFormatLinearPCM;
-		srcFormat.mFormatFlags = kAudioFormatFlagsNativeFloatPacked | kLinearPCMFormatFlagIsNonInterleaved;
-		srcFormat.mBytesPerPacket = sizeof(float);
-		srcFormat.mFramesPerPacket = 1;
-		srcFormat.mBytesPerFrame = sizeof(float);
-		srcFormat.mChannelsPerFrame = outchannels;
-		srcFormat.mBitsPerChannel = 32;
+  	srcFormat.mSampleRate = samplerate;
+	srcFormat.mFormatID = kAudioFormatLinearPCM;
+	srcFormat.mFormatFlags = kAudioFormatFlagsNativeFloatPacked | kLinearPCMFormatFlagIsNonInterleaved;
+	srcFormat.mBytesPerPacket = sizeof(float);
+	srcFormat.mFramesPerPacket = 1;
+	srcFormat.mBytesPerFrame = sizeof(float);
+	srcFormat.mChannelsPerFrame = outchannels;
+	srcFormat.mBitsPerChannel = 32;
 
-		err1 = AudioUnitSetProperty(driver->au_hal, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &srcFormat, sizeof(AudioStreamBasicDescription));
-		if (err1 != noErr) {
-			jack_error("Error calling AudioUnitSetProperty - kAudioUnitProperty_StreamFormat kAudioUnitScope_Input");
-			printError(err1);
-		}
+	err1 = AudioUnitSetProperty(driver->au_hal, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &srcFormat, sizeof(AudioStreamBasicDescription));
+	if (err1 != noErr) {
+		jack_error("Error calling AudioUnitSetProperty - kAudioUnitProperty_StreamFormat kAudioUnitScope_Input");
+		printError(err1);
 	}
 
-	if (playing && outchannels > 0) {
-		dstFormat.mSampleRate = samplerate;
-		dstFormat.mFormatID = kAudioFormatLinearPCM;
-		dstFormat.mFormatFlags = kAudioFormatFlagsNativeFloatPacked | kLinearPCMFormatFlagIsNonInterleaved;
-		dstFormat.mBytesPerPacket = sizeof(float);
-		dstFormat.mFramesPerPacket = 1;
-		dstFormat.mBytesPerFrame = sizeof(float);
-		dstFormat.mChannelsPerFrame = inchannels;
-		dstFormat.mBitsPerChannel = 32;
+	dstFormat.mSampleRate = samplerate;
+	dstFormat.mFormatID = kAudioFormatLinearPCM;
+	dstFormat.mFormatFlags = kAudioFormatFlagsNativeFloatPacked | kLinearPCMFormatFlagIsNonInterleaved;
+	dstFormat.mBytesPerPacket = sizeof(float);
+	dstFormat.mFramesPerPacket = 1;
+	dstFormat.mBytesPerFrame = sizeof(float);
+	dstFormat.mChannelsPerFrame = inchannels;
+	dstFormat.mBitsPerChannel = 32;
 
-		err1 = AudioUnitSetProperty(driver->au_hal, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &dstFormat, sizeof(AudioStreamBasicDescription));
-		if (err1 != noErr) {
-			jack_error("Error calling AudioUnitSetProperty - kAudioUnitProperty_StreamFormat kAudioUnitScope_Output");
-			printError(err1);
-		}
+	err1 = AudioUnitSetProperty(driver->au_hal, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &dstFormat, sizeof(AudioStreamBasicDescription));
+	if (err1 != noErr) {
+		jack_error("Error calling AudioUnitSetProperty - kAudioUnitProperty_StreamFormat kAudioUnitScope_Output");
+		printError(err1);
 	}
 
 	// Setup callbacks
@@ -885,8 +961,16 @@ static jack_driver_t *coreaudio_driver_new(char* name,
 	}
 
 	err = AudioDeviceAddPropertyListener(driver->device_id, 0, true, kAudioDeviceProcessorOverload, notification, driver);
-    if (err != noErr)
+    if (err != noErr) {
+		jack_error("Error calling AudioDeviceAddPropertyListener with kAudioDeviceProcessorOverload");
         goto error;
+	}
+		
+	err = AudioDeviceAddPropertyListener(driver->device_id, 0, true, kAudioDevicePropertyNominalSampleRate, notification, driver);
+    if (err != noErr) {
+        jack_error("Error calling AudioDeviceAddPropertyListener with kAudioDevicePropertyNominalSampleRate");
+        goto error;
+    }
  
 	driver->playback_nchannels = outchannels;
     driver->capture_nchannels = inchannels;
@@ -1036,8 +1120,8 @@ jack_driver_t *driver_initialize(jack_client_t * client,
     int playback = FALSE;
     int chan_in = 0;
     int chan_out = 0;
-    char* capture_pcm_name = NULL;
-	char* playback_pcm_name = NULL;
+    char* capture_pcm_name = "";
+	char* playback_pcm_name = "";
     const JSList *node;
     const jack_driver_param_t *param;
 	jack_nframes_t systemic_input_latency = 0;
@@ -1113,8 +1197,8 @@ jack_driver_t *driver_initialize(jack_client_t * client,
     }
 	
 	return coreaudio_driver_new("coreaudio", client, frames_per_interrupt,
-				srate, capture, playback, chan_in,
-				chan_out, capture_pcm_name, playback_pcm_name, systemic_input_latency, systemic_output_latency);
+								srate, capture, playback, chan_in,
+								chan_out, capture_pcm_name, playback_pcm_name, systemic_input_latency, systemic_output_latency);
 }
 
 void driver_finish(jack_driver_t * driver)

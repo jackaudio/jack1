@@ -61,6 +61,7 @@ typedef struct {
 	AudioUnit au_hal;
 	AudioBufferList* input_list;
 	AudioDeviceID device_id;
+	int state;
 	
 	jack_nframes_t capture_frame_latency;
 	jack_nframes_t playback_frame_latency;
