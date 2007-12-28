@@ -21,8 +21,9 @@ void
 show_usage (void)
 {
 	show_version ();
-	fprintf (stderr, "\nUsage: %s [options]\n", my_name);
-	fprintf (stderr, "List active Jack ports, and optionally display extra information.\n\n");
+	fprintf (stderr, "\nUsage: %s [options] [filter string]\n", my_name);
+	fprintf (stderr, "List active Jack ports, and optionally display extra information.\n");
+	fprintf (stderr, "Optionally filter ports which match ALL strings provided after any options.\n\n");
 	fprintf (stderr, "Display options:\n");
 	fprintf (stderr, "        -A, --aliases         List aliases for each port\n");
 	fprintf (stderr, "        -c, --connections     List connections to/from each port\n");
@@ -42,7 +43,8 @@ main (int argc, char *argv[])
 	jack_client_t *client;
 	jack_status_t status;
 	const char **ports, **connections;
-	unsigned int i, j;
+	unsigned int i, j, k;
+	int skip_port;
 	int show_aliases = 0;
 	int show_con = 0;
 	int show_port_latency = 0;
@@ -128,6 +130,15 @@ main (int argc, char *argv[])
 	ports = jack_get_ports (client, NULL, NULL, 0);
 
 	for (i = 0; ports[i]; ++i) {
+		// skip over any that don't match ALL of the strings presented at command line
+		skip_port = 0;
+		for(k=optind; k < argc; k++){
+			if(strstr(ports[i], argv[k]) == NULL ){
+				skip_port = 1;
+			}
+		}
+		if(skip_port) continue;
+
 		printf ("%s\n", ports[i]);
 
 		jack_port_t *port = jack_port_by_name (client, ports[i]);
