@@ -225,6 +225,7 @@ typedef volatile struct {
     volatile uint64_t	signalled_at;
     volatile uint64_t	awake_at;
     volatile uint64_t	finished_at;
+    volatile int32_t	last_status;         /* w: client, r: engine and client */
 
     /* JOQ: all these pointers are trouble for 32/64 compatibility,
      * they should move to non-shared memory. 

@@ -2032,6 +2032,12 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 						client->control->name);
 					client->error++;
 				}
+				if(client->control->last_status != 0) {
+					VERBOSE(engine,
+						"client %s has nonzero process callback status (%d)\n",
+						client->control->name, client->control->last_status);
+					client->error++;
+				}
 			}
 			
 			DEBUG ("client %s errors = %d", client->control->name,

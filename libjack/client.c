@@ -1470,20 +1470,20 @@ jack_thread_first_wait (jack_client_t* client)
 jack_nframes_t
 jack_thread_wait (jack_client_t* client, int status)
 {
-	jack_client_control_t *control = client->control;
+	client->control->last_status = status;
 
    /* SECTION ONE: HOUSEKEEPING/CLEANUP FROM LAST DATA PROCESSING */
 
 	/* housekeeping/cleanup after data processing */
 
-	if (status == 0 && control->timebase_cb) {
+	if (status == 0 && client->control->timebase_cb) {
 		jack_call_timebase_master (client);
 	}
 	
 	/* end preemption checking */
 	CHECK_PREEMPTION (client->engine, FALSE);
 	
-	control->finished_at = jack_get_microseconds();
+	client->control->finished_at = jack_get_microseconds();
 	
 	/* wake the next client in the chain (could be the server), 
 	   and check if we were killed during the process
@@ -1509,15 +1509,15 @@ jack_thread_wait (jack_client_t* client, int status)
 
 	/* Time to do data processing */
 
-	control->state = Running;
+	client->control->state = Running;
 	
 	/* begin preemption checking */
 	CHECK_PREEMPTION (client->engine, TRUE);
 	
-	if (control->sync_cb)
+	if (client->control->sync_cb)
 		jack_call_sync_client (client);
 
-	return control->nframes;
+	return client->control->nframes;
 }
 
 static void *
