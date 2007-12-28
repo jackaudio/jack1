@@ -53,6 +53,8 @@ typedef uint32_t jack_client_id_t;
 #define JACK_SHM_MAX (MAX_INT32)
 typedef int32_t jack_port_type_id_t;
 
+#define JACK_BACKEND_ALIAS "system"
+
 /* Port type structure.  
  *
  *  (1) One for each port type is part of the engine's jack_control_t
