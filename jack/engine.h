@@ -146,7 +146,12 @@ struct _jack_engine {
     mach_port_t servertask, bp;
     int portnum;
 #endif
-   
+
+    /* used for port names munging */
+    int audio_out_cnt;
+    int audio_in_cnt;
+    int midi_out_cnt;
+    int midi_in_cnt;
 };
 
 /* public functions */

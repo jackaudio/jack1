@@ -1616,6 +1616,11 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->wait_pid = wait_pid;
 	engine->nozombies = nozombies;
 
+	engine->audio_out_cnt = 0;
+	engine->audio_in_cnt = 0;
+	engine->midi_out_cnt = 0;
+	engine->midi_in_cnt = 0;
+
 	jack_engine_reset_rolling_usecs (engine);
 	engine->max_usecs = 0.0f;
 
@@ -3483,10 +3488,6 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req, int internal)
 	unsigned long i;
 	char *backend_client_name;
 	size_t len;
-	static int audio_out_cnt = 1;
-	static int audio_in_cnt = 1;
-	static int midi_out_cnt = 1;
-	static int midi_in_cnt = 1;
 
 	for (i = 0; i < engine->control->n_port_types; ++i) {
 		if (strcmp (req->x.port_info.type,
@@ -3537,24 +3538,24 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req, int internal)
 
 	if (strcmp(req->x.port_info.type, JACK_DEFAULT_AUDIO_TYPE) == 0) {
 		if ((req->x.port_info.flags & (JackPortIsPhysical|JackPortIsInput)) == (JackPortIsPhysical|JackPortIsInput)) {
-			snprintf (shared->name, sizeof (shared->name), JACK_BACKEND_ALIAS ":playback_%d", audio_out_cnt++);
+			snprintf (shared->name, sizeof (shared->name), JACK_BACKEND_ALIAS ":playback_%d", ++engine->audio_out_cnt);
 			strcpy (shared->alias1, req->x.port_info.name);
 			goto next;
 		} 
 		else if ((req->x.port_info.flags & (JackPortIsPhysical|JackPortIsOutput)) == (JackPortIsPhysical|JackPortIsOutput)) {
-			snprintf (shared->name, sizeof (shared->name), JACK_BACKEND_ALIAS ":capture_%d", audio_in_cnt++);
+			snprintf (shared->name, sizeof (shared->name), JACK_BACKEND_ALIAS ":capture_%d", ++engine->audio_in_cnt);
 			strcpy (shared->alias1, req->x.port_info.name);
 			goto next;
 		}
 	}
 	else if (strcmp(req->x.port_info.type, JACK_DEFAULT_MIDI_TYPE) == 0) {
 		if ((req->x.port_info.flags & (JackPortIsPhysical|JackPortIsInput)) == (JackPortIsPhysical|JackPortIsInput)) {
-			snprintf (shared->name, sizeof (shared->name), JACK_BACKEND_ALIAS ":midi_playback_%d", midi_out_cnt++);
+			snprintf (shared->name, sizeof (shared->name), JACK_BACKEND_ALIAS ":midi_playback_%d", ++engine->midi_out_cnt);
 			strcpy (shared->alias1, req->x.port_info.name);
 			goto next;
 		} 
 		else if ((req->x.port_info.flags & (JackPortIsPhysical|JackPortIsOutput)) == (JackPortIsPhysical|JackPortIsOutput)) {
-			snprintf (shared->name, sizeof (shared->name), JACK_BACKEND_ALIAS ":midi_capture_%d", midi_in_cnt++);
+			snprintf (shared->name, sizeof (shared->name), JACK_BACKEND_ALIAS ":midi_capture_%d", ++engine->midi_in_cnt);
 			strcpy (shared->alias1, req->x.port_info.name);
 			goto next;
 		}
@@ -3564,7 +3565,6 @@ fallback:
 	strcpy (shared->name, req->x.port_info.name);
 
 next:
-
 	shared->ptype_id = engine->control->port_types[i].ptype_id;
 	shared->client_id = req->x.port_info.client_id;
 	shared->flags = req->x.port_info.flags;
