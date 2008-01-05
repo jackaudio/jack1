@@ -22,7 +22,7 @@
 Summary:	The Jack Audio Connection Kit
 Name:		@PACKAGE@
 Version:	@VERSION@
-Release:	4
+Release:	5
 License:	GPL
 Group:		System Environment/Daemons
 Source0:	%{name}-%{version}.tar.gz
@@ -145,10 +145,8 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 %files devel
 %defattr(-,root,root)
 %doc doc/reference
-%{_libdir}/libjack.la
-%{_libdir}/jack/inprocess.la
-%{_libdir}/jack/intime.la
-%{_libdir}/jack/jack_*.la
+%{_libdir}/*.la
+%{_libdir}/jack/*.la
 %{_includedir}/jack/jack.h
 %{_includedir}/jack/ringbuffer.h
 %{_includedir}/jack/timestamps.h
@@ -163,19 +161,24 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 %files example-clients
 %defattr(-,root,root)
 %{_bindir}/jackrec
+%{_bindir}/jack_alias
 %{_bindir}/jack_connect
 %{_bindir}/jack_disconnect
+%{_bindir}/jack_evmon
 %{_bindir}/jack_impulse_grabber
 %{_bindir}/jack_lsp
 %{_bindir}/jack_metro
+%{_bindir}/jack_midiseq
+%{_bindir}/jack_midisine
 %{_bindir}/jack_monitor_client
 %{_bindir}/jack_showtime
 %{_bindir}/jack_simple_client
-%{_bindir}/jack_midiseq
-%{_bindir}/jack_midisine
 
 
 %changelog
+
+* Sat Jan  5 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.108.1-5
+- added jack_alias and jack_evmon to example-clients package
 
 * Sun Jun 18 2006 Rui Nuno Capela <rncbc@rncbc.org> - 0.102.15-4
 - enable freebob backend drivers whenever available 
