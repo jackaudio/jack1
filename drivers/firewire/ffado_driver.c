@@ -49,14 +49,7 @@
 
 static int ffado_driver_stop (ffado_driver_t *driver);
 
-#ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
-	static ffado_driver_midi_handle_t *ffado_driver_midi_init(ffado_driver_t *driver);
-	static void ffado_driver_midi_finish (ffado_driver_midi_handle_t *m);
-	static int ffado_driver_midi_start (ffado_driver_midi_handle_t *m);
-	static int ffado_driver_midi_stop (ffado_driver_midi_handle_t *m);
-#endif
-
-#define FIREWIRE_REQUIRED_FFADO_API_VERSION 5
+#define FIREWIRE_REQUIRED_FFADO_API_VERSION 7
 
 // enable verbose messages
 static int g_verbose=0;
@@ -91,17 +84,6 @@ ffado_driver_attach (ffado_driver_t *driver)
 		return -1;
 	}
 
-#ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
-	driver->midi_handle=ffado_driver_midi_init(driver);
-	if(!driver->midi_handle) {
-		printError("-----------------------------------------------------------");
-		printError("Error creating midi device!");
-		printError("The FireWire backend will run without MIDI support.");
-		printError("Consult the above error messages to solve the problem. ");
-		printError("-----------------------------------------------------------\n\n");
-	}
-#endif
-
 	if (driver->device_options.realtime) {
 		printMessage("Streaming thread running with Realtime scheduling, priority %d",
 		           driver->device_options.packetizer_priority);
@@ -109,6 +91,8 @@ ffado_driver_attach (ffado_driver_t *driver)
 		printMessage("Streaming thread running without Realtime scheduling");
 	}
 
+	ffado_streaming_set_audio_datatype(driver->dev, ffado_audio_datatype_float);
+	
 	/* ports */
 	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
 
@@ -136,9 +120,6 @@ ffado_driver_attach (ffado_driver_t *driver)
 			driver->capture_ports =
 				jack_slist_append (driver->capture_ports, port);
 			// setup port parameters
-			if(ffado_streaming_set_capture_buffer_type(driver->dev, chn, ffado_buffer_type_float)) {
-				printError(" cannot set port buffer type for %s", buf2);
-			}
 			if (ffado_streaming_set_capture_stream_buffer(driver->dev, chn, NULL)) {
 				printError(" cannot configure initial port buffer for %s", buf2);
 			}
@@ -177,9 +158,6 @@ ffado_driver_attach (ffado_driver_t *driver)
 				jack_slist_append (driver->playback_ports, port);
 
 			// setup port parameters
-			if(ffado_streaming_set_playback_buffer_type(driver->dev, chn, ffado_buffer_type_float)) {
-				printError(" cannot set port buffer type for %s", buf2);
-			}
 			if (ffado_streaming_set_playback_stream_buffer(driver->dev, chn, NULL)) {
 				printError(" cannot configure initial port buffer for %s", buf2);
 			}
@@ -236,43 +214,7 @@ ffado_driver_detach (ffado_driver_t *driver)
 	ffado_streaming_finish(driver->dev);
 	driver->dev=NULL;
 
-#ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
-	if(driver->midi_handle) {
-		ffado_driver_midi_finish(driver->midi_handle);	
-	}
-	driver->midi_handle=NULL;
-#endif
-
 	return 0;
-}
-
-static inline void 
-ffado_driver_read_from_channel (ffado_driver_t *driver,
-			       channel_t channel,
-			       jack_default_audio_sample_t *dst,
-			       jack_nframes_t nsamples)
-{
-	
-	ffado_sample_t buffer[nsamples];
-	char *src=(char *)buffer;
-	
-	ffado_streaming_read(driver->dev, channel, buffer, nsamples);
-	
-	/* ALERT: signed sign-extension portability !!! */
-
-	while (nsamples--) {
-		int x;
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		memcpy((char*)&x + 1, src, 3);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		memcpy(&x, src, 3);
-#endif
-		x >>= 8;
-		*dst = x / SAMPLE_MAX_24BIT;
-		dst++;
-		src += sizeof(ffado_sample_t);
-	}
-	
 }
 
 static int
@@ -309,40 +251,6 @@ ffado_driver_read (ffado_driver_t * driver, jack_nframes_t nframes)
 	
 	return 0;
 
-}
-
-static inline void 
-ffado_driver_write_to_channel (ffado_driver_t *driver,
-			      channel_t channel, 
-			      jack_default_audio_sample_t *buf, 
-			      jack_nframes_t nsamples)
-{
-    long long y;
-	ffado_sample_t buffer[nsamples];
-	unsigned int i=0;	
-    char *dst=(char *)buffer;
-	
-	// convert from float to integer
-	for(;i<nsamples;i++) {
-		y = (long long)(*buf * SAMPLE_MAX_24BIT);
-
-		if (y > (INT_MAX >> 8 )) {
-			y = (INT_MAX >> 8);
-		} else if (y < (INT_MIN >> 8 )) {
-			y = (INT_MIN >> 8 );
-		}
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		memcpy (dst, &y, 3);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		memcpy (dst, (char *)&y + 5, 3);
-#endif
-		dst += sizeof(ffado_sample_t);
-		buf++;
-	}
-	
-	// write to the ffado streaming device
-	ffado_streaming_write(driver->dev, channel, buffer, nsamples);
-	
 }
 
 static int
@@ -533,22 +441,8 @@ ffado_driver_start (ffado_driver_t *driver)
 {
 	int retval=0;
 
-#ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
-	if(driver->midi_handle) {
-		if((retval=ffado_driver_midi_start(driver->midi_handle))) {
-			printError("Could not start MIDI threads");
-			return retval;
-		}
-	}
-#endif	
-
 	if((retval=ffado_streaming_start(driver->dev))) {
 		printError("Could not start streaming threads");
-#ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
-		if(driver->midi_handle) {
-			ffado_driver_midi_stop(driver->midi_handle);
-		}
-#endif	
 		return retval;
 	}
 
@@ -561,14 +455,6 @@ ffado_driver_stop (ffado_driver_t *driver)
 {
 	int retval=0;
 	
-#ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
-	if(driver->midi_handle) {
-		if((retval=ffado_driver_midi_stop(driver->midi_handle))) {
-			printError("Could not stop MIDI threads");
-			return retval;
-		}
-	}
-#endif	
 	if((retval=ffado_streaming_stop(driver->dev))) {
 		printError("Could not stop streaming threads");
 		return retval;
@@ -680,350 +566,6 @@ ffado_driver_delete (ffado_driver_t *driver)
 	free (driver);
 }
 
-#ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
-/*
- * MIDI support
- */ 
-
-// the thread that will queue the midi events from the seq to the stream buffers
-
-void * ffado_driver_midi_queue_thread(void *arg)
-{
-	ffado_driver_midi_handle_t *m=(ffado_driver_midi_handle_t *)arg;
-	assert(m);
-	snd_seq_event_t *ev;
-	unsigned char work_buffer[MIDI_TRANSMIT_BUFFER_SIZE];
-	int bytes_to_send;
-	int b;
-	int i;
-
-	printMessage("MIDI queue thread started");
-
-	while(1) {
-		// get next event, if one is present
-		while ((snd_seq_event_input(m->seq_handle, &ev) > 0)) {
-			// get the port this event is originated from
-			ffado_midi_port_t *port=NULL;
-			for (i=0;i<m->nb_output_ports;i++) {
-				if(m->output_ports[i]->seq_port_nr == ev->dest.port) {
-					port=m->output_ports[i];
-					break;
-				}
-			}
-	
-			if(!port) {
-				printError(" Could not find target port for event: dst=%d src=%d", ev->dest.port, ev->source.port);
-
-				break;
-			}
-			
-			// decode it to the work buffer
-			if((bytes_to_send = snd_midi_event_decode ( port->parser, 
-				work_buffer,
-				MIDI_TRANSMIT_BUFFER_SIZE, 
-				ev))<0) 
-			{ // failed
-				printError(" Error decoding event for port %d (errcode=%d)", port->seq_port_nr,bytes_to_send);
-				bytes_to_send=0;
-				//return -1;
-			}
-	
-			for(b=0;b<bytes_to_send;b++) {
-				ffado_sample_t tmp_event=work_buffer[b];
-				if(ffado_streaming_write(m->dev, port->stream_nr, &tmp_event, 1)<1) {
-					printError(" Midi send buffer overrun");
-				}
-			}
-	
-		}
-
-		// sleep for some time
-		usleep(MIDI_THREAD_SLEEP_TIME_USECS);
-	}
-	return NULL;
-}
-
-// the dequeue thread (maybe we need one thread per stream)
-void *ffado_driver_midi_dequeue_thread (void *arg) {
-	ffado_driver_midi_handle_t *m=(ffado_driver_midi_handle_t *)arg;
-
-	int i;
-	int s;
-	
-	int samples_read;
-
-	assert(m);
-
-	while(1) {
-		// read incoming events
-	
-		for (i=0;i<m->nb_input_ports;i++) {
-			unsigned int buff[64];
-	
-			ffado_midi_port_t *port=m->input_ports[i];
-		
-			if(!port) {
-				printError(" something went wrong when setting up the midi input port map (%d)",i);
-			}
-		
-			do {
-				samples_read=ffado_streaming_read(m->dev, port->stream_nr, buff, 64);
-			
-				for (s=0;s<samples_read;s++) {
-					unsigned int *byte=(buff+s) ;
-					snd_seq_event_t ev;
-					if ((snd_midi_event_encode_byte(port->parser,(*byte) & 0xFF, &ev)) > 0) {
-						// a midi message is complete, send it out to ALSA
-						snd_seq_ev_set_subs(&ev);  
-						snd_seq_ev_set_direct(&ev);
-						snd_seq_ev_set_source(&ev, port->seq_port_nr);
-						snd_seq_event_output_direct(port->seq_handle, &ev);						
-					}
-				}
-			} while (samples_read>0);
-		}
-
-		// sleep for some time
-		usleep(MIDI_THREAD_SLEEP_TIME_USECS);
-	}
-	return NULL;
-}
-
-static ffado_driver_midi_handle_t *ffado_driver_midi_init(ffado_driver_t *driver) {
-// 	int err;
-
-	char buf[256];
-	channel_t chn;
-	int nchannels;
-	int i=0;
-
-	ffado_device_t *dev=driver->dev;
-
-	assert(dev);
-
-	ffado_driver_midi_handle_t *m=calloc(1,sizeof(ffado_driver_midi_handle_t));
-	if (!m) {
-		printError("not enough memory to create midi structure");
-		return NULL;
-	}
-
-	if (snd_seq_open(&m->seq_handle, "default", SND_SEQ_OPEN_DUPLEX, SND_SEQ_NONBLOCK) < 0) {
-		printError("Error opening ALSA sequencer.");
-		free(m);
-		return NULL;
-	}
-
-	snd_seq_set_client_name(m->seq_handle, "firewire Jack MIDI");
-
-	// find out the number of midi in/out ports we need to setup
-	nchannels=ffado_streaming_get_nb_capture_streams(dev);
-
-	m->nb_input_ports=0;
-
-	for (chn = 0; chn < nchannels; chn++) {	
-		if(ffado_streaming_get_capture_stream_type(dev, chn) == ffado_stream_type_midi) {
-			m->nb_input_ports++;
-		}
-	}
-
-	m->input_ports=calloc(m->nb_input_ports,sizeof(ffado_midi_port_t *));
-	if(!m->input_ports) {
-		printError("not enough memory to create midi structure");
-		free(m);
-		return NULL;
-	}
-
-	i=0;
-	for (chn = 0; chn < nchannels; chn++) {
-		if(ffado_streaming_get_capture_stream_type(dev, chn) == ffado_stream_type_midi) {
-			m->input_ports[i]=calloc(1,sizeof(ffado_midi_port_t));
-			if(!m->input_ports[i]) {
-				// fixme
-				printError("Could not allocate memory for seq port");
-				continue;
-			}
-
-	 		ffado_streaming_get_capture_stream_name(dev, chn, buf, sizeof(buf) - 1);
-			printMessage("Register MIDI IN port %s", buf);
-
-			m->input_ports[i]->seq_port_nr=snd_seq_create_simple_port(m->seq_handle, buf,
-				SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_SUBS_READ,
-				SND_SEQ_PORT_TYPE_MIDI_GENERIC);
-
-			if(m->input_ports[i]->seq_port_nr<0) {
-				printError("Could not create seq port");
-				m->input_ports[i]->stream_nr=-1;
-				m->input_ports[i]->seq_port_nr=-1;
-			} else {
-				m->input_ports[i]->stream_nr=chn;
-				m->input_ports[i]->seq_handle=m->seq_handle;
-				if (snd_midi_event_new  ( ALSA_SEQ_BUFF_SIZE, &(m->input_ports[i]->parser)) < 0) {
-					printError("could not init parser for MIDI IN port %d",i);
-					m->input_ports[i]->stream_nr=-1;
-					m->input_ports[i]->seq_port_nr=-1;
-				} else {
-					if(ffado_streaming_set_capture_buffer_type(dev, chn, ffado_buffer_type_midi)) {
-						printError(" cannot set port buffer type for %s", buf);
-						m->input_ports[i]->stream_nr=-1;
-						m->input_ports[i]->seq_port_nr=-1;
-					}
-					if(ffado_streaming_capture_stream_onoff(dev, chn, 1)) {
-						printError(" cannot enable port %s", buf);
-						m->input_ports[i]->stream_nr=-1;
-						m->input_ports[i]->seq_port_nr=-1;
-					}
-
-				}
-			}
-
-			i++;
-		}
-	}
-
-	// playback
-	nchannels=ffado_streaming_get_nb_playback_streams(dev);
-
-	m->nb_output_ports=0;
-
-	for (chn = 0; chn < nchannels; chn++) {	
-		if(ffado_streaming_get_playback_stream_type(dev, chn) == ffado_stream_type_midi) {
-			m->nb_output_ports++;
-		}
-	}
-
-	m->output_ports=calloc(m->nb_output_ports,sizeof(ffado_midi_port_t *));
-	if(!m->output_ports) {
-		printError("not enough memory to create midi structure");
-		for (i = 0; i < m->nb_input_ports; i++) {	
-			free(m->input_ports[i]);
-		}
-		free(m->input_ports);
-		free(m);
-		return NULL;
-	}
-
-	i=0;
-	for (chn = 0; chn < nchannels; chn++) {
-		if(ffado_streaming_get_playback_stream_type(dev, chn) == ffado_stream_type_midi) {
-			m->output_ports[i]=calloc(1,sizeof(ffado_midi_port_t));
-			if(!m->output_ports[i]) {
-				// fixme
-				printError("Could not allocate memory for seq port");
-				continue;
-			}
-
-	 		ffado_streaming_get_playback_stream_name(dev, chn, buf, sizeof(buf) - 1);
-			printMessage("Register MIDI OUT port %s", buf);
-
-			m->output_ports[i]->seq_port_nr=snd_seq_create_simple_port(m->seq_handle, buf,
-				SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,
-              			SND_SEQ_PORT_TYPE_MIDI_GENERIC);
-
-
-			if(m->output_ports[i]->seq_port_nr<0) {
-				printError("Could not create seq port");
-				m->output_ports[i]->stream_nr=-1;
-				m->output_ports[i]->seq_port_nr=-1;
-			} else {
-				m->output_ports[i]->stream_nr=chn;
-				m->output_ports[i]->seq_handle=m->seq_handle;
-				if (snd_midi_event_new  ( ALSA_SEQ_BUFF_SIZE, &(m->output_ports[i]->parser)) < 0) {
-					printError("could not init parser for MIDI OUT port %d",i);
-					m->output_ports[i]->stream_nr=-1;
-					m->output_ports[i]->seq_port_nr=-1;
-				} else {
-					if(ffado_streaming_set_playback_buffer_type(dev, chn, ffado_buffer_type_midi)) {
-						printError(" cannot set port buffer type for %s", buf);
-						m->input_ports[i]->stream_nr=-1;
-						m->input_ports[i]->seq_port_nr=-1;
-					}
-					if(ffado_streaming_playback_stream_onoff(dev, chn, 1)) {
-						printError(" cannot enable port %s", buf);
-						m->input_ports[i]->stream_nr=-1;
-						m->input_ports[i]->seq_port_nr=-1;
-					}
-				}
-			}
-
-			i++;
-		}
-	}
-
-	m->dev=dev;
-	m->driver=driver;
-
-	return m;
-}
-
-static int
-ffado_driver_midi_start (ffado_driver_midi_handle_t *m)
-{
-	assert(m);
-	// start threads
-
-	m->queue_thread_realtime=(m->driver->engine->control->real_time? 1 : 0);
- 	m->queue_thread_priority=
-		m->driver->engine->control->client_priority +
-		FFADO_RT_PRIORITY_MIDI_RELATIVE;
-
-	if (m->queue_thread_priority>98) {
-		m->queue_thread_priority=98;
-	}
-	if (m->queue_thread_realtime) {
-		printMessage("MIDI threads running with Realtime scheduling, priority %d",
-		           m->queue_thread_priority);
-	} else {
-		printMessage("MIDI threads running without Realtime scheduling");
-	}
-
-	if (jack_client_create_thread(NULL, &m->queue_thread, m->queue_thread_priority, m->queue_thread_realtime, ffado_driver_midi_queue_thread, (void *)m)) {
-		printError(" cannot create midi queueing thread");
-		return -1;
-	}
-
-	if (jack_client_create_thread(NULL, &m->dequeue_thread, m->queue_thread_priority, m->queue_thread_realtime, ffado_driver_midi_dequeue_thread, (void *)m)) {
-		printError(" cannot create midi dequeueing thread");
-		return -1;
-	}
-	return 0;
-}
-
-static int
-ffado_driver_midi_stop (ffado_driver_midi_handle_t *m)
-{
-	assert(m);
-
-	pthread_cancel (m->queue_thread);
-	pthread_join (m->queue_thread, NULL);
-
-	pthread_cancel (m->dequeue_thread);
-	pthread_join (m->dequeue_thread, NULL);
-	return 0;
-
-}
-
-static void
-ffado_driver_midi_finish (ffado_driver_midi_handle_t *m)
-{
-	assert(m);
-
-	int i;
-	// TODO: add state info here, if not stopped then stop
-
-	for (i=0;i<m->nb_input_ports;i++) {
-		free(m->input_ports[i]);
-
-	}
-	free(m->input_ports);
-
-	for (i=0;i<m->nb_output_ports;i++) {
-		free(m->output_ports[i]);
-	}
-	free(m->output_ports);
-
-	free(m);
-}
-#endif	
 /*
  * dlopen plugin stuff
  */
