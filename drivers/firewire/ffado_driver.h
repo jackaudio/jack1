@@ -73,7 +73,7 @@
 #define DEBUG_LEVEL_STARTUP				(1<<17)
 #define DEBUG_LEVEL_THREADS				(1<<18)
 
-
+#define DEBUG_ENABLED
 #ifdef DEBUG_ENABLED
 
 	// default debug level
@@ -85,8 +85,8 @@
 	#define printMessage(format, args...) jack_error( "firewire MSG: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
 	#define printError(format, args...) jack_error( "firewire ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
 	
-	//#define printEnter() jack_error( "FBDRV ENTERS: %s (%s)\n", __FUNCTION__,  __FILE__)
-	//#define printExit() jack_error( "FBDRV EXITS: %s (%s)\n", __FUNCTION__,  __FILE__)
+	#define printEnter() jack_error( "FWDRV ENTERS: %s (%s)\n", __FUNCTION__,  __FILE__)
+	#define printExit() jack_error( "FWDRV EXITS: %s (%s)\n", __FUNCTION__,  __FILE__)
 	#define printEnter() 
 	#define printExit() 
 	

@@ -303,9 +303,9 @@ static jack_nframes_t
 ffado_driver_wait (ffado_driver_t *driver, int extra_fd, int *status,
 		   float *delayed_usecs)
 {
-	int nframes;
 	jack_time_t                   wait_enter;
 	jack_time_t                   wait_ret;
+	ffado_wait_response           response;
 	
 	printEnter();
 
@@ -323,7 +323,7 @@ ffado_driver_wait (ffado_driver_t *driver, int extra_fd, int *status,
 // *status = -3; timeout
 // *status = -4; extra FD
 
-	nframes=ffado_streaming_wait(driver->dev);
+	response = ffado_streaming_wait(driver->dev);
 	
 	wait_ret = jack_get_microseconds ();
 	
@@ -334,27 +334,26 @@ ffado_driver_wait (ffado_driver_t *driver, int extra_fd, int *status,
 	driver->wait_next = wait_ret + driver->period_usecs;
 	driver->engine->transport_cycle_start (driver->engine, wait_ret);
 	
-	// transfer the streaming buffers
-	// we now do this in the read/write functions
-// 	ffado_streaming_transfer_buffers(driver->dev);
-	
-	if (nframes < 0) {
+	if (response == ffado_wait_xrun) {
+		// xrun happened, but it's handled
 		*status=0;
-		
 		return 0;
-		//nframes=driver->period_size; //debug
+	} else if (response == ffado_wait_error) {
+		// an error happened (unhandled xrun)
+		// this should be fatal
+		*status=-1;
+		return 0;
 	}
 
 	*status = 0;
 	driver->last_wait_ust = wait_ret;
 
-	// FIXME: this should do something more usefull
+	// FIXME: this should do something more useful
 	*delayed_usecs = 0;
 	
 	printExit();
 
-	return nframes - nframes % driver->period_size;
-	
+	return driver->period_size;
 }
 
 static int
