@@ -43,7 +43,7 @@
 void
 FakeVideoSync( dummy_driver_t *driver )
 {
-        static const int VIDEO_SYNC_PERIOD = 48000 / 30;
+        #define VIDEO_SYNC_PERIOD (48000 / 30)
         static int vidCounter = VIDEO_SYNC_PERIOD;
         
         int period = driver->period_size;
