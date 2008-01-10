@@ -51,7 +51,7 @@ typedef struct _jack_port_buffer_list {
     jack_port_buffer_info_t *info;	/* jack_buffer_info_t array */
 } jack_port_buffer_list_t;
 
-#define JACKD_WATCHDOG_TIMEOUT 5000
+#define JACKD_WATCHDOG_TIMEOUT 10000
 
 /* The main engine structure in local memory. */
 struct _jack_engine {
