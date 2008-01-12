@@ -71,5 +71,14 @@ Frank van der Pol
 	wrote the COMPLEX_MMAP patch for ALSA, allowing JACK to run
 	on multi-device PCM configurations.
 
+Dmitry Baikov
+	wrote the jackmidi ALSA hardware support
+
+Pieter Palmers
+	wrote the freebob and firewire backends and some bugfixes
+
+Nedko Arnaudov
+	contributed several fixes
+
 Many others have contributed patches and/or test results, and we thank
 them all.
