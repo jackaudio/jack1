@@ -16,8 +16,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=108
-JACK_MICRO_VERSION=2
+JACK_MINOR_VERSION=109
+JACK_MICRO_VERSION=0
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -618,7 +618,7 @@ HAVE_FIREWIRE="false"
 if test "x$TRY_FIREWIRE" = "xyes"
 then
 	# check for FFADO libraries
-	PKG_CHECK_MODULES(LIBFFADO, libffado >= 1.999.0,
+	PKG_CHECK_MODULES(LIBFFADO, libffado >= 1.999.14,
 	     [HAVE_FIREWIRE="true"
               JACK_DEFAULT_DRIVER=\"firewire\"
 	     ], AC_MSG_RESULT([no]))
