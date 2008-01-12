@@ -73,7 +73,7 @@
 #define DEBUG_LEVEL_STARTUP				(1<<17)
 #define DEBUG_LEVEL_THREADS				(1<<18)
 
-#define DEBUG_ENABLED
+//#define DEBUG_ENABLED
 #ifdef DEBUG_ENABLED
 
 	// default debug level
