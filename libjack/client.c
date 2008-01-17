@@ -115,13 +115,52 @@ jack_get_tmpdir ()
 	FILE* in;
 	size_t len;
 	char buf[PATH_MAX+2]; /* allow tmpdir to live anywhere, plus newline, plus null */
+	char *pathenv;
+	char *pathcopy;
+	char *p;
 
-	if ((in = popen ("jackd -l", "r")) == NULL) {
+	/* some implementations of popen(3) close a security loophole by
+	   resetting PATH for the exec'd command. since we *want* to
+	   use the user's PATH setting to locate jackd, we have to
+	   do it ourselves.
+	*/
+
+	if ((pathenv = getenv ("PATH")) == 0) {
+		return -1;
+	}
+
+	/* don't let strtok(3) mess with the real environment variable */
+
+	pathcopy = strdup (pathenv);
+	p = strtok (pathcopy, ":");
+
+	while (p) {
+		char jackd[PATH_MAX+1];
+		char command[PATH_MAX+4];
+
+		snprintf (jackd, sizeof (jackd), "%s/jackd", p);
+		
+		if (access (jackd, X_OK) == 0) {
+			
+			snprintf (command, sizeof (command), "%s -l", jackd);
+
+			if ((in = popen (command, "r")) != NULL) {
+				break;
+			}
+		}
+
+		p = strtok (NULL, ":");
+	}
+
+	if (p == NULL) {
+		/* no command successfully started */
+		free (pathcopy);
 		return -1;
 	}
 
 	if (fgets (buf, sizeof (buf), in) == NULL) {
 		fclose (in);
+		free (pathcopy);
 		return -1;
 	}
 
@@ -130,6 +169,7 @@ jack_get_tmpdir ()
 	if (buf[len-1] != '\n') {
 		/* didn't get a whole line */
 		fclose (in);
+		free (pathcopy);
 		return -1;
 	}
 
@@ -138,6 +178,7 @@ jack_get_tmpdir ()
 	jack_tmpdir[len-1] = '\0';
 	
 	fclose (in);
+	free (pathcopy);
 	return 0;
 }
 
@@ -569,7 +610,7 @@ _start_server (const char *server_name)
 	int i = 0;
 	int good = 0;
 	int ret;
-	
+
 	snprintf(filename, 255, "%s/.jackdrc", getenv("HOME"));
 	fp = fopen(filename, "r");
 
@@ -642,6 +683,14 @@ _start_server (const char *server_name)
 		++i;
 	}
 	argv[i] = 0;
+
+#if 0
+	fprintf (stderr, "execing  JACK using %s\n", command);
+	for (_xx = 0; argv[_xx]; ++_xx) {
+		fprintf (stderr, "\targv[%d] = %s\n", _xx, argv[_xx]);
+	}
+#endif
+
 	execv (command, argv);
 
 	/* If execv() succeeds, it does not return.  There's no point
@@ -722,7 +771,7 @@ jack_request_client (ClientType type,
 			    va->load_init, sizeof (req.object_data) - 1);
 		return -1;
 	}
-
+	
 	if ((*req_fd = server_connect (va->server_name)) < 0) {
 		int trys;
 		if (start_server(va->server_name, options)) {
@@ -741,6 +790,7 @@ jack_request_client (ClientType type,
 	}
 
 	/* format connection request */
+
 	req.protocol_v = jack_protocol_version;
 	req.load = TRUE;
 	req.type = type;
