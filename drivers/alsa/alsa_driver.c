@@ -2352,7 +2352,7 @@ dither_opt (char c, DitherAlgorithm* dither)
 
 /* DRIVER "PLUGIN" INTERFACE */
 
-const char driver_client_name[] = "ALSA";
+const char driver_client_name[] = "alsa_pcm";
 
 const jack_driver_desc_t *
 driver_get_descriptor ()
