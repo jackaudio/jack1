@@ -390,7 +390,6 @@ ffado_driver_null_cycle (ffado_driver_t* driver, jack_nframes_t nframes)
 {
 	channel_t chn;
 	JSList *node;
-	snd_pcm_sframes_t nwritten;
 
 	ffado_streaming_stream_type stream_type;
 
@@ -408,7 +407,6 @@ ffado_driver_null_cycle (ffado_driver_t* driver, jack_nframes_t nframes)
  	}
 
 	// write silence to buffer
-	nwritten = 0;
 
 	for (chn = 0, node = driver->playback_ports; node; node = jack_slist_next (node), chn++) {
 		stream_type=ffado_streaming_get_playback_stream_type(driver->dev, chn);

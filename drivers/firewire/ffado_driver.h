@@ -31,8 +31,6 @@
 #ifndef __JACK_FFADO_DRIVER_H__
 #define __JACK_FFADO_DRIVER_H__
 
-#define FFADO_DRIVER_WITH_ASEQ_MIDI
-
 #include <libffado/ffado.h>
 
 #include <jack/driver.h>
@@ -58,8 +56,6 @@
 #include <jack/engine.h>
 #include <jack/types.h>
 #include <jack/thread.h>
-
-#include <alsa/asoundlib.h>
 
 // debug print control flags
 #define DEBUG_LEVEL_BUFFERS           	(1<<0)
@@ -114,19 +110,6 @@
 // thread priority setup
 #define FFADO_RT_PRIORITY_PACKETIZER_RELATIVE	5
 
-#ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
-
-	#define ALSA_SEQ_BUFF_SIZE 1024
-	#define MIDI_TRANSMIT_BUFFER_SIZE 1024
-	#define MIDI_THREAD_SLEEP_TIME_USECS 100
-	// midi priority should be higher than the audio priority in order to
-	// make sure events are not only delivered on period boundarys
-	// but I think it should be smaller than the packetizer thread in order not 
-	// to lose any packets
-	#define FFADO_RT_PRIORITY_MIDI_RELATIVE 	4
-
-#endif
-
 typedef struct _ffado_driver ffado_driver_t;
 
 /*
@@ -158,39 +141,6 @@ struct _ffado_jack_settings {
     char *device_info;
 };
 
-#ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
-
-typedef struct {
-	int stream_nr;
-	int seq_port_nr;
-	snd_midi_event_t *parser;
-	snd_seq_t *seq_handle;
-} ffado_midi_port_t;
-
-typedef struct _ffado_driver_midi_handle {
-	ffado_device_t *dev;
-	ffado_driver_t *driver;
-
-	snd_seq_t *seq_handle;
-	
-	pthread_t queue_thread;
-	pthread_t dequeue_thread;
-	int queue_thread_realtime;
-	int queue_thread_priority;
-
-	int nb_input_ports;
-	int nb_output_ports;
-
-	ffado_midi_port_t **input_ports;
-	ffado_midi_port_t **output_ports;
-
-	ffado_midi_port_t **input_stream_port_map;
-	int *output_port_stream_map;
-
-
-} ffado_driver_midi_handle_t;
-
-#endif
 /*
  * JACK driver structure
  */
@@ -232,10 +182,6 @@ struct _ffado_driver
     	
 	ffado_device_info_t device_info;
 	ffado_options_t device_options;
-
-#ifdef FFADO_DRIVER_WITH_ASEQ_MIDI
-	ffado_driver_midi_handle_t *midi_handle;
-#endif
 
 }; 
 
