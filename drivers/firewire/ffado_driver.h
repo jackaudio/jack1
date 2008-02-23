@@ -31,11 +31,9 @@
 #ifndef __JACK_FFADO_DRIVER_H__
 #define __JACK_FFADO_DRIVER_H__
 
-#include <libffado/ffado.h>
+#include <assert.h>
 
-#include <jack/driver.h>
-#include <jack/engine.h>
-#include <jack/types.h>
+#include <libffado/ffado.h>
 
 #include <string.h>
 #include <stdlib.h>
@@ -49,13 +47,16 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-#include <jack/internal.h>
-#include <jack/types.h>
-#include <jack/ringbuffer.h>
 #include <jack/driver.h>
 #include <jack/engine.h>
 #include <jack/types.h>
+#include <jack/internal.h>
+#include <jack/types.h>
+#include <jack/ringbuffer.h>
 #include <jack/thread.h>
+
+#include <../alsa-midi/midi_pack.h>
+#include <../alsa-midi/midi_unpack.h>
 
 // debug print control flags
 #define DEBUG_LEVEL_BUFFERS           	(1<<0)
@@ -141,11 +142,23 @@ struct _ffado_jack_settings {
     char *device_info;
 };
 
+typedef struct _ffado_capture_channel
+{
+	ffado_streaming_stream_type stream_type;
+	midi_unpack_t midi_unpack;
+	uint32_t *midi_buffer;
+} ffado_capture_channel_t;
+
+typedef struct _ffado_playback_channel
+{
+	ffado_streaming_stream_type stream_type;
+	midi_pack_t midi_pack;
+	uint32_t *midi_buffer;
+} ffado_playback_channel_t;
+
 /*
  * JACK driver structure
  */
- 
-
 struct _ffado_driver
 {
 	JACK_DRIVER_NT_DECL;
@@ -170,12 +183,18 @@ struct _ffado_driver
 	
 	/* the firewire virtual device */
 	ffado_device_t *dev;
-	
+
+	ffado_sample_t *nullbuffer;
+	ffado_sample_t *scratchbuffer;
+
     JSList                       *capture_ports;
     JSList                       *playback_ports;
     JSList                       *monitor_ports;
     channel_t                     playback_nchannels;
     channel_t                     capture_nchannels;
+
+	ffado_playback_channel_t *playback_channels;
+	ffado_capture_channel_t  *capture_channels;
 
 	jack_nframes_t  playback_frame_latency;
 	jack_nframes_t  capture_frame_latency;
