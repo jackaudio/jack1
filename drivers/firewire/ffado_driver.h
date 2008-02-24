@@ -149,11 +149,16 @@ typedef struct _ffado_capture_channel
 	uint32_t *midi_buffer;
 } ffado_capture_channel_t;
 
+#define MIDI_OVERFLOW_BUFFER_SIZE 4
 typedef struct _ffado_playback_channel
 {
 	ffado_streaming_stream_type stream_type;
 	midi_pack_t midi_pack;
 	uint32_t *midi_buffer;
+	// to hold the midi bytes that couldn't be transferred
+	// during the previous period
+	char overflow_buffer[MIDI_OVERFLOW_BUFFER_SIZE];
+	unsigned int nb_overflow_bytes;
 } ffado_playback_channel_t;
 
 /*
