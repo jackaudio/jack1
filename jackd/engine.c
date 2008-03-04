@@ -510,7 +510,7 @@ jack_driver_buffer_size (jack_engine_t *engine, jack_nframes_t nframes)
 	jack_event_t event;
 	JSList *node;
 
-	VERBOSE (engine, "new buffer size %" PRIu32 "\n", nframes);
+	VERBOSE (engine, "new buffer size %" PRIu32, nframes);
 
 	engine->control->buffer_size = nframes;
 	if (engine->driver)
@@ -709,7 +709,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 			 " waiting on %d for %" PRIu64
 			 " usecs, status = %d sig = %" PRIu64
 			 " awa = %" PRIu64 " fin = %" PRIu64
-			 " dur=%" PRIu64 "\n",
+			 " dur=%" PRIu64,
 			 now,
 			 client->subgraph_wait_fd,
 			 now - then,
@@ -808,7 +808,7 @@ jack_calc_cpu_load(jack_engine_t *engine)
 	engine->rolling_client_usecs[engine->rolling_client_usecs_index++] = 
 		cycle_end - engine->control->current_time.usecs;
 
-	//printf ("cycle_end - engine->control->current_time.usecs %ld\n",
+	//jack_info ("cycle_end - engine->control->current_time.usecs %ld",
 	//	(long) (cycle_end - engine->control->current_time.usecs));
 
 	if (engine->rolling_client_usecs_index >= JACK_ENGINE_ROLLING_COUNT) {
@@ -847,7 +847,7 @@ jack_calc_cpu_load(jack_engine_t *engine)
 			+ (engine->control->cpu_load * 0.5f);
 
 		VERBOSE (engine, "load = %.4f max usecs: %.3f, "
-			 "spare = %.3f\n", engine->control->cpu_load,
+			 "spare = %.3f", engine->control->cpu_load,
 			 max_usecs, engine->spare_usecs);
 	}
 
@@ -880,7 +880,7 @@ jack_engine_post_process (jack_engine_t *engine)
 			    ctl->timed_out++) {
 				VERBOSE(engine, "client %s error: awake_at = %"
 					 PRIu64
-					 " state = %d timed_out = %d\n",
+					 " state = %d timed_out = %d",
 					 ctl->name,
 					 ctl->awake_at,
 					 ctl->state,
@@ -1077,14 +1077,14 @@ static int check_capabilities (jack_engine_t *engine)
 
 	if (caps == NULL) {
 		VERBOSE (engine, "check: could not allocate capability"
-			 " working storage\n");
+			 " working storage");
 		return 0;
 	}
 	pid = getpid ();
 	cap_clear (caps);
 	if (capgetp (pid, caps)) {
 		VERBOSE (engine, "check: could not get capabilities "
-			 "for process %d\n", pid);
+			 "for process %d", pid);
 		return 0;
 	}
 	/* check that we are able to give capabilites to other processes */
@@ -1123,13 +1123,13 @@ static int give_capabilities (jack_engine_t *engine, pid_t pid)
 
 	if (caps == NULL) {
 		VERBOSE (engine, "give: could not allocate capability"
-			 " working storage\n");
+			 " working storage");
 		return -1;
 	}
 	cap_clear(caps);
 	if (capgetp (pid, caps)) {
 		VERBOSE (engine, "give: could not get current "
-			 "capabilities for process %d\n", pid);
+			 "capabilities for process %d", pid);
 		cap_clear(caps);
 	}
 	cap_set_flag(caps, CAP_EFFECTIVE, caps_size, cap_list , CAP_SET);
@@ -1156,11 +1156,11 @@ jack_set_client_capabilities (jack_engine_t *engine, pid_t cap_pid)
 
 	if ((ret = give_capabilities (engine, cap_pid)) != 0) {
 		jack_error ("could not give capabilities to "
-			    "process %d\n",
+			    "process %d",
 			    cap_pid);
 	} else {
 		VERBOSE (engine, "gave capabilities to"
-			 " process %d\n",
+			 " process %d",
 			 cap_pid);
 	}
 
@@ -1672,7 +1672,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 			&jack_builtin_port_types[i],
 			sizeof (jack_port_type_info_t));
 
-		VERBOSE (engine, "registered builtin port type %s\n",
+		VERBOSE (engine, "registered builtin port type %s",
 			 engine->control->port_types[i].type_name);
 
 		/* the port type id is index into port_types array */
@@ -1730,7 +1730,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	jack_set_clock_source (clock_source);
 	engine->control->clock_source = clock_source;
 
-	VERBOSE (engine, "clock source = %s\n", jack_clock_source_name (clock_source));
+	VERBOSE (engine, "clock source = %s", jack_clock_source_name (clock_source));
 
 	engine->control->frame_timer.frames = frame_time_offset;
 	engine->control->frame_timer.reset_pending = 0;
@@ -1764,20 +1764,20 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 #ifdef USE_CAPABILITIES
 	if (uid == 0 || euid == 0) {
 		VERBOSE (engine, "running with uid=%d and euid=%d, "
-			 "will not try to use capabilites\n",
+			 "will not try to use capabilites",
 			 uid, euid);
 	} else {
 		/* only try to use capabilities if not running as root */
 		engine->control->has_capabilities = check_capabilities (engine);
 		if (engine->control->has_capabilities == 0) {
 			VERBOSE (engine, "required capabilities not "
-				 "available\n");
+				 "available");
 		}
 		if (engine->verbose) {
 			size_t size;
 			cap_t cap = cap_init();
 			capgetp(0, cap);
-			VERBOSE (engine, "capabilities: %s\n",
+			VERBOSE (engine, "capabilities: %s",
 				 cap_to_text(cap, &size));
 		}
 	}
@@ -1852,7 +1852,7 @@ jack_engine_freewheel (void *arg)
 {
 	jack_engine_t* engine = (jack_engine_t *) arg;
 
-	VERBOSE (engine, "freewheel thread starting ...\n");
+	VERBOSE (engine, "freewheel thread starting ...");
 
 	/* we should not be running SCHED_FIFO, so we don't 
 	   have to do anything about scheduling.
@@ -1872,7 +1872,7 @@ jack_engine_freewheel (void *arg)
 		jack_unlock_graph (engine);
 	}
 
-	VERBOSE (engine, "freewheel came to an end, naturally\n");
+	VERBOSE (engine, "freewheel came to an end, naturally");
 	return 0;
 }
 
@@ -1929,7 +1929,7 @@ jack_stop_freewheeling (jack_engine_t* engine)
 	}
 
 	if (!engine->freewheeling) {
-		VERBOSE (engine, "stop freewheel when not freewheeling\n");
+		VERBOSE (engine, "stop freewheel when not freewheeling");
 		return 0;
 	}
 
@@ -1938,9 +1938,9 @@ jack_stop_freewheeling (jack_engine_t* engine)
 	*/
 
 	engine->freewheeling = 0;
-	VERBOSE (engine, "freewheeling stopped, waiting for thread\n");
+	VERBOSE (engine, "freewheeling stopped, waiting for thread");
 	pthread_join (engine->freewheel_thread, &ftstatus);
-	VERBOSE (engine, "freewheel thread has returned\n");
+	VERBOSE (engine, "freewheel thread has returned");
 
 	/* tell everyone we've stopped */
 
@@ -2028,7 +2028,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 			if (client->control->type == ClientExternal) {
 				if (kill (client->control->pid, 0)) {
 					VERBOSE(engine,
-						"client %s has died/exited\n",
+						"client %s has died/exited",
 						client->control->name);
 					client->error++;
 				}
@@ -2120,7 +2120,7 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		if (nframes != b_size) { 
 			VERBOSE (engine, 
 				"late driver wakeup: nframes to process = %"
-				PRIu32 ".\n", nframes);
+				PRIu32 ".", nframes);
 		}
 	}
 
@@ -2143,7 +2143,7 @@ jack_engine_delete (jack_engine_t *engine)
 	if (engine == NULL)
 		return;
 
-	VERBOSE (engine, "starting server engine shutdown\n");
+	VERBOSE (engine, "starting server engine shutdown");
 
 	engine->control->engine_ok = 0;	/* tell clients we're going away */
 
@@ -2160,23 +2160,23 @@ jack_engine_delete (jack_engine_t *engine)
 	if (engine->driver) {
 		jack_driver_t* driver = engine->driver;
 
-		VERBOSE (engine, "stopping driver\n");
+		VERBOSE (engine, "stopping driver");
 		driver->stop (driver);
-		// VERBOSE (engine, "detaching driver\n");
+		// VERBOSE (engine, "detaching driver");
 		// driver->detach (driver, engine);
-		VERBOSE (engine, "unloading driver\n");
+		VERBOSE (engine, "unloading driver");
 		jack_driver_unload (driver);
 		engine->driver = NULL;
 	}
 
-	VERBOSE (engine, "freeing shared port segments\n");
+	VERBOSE (engine, "freeing shared port segments");
 	for (i = 0; i < engine->control->n_port_types; ++i) {
 		jack_release_shm (&engine->port_segment[i]);
 		jack_destroy_shm (&engine->port_segment[i]);
 	}
 
 	/* stop the other engine threads */
-	VERBOSE (engine, "stopping server thread\n");
+	VERBOSE (engine, "stopping server thread");
 
 #if JACK_USE_MACH_THREADS 
 	// MacOSX pthread_cancel still not implemented correctly in Darwin
@@ -2194,26 +2194,25 @@ jack_engine_delete (jack_engine_t *engine)
 	 * drivers already contain a similar mechanism.
 	 */	
 	if (engine->control->real_time && engine->watchdog_thread) {
-		VERBOSE (engine, "stopping watchdog thread\n");
+		VERBOSE (engine, "stopping watchdog thread");
 		pthread_cancel (engine->watchdog_thread);
 		pthread_join (engine->watchdog_thread, NULL);
 	}
 #endif
 
-	VERBOSE (engine, "last xrun delay: %.3f usecs\n",
+	VERBOSE (engine, "last xrun delay: %.3f usecs",
 		engine->control->xrun_delayed_usecs);
-	VERBOSE (engine, "max delay reported by backend: %.3f usecs\n",
+	VERBOSE (engine, "max delay reported by backend: %.3f usecs",
 		engine->control->max_delayed_usecs);
 
 	/* free engine control shm segment */
 	engine->control = NULL;
-	VERBOSE (engine, "freeing engine shared memory\n");
+	VERBOSE (engine, "freeing engine shared memory");
 	jack_release_shm (&engine->control_shm);
 	jack_destroy_shm (&engine->control_shm);
 
-	VERBOSE (engine, "max usecs: %.3f, ", engine->max_usecs);
+	VERBOSE (engine, "max usecs: %.3f, engine deleted", engine->max_usecs);
 
-	VERBOSE (engine, "engine deleted\n");
 	free (engine);
 
 	jack_messagebuffer_exit();
@@ -2409,7 +2408,7 @@ jack_rechain_graph (jack_engine_t *engine)
 
 	subgraph_client = 0;
 
-	VERBOSE(engine, "++ jack_rechain_graph():\n");
+	VERBOSE(engine, "++ jack_rechain_graph():");
 
 	event.type = GraphReordered;
 
@@ -2455,7 +2454,7 @@ jack_rechain_graph (jack_engine_t *engine)
 						jack_get_fifo_fd (engine, n);
 					VERBOSE (engine, "client %s: wait_fd="
 						 "%d, execution_order="
-						 "%lu.\n", 
+						 "%lu.", 
 						 subgraph_client->
 						 control->name,
 						 subgraph_client->
@@ -2465,7 +2464,7 @@ jack_rechain_graph (jack_engine_t *engine)
 
 				VERBOSE (engine, "client %s: internal "
 					 "client, execution_order="
-					 "%lu.\n", 
+					 "%lu.", 
 					 client->control->name, n);
 
 				/* this does the right thing for
@@ -2491,7 +2490,7 @@ jack_rechain_graph (jack_engine_t *engine)
 						jack_get_fifo_fd (engine, n);
 					VERBOSE (engine, "client %s: "
 						 "start_fd=%d, execution"
-						 "_order=%lu.\n",
+						 "_order=%lu.",
 						 subgraph_client->
 						 control->name,
 						 subgraph_client->
@@ -2509,7 +2508,7 @@ jack_rechain_graph (jack_engine_t *engine)
 					VERBOSE (engine, "client %s: in"
 						 " subgraph after %s, "
 						 "execution_order="
-						 "%lu.\n",
+						 "%lu.",
 						 client->control->name,
 						 subgraph_client->
 						 control->name, n);
@@ -2541,12 +2540,12 @@ jack_rechain_graph (jack_engine_t *engine)
 		subgraph_client->subgraph_wait_fd =
 			jack_get_fifo_fd (engine, n);
 		VERBOSE (engine, "client %s: wait_fd=%d, "
-			 "execution_order=%lu (last client).\n", 
+			 "execution_order=%lu (last client).", 
 			 subgraph_client->control->name,
 			 subgraph_client->subgraph_wait_fd, n);
 	}
 
-	VERBOSE (engine, "-- jack_rechain_graph()\n");
+	VERBOSE (engine, "-- jack_rechain_graph()");
 
 	return err;
 }
@@ -2584,7 +2583,7 @@ jack_get_port_total_latency (jack_engine_t *engine,
 	}
 
 #ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
-	fprintf (stderr, "\n%sFor port %s (%s)\n", prefix, port->shared->name, (toward_port ? "toward" : "away"));
+	jack_info ("%sFor port %s (%s)", prefix, port->shared->name, (toward_port ? "toward" : "away"));
 #endif
 	
 	for (node = port->connections; node; node = jack_slist_next (node)) {
@@ -2601,7 +2600,7 @@ jack_get_port_total_latency (jack_engine_t *engine,
 		     (connection->destination->shared == port->shared))) {
 
 #ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
-			fprintf (stderr, "%s\tskip connection %s->%s\n",
+			jack_info ("%s\tskip connection %s->%s",
 				 prefix,
 				 connection->source->shared->name,
 				 connection->destination->shared->name);
@@ -2611,7 +2610,7 @@ jack_get_port_total_latency (jack_engine_t *engine,
 		}
 
 #ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
-		fprintf (stderr, "%s\tconnection %s->%s ... ", 
+		jack_info ("%s\tconnection %s->%s ... ", 
 			 prefix,
 			 connection->source->shared->name,
 			 connection->destination->shared->name);
@@ -2658,7 +2657,7 @@ jack_get_port_total_latency (jack_engine_t *engine,
 	}
 
 #ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
-	fprintf (stderr, "%s\treturn %lu + %lu = %lu\n", prefix, latency, max_latency, latency + max_latency);
+	jack_info ("%s\treturn %lu + %lu = %lu", prefix, latency, max_latency, latency + max_latency);
 #endif	
 
 	return latency + max_latency;
@@ -2793,7 +2792,7 @@ jack_check_acyclic (jack_engine_t *engine)
 	int stuck;
 	int unsortedclients = 0;
 
-	VERBOSE (engine, "checking for graph become acyclic\n");
+	VERBOSE (engine, "checking for graph become acyclic");
 
 	for (srcnode = engine->clients; srcnode;
 	     srcnode = jack_slist_next (srcnode)) {
@@ -2834,10 +2833,10 @@ jack_check_acyclic (jack_engine_t *engine)
 	
 	if (stuck) {
 
-		VERBOSE (engine, "graph is still cyclic\n" );
+		VERBOSE (engine, "graph is still cyclic" );
 	} else {
 
-		VERBOSE (engine, "graph has become acyclic\n");
+		VERBOSE (engine, "graph has become acyclic");
 
 		/* turn feedback connections around in sortfeeds */
 		for (srcnode = engine->clients; srcnode;
@@ -2863,7 +2862,7 @@ jack_check_acyclic (jack_engine_t *engine)
 				
 						VERBOSE (engine,
 						"reversing connection from "
-						"%s to %s\n",
+						"%s to %s",
 						conn->srcclient->control->name,
 						conn->dstclient->control->name);
 						conn->dir = 1;
@@ -2885,7 +2884,7 @@ jack_check_acyclic (jack_engine_t *engine)
 }
 
 /**
- * Dumps current engine configuration to stderr.
+ * Dumps current engine configuration.
  */
 void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 {
@@ -2896,7 +2895,7 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 	jack_connection_internal_t* connection;
 	int n, m, o;
 	
-	fprintf(stderr, "engine.c: <-- dump begins -->\n");
+	jack_info ("engine.c: <-- dump begins -->");
 
 	if (take_lock) {
 		jack_lock_graph (engine);
@@ -2907,8 +2906,8 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 	        client = (jack_client_internal_t *) clientnode->data;
 		ctl = client->control;
 
-		fprintf (stderr, "client #%d: %s (type: %d, process? %s,"
-			 " start=%d wait=%d\n",
+		jack_info ("client #%d: %s (type: %d, process? %s,"
+			 " start=%d wait=%d",
 			 ++n,
 			 ctl->name,
 			 ctl->type,
@@ -2920,7 +2919,7 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 		    portnode = jack_slist_next (portnode)) {
 		        port = (jack_port_internal_t *) portnode->data;
 
-			fprintf(stderr, "\t port #%d: %s\n", ++m,
+			jack_info("\t port #%d: %s", ++m,
 				port->shared->name);
 
 			for(o = 0, connectionnode = port->connections; 
@@ -2930,7 +2929,7 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 			        connection = (jack_connection_internal_t *)
 					connectionnode->data;
 	
-				fprintf(stderr, "\t\t connection #%d: %s %s\n",
+				jack_info("\t\t connection #%d: %s %s",
 					++o,
 					(port->shared->flags
 					 & JackPortIsInput)? "<-": "->",
@@ -2946,7 +2945,7 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 	}
 
 	
-	fprintf(stderr, "engine.c: <-- dump ends -->\n");
+	jack_info("engine.c: <-- dump ends -->");
 }
 
 static int 
@@ -3060,7 +3059,7 @@ jack_port_do_connect (jack_engine_t *engine,
 			   feedback */
 			
 			VERBOSE (engine,
-				 "connect %s and %s (output)\n",
+				 "connect %s and %s (output)",
 				 srcport->shared->name,
 				 dstport->shared->name);
 
@@ -3083,7 +3082,7 @@ jack_port_do_connect (jack_engine_t *engine,
 				   this is a feedback connection */
 				
 				VERBOSE (engine,
-					 "connect %s and %s (feedback)\n",
+					 "connect %s and %s (feedback)",
 					 srcport->shared->name,
 					 dstport->shared->name);
 				 
@@ -3093,7 +3092,7 @@ jack_port_do_connect (jack_engine_t *engine,
 				connection->dir = -1;
 				engine->feedbackcount++;
 				VERBOSE (engine,
-					 "feedback count up to %d\n",
+					 "feedback count up to %d",
 					 engine->feedbackcount);
 
 			} else {
@@ -3101,7 +3100,7 @@ jack_port_do_connect (jack_engine_t *engine,
 				/* this is not a feedback connection */
 
 				VERBOSE (engine,
-					 "connect %s and %s (forward)\n",
+					 "connect %s and %s (forward)",
 					 srcport->shared->name,
 					 dstport->shared->name);
 
@@ -3116,7 +3115,7 @@ jack_port_do_connect (jack_engine_t *engine,
 			/* this is a connection to self */
 
 			VERBOSE (engine,
-				 "connect %s and %s (self)\n",
+				 "connect %s and %s (self)",
 				 srcport->shared->name,
 				 dstport->shared->name);
 			
@@ -3171,7 +3170,7 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 		if (connect->source == srcport &&
 		    connect->destination == dstport) {
 
-			VERBOSE (engine, "DIS-connect %s and %s\n",
+			VERBOSE (engine, "DIS-connect %s and %s",
 				 srcport->shared->name,
 				 dstport->shared->name);
 			
@@ -3236,7 +3235,7 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 						(dst->sortfeeds, src);
 					engine->feedbackcount--;
 					VERBOSE (engine,
-						 "feedback count down to %d\n",
+						 "feedback count down to %d",
 						 engine->feedbackcount);
 					
 				}
@@ -3267,7 +3266,7 @@ jack_port_do_disconnect_all (jack_engine_t *engine,
 		return -1;
 	}
 
-	VERBOSE (engine, "clear connections for %s\n",
+	VERBOSE (engine, "clear connections for %s",
 		 engine->internal_ports[port_id].shared->name);
 
 	jack_lock_graph (engine);
@@ -3594,7 +3593,7 @@ next:
 	jack_port_registration_notify (engine, port_id, TRUE);
 	jack_unlock_graph (engine);
 
-	VERBOSE (engine, "registered port %s, offset = %u\n",
+	VERBOSE (engine, "registered port %s, offset = %u",
 		 shared->name, (unsigned int)shared->offset);
 
 	req->x.port_info.port_id = port_id;

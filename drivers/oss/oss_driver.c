@@ -599,14 +599,14 @@ static int oss_driver_start (oss_driver_t *driver)
 			jack_error(
 				"OSS: failed to set samplerate for %s: %s@%i, errno=%d", 
 				indev, __FILE__, __LINE__, errno);
-		printf("oss_driver: %s : 0x%x/%i/%i (%i)\n", indev, 
+		jack_info("oss_driver: %s : 0x%x/%i/%i (%i)", indev, 
 			format, channels, samplerate, get_fragment(infd));
 		
 		period_size = get_fragment(infd) / samplesize / channels;
 		if (period_size != driver->period_size && 
 			!driver->ignorehwbuf)
 		{
-			printf("oss_driver: period size update: %u\n",
+			jack_info("oss_driver: period size update: %u",
 				period_size);
 			driver->period_size = period_size;
 			driver->period_usecs = 
@@ -634,7 +634,7 @@ static int oss_driver_start (oss_driver_t *driver)
 			jack_error(
 				"OSS: failed to set samplerate for %s: %s@%i, errno=%d", 
 				outdev, __FILE__, __LINE__, errno);
-		printf("oss_driver: %s : 0x%x/%i/%i (%i)\n", outdev, 
+		jack_info("oss_driver: %s : 0x%x/%i/%i (%i)", outdev, 
 			format, channels, samplerate, 
 			get_fragment(outfd));
 
@@ -642,7 +642,7 @@ static int oss_driver_start (oss_driver_t *driver)
 		if (period_size != driver->period_size &&
 			!driver->ignorehwbuf)
 		{
-			printf("oss_driver: period size update: %u\n",
+			jack_info("oss_driver: period size update: %u",
 				period_size);
 			driver->period_size = period_size;
 			driver->period_usecs = 
@@ -691,7 +691,7 @@ static int oss_driver_start (oss_driver_t *driver)
 		driver->outdevbuf = NULL;
 	}
 
-	printf("oss_driver: indevbuf %zd B, outdevbuf %zd B\n",
+	jack_info("oss_driver: indevbuf %zd B, outdevbuf %zd B",
 		driver->indevbufsize, driver->outdevbufsize);
 
 	pthread_mutex_init(&driver->mutex_in, NULL);
@@ -907,7 +907,7 @@ static int oss_driver_bufsize (oss_driver_t *driver, jack_nframes_t nframes)
 
 	set_period_size(driver, nframes);
 	driver->engine->set_buffer_size(driver->engine, driver->period_size);
-	printf("oss_driver: period size update: %u\n", nframes);
+	jack_info("oss_driver: period size update: %u", nframes);
 
 	oss_driver_start(driver);
 
@@ -1102,7 +1102,7 @@ jack_driver_desc_t * driver_get_descriptor ()
 	desc = (jack_driver_desc_t *) calloc(1, sizeof(jack_driver_desc_t));
 	if (desc == NULL)
 	{
-		printf("oss_driver: calloc() failed: %s@%i, errno=%d\n",
+		jack_error("oss_driver: calloc() failed: %s@%i, errno=%d",
 			__FILE__, __LINE__, errno);
 		return NULL;
 	}
@@ -1112,7 +1112,7 @@ jack_driver_desc_t * driver_get_descriptor ()
 	params = calloc(desc->nparams, sizeof(jack_driver_param_desc_t));
 	if (params == NULL)
 	{
-		printf("oss_driver: calloc() failed: %s@%i, errno=%d\n",
+		jack_error("oss_driver: calloc() failed: %s@%i, errno=%d",
 			__FILE__, __LINE__, errno);
 		return NULL;
 	}

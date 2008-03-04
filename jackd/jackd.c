@@ -148,14 +148,14 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 				       temporary, verbose, client_timeout,
 				       port_max, getpid(), frame_time_offset, 
 				       nozombies, drivers)) == 0) {
-		fprintf (stderr, "cannot create engine\n");
+		jack_error ("cannot create engine");
 		return -1;
 	}
 
-	fprintf (stderr, "loading driver ..\n");
+	jack_info ("loading driver ..");
 	
 	if (jack_engine_load_driver (engine, driver_desc, driver_params)) {
-		fprintf (stderr, "cannot load driver module %s\n",
+		jack_error ("cannot load driver module %s",
 			 driver_desc->name);
 		goto error;
 	}
@@ -181,7 +181,7 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	}
 	
 	if (verbose) {
-		fprintf (stderr, "%d waiting for signals\n", getpid());
+		jack_info ("%d waiting for signals", getpid());
 	}
 
 	waiting = TRUE;
@@ -189,7 +189,7 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 	while (waiting) {
 		sigwait (&signals, &sig);
 
-		fprintf (stderr, "jack main caught signal %d\n", sig);
+		jack_info ("jack main caught signal %d", sig);
 		
 		switch (sig) {
 		case SIGUSR1:
@@ -241,7 +241,7 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 	sprintf (filename, "%s/%s", driver_dir, sofile);
 
 	if (verbose) {
-		fprintf (stderr, "getting driver descriptor from %s\n", filename);
+		jack_info ("getting driver descriptor from %s", filename);
 	}
 
 	if ((dlhandle = dlopen (filename, RTLD_NOW|RTLD_GLOBAL)) == NULL) {
@@ -254,7 +254,7 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 		dlsym (dlhandle, "driver_get_descriptor");
 
 	if ((dlerr = dlerror ()) != NULL) {
-		fprintf(stderr, "%s\n", dlerr);
+		jack_error("%s", dlerr);
 		dlclose (dlhandle);
 		free (filename);
 		return NULL;
@@ -479,24 +479,23 @@ maybe_use_capabilities ()
   	        char c = 1;
 
 	        if (write (PIPE_WRITE_FD, &c, 1) != 1) {
-		        fprintf (stderr, "cannot write to jackstart sync "
-				 "pipe %d (%s)\n", PIPE_WRITE_FD,
+		        jack_error ("cannot write to jackstart sync "
+				 "pipe %d (%s)", PIPE_WRITE_FD,
 				 strerror (errno));
 	        }
 
 		if (close(PIPE_WRITE_FD) != 0) {
-			fprintf(stderr,
-				"jackd: error on startup pipe close: %s\n",
-				strerror (errno));
+			jack_error("jackd: error on startup pipe close: %s",
+				   strerror (errno));
 		} else {
 			/* wait for jackstart process to set our capabilities */
 			if (wait (&status) == -1) {
-				fprintf (stderr, "jackd: wait for startup "
-					 "process exit failed\n");
+				jack_error ("jackd: wait for startup "
+					    "process exit failed");
 			}
 			if (!WIFEXITED (status) || WEXITSTATUS (status)) {
-				fprintf(stderr, "jackd: jackstart did not "
-					"exit cleanly\n");
+				jack_error ("jackd: jackstart did not "
+					    "exit cleanly");
 				exit (1);
 			}
 		}
@@ -627,8 +626,8 @@ main (int argc, char *argv[])
 			break;
 
 		default:
-			fprintf (stderr, "Unknown option character %c\n",
-				 optopt);
+			jack_error ("Unknown option character %c",
+				    optopt);
 			/*fallthru*/
 		case 'h':
 			usage (stdout);

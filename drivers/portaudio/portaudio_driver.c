@@ -332,9 +332,9 @@ portaudio_driver_set_parameters (portaudio_driver_t* driver,
 
 		// JOQ: this driver is dead.  How do we terminate it?
 		Pa_Terminate();
-		fprintf(stderr, "Unable to set portaudio parameters\n"); 
-		fprintf(stderr, "Error number: %d\n", err);
-		fprintf(stderr, "Error message: %s\n", Pa_GetErrorText(err));
+		jack_error("Unable to set portaudio parameters");
+		jack_error("Error number: %d", err);
+		jack_error("Error message: %s", Pa_GetErrorText(err));
 		return EIO;
 	}
 }
@@ -345,8 +345,8 @@ portaudio_driver_reset_parameters (portaudio_driver_t* driver,
 				   jack_nframes_t rate)
 {
 	if (!jack_power_of_two(nframes)) {
-		fprintf (stderr, "PA: frames must be a power of two "
-			 "(64, 512, 1024, ...)\n");
+		jack_error("PA: frames must be a power of two "
+			 "(64, 512, 1024, ...)");
 		return EINVAL;
 	}
 
@@ -541,7 +541,7 @@ portaudio_driver_new (char *name,
 	jack_driver_init ((jack_driver_t *) driver);
 
 	if (!jack_power_of_two(frames_per_cycle)) {
-		fprintf (stderr, "PA: -p must be a power of two.\n");
+		jack_error ("PA: -p must be a power of two.");
 		goto error;
 	}
 
@@ -653,9 +653,9 @@ portaudio_driver_new (char *name,
 error:
 
 	Pa_Terminate();
-	fprintf(stderr, "An error occured while using the portaudio stream\n"); 
-	fprintf(stderr, "Error number: %d\n", err);
-	fprintf(stderr, "Error message: %s\n", Pa_GetErrorText(err));
+	jack_error("An error occured while using the portaudio stream");
+	jack_error("Error number: %d", err);
+	jack_error("Error message: %s", Pa_GetErrorText(err));
 	free(driver);
 	return NULL;
 }

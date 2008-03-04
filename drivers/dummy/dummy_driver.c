@@ -50,7 +50,7 @@ FakeVideoSync( dummy_driver_t *driver )
         jack_position_t *position = &driver->engine->control->current_time;
 
         if ( period >= VIDEO_SYNC_PERIOD ) {
-                printf("JACK driver period size too large for simple video sync emulation. Halting.\n");
+                jack_error("JACK driver period size too large for simple video sync emulation. Halting.");
                 exit(0);
         }
 
@@ -87,7 +87,7 @@ dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
 			    > (PRETEND_BUFFER_SIZE * 1000000LL
 			       / driver->sample_rate)) {
 			/* xrun */
-			fprintf(stderr,"**** dummy: xrun of %ju usec\n",
+			jack_error("**** dummy: xrun of %ju usec",
 				(uintmax_t)now - driver->next_time);
 			driver->next_time = now + driver->wait_time;
 		} else {
@@ -267,8 +267,8 @@ dummy_driver_new (jack_client_t * client,
 {
 	dummy_driver_t * driver;
 
-	printf ("creating dummy driver ... %s|%" PRIu32 "|%" PRIu32
-		"|%lu|%u|%u\n", name, sample_rate, period_size, wait_time,
+	jack_info ("creating dummy driver ... %s|%" PRIu32 "|%" PRIu32
+		"|%lu|%u|%u", name, sample_rate, period_size, wait_time,
 		capture_ports, playback_ports);
 
 	driver = (dummy_driver_t *) calloc (1, sizeof (dummy_driver_t));

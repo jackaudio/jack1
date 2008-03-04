@@ -247,7 +247,7 @@ jack_time_to_frames(const jack_client_t *client, jack_time_t now)
 
 	if (time.initialized) {
 #if 0
-		fprintf (stderr, "now = %Lu current wakeup = %Lu next = %Lu frames = %lu + %f => %lu\n", 
+		jack_info ("now = %Lu current wakeup = %Lu next = %Lu frames = %lu + %f => %lu", 
 			 now, time.current_wakeup, time.next_wakeup, time.frames,
 			 (double) (now - time.current_wakeup)/ 
 			 (time.next_wakeup - time.current_wakeup),

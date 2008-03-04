@@ -48,10 +48,10 @@ jack_sync_poll_new (jack_engine_t *engine, jack_client_internal_t *client)
 	// JOQ: I don't like doing this here...
 	if (engine->control->transport_state == JackTransportRolling) {
 		engine->control->transport_state = JackTransportStarting;
-		VERBOSE (engine, "force transport state to Starting\n");
+		VERBOSE (engine, "force transport state to Starting");
 	}
 
-	VERBOSE (engine, "polling sync client %" PRIu32 "\n",
+	VERBOSE (engine, "polling sync client %" PRIu32,
 		 client->control->id);
 }
 
@@ -67,7 +67,7 @@ jack_sync_poll_deactivate (jack_engine_t *engine,
 		client->control->sync_new = 0;
 		engine->control->sync_remain--;
 		VERBOSE (engine, "sync poll interrupted for client %"
-			 PRIu32 "\n", client->control->id);
+			 PRIu32, client->control->id);
 	}
 	client->control->active_slowsync = 0;
 	engine->control->sync_clients--;
@@ -97,7 +97,7 @@ jack_sync_poll_stop (jack_engine_t *engine)
 	assert (poll_count == engine->control->sync_remain);
 	VERBOSE (engine,
 		 "sync poll halted with %" PRIu32
-		 " clients and %8.6f secs remaining\n",
+		 " clients and %8.6f secs remaining",
 		 engine->control->sync_remain,
 		 (double) (engine->control->sync_time_left / 1000000.0));
 	engine->control->sync_remain = 0;
@@ -127,7 +127,7 @@ jack_sync_poll_start (jack_engine_t *engine)
 	engine->control->sync_remain = sync_count;
 	engine->control->sync_time_left = engine->control->sync_timeout;
 	VERBOSE (engine, "transport Starting, sync poll of %" PRIu32
-		 " clients for %8.6f secs\n", engine->control->sync_remain,
+		 " clients for %8.6f secs", engine->control->sync_remain,
 		 (double) (engine->control->sync_time_left / 1000000.0));
 }
 
@@ -147,7 +147,7 @@ jack_sync_timeout (jack_engine_t *engine)
 	}
 
 	/* timed out */
-	VERBOSE (engine, "transport sync timeout\n");
+	VERBOSE (engine, "transport sync timeout");
 	ectl->sync_time_left = 0;
 	return TRUE;
 }
@@ -182,7 +182,7 @@ jack_timebase_reset (jack_engine_t *engine, jack_client_id_t client_id)
 		client->control->timebase_new = 0;
 		engine->timebase_client = NULL;
 		ectl->pending_time.valid = 0;
-		VERBOSE (engine, "%s resigned as timebase master\n",
+		VERBOSE (engine, "%s resigned as timebase master",
 			 client->control->name);
 		ret = 0;
 	}  else
@@ -206,7 +206,7 @@ jack_timebase_set (jack_engine_t *engine,
 	client = jack_client_internal_by_id (engine, client_id);
 
 	if (client == NULL) {
- 		VERBOSE (engine, " %" PRIu32 " no longer exists\n", client_id);
+ 		VERBOSE (engine, " %" PRIu32 " no longer exists", client_id);
 		jack_unlock_graph (engine);
 		return EINVAL;
 	}
@@ -215,13 +215,13 @@ jack_timebase_set (jack_engine_t *engine,
 
 		/* see if timebase master is someone else */
 		if (client != engine->timebase_client) {
-			VERBOSE (engine, "conditional timebase for %s failed\n"
-				 " %s is already the master\n",
-				 client->control->name,
+			VERBOSE (engine, "conditional timebase for %s failed",
+				 client->control->name);
+			VERBOSE (engine, " %s is already the master",
 				 engine->timebase_client->control->name);
 			ret = EBUSY;
 		} else
-			VERBOSE (engine, " %s was already timebase master:\n",
+			VERBOSE (engine, " %s was already timebase master:",
 				 client->control->name);
 
 	} else {
@@ -234,7 +234,7 @@ jack_timebase_set (jack_engine_t *engine,
 		client->control->is_timebase = 1;
 		if (client->control->active)
 			client->control->timebase_new = 1;
-		VERBOSE (engine, "new timebase master: %s\n",
+		VERBOSE (engine, "new timebase master: %s",
 			 client->control->name);
 	}
 
@@ -297,7 +297,7 @@ jack_transport_client_exit (jack_engine_t *engine,
 			engine->timebase_client->control->is_timebase = 0;
 			engine->timebase_client->control->timebase_new = 0;
 			engine->timebase_client = NULL;
-			VERBOSE (engine, "timebase master exit\n");
+			VERBOSE (engine, "timebase master exit");
 		}
 		engine->control->current_time.valid = 0;
 		engine->control->pending_time.valid = 0;
@@ -410,7 +410,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 		    (jack_sync_timeout(engine))) {
 			ectl->transport_state = JackTransportRolling;
 			VERBOSE (engine, "transport Rolling, %8.6f sec"
-				 " left for poll\n",
+				 " left for poll",
 				 (double) (ectl->sync_time_left / 1000000.0));
 		}
 	}
@@ -419,7 +419,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 	cmd = ectl->transport_cmd;
 	if (cmd != ectl->previous_cmd) {
 		ectl->previous_cmd = cmd;
-		VERBOSE (engine, "transport command: %s\n",
+		VERBOSE (engine, "transport command: %s",
 		       (cmd == TransportCommandStart? "START": "STOP"));
 	} else
 		cmd = TransportCommandNone;
@@ -435,7 +435,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 				jack_sync_poll_start(engine);
 			} else {
 				ectl->transport_state = JackTransportRolling;
-				VERBOSE (engine, "transport Rolling\n");
+				VERBOSE (engine, "transport Rolling");
 			}
 		}
 		break;
@@ -443,7 +443,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 	case JackTransportStarting:
 		if (cmd == TransportCommandStop) {
 			ectl->transport_state = JackTransportStopped;
-			VERBOSE (engine, "transport Stopped\n");
+			VERBOSE (engine, "transport Stopped");
 			if (ectl->sync_remain)
 				jack_sync_poll_stop(engine);
 		} else if (ectl->new_pos) {
@@ -452,7 +452,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 				jack_sync_poll_start(engine);
 			} else {
 				ectl->transport_state = JackTransportRolling;
-				VERBOSE (engine, "transport Rolling\n");
+				VERBOSE (engine, "transport Rolling");
 			}
 		}
 		break;
@@ -460,7 +460,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 	case JackTransportRolling:
 		if (cmd == TransportCommandStop) {
 			ectl->transport_state = JackTransportStopped;
-			VERBOSE (engine, "transport Stopped\n");
+			VERBOSE (engine, "transport Stopped");
 			if (ectl->sync_remain)
 				jack_sync_poll_stop(engine);
 		} else if (ectl->new_pos) {
@@ -490,7 +490,7 @@ jack_transport_cycle_end (jack_engine_t *engine)
 		jack_transport_copy_position(&ectl->request_time,
 					     &ectl->pending_time);
 		VERBOSE (engine, "new transport position: %" PRIu32
-			 ", id=0x%" PRIx64 "\n", ectl->pending_time.frame,
+			 ", id=0x%" PRIx64, ectl->pending_time.frame,
 			 ectl->pending_time.unique_1);
 		ectl->prev_request = ectl->pending_time.unique_1;
 		ectl->pending_pos = 1;
@@ -513,7 +513,7 @@ jack_transport_set_sync_timeout (jack_engine_t *engine,
 				 jack_time_t usecs)
 {
 	engine->control->sync_timeout = usecs;
-	VERBOSE (engine, "new sync timeout: %8.6f secs\n",
+	VERBOSE (engine, "new sync timeout: %8.6f secs",
 		 (double) (usecs / 1000000.0));
 	return 0;
 }

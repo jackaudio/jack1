@@ -86,12 +86,11 @@ init_cpu ()
 {
 	cpu_type = ((have_3dnow() << 8) | have_sse());
 	if (ARCH_X86_HAVE_3DNOW(cpu_type))
-		fprintf(stderr, "Enhanced3DNow! detected\n");
+		jack_info("Enhanced3DNow! detected");
 	if (ARCH_X86_HAVE_SSE2(cpu_type))
-		fprintf(stderr, "SSE2 detected\n");
+		jack_info("SSE2 detected");
 	if ((!ARCH_X86_HAVE_3DNOW(cpu_type)) && (!ARCH_X86_HAVE_SSE2(cpu_type)))
-		fprintf(stderr,
-			"No supported SIMD instruction sets detected\n");
+		jack_info("No supported SIMD instruction sets detected");
 	jack_port_set_funcs();
 }
 
@@ -198,6 +197,14 @@ void
 default_jack_error_callback (const char *desc)
 {
 	fprintf(stderr, "%s\n", desc);
+	fflush(stderr);
+}
+
+void 
+default_jack_info_callback (const char *desc)
+{
+	fprintf(stdout, "%s\n", desc);
+	fflush(stdout);
 }
 
 void 
@@ -206,6 +213,19 @@ silent_jack_error_callback (const char *desc)
 }
 
 void (*jack_error_callback)(const char *desc) = &default_jack_error_callback;
+void (*jack_info_callback)(const char *desc) = &default_jack_info_callback;
+
+void 
+jack_info (const char *fmt, ...)
+{
+	va_list ap;
+	char buffer[300];
+
+	va_start (ap, fmt);
+	vsnprintf (buffer, sizeof(buffer), fmt, ap);
+	jack_info_callback (buffer);
+	va_end (ap);
+}
 
 static int
 oop_client_deliver_request (void *ptr, jack_request_t *req)
@@ -528,7 +548,7 @@ server_connect (const char *server_name)
 	}
 
 	//JOQ: temporary debug message
-	//fprintf (stderr, "DEBUG: connecting to `%s' server\n", server_name);
+	//jack_info ("DEBUG: connecting to `%s' server", server_name);
 
 	addr.sun_family = AF_UNIX;
 	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d",
@@ -2052,6 +2072,12 @@ void
 jack_set_error_function (void (*func) (const char *))
 {
 	jack_error_callback = func;
+}
+
+void
+jack_set_info_function (void (*func) (const char *))
+{
+	jack_info_callback = func;
 }
 
 int 

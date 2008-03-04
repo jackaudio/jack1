@@ -272,8 +272,8 @@ static OSStatus display_device_names()
 		err = AudioDeviceGetProperty(devices[i], 0, false, kAudioDevicePropertyDeviceName, &size, device_name);
 		if (err != noErr) 
 			return err; 
-		printf("ICI\n");
-		printf("Device name = \'%s\', internal_name = \'%s\' (to be used as -d parameter)\n", device_name, internal_name); 
+		jack_info("ICI");
+		jack_info("Device name = \'%s\', internal_name = \'%s\' (to be used as -d parameter)", device_name, internal_name); 
 	}
 	
 	return noErr;
@@ -627,7 +627,7 @@ static jack_driver_t *coreaudio_driver_new(char* name,
     jack_driver_init((jack_driver_t *) driver);
 
     if (!jack_power_of_two(nframes)) {
-		fprintf(stderr, "CA: -p must be a power of two.\n");
+		jack_error("CA: -p must be a power of two.");
 		goto error;
     }
 

@@ -66,7 +66,7 @@ cleanup_mlock ()
 	snprintf (path, sizeof(path), "/proc/%d/maps", getpid());
 
 	if ((map = fopen (path, "r")) == NULL) {
-		fprintf (stderr, "can't open map file\n");
+		jack_error ("can't open map file");
 		return;
 	}
 
@@ -118,7 +118,7 @@ cleanup_mlock ()
 		}
 		
 		if (unlock) {
-			fprintf (stderr, "unlocking %s\n", path);
+			jack_info ("unlocking %s", path);
 			munlock ((char *) start, end - start);
 		}
 	}

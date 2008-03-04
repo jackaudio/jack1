@@ -115,7 +115,7 @@ alsa_driver_check_card_type (alsa_driver_t *driver)
 		char tmp[5];
 		strncpy(tmp,strstr(driver->alsa_name_playback,"hw"),4);
 		tmp[4]='\0';
-		printf("control device %s\n",tmp);
+		jack_info("control device %s",tmp);
 		ctl_name = strdup(tmp);
 	} else {
 		ctl_name = strdup(driver->alsa_name_playback);
@@ -243,21 +243,21 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 
 		switch (driver->dither) {
 			case Rectangular:
-			printf("Rectangular dithering at 16 bits\n");
+			jack_info("Rectangular dithering at 16 bits");
 			driver->write_via_copy = driver->quirk_bswap?
 				sample_move_dither_rect_d16_sSs:
 				sample_move_dither_rect_d16_sS;
 			break;
 
 			case Triangular:
-			printf("Triangular dithering at 16 bits\n");
+			jack_info("Triangular dithering at 16 bits");
 			driver->write_via_copy = driver->quirk_bswap?
 				sample_move_dither_tri_d16_sSs:
 				sample_move_dither_tri_d16_sS;
 			break;
 
 			case Shaped:
-			printf("Noise-shaped dithering at 16 bits\n");
+			jack_info("Noise-shaped dithering at 16 bits");
 			driver->write_via_copy = driver->quirk_bswap?
 				sample_move_dither_shaped_d16_sSs:
 				sample_move_dither_shaped_d16_sS;
@@ -279,21 +279,21 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 
 		switch (driver->dither) {
 			case Rectangular:
-			printf("Rectangular dithering at 16 bits\n");
+			jack_info("Rectangular dithering at 16 bits");
 			driver->write_via_copy = driver->quirk_bswap?
 				sample_move_dither_rect_d24_sSs:
 				sample_move_dither_rect_d24_sS;
 			break;
 
 			case Triangular:
-			printf("Triangular dithering at 16 bits\n");
+			jack_info("Triangular dithering at 16 bits");
 			driver->write_via_copy = driver->quirk_bswap?
 				sample_move_dither_tri_d24_sSs:
 				sample_move_dither_tri_d24_sS;
 			break;
 
 			case Shaped:
-			printf("Noise-shaped dithering at 16 bits\n");
+			jack_info("Noise-shaped dithering at 16 bits");
 			driver->write_via_copy = driver->quirk_bswap?
 				sample_move_dither_shaped_d24_sSs:
 				sample_move_dither_shaped_d24_sS;
@@ -315,21 +315,21 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 		
 		switch (driver->dither) {
 			case Rectangular:
-			printf("Rectangular dithering at 16 bits\n");
+			jack_info("Rectangular dithering at 16 bits");
 			driver->write_via_copy = driver->quirk_bswap?
 				sample_move_dither_rect_d32u24_sSs:
 				sample_move_dither_rect_d32u24_sS;
 			break;
 
 			case Triangular:
-			printf("Triangular dithering at 16 bits\n");
+			jack_info("Triangular dithering at 16 bits");
 			driver->write_via_copy = driver->quirk_bswap?
 				sample_move_dither_tri_d32u24_sSs:
 				sample_move_dither_tri_d32u24_sS;
 			break;
 
 			case Shaped:
-			printf("Noise-shaped dithering at 16 bits\n");
+			jack_info("Noise-shaped dithering at 16 bits");
 			driver->write_via_copy = driver->quirk_bswap?
 				sample_move_dither_shaped_d32u24_sSs:
 				sample_move_dither_shaped_d32u24_sS;
@@ -436,7 +436,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			} else {
 				driver->quirk_bswap = 0;
 			}
-			jack_error ("ALSA: final selected sample format for %s: %s", stream_name, formats[format].Name);
+			jack_info ("ALSA: final selected sample format for %s: %s", stream_name, formats[format].Name);
 			break;
 		}
 	} 
@@ -514,7 +514,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 			    stream_name);
 		return -1;
 	}
-	jack_error ("ALSA: use %d periods for %s", *nperiodsp, stream_name);
+	jack_info ("ALSA: use %d periods for %s", *nperiodsp, stream_name);
 	
 	if (!jack_power_of_two(driver->frames_per_cycle)) {
 		jack_error("JACK: frames must be a power of two "
@@ -567,7 +567,7 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 	}
 
 #if 0
-	fprintf (stderr, "set silence size to %lu * %lu = %lu\n",
+	jack_info ("set silence size to %lu * %lu = %lu",
 		 driver->frames_per_cycle, *nperiodsp,
 		 driver->frames_per_cycle * *nperiodsp);
 
@@ -621,8 +621,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	driver->frames_per_cycle = frames_per_cycle;
 	driver->user_nperiods = user_nperiods;
 
-	fprintf (stderr, "configuring for %" PRIu32 "Hz, period = %"
-		 PRIu32 " frames (%.1f ms), buffer = %" PRIu32 " periods\n",
+	jack_info ("configuring for %" PRIu32 "Hz, period = %"
+		 PRIu32 " frames (%.1f ms), buffer = %" PRIu32 " periods",
 		 rate, frames_per_cycle, (((float)frames_per_cycle / (float) rate) * 1000.0f), user_nperiods);
 	
 	if (driver->capture_handle) {
@@ -1299,7 +1299,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 		if (poll_result < 0) {
 
 			if (errno == EINTR) {
-				printf ("poll interrupt\n");
+				jack_info ("poll interrupt");
 				// this happens mostly when run
 				// under gdb, or when exiting due to a signal
 				if (under_gdb) {
@@ -1329,8 +1329,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 		}
 
 #ifdef DEBUG_WAKEUP
-		fprintf (stderr, "%" PRIu64 ": checked %d fds, %" PRIu64
-			 " usecs since poll entered\n", poll_ret, nfds,
+		jack_info ("%" PRIu64 ": checked %d fds, %" PRIu64
+			 " usecs since poll entered", poll_ret, nfds,
 			 poll_ret - poll_enter);
 #endif
 
@@ -1368,8 +1368,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			if (revents & POLLOUT) {
 				need_playback = 0;
 #ifdef DEBUG_WAKEUP
-				fprintf (stderr, "%" PRIu64
-					 " playback stream ready\n",
+				jack_info ("%" PRIu64
+					 " playback stream ready",
 					 poll_ret);
 #endif
 			}
@@ -1391,8 +1391,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			if (revents & POLLIN) {
 				need_capture = 0;
 #ifdef DEBUG_WAKEUP
-				fprintf (stderr, "%" PRIu64
-					 " capture stream ready\n",
+				jack_info ("%" PRIu64
+					 " capture stream ready",
 					 poll_ret);
 #endif
 			}
@@ -1449,8 +1449,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 	avail = capture_avail < playback_avail ? capture_avail : playback_avail;
 
 #ifdef DEBUG_WAKEUP
-	fprintf (stderr, "wakeup complete, avail = %lu, pavail = %lu "
-		 "cavail = %lu\n",
+	jack_info ("wakeup complete, avail = %lu, pavail = %lu "
+		 "cavail = %lu",
 		 avail, playback_avail, capture_avail);
 #endif
 
@@ -1600,7 +1600,7 @@ alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 		if ((err = snd_pcm_mmap_commit (driver->capture_handle,
 				offset, contiguous)) < 0) {
 			jack_error ("ALSA: could not complete read of %"
-				PRIu32 " frames: error = %d\n", contiguous, err);
+				PRIu32 " frames: error = %d", contiguous, err);
 			return -1;
 		}
 
@@ -2011,8 +2011,8 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 
 	alsa_driver_t *driver;
 
-	printf ("creating alsa driver ... %s|%s|%" PRIu32 "|%" PRIu32
-		"|%" PRIu32"|%" PRIu32"|%" PRIu32 "|%s|%s|%s|%s\n",
+	jack_info ("creating alsa driver ... %s|%s|%" PRIu32 "|%" PRIu32
+		"|%" PRIu32"|%" PRIu32"|%" PRIu32 "|%s|%s|%s|%s",
 		playing ? playback_alsa_device : "-",
 		capturing ? capture_alsa_device : "-", 
 		frames_per_cycle, user_nperiods, rate,
@@ -2343,7 +2343,7 @@ dither_opt (char c, DitherAlgorithm* dither)
 		break;
 		
 	default:
-		fprintf (stderr, "ALSA driver: illegal dithering mode %c\n", c);
+		jack_error ("ALSA driver: illegal dithering mode %c", c);
 		return -1;
 	}
 	return 0;
@@ -2600,7 +2600,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 
 		case 'r':
 		        srate = param->value.ui;
-			fprintf (stderr, "apparent rate = %d\n", srate);
+			jack_info ("apparent rate = %d", srate);
 		        break;
 			
 		case 'p':

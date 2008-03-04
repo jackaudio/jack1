@@ -380,7 +380,7 @@ jack_register_server (const char *server_name)
 
 	jack_set_server_prefix (server_name);
 
-	fprintf (stderr, "JACK compiled with %s SHM support.\n", JACK_SHM_TYPE);
+	jack_info ("JACK compiled with %s SHM support.", JACK_SHM_TYPE);
 
 	if (jack_server_initialize_shm ())
 		return ENOMEM;

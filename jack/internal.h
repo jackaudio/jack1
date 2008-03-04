@@ -37,6 +37,8 @@
 /* Needed by <sysdeps/time.h> */
 extern void jack_error (const char *fmt, ...);
 
+extern void jack_info (const char *fmt, ...);
+
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/port.h>

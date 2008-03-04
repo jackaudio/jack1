@@ -54,7 +54,7 @@ mb_flush()
 {
 	/* called WITHOUT the mb_write_lock */
 	while (mb_outbuffer != mb_inbuffer) {
-		fputs(mb_buffers[mb_outbuffer], stderr);
+		jack_info(mb_buffers[mb_outbuffer]);
 		mb_outbuffer = MB_NEXT(mb_outbuffer);
 	}
 }
@@ -111,10 +111,10 @@ jack_messagebuffer_exit ()
 	mb_flush();
 
 	if (mb_overruns)
-		fprintf(stderr, "WARNING: %d message buffer overruns!\n",
+		jack_error("WARNING: %d message buffer overruns!",
 			mb_overruns);
 	else
-		fprintf(stderr, "no message buffer overruns\n");
+		jack_info("no message buffer overruns");
 
 	pthread_mutex_destroy(&mb_write_lock);
 	pthread_cond_destroy(&mb_ready_cond);

@@ -87,7 +87,7 @@ jack_client_do_deactivate (jack_engine_t *engine,
 static void
 jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
-	VERBOSE (engine, "removing client \"%s\" from the processing chain\n",
+	VERBOSE (engine, "removing client \"%s\" from the processing chain",
 		 client->control->name);
 
 	/* caller must hold the client_lock */
@@ -109,7 +109,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	/* caller must hold the client_lock */
 
-	VERBOSE (engine, "removing client \"%s\"\n", client->control->name);
+	VERBOSE (engine, "removing client \"%s\"", client->control->name);
 
 	/* if its not already a zombie, make it so */
 
@@ -187,7 +187,7 @@ jack_remove_clients (jack_engine_t* engine)
 			if (client->error >= JACK_ERROR_WITH_SOCKETS) {
 				VERBOSE (engine, "removing failed "
 					 "client %s state = %s errors"
-					 " = %d\n", 
+					 " = %d", 
 					 client->control->name,
 					 jack_client_state_name (client),
 					 client->error);
@@ -197,7 +197,7 @@ jack_remove_clients (jack_engine_t* engine)
 			} else {
 				VERBOSE (engine, "client failure: "
 					 "client %s state = %s errors"
-					 " = %d\n", 
+					 " = %d", 
 					 client->control->name,
 					 jack_client_state_name (client),
 					 client->error);
@@ -527,7 +527,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 	}
 
 	VERBOSE (engine, "new client: %s, id = %" PRIu32
-		 " type %d @ %p fd = %d\n", 
+		 " type %d @ %p fd = %d", 
 		 client->control->name, client->control->id, 
 		 type, client->control, client_fd);
 
@@ -568,7 +568,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 
 				/* failed: clean up client data */
 				VERBOSE (engine,
-					 "%s jack_initialize() failed!\n",
+					 "%s jack_initialize() failed!",
 					 client->control->name);
 				jack_lock_graph (engine);
 				jack_remove_client (engine, client);
@@ -628,7 +628,7 @@ handle_unload_client (jack_engine_t *engine, jack_client_id_t id)
 	jack_lock_graph (engine);
 
 	if ((client = jack_client_internal_by_id (engine, id))) {
-		VERBOSE (engine, "unloading client \"%s\"\n",
+		VERBOSE (engine, "unloading client \"%s\"",
 			 client->control->name);
 		jack_remove_client (engine, client);
 		status = 0;
@@ -824,7 +824,7 @@ jack_client_disconnect (jack_engine_t *engine, int fd)
 
         if (client) {
 		VERBOSE (engine, "removing disconnected client %s state = "
-			 "%s errors = %d\n", client->control->name,
+			 "%s errors = %d", client->control->name,
 			 jack_client_state_name (client),
 			 client->error);
 		jack_remove_client(engine, client);
@@ -906,7 +906,7 @@ jack_intclient_load_request (jack_engine_t *engine, jack_request_t *req)
 	jack_status_t status = 0;
 
 	VERBOSE (engine, "load internal client %s from %s, init `%s', "
-		 "options: 0x%x\n", req->x.intclient.name,
+		 "options: 0x%x", req->x.intclient.name,
 		 req->x.intclient.path, req->x.intclient.init,
 		 req->x.intclient.options);
 
@@ -917,7 +917,7 @@ jack_intclient_load_request (jack_engine_t *engine, jack_request_t *req)
 	if (client == NULL) {
 		status |= JackFailure;	/* just making sure */
 		req->x.intclient.id = 0;
-		VERBOSE (engine, "load failed, status = 0x%x\n", status);
+		VERBOSE (engine, "load failed, status = 0x%x", status);
 	} else {
 		req->x.intclient.id = client->control->id;
 	}
@@ -955,7 +955,7 @@ jack_intclient_unload_request (jack_engine_t *engine, jack_request_t *req)
 			handle_unload_client (engine, req->x.intclient.id);
 		pthread_mutex_lock (&engine->request_lock);
 	} else {
-		VERBOSE (engine, "invalid unload request\n");
+		VERBOSE (engine, "invalid unload request");
 		req->status = JackFailure;
 	}
 }

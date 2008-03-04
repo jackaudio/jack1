@@ -298,7 +298,7 @@ x86_sse_add2f (float *dest, const float *src, int length)
 
 	if (__builtin_expect(((long) src & 0xf) || ((long) dest & 0xf), 0))
 	{
-		/*fprintf(stderr, "x86_sse_add2f(): non aligned pointers!\n");*/
+		/*jack_error("x86_sse_add2f(): non aligned pointers!");*/
 		si2 = 0;
 		goto sse_nonalign;
 	}
