@@ -109,6 +109,8 @@ static int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *,
 static void jack_deliver_event_to_all (jack_engine_t *engine,
 				       jack_event_t *event);
 static void jack_notify_all_port_interested_clients (jack_engine_t *engine,
+						     jack_client_id_t exclude_src_id,
+						     jack_client_id_t exclude_dst_id,
 						     jack_port_id_t a,
 						     jack_port_id_t b,
 						     int connect);
@@ -2253,7 +2255,7 @@ jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event)
 }
 
 static void
-jack_notify_all_port_interested_clients (jack_engine_t *engine, jack_port_id_t a, jack_port_id_t b, int connected)
+jack_notify_all_port_interested_clients (jack_engine_t *engine, jack_client_id_t src, jack_client_id_t dst, jack_port_id_t a, jack_port_id_t b, int connected)
 {
 	JSList *node;
 	jack_event_t event;
@@ -2265,12 +2267,15 @@ jack_notify_all_port_interested_clients (jack_engine_t *engine, jack_port_id_t a
 	/* GRAPH MUST BE LOCKED : see callers of jack_send_connection_notification() 
 	 */
 
+	jack_client_internal_t* src_client = jack_client_internal_by_id (engine, src);
+	jack_client_internal_t* dst_client = jack_client_internal_by_id (engine, dst);
+
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client;
 
 		client = (jack_client_internal_t*) node->data;
 
-		if (client->control->port_connect != NULL) {
+		if (src_client != client &&  dst_client  != client && client->control->port_connect != NULL) {
 			
 			/* one of the ports belong to this client or it has a port connect callback */
 			
@@ -3138,9 +3143,9 @@ jack_port_do_connect (jack_engine_t *engine,
 						   dstport->shared->client_id,
 						   dst_id, src_id, TRUE);
 						   
-		/* send a port connection notification just once to everyone who cares */
+		/* send a port connection notification just once to everyone who cares excluding clients involved in the connection */
 
-		jack_notify_all_port_interested_clients (engine, src_id, dst_id, 1);
+		jack_notify_all_port_interested_clients (engine, srcport->shared->client_id, dstport->shared->client_id, src_id, dst_id, 1);
 
 		jack_sort_graph (engine);
 	}
@@ -3203,9 +3208,9 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 				engine, dstport->shared->client_id, dst_id,
 				src_id, FALSE);
 
-			/* send a port connection notification just once to everyone who cares */
+			/* send a port connection notification just once to everyone who cares excluding clients involved in the connection */
 			
-			jack_notify_all_port_interested_clients (engine, src_id, dst_id, 0);
+			jack_notify_all_port_interested_clients (engine, srcport->shared->client_id, dstport->shared->client_id, src_id, dst_id, 0);
 
 			if (connect->dir) {
 			
