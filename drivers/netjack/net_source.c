@@ -70,7 +70,7 @@ void alloc_ports(int n_capture, int n_playback)
                                    port_flags, 0);
 
         if (!port) {
-            printf("jacknet_client: cannot register port for %s", buf);
+            jack_info("jacknet_client: cannot register port for %s", buf);
             break;
         }
 
@@ -89,7 +89,7 @@ void alloc_ports(int n_capture, int n_playback)
                                    port_flags, 0);
 
         if (!port) {
-            printf("jacknet_client: cannot register port for %s", buf);
+            jack_info("jacknet_client: cannot register port for %s", buf);
             break;
         }
 
@@ -174,7 +174,7 @@ ReadAgain:
 
         cont_miss = 0;
         if ((framecnt - pkthdr->framecnt) > latency) {
-            printf("FRAMCNT_DIFF = %d  -----  A Packet was lost, or did came too late (try -l %d) \n", pkthdr->framecnt - framecnt, framecnt - pkthdr->framecnt);
+            jack_info("FRAMCNT_DIFF = %d  -----  A Packet was lost, or did came too late (try -l %d) ", pkthdr->framecnt - framecnt, framecnt - pkthdr->framecnt);
             goto ReadAgain;
         }
 
@@ -182,10 +182,11 @@ ReadAgain:
 
         render_payload_to_jack_ports(bitdepth, packet_bufX, net_period, capture_ports, capture_srcs, nframes);
         // Now evaluate packet header;
-        if (sync_state != pkthdr->sync_state) printf("sync = %d\n", pkthdr->sync_state);
+        if (sync_state != pkthdr->sync_state) 
+			jack_info("sync = %d", pkthdr->sync_state);
         sync_state = pkthdr->sync_state;
     } else {
-        printf("Packet Miss: (expected: %d, got: %d) framecnt=%d\n", rx_bufsize, size, framecnt);
+        jack_info("Packet Miss: (expected: %d, got: %d) framecnt=%d", rx_bufsize, size, framecnt);
         cont_miss += 1;
         chn = 0;
         node = capture_ports;
@@ -253,7 +254,7 @@ init_sockaddr_in (struct sockaddr_in *name , const char *hostname , uint16_t por
     if (hostname) {
         struct hostent *hostinfo = gethostbyname (hostname) ;
         if (hostinfo == NULL) {
-            fprintf (stderr , "init_sockaddr_in: unknown host: %s.\n" , hostname) ;
+            jack_info ("init_sockaddr_in: unknown host: %s", hostname) ;
         }
         name->sin_addr = *(struct in_addr *) hostinfo->h_addr ;
     } else {
@@ -379,7 +380,7 @@ main (int argc, char *argv[])
     /* display the current sample rate.
     */
 
-    printf ("engine sample rate: %" PRIu32 "\n",
+    jack_info ("engine sample rate: %" PRIu32 "",
             jack_get_sample_rate (client));
 
     alloc_ports(capture_channels, playback_channels);
@@ -418,9 +419,118 @@ main (int argc, char *argv[])
  * the client terminated immediately.
  */
 int
-jack_initialize (jack_client_t *client, const char *load_init)
+jack_initialize (jack_client_t *int_client, const char *load_init)
 {
+	int argc = 0;
+	char* argv[32];
+	char buffer[255];
+	
+	char jack_name[30] = "net_source";
+    char *peer_ip = "localhost";
+    int peer_socket = 3000;
+	int ret;
+
+    extern char *optarg;
+    extern int optind, optopt;
+    int errflg = 0;
+    int c;
+
 	jack_info("netsource: jack_initialize");
+	
+	ret = sscanf(load_init, "%s", buffer);
+	while (ret != 0 && ret != EOF) {
+		argv[argc] = (char*)malloc(64);
+		strcpy(argv[argc], buffer);
+		ret = sscanf(load_init, "%s", buffer);
+		argc++;
+	}
+	
+    while ((c = getopt(argc, argv, ":n:p:s:C:P:l:r:f:b:")) != -1) {
+        switch (c) {
+            case 'n':
+                strcpy(jack_name, optarg);
+                break;
+            case 'p':
+                peer_ip = optarg;
+                break;
+            case 's':
+                peer_socket = atoi(optarg);
+                break;
+            case 'P':
+                playback_channels = atoi(optarg);
+                break;
+            case 'C':
+                capture_channels = atoi(optarg);
+                break;
+            case 'l':
+                latency = atoi(optarg);
+                break;
+            case 'r':
+                reply_port = atoi(optarg);
+                break;
+            case 'f':
+                factor = atoi(optarg);
+                break;
+            case 'b':
+                bitdepth = atoi(optarg);
+                break;
+            case ':':       /* -n or -p without operand */
+                fprintf(stderr,
+                        "Option -%c requires an operand\n", optopt);
+                errflg++;
+                break;
+            case '?':
+                fprintf(stderr,
+                        "Unrecognized option: -%c\n", optopt);
+                errflg++;
+        }
+    }
+ 
+    //src_state = src_new(SRC_LINEAR, 1, NULL);
+
+    outsockfd = socket(PF_INET, SOCK_DGRAM, 0);
+    insockfd = socket(PF_INET, SOCK_DGRAM, 0);
+    init_sockaddr_in((struct sockaddr_in *)&destaddr, peer_ip, peer_socket);
+    if (reply_port) {
+        init_sockaddr_in((struct sockaddr_in *)&bindaddr, NULL, reply_port);
+        bind(insockfd, &bindaddr, sizeof(bindaddr));
+    }
+ 
+    /*
+       send a ping to the peer 
+       -- this needs to be made more robust --
+       */
+
+    //sendto(outsockfd, "x", 1, 0, &destaddr, sizeof(destaddr));
+
+    /* tell the JACK server to call `process()' whenever
+       there is work to be done.
+       */
+    jack_set_process_callback (int_client, process, 0);
+    jack_set_sync_callback (int_client, sync_cb, 0);
+
+    /* tell the JACK server to call `jack_shutdown()' if
+       it ever shuts down, either entirely, or if it
+       just decides to stop calling us.
+       */
+    jack_on_shutdown (int_client, jack_shutdown, 0);
+
+    /* display the current sample rate.
+    */
+    jack_info ("engine sample rate: %d", jack_get_sample_rate (int_client));
+
+    alloc_ports(capture_channels, playback_channels);
+
+    jack_nframes_t net_period = (float) jack_get_buffer_size(int_client) / (float) factor;
+    int rx_bufsize =  get_sample_size(bitdepth) * capture_channels * net_period + sizeof(jacknet_packet_header);
+    global_packcache = packet_cache_new(latency + 5, rx_bufsize, 1400);
+
+    /* tell the JACK server that we are ready to roll */
+    if (jack_activate (int_client)) {
+        jack_info ("cannot activate client");
+        return -1;
+    }
+
 	return 0;			/* success */
 }
 
@@ -436,5 +546,6 @@ void
 jack_finish (void *arg)
 {
 	jack_info("netsource: jack_finish");
+	packet_cache_free(global_packcache);
 }
 
