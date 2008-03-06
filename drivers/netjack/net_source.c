@@ -423,18 +423,15 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
 {
 	int argc = 0;
 	char* argv[32];
-	char buffer[255];
 	char jack_name[30] = "net_source";
     char *peer_ip = "localhost";
     int peer_socket = 3000;
-	int ret;
 	extern char *optarg;
     extern int optind, optopt;
     int errflg = 0;
     int i,c;
 
 	client = int_client;
-	jack_info("netsource: jack_initialize %s", load_init);
 	
 	argv[argc] = (char*)malloc(64);
 	while (sscanf(load_init, "%31[^ ]%n", argv[argc], &i) == 1) {
@@ -443,7 +440,6 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
 			break;		// didn't find an expected delimiter, done? 
 		}
 		while (*load_init == ' ') { load_init++; } // skip the space 
-		jack_info("netsource:  argv[argc] %d %s", argc, argv[argc]);
 		argc++;
 		argv[argc] = (char*)malloc(64);
 	}
@@ -452,9 +448,7 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
 	sscanf(load_init, "%s", argv[argc]);
 	argc++;
 	   
-	jack_info("netsource: jack_initialize 0");
-	
-    while ((c = getopt(argc, argv, ":n:p:s:C:P:l:r:f:b:")) != -1) {
+	while ((c = getopt(argc, argv, ":n:p:s:C:P:l:r:f:b:")) != -1) {
         switch (c) {
             case 'n':
                 strcpy(jack_name, optarg);
@@ -495,9 +489,7 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
         }
     }
 
-	jack_info("netsource: jack_initialize 1");
- 
-    //src_state = src_new(SRC_LINEAR, 1, NULL);
+	//src_state = src_new(SRC_LINEAR, 1, NULL);
 
     outsockfd = socket(PF_INET, SOCK_DGRAM, 0);
     insockfd = socket(PF_INET, SOCK_DGRAM, 0);
@@ -507,8 +499,6 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
         bind(insockfd, &bindaddr, sizeof(bindaddr));
     }
 
-	jack_info("netsource: jack_initialize 2");
- 
     /*
        send a ping to the peer 
        -- this needs to be made more robust --
@@ -528,23 +518,14 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
        */
     jack_on_shutdown (client, jack_shutdown, 0);
 
-	jack_info("netsource: jack_initialize 3");
-
     /* display the current sample rate.
     */
     jack_info ("engine sample rate: %d", jack_get_sample_rate (client));
-
-	jack_info("netsource: capture_channels %d, playback_channels %d", capture_channels ,playback_channels);
-
     alloc_ports(capture_channels, playback_channels);
-
-	jack_info("netsource: jack_initialize 4");
 
     jack_nframes_t net_period = (float) jack_get_buffer_size(client) / (float) factor;
     int rx_bufsize =  get_sample_size(bitdepth) * capture_channels * net_period + sizeof(jacknet_packet_header);
     global_packcache = packet_cache_new(latency + 5, rx_bufsize, 1400);
-
-	jack_info("netsource: jack_initialize 5");
 	
 	for (i = 0; i < argc; i++) {
 		free(argv[i]);
