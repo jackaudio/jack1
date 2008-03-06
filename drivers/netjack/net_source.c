@@ -449,17 +449,20 @@ jack_info("netsource: jack_initialize %s %d",buffer, ret);
 		argc++;
 	}
 */
-
+	
+	argv[argc] = (char*)malloc(64);
 	while (sscanf(load_init, "%31[^ ]%n", argv[argc], &i) == 1) {
-		load_init += i; /* advance the pointer by the number of characters read */
+		load_init += i; // advance the pointer by the number of characters read 
 		if (*load_init != ' ') {
-			break; /* didn't find an expected delimiter, done? */
+			break; // didn't find an expected delimiter, done? 
 		}
-		while (*load_init == ' ') { load_init++; } /* skip the space */
+		while (*load_init == ' ') { load_init++; } // skip the space 
 		jack_info("netsource:  argv[argc] %d %s", argc, argv[argc]);
 		argc++;
+		argv[argc] = (char*)malloc(64);
 	}
-   
+	
+	   
 	/*
 	argc = 4;
 	argv[0] = "-P";
