@@ -72,5 +72,4 @@ struct _net_driver
     unsigned int latency;
 };
 
-
 #endif /* __JACK_NET_DRIVER_H__ */
