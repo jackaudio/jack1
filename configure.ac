@@ -545,7 +545,7 @@ fi
 
 # NetJack backend and internal client need libsamplerate
 HAVE_SAMPLERATE=false
-PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 1.0,[HAVE_SAMPLERATE =true], [true])
+PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 0.1.2,[HAVE_SAMPLERATE=true], [true])
 if test x$HAVE_SAMPLERATE = xfalse; then
              AC_MSG_WARN([*** the NetJack backend and internal client will not be built])
 fi
