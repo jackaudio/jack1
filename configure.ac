@@ -542,6 +542,15 @@ PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
 if test x$HAVE_SNDFILE = xfalse; then
              AC_MSG_WARN([*** the jackrec example client will not be built])
 fi
+
+# NetJack backend and internal client need libsamplerate
+HAVE_SAMPLERATE=false
+PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 1.0,[HAVE_SAMPLERATE =true], [true])
+if test x$HAVE_SAMPLERATE = xfalse; then
+             AC_MSG_WARN([*** the NetJack backend and internal client will not be built])
+fi
+
+
 # Note: A bug in pkg-config causes problems if the first occurence of
 # PKG_CHECK_MODULES can be disabled. So, if you're going to use
 # PKG_CHECK_MODULES inside a --disable-whatever check, you need to

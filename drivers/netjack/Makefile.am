@@ -2,6 +2,8 @@ MAINTAINCLEANFILES = Makefile.in
 
 AM_CFLAGS = $(JACK_CFLAGS) 
 
+if HAVE_SNDFILE
+
 plugindir = $(ADDON_DIR)
 
 plugin_LTLIBRARIES = jack_net.la
@@ -25,3 +27,5 @@ netsource_la_LDFLAGS = -module -avoid-version @OS_LDFLAGS@
 netsource_la_SOURCES = net_source.c netjack_packet.c 
 
 netsource_la_LIBADD = -lsamplerate
+
+endif
