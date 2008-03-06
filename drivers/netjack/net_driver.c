@@ -241,7 +241,7 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
             case JackTransportStarting:
                 // the master transport is starting... so we set our reply to the sync_callback;
                 if (local_trans_state == JackTransportStopped) {
-                    ja(ck_transport_start(driver->client);
+                    jack_transport_start(driver->client);
                     last_transport_state = JackTransportStopped;
                     sync_state = FALSE;
                     jack_info("locally stopped... starting...");
