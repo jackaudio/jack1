@@ -2,7 +2,7 @@ MAINTAINCLEANFILES = Makefile.in
 
 AM_CFLAGS = $(JACK_CFLAGS) 
 
-if HAVE_SNDFILE
+if HAVE_SAMPLERATE
 
 plugindir = $(ADDON_DIR)
 
