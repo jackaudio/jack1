@@ -424,37 +424,23 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
 	int argc = 0;
 	char* argv[32];
 	char buffer[255];
-	
 	char jack_name[30] = "net_source";
     char *peer_ip = "localhost";
     int peer_socket = 3000;
 	int ret;
-
-    extern char *optarg;
+	extern char *optarg;
     extern int optind, optopt;
     int errflg = 0;
     int i,c;
 
 	client = int_client;
-
 	jack_info("netsource: jack_initialize %s", load_init);
-	
-/*
-	ret = sscanf(load_init, "%s", buffer);
-	while (ret != 0 && ret != EOF) {
-		argv[argc] = (char*)malloc(64);
-		strcpy(argv[argc], buffer);
-		ret = sscanf(load_init, "%s", buffer);
-jack_info("netsource: jack_initialize %s %d",buffer, ret);
-		argc++;
-	}
-*/
 	
 	argv[argc] = (char*)malloc(64);
 	while (sscanf(load_init, "%31[^ ]%n", argv[argc], &i) == 1) {
 		load_init += i; // advance the pointer by the number of characters read 
 		if (*load_init != ' ') {
-			break; // didn't find an expected delimiter, done? 
+			break;		// didn't find an expected delimiter, done? 
 		}
 		while (*load_init == ' ') { load_init++; } // skip the space 
 		jack_info("netsource:  argv[argc] %d %s", argc, argv[argc]);
@@ -462,15 +448,10 @@ jack_info("netsource: jack_initialize %s %d",buffer, ret);
 		argv[argc] = (char*)malloc(64);
 	}
 	
+	// last topken
+	sscanf(load_init, "%s", argv[argc]);
+	argc++;
 	   
-	/*
-	argc = 4;
-	argv[0] = "-P";
-	argv[1] = "2";
-	argv[2] = "-C";
-	argv[3] = "2";
-	*/
-
 	jack_info("netsource: jack_initialize 0");
 	
     while ((c = getopt(argc, argv, ":n:p:s:C:P:l:r:f:b:")) != -1) {
@@ -565,11 +546,9 @@ jack_info("netsource: jack_initialize %s %d",buffer, ret);
 
 	jack_info("netsource: jack_initialize 5");
 	
-	/*
 	for (i = 0; i < argc; i++) {
 		free(argv[i]);
 	}
-	*/
 
     /* tell the JACK server that we are ready to roll */
     if (jack_activate (client)) {
