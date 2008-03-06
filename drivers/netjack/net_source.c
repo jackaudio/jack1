@@ -433,17 +433,29 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
     extern char *optarg;
     extern int optind, optopt;
     int errflg = 0;
-    int c;
+    int i,c;
 
-	jack_info("netsource: jack_initialize");
+	client = int_client;
+
+	jack_info("netsource: jack_initialize %s", load_init);
 	
+/*
 	ret = sscanf(load_init, "%s", buffer);
 	while (ret != 0 && ret != EOF) {
 		argv[argc] = (char*)malloc(64);
 		strcpy(argv[argc], buffer);
 		ret = sscanf(load_init, "%s", buffer);
+jack_info("netsource: jack_initialize %s %d",buffer, ret);
 		argc++;
 	}
+*/
+	argc = 4;
+	argv[0] = "-P";
+	argv[1] = "2";
+	argv[2] = "-C";
+	argv[3] = "2";
+
+	jack_info("netsource: jack_initialize 0");
 	
     while ((c = getopt(argc, argv, ":n:p:s:C:P:l:r:f:b:")) != -1) {
         switch (c) {
@@ -485,6 +497,8 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
                 errflg++;
         }
     }
+
+	jack_info("netsource: jack_initialize 1");
  
     //src_state = src_new(SRC_LINEAR, 1, NULL);
 
@@ -495,6 +509,8 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
         init_sockaddr_in((struct sockaddr_in *)&bindaddr, NULL, reply_port);
         bind(insockfd, &bindaddr, sizeof(bindaddr));
     }
+
+	jack_info("netsource: jack_initialize 2");
  
     /*
        send a ping to the peer 
@@ -506,27 +522,41 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
     /* tell the JACK server to call `process()' whenever
        there is work to be done.
        */
-    jack_set_process_callback (int_client, process, 0);
-    jack_set_sync_callback (int_client, sync_cb, 0);
+    jack_set_process_callback (client, process, 0);
+    jack_set_sync_callback (client, sync_cb, 0);
 
     /* tell the JACK server to call `jack_shutdown()' if
        it ever shuts down, either entirely, or if it
        just decides to stop calling us.
        */
-    jack_on_shutdown (int_client, jack_shutdown, 0);
+    jack_on_shutdown (client, jack_shutdown, 0);
+
+	jack_info("netsource: jack_initialize 3");
 
     /* display the current sample rate.
     */
-    jack_info ("engine sample rate: %d", jack_get_sample_rate (int_client));
+    jack_info ("engine sample rate: %d", jack_get_sample_rate (client));
+
+	jack_info("netsource: capture_channels %d, playback_channels %d", capture_channels ,playback_channels);
 
     alloc_ports(capture_channels, playback_channels);
 
-    jack_nframes_t net_period = (float) jack_get_buffer_size(int_client) / (float) factor;
+	jack_info("netsource: jack_initialize 4");
+
+    jack_nframes_t net_period = (float) jack_get_buffer_size(client) / (float) factor;
     int rx_bufsize =  get_sample_size(bitdepth) * capture_channels * net_period + sizeof(jacknet_packet_header);
     global_packcache = packet_cache_new(latency + 5, rx_bufsize, 1400);
 
+	jack_info("netsource: jack_initialize 5");
+	
+	/*
+	for (i = 0; i < argc; i++) {
+		free(argv[i]);
+	}
+	*/
+
     /* tell the JACK server that we are ready to roll */
-    if (jack_activate (int_client)) {
+    if (jack_activate (client)) {
         jack_info ("cannot activate client");
         return -1;
     }

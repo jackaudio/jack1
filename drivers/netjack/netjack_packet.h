@@ -59,7 +59,7 @@ struct _jacknet_packet_header
 
 typedef union _int_float int_float_t;
 
-union _int_float 
+union _int_float
 {
     uint32_t i;
     float    f;
