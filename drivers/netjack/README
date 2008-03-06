@@ -1,0 +1,106 @@
+
+
+
+see the updated docs on http://netjack.sf.net please.
+
+or mail me (torbenh@gmx.de) if you have questions.
+this Release has the tightest jack sync ever :)
+                       
+                        ---  netJack    ---
+                        -   v0.5pre1 2005    -
+
+|| AUTHORS(s):
+
+Torben Hohn
+Dan Mills
+Robert Jonsson
+
+
+|| CHANGES
+
+cvs -th-
+    fixed hardcoeded number of channels.
+    started 
+
+cvs -th-
+    added packet_hdr
+    which needs to be htonled..
+
+cvs -rj-
+    added Sconstruct
+    added htonl() usage for crossplatform communication.
+
+0.41   - rj -
+    added missing Makefile.am
+    added some configurability to udpsync_source
+    
+0.4    - rj - 
+    support for stereo
+    support for duplex
+... older ... lost in time
+       
+|| WHAT IS THIS?
+
+jack_net is a backend driver for Jack that takes on the role of a
+sound card. This machine is generally designated as the slave machine.
+
+jacknet_client is a jack application that shall be run from another
+computer with the ip adress of the other machine as argument. This
+machine is generalled designated as the master machine.
+
+
+|| PREREQUISITES
+
+Two machines with a _good_ network connection between them.
+A Jack (http://jackit.sf.net) source package.
+
+
+|| INSTALLATION:
+
+compile with 
+scons jack_source_dir='path/to/jack-src'
+
+this creates jack_net.so.
+copy this to /lib/jack/drivers or wherever jack looks for driver.so`s
+
+it also creates jacknet_client. a normal program.
+
+if you build on OSX you need to add 
+
+with_alsa=0 
+
+
+|| USAGE
+
+The programs will open a bidirectional connection between the two
+machines (using UDP). Exposing a stereopair both ways.
+
+The udpsync_source needs the slave machine as a parameter.
+
+The alsa-client is a nice thing also, it makes a not jack related 
+alsa-card available for capturing under jack.
+
+Best performance is achieved if connecting the machines with an
+ XOVER cable, omitting switches / hubs / other nasty things.
+
+|| KNOWN ISSUES
+
+While running with full duplex, utilizing the slave machine as an
+outboard effect it seems very hard (atleast with my network with a
+cheap switch inbetween) to use buffers below 512. Sometimes 256 
+is usable for a while. 
+While connecting ports on the slave side it is very prone to 
+crash if the buffers are small.
+
+The jitter of a wlan network is a little too hard for the current 
+sync code. A delay locked loop might be used soon.
+
+There is always atleast one buffers delay if a port is routed back
+through the connection. This is a design issue that might be hard
+to remedy.
+
+
+|| LICENSE
+
+this is free software under the GPL license, see the file COPYING.
+
