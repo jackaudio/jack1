@@ -5,7 +5,8 @@
  */
 
 #include <stdio.h>
-#include <errno.h>(#include <unistd.h>
+#include <errno.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -38,16 +39,13 @@ int insockfd;
 struct sockaddr destaddr;
 struct sockaddr bindaddr;
 
-
 int recv_channels;
 int recv_smaple_format;
-
 
 int sync_state;
 jack_transport_state_t last_transport_state;
 
 int framecnt = 0;
-
 int cont_miss = 0;
 
 SRC_STATE *src_state;
@@ -207,7 +205,6 @@ ReadAgain:
     ////////////////
 
     // reset packet_bufX... and then send...
-
     packet_bufX = packet_buf + sizeof(jacknet_packet_header) / sizeof(jack_default_audio_sample_t);
 
     //////////////// send ////////////////
@@ -216,7 +213,6 @@ ReadAgain:
     render_jack_ports_to_payload(bitdepth, playback_ports, playback_srcs, nframes, packet_bufX, net_period);
 
     // fill in packet hdr
-
     pkthdr->transport_state = jack_transport_query(client, &local_trans_pos);
     pkthdr->transport_frame = local_trans_pos.frame;
     pkthdr->framecnt = framecnt;
@@ -246,7 +242,6 @@ ReadAgain:
 void
 jack_shutdown (void *arg)
 {
-
     exit (1);
 }
 
@@ -381,7 +376,6 @@ main (int argc, char *argv[])
 
     jack_on_shutdown (client, jack_shutdown, 0);
 
-
     /* display the current sample rate.
     */
 
@@ -411,5 +405,36 @@ main (int argc, char *argv[])
     packet_cache_free(global_packcache);
     jack_client_close(client);
     exit (0);
+}
+
+/**
+ * This required entry point is called after the client is loaded by
+ * jack_internal_client_load().
+ *
+ * @param client pointer to JACK client structure.
+ * @param load_init character string passed to the load operation.
+ *
+ * @return 0 if successful; otherwise jack_finish() will be called and
+ * the client terminated immediately.
+ */
+int
+jack_initialize (jack_client_t *client, const char *load_init)
+{
+	jack_info("netsource: jack_initialize");
+	return 0;			/* success */
+}
+
+/**
+ * This required entry point is called immediately before the client
+ * is unloaded, which could happen due to a call to
+ * jack_internal_client_unload(), or a nonzero return from either
+ * jack_initialize() or inprocess().
+ *
+ * @param arg the same parameter provided to inprocess().
+ */
+void
+jack_finish (void *arg)
+{
+	jack_info("netsource: jack_finish");
 }
 

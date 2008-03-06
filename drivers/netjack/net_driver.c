@@ -465,8 +465,6 @@ net_driver_new (jack_client_t * client,
         resample_factor_up = resample_factor;
 
     // Now open the socket, and wait for the first packet to arrive...
-
-
     driver->sockfd = socket(PF_INET, SOCK_DGRAM, 0);
     if (driver->sockfd == -1) {
         jack_info("socket error");
@@ -520,7 +518,6 @@ net_driver_new (jack_client_t * client,
     }
 
     // After possible Autoconfig: do all calculations...
-
     driver->period_usecs =
         (jack_time_t) floor ((((float) driver->period_size) / driver->sample_rate)
                              * 1000000.0f);
