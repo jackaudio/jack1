@@ -122,7 +122,7 @@ usx2y_driver_get_channel_addresses_playback (alsa_driver_t *driver,
 	if (dbg_offset < (sizeof(dbg_buffer) - 256))
 		dbg_offset += sprintf(dbg_buffer + dbg_offset, "avail %li@%p\n", *playback_avail, driver->playback_addr[0]);
 	else {
-		jack_info_multiline(dbg_buffer);
+		printf(dbg_buffer);
 		return -1;
 	}
 #endif
@@ -196,7 +196,7 @@ usx2y_driver_get_channel_addresses_capture (alsa_driver_t *driver,
 	if (dbg_offset < (sizeof(dbg_buffer) - 256))
 		dbg_offset += sprintf(dbg_buffer + dbg_offset, "avail %li@%p\n", *capture_avail, driver->capture_addr[0]);
 	else {
-		jack_info_multiline(dbg_buffer);
+		printf(dbg_buffer);
 		return -1;
 	}
 #endif
