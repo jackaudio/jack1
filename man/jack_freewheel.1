@@ -1,0 +1,16 @@
+.TH JACK_FREEWHEEL "1" "December 2003" "0.91.1"
+.SH NAME
+jack_freewheel \- The JACK Audio Connection Kit example client
+.SH SYNOPSYS
+.B jack_freewheel [y|n]
+.SH DESCRIPTION
+.B jack_freewheel
+Turns freewheeling mode on (y) or off (n). While in freewheeling mode, jackd
+does not wait in between process() calls. That results in the JACK graph
+processing data as fast as possible. Freewheeling makes fast exports to 
+files possible.
+.SH AUTHOR
+Paul Davis
+.PP
+This manpage was written by Robert Jordens <jordens@debian.org> for Debian.
+

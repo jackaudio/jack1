@@ -1,0 +1,20 @@
+.TH JACK_LOAD "1" "August 2003" "0.91.1"
+.SH NAME
+jack_load \- The JACK Audio Connection Kit example client
+.SH SYNOPSYS
+.B jack_load
+client-name so-name [so-data]
+.PP
+The client-name must be a yet unused client name.
+The so-name is the name of a plugin under /usr/lib/libjack*.
+.SH DESCRIPTION
+.B jack_load
+is an example client for the JACK Audio Connection Kit. It loads the
+specified plugin and creates a client.
+.SH EXAMPLE
+.B jack_load in_process_test inprocess
+.SH AUTHOR
+Jeremy Hall
+.PP
+This manpage was written by Robert Jordens <rjo@gmx.de> for Debian.
+
