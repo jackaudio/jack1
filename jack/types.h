@@ -154,7 +154,7 @@ typedef int  (*JackSampleRateCallback)(jack_nframes_t nframes, void *arg);
  * Prototype for the client supplied function that is called 
  * whenever a port is registered or unregistered.
  *
- * @parm  port the ID of the port 
+ * @param port the ID of the port 
  * @param arg pointer to a client supplied data
  * @param register non-zero if the port is being registered,
  *                     zero if the port is being unregistered
