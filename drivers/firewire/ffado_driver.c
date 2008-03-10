@@ -41,6 +41,7 @@
 #include <jack/internal.h>
 #include <jack/engine.h>
 #include <sysdeps/time.h>
+#include <assert.h>
 
 #include "ffado_driver.h"
 
