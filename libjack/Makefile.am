@@ -11,7 +11,6 @@ endif
 
 SOURCE_FILES = \
 	     client.c \
-	     driver.c \
 	     intclient.c \
 	     messagebuffer.c \
 	     pool.c \

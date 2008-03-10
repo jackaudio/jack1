@@ -23,8 +23,9 @@ bin_PROGRAMS = jackd $(CAP_PROGS)
 
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 
-jackd_SOURCES = jackd.c engine.c clientengine.c transengine.c
-jackd_LDADD = ../libjack/libjack.la $(CAP_LIBS) @OS_LDFLAGS@
+jackd_SOURCES = jackd.c
+jackd_LDADD = libjackserver.la $(CAP_LIBS) @OS_LDFLAGS@
+
 noinst_HEADERS = jack_md5.h md5.h md5_loc.h \
 		 clientengine.h transengine.h
 
@@ -38,6 +39,17 @@ endif
 
 jackstart_SOURCES = jackstart.c md5.c
 jackstart_LDFLAGS = -lcap
+
+lib_LTLIBRARIES	= libjackserver.la
+
+libjackserver_la_CFLAGS = $(AM_CFLAGS)
+
+libjackserver_la_SOURCES = engine.c clientengine.c transengine.c ../libjack/client.c ../libjack/driver.c ../libjack/intclient.c \
+			../libjack/messagebuffer.c ../libjack/pool.c ../libjack/port.c ../libjack/midiport.c ../libjack/ringbuffer.c ../libjack/shm.c \
+			../libjack/thread.c ../libjack/time.c  ../libjack/transclient.c  ../libjack/unlock.c  ../libjack/simd.c
+libjackserver_la_LIBADD  = @OS_LDFLAGS@
+libjackserver_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@
+
 
 man_MANS = jackd.1 jackstart.1
 EXTRA_DIST = $(man_MANS)

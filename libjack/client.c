@@ -64,6 +64,9 @@
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
 
+static int
+jack_client_close_aux (jack_client_t *client);
+
 #define EVENT_POLL_INDEX 0
 #define WAIT_POLL_INDEX 1
 #define event_fd pollfd[EVENT_POLL_INDEX].fd
@@ -934,8 +937,8 @@ jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 	return 0;
 }
 
-jack_client_t *
-jack_client_open (const char *client_name,
+static jack_client_t *
+jack_client_open_aux (const char *client_name,
 		  jack_options_t options,
 		  jack_status_t *status, ...)
 {
@@ -1093,6 +1096,15 @@ jack_client_open (const char *client_name,
 	return NULL;
 }
 
+jack_client_t* jack_client_open(const char* ext_client_name, jack_options_t options, jack_status_t* status, ...)
+{
+	va_list ap;
+    va_start(ap, status);
+    jack_client_t* res =  jack_client_open_aux(ext_client_name, options, status, ap);
+    va_end(ap);
+    return res;
+}
+
 jack_client_t *
 jack_client_new (const char *client_name)
 {
@@ -1100,7 +1112,7 @@ jack_client_new (const char *client_name)
 	if (getenv("JACK_START_SERVER") == NULL)
 		options |= JackNoStartServer;
 
-	return jack_client_open (client_name, options, NULL);
+	return jack_client_open_aux (client_name, options, NULL);
 }
 
 char *
@@ -1271,7 +1283,7 @@ jack_client_thread_suicide (jack_client_t* client)
 		client->on_shutdown (client->on_shutdown_arg);
 	} else {
 		jack_error ("jack_client_thread zombified - exiting from JACK");
-		jack_client_close (client);
+		jack_client_close_aux (client);
 		/* Need a fix : possibly make client crash if
 		 * zombified without shutdown handler 
 		 */
@@ -1719,7 +1731,7 @@ jack_client_process_thread (void *arg)
 		jack_error ("jack_client_process_thread zombified - exiting from JACK");
 		/* Need a fix : possibly make client crash if
 		 * zombified without shutdown handler */
-		jack_client_close (client); 
+		jack_client_close_aux (client); 
 	}
 
 	pthread_exit (0);
@@ -1885,8 +1897,8 @@ jack_activate (jack_client_t *client)
 	return jack_client_deliver_request (client, &req);
 }
 
-int 
-jack_deactivate (jack_client_t *client)
+static int 
+jack_deactivate_aux (jack_client_t *client)
 {
 	jack_request_t req;
 	int rc = ESRCH;			/* already shut down */
@@ -1902,14 +1914,20 @@ jack_deactivate (jack_client_t *client)
 	return rc;
 }
 
-int
-jack_client_close (jack_client_t *client)
+int 
+jack_deactivate (jack_client_t *client)
+{
+	return jack_deactivate_aux(client);
+}
+
+static int
+jack_client_close_aux (jack_client_t *client)
 {
 	JSList *node;
 	void *status;
 	int rc;
 
-	rc = jack_deactivate (client);
+	rc = jack_deactivate_aux (client);
 	if (rc == ESRCH) {		/* already shut down? */
 		return rc;
 	}
@@ -1984,6 +2002,12 @@ jack_client_close (jack_client_t *client)
 	jack_client_free (client);
 
 	return rc;
+}
+
+int
+jack_client_close (jack_client_t *client)
+{
+	return jack_client_close_aux(client);
 }	
 
 int 
