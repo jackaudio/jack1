@@ -940,10 +940,10 @@ jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 static jack_client_t *
 jack_client_open_aux (const char *client_name,
 		  jack_options_t options,
-		  jack_status_t *status, ...)
+		  jack_status_t *status, va_list ap)
 {
 	/* optional arguments: */
-	va_list ap;			/* variable argument pointer */
+	//va_list ap;			/* variable argument pointer */
 	jack_varargs_t va;		/* variable arguments */
 
 	int req_fd = -1;
@@ -964,9 +964,10 @@ jack_client_open_aux (const char *client_name,
 	}
 
 	/* parse variable arguments */
-	va_start (ap, status);
-	jack_varargs_parse (options, ap, &va);
-	va_end (ap);
+	//va_start (ap, status);
+	if (ap)
+		jack_varargs_parse (options, ap, &va);
+	//va_end (ap);
 
 	/* External clients need to know where the tmpdir used for
 	   communication with the server lives
@@ -1100,7 +1101,7 @@ jack_client_t* jack_client_open(const char* ext_client_name, jack_options_t opti
 {
 	va_list ap;
     va_start(ap, status);
-    jack_client_t* res =  jack_client_open_aux(ext_client_name, options, status, ap);
+    jack_client_t* res = jack_client_open_aux(ext_client_name, options, status, ap);
     va_end(ap);
     return res;
 }
@@ -1111,8 +1112,8 @@ jack_client_new (const char *client_name)
 	jack_options_t options = JackUseExactName;
 	if (getenv("JACK_START_SERVER") == NULL)
 		options |= JackNoStartServer;
-
-	return jack_client_open_aux (client_name, options, NULL);
+	
+	return jack_client_open_aux (client_name, options, NULL, NULL);
 }
 
 char *
