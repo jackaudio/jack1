@@ -168,7 +168,7 @@ ReadAgain:
         cont_miss = 0;
         if ((framecnt - pkthdr->framecnt) > latency)
         {
-            jack_log("FRAMCNT_DIFF = %d  -----  A Packet was lost, or did came too late (try -l %d) ", pkthdr->framecnt - framecnt, framecnt - pkthdr->framecnt);
+            jack_info("FRAMCNT_DIFF = %d  -----  A Packet was lost, or did came too late (try -l %d) ", pkthdr->framecnt - framecnt, framecnt - pkthdr->framecnt);
             goto ReadAgain;
         }
         // packet has expected size
@@ -176,13 +176,13 @@ ReadAgain:
         // Now evaluate packet header;
         if (sync_state != pkthdr->sync_state)
         {
-            jack_log("sync = %d", pkthdr->sync_state);
+            jack_info("sync = %d", pkthdr->sync_state);
         }
         sync_state = pkthdr->sync_state;
     }
     else
     {
-        jack_log("Packet Miss: (expected: %d, got: %d) framecnt=%d", rx_bufsize, size, framecnt);
+        jack_info("Packet Miss: (expected: %d, got: %d) framecnt=%d", rx_bufsize, size, framecnt);
         cont_miss += 1;
         chn = 0;
         node = capture_ports;
@@ -401,7 +401,7 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
 
     /* Display the current sample rate
         TODO : Shall we remove that ? Who cares really... we're 'in process' ! */
-    jack_log ("engine sample rate: %d", jack_get_sample_rate (client));
+    jack_info ("engine sample rate: %d", jack_get_sample_rate (client));
     alloc_ports (capture_channels, playback_channels);
 
     /* TODO : figure out what this does */
