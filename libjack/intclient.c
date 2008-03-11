@@ -134,12 +134,11 @@ jack_internal_client_handle (jack_client_t *client,
 }
 
 jack_intclient_t
-jack_internal_client_load (jack_client_t *client,
+jack_internal_client_load_aux (jack_client_t *client,
 		  const char *client_name,
 		  jack_options_t options,
-		  jack_status_t *status, ...)
+		  jack_status_t *status, va_list ap)
 {
-	va_list ap;
 	jack_varargs_t va;
 	jack_status_t my_status;
 
@@ -154,12 +153,23 @@ jack_internal_client_load (jack_client_t *client,
 	}
 
 	/* parse variable arguments */
-	va_start (ap, status);
 	jack_varargs_parse (options, ap, &va);
-	va_end (ap);
 
 	return jack_intclient_request (IntClientLoad, client, client_name,
 				       options, status, &va);
+}
+
+jack_intclient_t
+jack_internal_client_load (jack_client_t *client,
+		  const char *client_name,
+		  jack_options_t options,
+		  jack_status_t *status, ...)
+{
+	va_list ap;
+    va_start(ap, status);
+    jack_client_t* res = jack_internal_client_load_aux(client, client_name, options, status, ap);
+    va_end(ap);
+    return res;
 }
 
 jack_status_t
