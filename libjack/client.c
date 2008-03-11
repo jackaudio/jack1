@@ -937,7 +937,7 @@ jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 	return 0;
 }
 
-static jack_client_t *
+jack_client_t *
 jack_client_open_aux (const char *client_name,
 		  jack_options_t options,
 		  jack_status_t *status, va_list ap)
