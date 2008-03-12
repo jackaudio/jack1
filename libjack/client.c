@@ -1420,7 +1420,7 @@ static int
 jack_client_core_wait (jack_client_t* client)
 {
 	jack_client_control_t *control = client->control;
-
+	
 	DEBUG ("client polling on %s", client->pollmax == 2 ? 
 	       "event_fd and graph_wait_fd..." :
 	       "event_fd only");
@@ -1599,8 +1599,65 @@ jack_thread_wait (jack_client_t* client, int status)
 	return client->control->nframes;
 }
 
-static void *
-jack_client_thread (void *arg)
+jack_nframes_t jack_cycle_wait (jack_client_t* client)
+{
+	/* SECTION TWO: WAIT FOR NEXT DATA PROCESSING TIME */
+
+	if (jack_client_core_wait (client)) {
+		return 0;
+	}
+
+   /* SECTION THREE: START NEXT DATA PROCESSING TIME */
+
+	/* Time to do data processing */
+
+	client->control->state = Running;
+	
+	/* begin preemption checking */
+	CHECK_PREEMPTION (client->engine, TRUE);
+	
+	if (client->control->sync_cb)
+		jack_call_sync_client (client);
+
+	return client->control->nframes;
+}
+
+void jack_cycle_signal(jack_client_t* client, int status)
+{
+	client->control->last_status = status;
+
+   /* SECTION ONE: HOUSEKEEPING/CLEANUP FROM LAST DATA PROCESSING */
+
+	/* housekeeping/cleanup after data processing */
+
+	if (status == 0 && client->control->timebase_cb) {
+		jack_call_timebase_master (client);
+	}
+	
+	/* end preemption checking */
+	CHECK_PREEMPTION (client->engine, FALSE);
+	
+	client->control->finished_at = jack_get_microseconds();
+	
+	/* wake the next client in the chain (could be the server), 
+	   and check if we were killed during the process
+	   cycle.
+	*/
+	
+	if (jack_wake_next_client (client)) {
+		DEBUG("client cannot wake next, or is dead\n");
+		jack_client_thread_suicide (client);
+		/*NOTREACHED*/
+	}
+
+	if (status || client->control->dead || !client->engine->engine_ok) {
+		jack_client_thread_suicide (client);
+		/*NOTREACHED*/
+	}
+}
+
+static void
+jack_client_thread_aux (void *arg)
 {
 	jack_client_t *client = (jack_client_t *) arg;
 	jack_client_control_t *control = client->control;
@@ -1640,6 +1697,31 @@ jack_client_thread (void *arg)
 	}
 
 	jack_client_thread_suicide (client);
+}
+
+static void *
+jack_client_thread (void *arg)
+{
+	jack_client_t *client = (jack_client_t *) arg;
+	jack_client_control_t *control = client->control;
+	
+	if (client->control->thread_cb) {
+	
+		pthread_mutex_lock (&client_lock);
+		client->thread_ok = TRUE;
+		client->thread_id = pthread_self();
+		pthread_cond_signal (&client_ready);
+		pthread_mutex_unlock (&client_lock);
+
+		control->pid = getpid();
+		control->pgrp = getpgrp();
+
+		client->control->thread_cb(client->control->thread_cb_arg);
+		jack_client_thread_suicide(client);
+	} else {
+		jack_client_thread_aux(arg);
+	}
+	
 	/*NOTREACHED*/
 	return (void *) 0;
 }
@@ -2136,6 +2218,12 @@ jack_set_process_callback (jack_client_t *client,
 		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
+	
+	if (client->control->thread_cb) {
+		jack_error ("A thread callback has already been setup, both models cannot be used at the same time!");
+		return -1;
+	}
+	
 	client->control->process_arg = arg;
 	client->control->process = callback;
 	return 0;
@@ -2216,6 +2304,24 @@ jack_set_client_registration_callback(jack_client_t *client,
 	}
 	client->control->client_register_arg = arg;
 	client->control->client_register = callback;
+	return 0;
+}
+
+int
+jack_set_process_thread(jack_client_t* client, JackThreadCallback callback, void *arg)
+{
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+	
+	if (client->control->process) {
+		jack_error ("A process callback has already been setup, both models cannot be used at the same time!");
+		return -1;
+	}
+
+	client->control->thread_cb_arg = arg;
+	client->control->thread_cb = callback;
 	return 0;
 }
 

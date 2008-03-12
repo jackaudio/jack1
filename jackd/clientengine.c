@@ -481,6 +481,8 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	client->control->graph_order_arg = NULL;
 	client->control->client_register = NULL;
 	client->control->client_register_arg = NULL;
+	client->control->thread_cb = NULL;
+	client->control->thread_cb_arg = NULL;
 
 	jack_transport_client_new (client);
         

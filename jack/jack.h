@@ -192,6 +192,14 @@ int jack_set_process_callback (jack_client_t *client,
  */
 jack_nframes_t jack_thread_wait (jack_client_t*, int status);
 
+// New experimental alternate threading model
+jack_nframes_t jack_cycle_wait (jack_client_t* client);
+	
+void jack_cycle_signal (jack_client_t* client, int status);
+	
+int jack_set_process_thread(jack_client_t* client, JackThreadCallback fun, void *arg);
+
+
 /**
  * Tell JACK to call @a thread_init_callback once just after
  * the creation of the thread in which all other callbacks 

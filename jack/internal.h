@@ -259,6 +259,8 @@ typedef volatile struct {
     void *freewheel_arg;
     JackClientRegistrationCallback client_register;	
     void *client_register_arg;
+	JackThreadCallback thread_cb;	
+    void *thread_cb_arg;
 
     /* external clients: set by libjack
      * internal clients: set by engine */
