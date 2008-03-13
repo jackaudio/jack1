@@ -18,6 +18,12 @@ else
 OSS_DIR =
 endif
 
+if HAVE_SUN
+SUN_DIR = sun
+else
+SUN_DIR =
+endif
+
 if HAVE_PA
 PA_DIR = portaudio
 else
@@ -42,5 +48,5 @@ else
 FIREWIRE_DIR =
 endif
 
-SUBDIRS = $(ALSA_MIDI_DIR) $(ALSA_DIR) dummy $(OSS_DIR) $(PA_DIR) $(CA_DIR) $(FREEBOB_DIR) $(FIREWIRE_DIR) netjack
-DIST_SUBDIRS = alsa alsa-midi dummy oss portaudio coreaudio freebob firewire netjack
+SUBDIRS = $(ALSA_MIDI_DIR) $(ALSA_DIR) dummy $(OSS_DIR) $(SUN_DIR) $(PA_DIR) $(CA_DIR) $(FREEBOB_DIR) $(FIREWIRE_DIR)
+DIST_SUBDIRS = alsa alsa-midi dummy oss sun portaudio coreaudio freebob firewire

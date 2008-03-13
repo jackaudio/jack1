@@ -376,7 +376,7 @@ static void usage (FILE *file)
 "             [ --nozombies OR -Z ]\n"
 "         -d backend [ ... backend args ... ]\n"
 "             The backend can be `alsa', `coreaudio', `dummy',\n"
-"                                `freebob', `oss' or `portaudio'.\n\n"
+"                                `freebob', `oss', `sun', or `portaudio'.\n\n"
 "       jackd -d backend --help\n"
 "             to display options for each backend\n\n");
 }	

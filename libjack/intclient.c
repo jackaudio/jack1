@@ -167,7 +167,7 @@ jack_internal_client_load (jack_client_t *client,
 {
 	va_list ap;
     va_start(ap, status);
-    jack_client_t* res = jack_internal_client_load_aux(client, client_name, options, status, ap);
+    jack_intclient_t* res = jack_internal_client_load_aux(client, client_name, options, status, ap);
     va_end(ap);
     return res;
 }

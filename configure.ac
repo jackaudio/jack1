@@ -17,7 +17,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=109
-JACK_MICRO_VERSION=8
+JACK_MICRO_VERSION=9
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -87,6 +87,12 @@ case "${host_os}" in
     # current FreeBSD header files conflict with the OSS driver's
     # barrier code, this may be fixed in 5.3, stay tuned.
     USE_BARRIER="no"
+    ;;
+  opebsd*)
+    # pthread_barrier* not implemented
+    USE_BARRIER="no"
+    # need small realtime stack
+    JACK_THREAD_STACK_TOUCH=10000
     ;;
   darwin*)
     JACK_THREAD_STACK_TOUCH=10000	# need small realtime stack
@@ -558,7 +564,7 @@ fi
 
 # Check which backend drivers can be built.  The last one successfully
 # configured becomes the default JACK driver; so the order of
-# precedence is: alsa, oss, coreaudio, portaudio, dummy.
+# precedence is: alsa, sun, oss, coreaudio, portaudio, dummy.
 
 JACK_DEFAULT_DRIVER=\"dummy\"
 
@@ -603,6 +609,18 @@ then
               JACK_DEFAULT_DRIVER=\"oss\"])
 fi
 AM_CONDITIONAL(HAVE_OSS, $HAVE_OSS)
+
+AC_ARG_ENABLE(sun, [  --disable-sun           ignore Sun driver ],
+			TRY_SUN=$enableval , TRY_SUN=yes ) 
+HAVE_SUN="false"
+if test "x$TRY_SUN" = "xyes"
+then
+	# check for Sun audio API
+	AC_CHECK_HEADER([sys/audioio.h],
+	     [HAVE_SUN="true"
+              JACK_DEFAULT_DRIVER=\"sun\"])
+fi
+AM_CONDITIONAL(HAVE_SUN, $HAVE_SUN)
 
 AC_ARG_ENABLE(freebob, [  --disable-freebob          ignore FreeBob driver ],
 			TRY_FREEBOB=$enableval , TRY_FREEBOB=yes ) 
@@ -726,6 +744,7 @@ drivers/alsa/Makefile
 drivers/alsa-midi/Makefile
 drivers/dummy/Makefile
 drivers/oss/Makefile
+drivers/sun/Makefile
 drivers/portaudio/Makefile
 drivers/coreaudio/Makefile
 drivers/freebob/Makefile
@@ -752,6 +771,7 @@ echo \| Build with ALSA support............................... : $HAVE_ALSA
 echo \| Build with old FireWire \(FreeBob\) support............. : $HAVE_FREEBOB
 echo \| Build with new FireWire \(FFADO\) support............... : $HAVE_FIREWIRE
 echo \| Build with OSS support................................ : $HAVE_OSS
+echo \| Build with Sun audio support.......................... : $HAVE_SUN
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
 echo \| Compiler optimization flags........................... : $JACK_OPT_CFLAGS
