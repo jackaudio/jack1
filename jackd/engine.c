@@ -2258,11 +2258,16 @@ static void
 jack_notify_all_port_interested_clients (jack_engine_t *engine, jack_client_id_t src, jack_client_id_t dst, jack_port_id_t a, jack_port_id_t b, int connected)
 {
 	JSList *node;
-	jack_event_t event;
+	jack_event_t event1;
+    jack_event_t event2;
 
-	event.type = (connected ? PortConnected : PortDisconnected);
-	event.x.self_id = a;
-	event.y.other_id = b;
+	event1.type = (connected ? PortConnected : PortDisconnected);
+	event1.x.self_id = a;
+	event1.y.other_id = b;
+    
+    event2.type = (connected ? PortConnected : PortDisconnected);
+	event2.x.self_id = b;
+	event2.y.other_id = a;
 	
 	/* GRAPH MUST BE LOCKED : see callers of jack_send_connection_notification() 
 	 */
@@ -2271,16 +2276,12 @@ jack_notify_all_port_interested_clients (jack_engine_t *engine, jack_client_id_t
 	jack_client_internal_t* dst_client = jack_client_internal_by_id (engine, dst);
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		jack_client_internal_t* client;
-
-		client = (jack_client_internal_t*) node->data;
-
+		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if (src_client != client &&  dst_client  != client && client->control->port_connect != NULL) {
 			
 			/* one of the ports belong to this client or it has a port connect callback */
-			
-			jack_deliver_event (engine, client, &event);
-			
+			jack_deliver_event (engine, client, &event1);
+            jack_deliver_event (engine, client, &event2);
 		} 
 	}
 }
