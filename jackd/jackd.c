@@ -508,7 +508,7 @@ main (int argc, char *argv[])
 
 {
 	jack_driver_desc_t * desc;
-	const char *options = "-ad:P:uvshVRTFlt:mn:p:c:";
+	const char *options = "-ad:P:uvshVRZTFlt:mn:p:c:";
 	struct option long_options[] = 
 	{ 
 		{ "driver", 1, 0, 'd' },
