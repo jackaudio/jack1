@@ -27,7 +27,7 @@ dnl made to the way libjack communicates with jackd
 dnl that would break applications linked with an older
 dnl version of libjack.
 dnl ---
-JACK_PROTOCOL_VERSION=22
+JACK_PROTOCOL_VERSION=23
 
 dnl ---
 dnl HOWTO: updating the libjack interface version

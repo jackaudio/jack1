@@ -137,6 +137,9 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 %{_libdir}/libjack.so
 %{_libdir}/libjack.so.0
 %{_libdir}/libjack.so.0.0.*
+%{_libdir}/libjackserver.so
+%{_libdir}/libjackserver.so.0
+%{_libdir}/libjackserver.so.0.0.*
 %{_libdir}/jack/inprocess.so
 %{_libdir}/jack/intime.so
 %{_libdir}/jack/jack_*.so
