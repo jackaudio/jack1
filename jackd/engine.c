@@ -1468,8 +1468,7 @@ jack_server_thread (void *arg)
 				    (engine, pfd[i].fd)) {
 					jack_error ("could not handle external"
 						    " client request");
-// #ifdef JACK_USE_MACH_THREADS
-#if 1
+#ifdef JACK_USE_MACH_THREADS
                                     /* poll is implemented using
 				       select (see the macosx/fakepoll
 				       code). When the socket is closed
