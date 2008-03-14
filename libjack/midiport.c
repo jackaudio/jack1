@@ -78,7 +78,11 @@ jack_midi_event_get(jack_midi_event_t *event,
 		(jack_midi_port_info_private_t *) port_buffer;
 	
 	if (event_idx >= info->event_count)
+#ifdef ENODATA
 		return ENODATA;
+#else
+		return ENOMSG;
+#endif
 	
 	port_event = (jack_midi_port_internal_event_t *) (info + 1);
 	port_event += event_idx;

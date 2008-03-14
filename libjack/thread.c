@@ -152,7 +152,11 @@ jack_client_create_thread (jack_client_t* client,
 		log_result("requesting joinable thread creation", result);
 		return result;
 	}
+#ifdef __OpenBSD__
+	result = pthread_attr_setscope(&attr, PTHREAD_SCOPE_PROCESS);
+#else
 	result = pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+#endif
 	if (result) {
 		log_result("requesting system scheduling scope", result);
 		return result;

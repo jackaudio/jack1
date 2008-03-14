@@ -88,7 +88,7 @@ case "${host_os}" in
     # barrier code, this may be fixed in 5.3, stay tuned.
     USE_BARRIER="no"
     ;;
-  opebsd*)
+  openbsd*)
     # pthread_barrier* not implemented
     USE_BARRIER="no"
     # need small realtime stack
