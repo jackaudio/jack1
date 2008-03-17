@@ -249,8 +249,9 @@ init_sockaddr_in (struct sockaddr_in *name, const char *hostname, uint16_t port)
         if (hostinfo == NULL)
         {
             jack_error ("init_sockaddr_in: unknown host: %s", hostname);
+        } else {
+            name->sin_addr = *(struct in_addr *) hostinfo->h_addr;
         }
-        name->sin_addr = *(struct in_addr *) hostinfo->h_addr;
     }
     else
     {
