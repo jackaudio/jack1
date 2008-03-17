@@ -182,7 +182,7 @@ ReadAgain:
     }
     else
     {
-        jack_info("Packet Miss: (expected: %d, got: %d) framecnt=%d", rx_bufsize, size, framecnt);
+//        jack_info("Packet Miss: (expected: %d, got: %d) framecnt=%d", rx_bufsize, size, framecnt);
         cont_miss += 1;
         chn = 0;
         node = capture_ports;
@@ -272,54 +272,45 @@ int
 jack_initialize (jack_client_t *int_client, const char *load_init)
 {
     int argc = 2; // getopt() starts parsing at the third element of argv
-    char *argv[32];
-    char *load_init_copy, *current_arg, *jack_name, *peer_ip;
+    char **argv;
+    char *load_init_dup, *peer_ip = "localhost";
     extern char *optarg;
     extern int optind, optopt;
     int index, option, errflag = 0, peer_socket;
     
-    /* Is that any good ? */
     client = int_client;
 
-    /* We'll use a copy of load_init to determine how much
-        should be allocated for each argument */
-    load_init_copy = strdup (load_init); // Make a copy of our init string
-
     /* Fill in some defaults */
-    jack_name = (char*) malloc (10);
-    peer_ip = (char*) malloc (9);
-    sprintf (jack_name, "net_source");
-    sprintf (peer_ip,   "localhost");
     peer_socket = 3000;
 
-    /* Count the length of out first argument, and allocate accordingly */
-    current_arg = strtok (load_init_copy, " ");
-    argv[argc] = (char*) malloc (strlen (current_arg) * sizeof (char) + 1);
-    /* Same for the rest of the list */
-    while (sscanf (load_init, "%s%n", argv[argc], &index) == 1)
+    /* We'll use a copy of load_init since we'll be using strtok
+        which modifies the string to split */
+    load_init_dup = strdup (load_init);
+    /* Count how many elements we have */
+    strtok (load_init_dup, " ");
+    argc++;
+    while (strtok (NULL, " ") != NULL)
     {
-        load_init += index; // Move on to the next arg
         argc++;
-        if ((current_arg = strtok (NULL, " ")) != NULL)
-        {
-            argv[argc] = (char*) malloc (strlen (current_arg) * sizeof (char) + 1);
-        }
     }
-
+    /* Allocate as needed */
+    argv = (char**) malloc (argc * sizeof(char*));
+    /* Get the arguments */
+    for (index = 2; index < argc; index++)
+    {
+        argv[index] = load_init_dup;
+        load_init_dup += strlen (argv[index]) + 1;
+    }
+    
     /* let's make sure we can run multiple in process clients
         and still have our parametters parsed by getopt */
     optind = 2;
     /* We may now run our getopt loop just as if all of it came from a real command line */
-    while ((option = getopt(argc, argv, ":n:p:s:P:C:l:r:f:b:")) != -1)
+    while ((option = getopt (argc, argv, ":p:s:P:C:l:r:f:b:")) != -1)
     {
         switch (option) 
     {
-            case 'n':
-                free(jack_name);
-                jack_name = optarg;
-                break;
             case 'p':
-                free(peer_ip);
                 peer_ip = optarg;
                 break;
             case 's':
@@ -345,18 +336,13 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
                 break;
             case ':': // -n or -p without operand
                 jack_error ("Option -%c requires an operand, ignoring\n", optopt);
-                errflag++;
                 break;
             case '?':
-                jack_error ("Unrecognized option: -%c, ignoring.\n"
-                    "TODO : send the format to jack_load application...\n"
-                    "Go bug the devs about it", optopt);
-                errflag++;
+                jack_error ("Unrecognized option: -%c, ignoring.\n", optopt);
         }
     }
-
+    
     jack_info ("Here's our netclient setup:\n"
-        "jack name: `%s'\n"
         "peer ip/hostname: `%s'\n"
         "peer_socket: `%i'\n"
         "playback channels: `%i'\n"
@@ -365,7 +351,6 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
         "reply port: `%i'\n"
         "factor: `%i'\n"
         "bitdepth: `%i'\n",
-        jack_name,
         peer_ip,
         peer_socket,
         playback_channels,
@@ -409,11 +394,9 @@ jack_initialize (jack_client_t *int_client, const char *load_init)
     int rx_bufsize =  get_sample_size (bitdepth) * capture_channels * net_period + sizeof (jacknet_packet_header);
     global_packcache = packet_cache_new (latency + 5, rx_bufsize, 1400);
 
-    /* Cleanup the mess */
-    for (index = 2; index < argc; index++)
-    {
-        free (argv[index]);
-    }
+    /* We're ready to clear previous allocations */
+    free (argv[2]);
+    free (argv);
 
     /* tell the JACK server that we are ready to roll,
         exit gracefully if we got something wrong before that */
