@@ -1,6 +1,4 @@
 /*
-
-
 	Sun Audio API driver for Jack
 	Copyright (C) 2008 Jacob Meuser <jakemsr@sdf.lonestar.org>
 	Based heavily on oss_driver.c which came with the following
@@ -28,16 +26,6 @@
 
 #include <config.h>
 
-#ifdef USE_BARRIER
-/*
- * POSIX conformance level should be globally defined somewhere, possibly
- * in config.h? Otherwise it's pre 1993/09 level, which leaves out significant
- * parts of threading and realtime stuff. Note: most of the parts are still
- * defined as optional by the standard, so OS conformance to this level
- * doesn't necessarily mean everything exists.
- */
-#define _XOPEN_SOURCE	600
-#endif
 #ifndef _REENTRANT
 #define _REENTRANT
 #endif
@@ -50,6 +38,7 @@
 #include <sys/ioctl.h>
 #include <sys/audioio.h>
 
+#include <poll.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -167,37 +156,195 @@ static void set_period_size (sun_driver_t *driver,
 		((double) driver->period_size /
 		(double) driver->sample_rate) * 1e6;
 	driver->last_wait_ust = 0;
-	driver->last_periodtime = jack_get_microseconds();
-	driver->next_periodtime = 0;
 	driver->iodelay = 0.0F;
 }
 
 
-static inline void update_times (sun_driver_t *driver)
+static void
+sun_driver_write_silence (sun_driver_t *driver, int nperiods)
 {
-	driver->last_periodtime = jack_get_microseconds();
-	if (driver->next_periodtime > 0)
+	size_t localsize;
+	ssize_t io_res;
+	void *localbuf;
+	int i;
+
+	localsize = driver->outdevbufsize;
+	localbuf = malloc(localsize);
+	if (localbuf == NULL)
 	{
-		driver->iodelay = (float)
-			((long double) driver->last_periodtime - 
-			(long double) driver->next_periodtime);
+		jack_error("sun_driver: malloc() failed: %s@%i",
+			__FILE__, __LINE__);
+		return;
 	}
-	else driver->iodelay = 0.0F;
-	driver->next_periodtime = 
-		driver->last_periodtime +
-		driver->period_usecs;
+
+	memset(localbuf, 0, localsize);
+	for (i = 0; i < nperiods; i++)
+	{
+		io_res = write(driver->outfd, localbuf, localsize);
+		if (io_res < (ssize_t) localsize)
+		{
+			jack_error("sun_driver: write() failed: %s: "
+				"count=%d/%d: %s@%i", strerror(errno), io_res,
+				localsize, __FILE__, __LINE__);
+			break;
+		}
+	}
+	free(localbuf);
+}
+
+static jack_nframes_t
+sun_driver_wait (sun_driver_t *driver, int *status, float *iodelay)
+{
+	struct pollfd pfd[2];
+	jack_time_t poll_enter;
+	jack_time_t poll_ret = 0;
+	jack_nframes_t capture_avail = 0;
+	jack_nframes_t playback_avail = 0;
+	jack_nframes_t avail;
+	int need_capture = 0;
+	int need_playback = 0;
+	int capture_errors = 0;
+	int playback_errors = 0;
+	int poll_timeout;
+	nfds_t nfds;
+
+	*status = 0;
+	*iodelay = 0;
+
+	if (driver->infd >= 0)
+	{
+		driver->capture_ready = 0;
+		need_capture = 1;
+	}
+
+	if (driver->outfd >= 0)
+	{
+		driver->playback_ready = 0;
+		need_playback = 1;
+	}
+
+	while (need_capture || need_playback)
+	{
+		bzero(&pfd[0], sizeof(struct pollfd));
+		bzero(&pfd[1], sizeof(struct pollfd));
+
+		if (driver->infd >= 0 )
+		{
+			pfd[0].fd = driver->infd;
+			pfd[0].events = POLLIN;
+		}
+
+		if (driver->outfd >= 0)
+		{
+			pfd[1].fd = driver->outfd;
+			pfd[1].events = POLLOUT;
+		}
+
+		poll_enter = jack_get_microseconds();
+
+		poll_timeout = (int)(driver->period_usecs / 666);
+		nfds = poll(pfd, 2, poll_timeout);
+		if ( nfds == -1 ||
+		    ((pfd[0].revents | pfd[1].revents) &
+		    (POLLERR | POLLHUP | POLLNVAL)) )
+		{
+			jack_error("sun_driver: poll() error: %s: %s@%i",  
+				strerror(errno), __FILE__, __LINE__);
+			return 0;
+		}
+
+		poll_ret = jack_get_microseconds();
+
+		driver->engine->transport_cycle_start(driver->engine,
+			poll_ret);
+
+		if (nfds == 0)
+		{
+			jack_error("sun_driver: poll() timeout, waited "
+				"%" PRIu64 " usecs: %s@%i",  
+				poll_ret - poll_enter, __FILE__, __LINE__);
+			return 0;
+		}
+
+		if (need_capture)
+		{
+			if (ioctl(driver->infd, AUDIO_RERROR,
+				&capture_errors) < 0)
+			{
+				jack_error("sun_driver: AUDIO_RERROR failed: "
+					"%s: %s@%i", strerror(errno),
+					__FILE__, __LINE__);
+				return 0;
+			}
+			capture_errors /= driver->period_size;
+			capture_errors -= driver->capture_drops;
+			driver->capture_drops += capture_errors;
+			if (pfd[0].revents & POLLIN)
+			{
+				capture_avail = driver->period_size;
+				need_capture--;
+			}
+		}
+
+		if (need_playback)
+		{
+			if (ioctl(driver->outfd, AUDIO_PERROR,
+				&playback_errors) < 0)
+			{
+				jack_error("sun_driver: AUDIO_PERROR failed: "
+					"%s: %s@%i", strerror(errno),
+					__FILE__, __LINE__);
+				return 0;
+			}
+			playback_errors /= driver->period_size;
+			playback_errors -= driver->playback_drops;
+			driver->playback_drops += playback_errors;
+			if (pfd[1].revents & POLLOUT)
+			{
+				playback_avail = driver->period_size;
+				need_playback--;
+			}
+		}
+	}
+
+	if (playback_errors || capture_errors)
+	{
+		*iodelay += driver->period_usecs *
+			(playback_errors > capture_errors ?
+			playback_errors : capture_errors);
+		driver->engine->delay (driver->engine, *iodelay);
+	}
+
+	*status = 0;
+	driver->last_wait_ust = poll_ret;
+
+	avail = capture_avail < playback_avail ?
+		(capture_avail > 0 ? capture_avail : playback_avail) :
+		(playback_avail > 0 ? playback_avail : capture_avail);
+
+	if (capture_avail > 0)
+		*status |= 1;
+	if (playback_avail > 0)
+		*status |= 2;
+
+	return avail - (avail % driver->period_size);
 }
 
 
 static inline void driver_cycle (sun_driver_t *driver)
 {
-	update_times(driver);
-	driver->engine->transport_cycle_start(driver->engine,
-		driver->last_periodtime);
+	jack_nframes_t ready_frames;
+	int ready_status;
+	float iodelay;
 
-	driver->last_wait_ust = driver->last_periodtime;
-	driver->engine->run_cycle(driver->engine, 
-		driver->period_size, driver->iodelay);
+	ready_frames = sun_driver_wait (driver, &ready_status, &iodelay);
+
+	if (ready_status & 1)
+		driver->capture_ready = 1;
+	if (ready_status & 2)
+		driver->playback_ready = 1;
+
+	driver->engine->run_cycle(driver->engine, ready_frames, iodelay);
 }
 
 
@@ -337,8 +484,8 @@ static int sun_driver_attach (sun_driver_t *driver, jack_engine_t *engine)
 			JACK_DEFAULT_AUDIO_TYPE, port_flags, 0);
 		if (port == NULL)
 		{
-			jack_error("sun_driver: cannot register port for %s: %s@%i",
-				channel_name, __FILE__, __LINE__);
+			jack_error("sun_driver: cannot register port for %s: "
+				"%s@%i", channel_name, __FILE__, __LINE__);
 			break;
 		}
 		jack_port_set_latency(port,
@@ -356,8 +503,8 @@ static int sun_driver_attach (sun_driver_t *driver, jack_engine_t *engine)
 			JACK_DEFAULT_AUDIO_TYPE, port_flags, 0);
 		if (port == NULL)
 		{
-			jack_error("sun_driver: cannot register port for %s: %s@%i",
-				channel_name, __FILE__, __LINE__);
+			jack_error("sun_driver: cannot register port for "
+				"%s: %s@%i", channel_name, __FILE__, __LINE__);
 			break;
 		}
 		jack_port_set_latency(port,
@@ -417,24 +564,22 @@ static int sun_driver_start (sun_driver_t *driver)
 	const char *indev = driver->indev;
 	const char *outdev = driver->outdev;
 
-	driver->trigger = 0;
-
 	if ((strcmp(indev, outdev) == 0) &&
 	    ((driver->capture_channels > 0) && (driver->playback_channels > 0)))
 	{
 		infd = outfd = open(indev, O_RDWR|O_EXCL);
 		if (infd < 0)
 		{
-			jack_error(
-				"sun_driver: failed to open duplex device %s: %s@%i, errno=%d",
-				indev, __FILE__, __LINE__, errno);
+			jack_error("sun_driver: failed to open duplex device "
+				"%s: %s: %s@%i", indev, strerror(errno),
+				__FILE__, __LINE__);
 			return -1;
 		}
 		if (ioctl(infd, AUDIO_SETFD, &s) < 0)
 		{
-			jack_error(
-				"sun_driver: failed to enable full duplex for %s: %s@%i, errno=%d",
-				indev, __FILE__, __LINE__, errno);
+			jack_error("sun_driver: failed to enable full duplex: "
+				"%s: %s@%i", strerror(errno),
+				__FILE__, __LINE__);
 			return -1;
 		}
 	}
@@ -445,9 +590,9 @@ static int sun_driver_start (sun_driver_t *driver)
 			infd = open(indev, O_RDONLY|O_EXCL);
 			if (infd < 0)
 			{
-				jack_error(
-					"sun_driver: failed to open input device %s: %s@%i, errno=%d",
-					indev, __FILE__, __LINE__, errno);
+				jack_error("sun_driver: failed to open input "
+					"device %s: %s: %s@%i", indev,
+					strerror(errno), __FILE__, __LINE__);
 			}
 		}
 		if (driver->playback_channels > 0)
@@ -455,16 +600,16 @@ static int sun_driver_start (sun_driver_t *driver)
 			outfd = open(outdev, O_WRONLY|O_EXCL);
 			if (outfd < 0)
 			{
-				jack_error(
-					"sun_driver: failed to open output device %s: %s@%i, errno=%d",
-					outdev, __FILE__, __LINE__, errno);
+				jack_error("sun_driver: failed to open output "
+					"device %s: %s: %s@%i", outdev,
+					strerror(errno), __FILE__, __LINE__);
 			}
 		}
 	}
 	if (infd == -1 && outfd == -1)
 	{
-		jack_error(
-			"sun_driver: no device was opened %s@%i", __FILE__, __LINE__);
+		jack_error("sun_driver: no device was opened: %s@%i",
+			__FILE__, __LINE__);
 	}
 
 	driver->infd = infd;
@@ -479,6 +624,7 @@ static int sun_driver_start (sun_driver_t *driver)
 		audio_if_in.record.precision = driver->bits;
 		audio_if_in.record.channels = driver->capture_channels;
 		audio_if_in.record.sample_rate = driver->sample_rate;
+		audio_if_in.record.pause = 1;
 
 	}
 	if (outfd >= 0)
@@ -487,6 +633,7 @@ static int sun_driver_start (sun_driver_t *driver)
 		audio_if_out.play.precision = driver->bits;
 		audio_if_out.play.channels = driver->playback_channels;
 		audio_if_out.play.sample_rate = driver->sample_rate;
+		audio_if_out.play.pause = 1;
 	}
 	if (infd == outfd)
 		audio_if_in.play = audio_if_out.play;
@@ -499,7 +646,7 @@ static int sun_driver_start (sun_driver_t *driver)
 
 	if (infd == outfd)
 	{
-		audio_if_in.mode = AUMODE_PLAY_ALL | AUMODE_RECORD;
+		audio_if_in.mode = AUMODE_PLAY | AUMODE_RECORD;
 	}
 	else
 	{
@@ -507,35 +654,31 @@ static int sun_driver_start (sun_driver_t *driver)
 			audio_if_in.mode = AUMODE_RECORD;
 
 		if (outfd > 0)
-			audio_if_out.mode = AUMODE_PLAY_ALL;
+			audio_if_out.mode = AUMODE_PLAY;
 	}
 
 	if (infd > 0)
 	{
 		if (ioctl(infd, AUDIO_SETINFO, &audio_if_in) < 0)
-			jack_error(
-				"sun_driver: failed to set parameters for %s: %s@%i, errno=%d",
-				indev, __FILE__, __LINE__, errno);
+			jack_error("sun_driver: failed to set parameters for "
+				"%s: %s: %s@%i", indev, strerror(errno),
+				__FILE__, __LINE__);
 	}
 
 	if (outfd > 0 && outfd != infd)
 	{
 		if (ioctl(outfd, AUDIO_SETINFO, &audio_if_out) < 0)
-			jack_error(
-				"sun_driver: failed to set parameters for %s: %s@%i, errno=%d",
-				outdev, __FILE__, __LINE__, errno);
+			jack_error("sun_driver: failed to set parameters for "
+				"%s: %s: %s@%i", outdev, strerror(errno),
+				__FILE__, __LINE__);
 	}
-
-	printf("sun_driver: %s : 0x%x/%i/%i (%i)\n", indev, 
-		driver->format, driver->capture_channels, driver->sample_rate,
-		driver->period_size);
 
 	if (infd > 0)
 	{
 		if (ioctl(infd, AUDIO_GETINFO, &audio_if_in) < 0)
 		{
-			jack_error("sun_driver: AUDIO_GETINFO failed: %s@%i, errno=%d",
-				__FILE__, __LINE__, errno);
+			jack_error("sun_driver: AUDIO_GETINFO failed: %s: "
+				"%s@%i", strerror(errno), __FILE__, __LINE__);
 		}
 
 		if (audio_if_in.record.encoding != driver->format ||
@@ -543,12 +686,12 @@ static int sun_driver_start (sun_driver_t *driver)
 		    audio_if_in.record.channels != driver->capture_channels ||
 		    audio_if_in.record.sample_rate != driver->sample_rate)
 		{
-			jack_error("sun_driver: setting capture parameters failed: %s@%i",
-				__FILE__, __LINE__);
+			jack_error("sun_driver: setting capture parameters "
+				"failed: %s@%i", __FILE__, __LINE__);
 		}
 
-		period_size = 8 * audio_if_in.blocksize / driver->capture_channels /
-			driver->bits;
+		period_size = 8 * audio_if_in.blocksize /
+			driver->capture_channels / driver->bits;
 	}
 
 	if (outfd > 0)
@@ -561,30 +704,30 @@ static int sun_driver_start (sun_driver_t *driver)
 		{
 			if (ioctl(outfd, AUDIO_GETINFO, &audio_if_out) < 0)
 			{
-				jack_error("sun_driver: AUDIO_GETINFO failed: %s@%i, errno=%d",
-					__FILE__, __LINE__, errno);
+				jack_error("sun_driver: AUDIO_GETINFO failed: "
+					"%s: %s@%i", strerror(errno),
+					__FILE__, __LINE__);
 			}
 		}
 
-		if (audio_if_in.play.encoding != driver->format ||
-		    audio_if_in.play.precision != driver->bits ||
-		    audio_if_in.play.channels != driver->playback_channels ||
-		    audio_if_in.play.sample_rate != driver->sample_rate)
+		if (audio_if_out.play.encoding != driver->format ||
+		    audio_if_out.play.precision != driver->bits ||
+		    audio_if_out.play.channels != driver->playback_channels ||
+		    audio_if_out.play.sample_rate != driver->sample_rate)
 		{
-			jack_error("sun_driver: setting playback parameters failed: %s@%i",
-				__FILE__, __LINE__);
+			jack_error("sun_driver: playback settings failed: "
+				"%s@%i", __FILE__, __LINE__);
 		}
 
-		period_size = 8 * audio_if_out.blocksize / driver->playback_channels /
-			driver->bits;
+		period_size = 8 * audio_if_out.blocksize /
+			driver->playback_channels / driver->bits;
 	}
 
 	if (period_size != driver->period_size && !driver->ignorehwbuf)
 	{
 		printf("sun_driver: period size update: %u\n", period_size);
-		driver->period_size = period_size;
-		driver->period_usecs = ((double) driver->period_size / 
-				 (double) driver->sample_rate) * 1e6;
+
+		set_period_size (driver, period_size);
 
 		driver->engine->set_buffer_size(driver->engine, 
 			driver->period_size);
@@ -631,50 +774,22 @@ static int sun_driver_start (sun_driver_t *driver)
 	printf("sun_driver: indevbuf %zd B, outdevbuf %zd B\n",
 		driver->indevbufsize, driver->outdevbufsize);
 
-	pthread_mutex_init(&driver->mutex_in, NULL);
-	pthread_mutex_init(&driver->mutex_out, NULL);
-#	ifdef USE_BARRIER
-	puts("sun_driver: using barrier mode, (dual thread)");
-	pthread_barrier_init(&driver->barrier, NULL, 2);
-#	else
-	puts("sun_driver: not using barrier mode, (single thread)");
-#	endif
+	pthread_mutex_init(&driver->io_mutex, NULL);
+
 	sem_init(&driver->sem_start, 0, 0);
 	driver->run = 1;
-	driver->threads = 0;
-	if (infd >= 0)
+
+	if (jack_client_create_thread(NULL, &driver->io_thread, 
+		driver->engine->rtpriority, driver->engine->control->real_time, 
+		io_thread, driver) < 0)
 	{
-		if (jack_client_create_thread(NULL, &driver->thread_in, 
-			driver->engine->rtpriority, 
-			driver->engine->control->real_time, 
-			io_thread, driver) < 0)
-		{
-			jack_error("sun_driver: jack_client_create_thread() failed: %s@%i",
-				__FILE__, __LINE__);
-			return -1;
-		}
-		driver->threads |= 1;
+		jack_error("sun_driver: jack_client_create_thread() "
+			"failed: %s@%i", __FILE__, __LINE__);
+		return -1;
 	}
 
-	if ((outfd >= 0) && (infd < 0))
-	{
-		if (jack_client_create_thread(NULL, &driver->thread_out, 
-			driver->engine->rtpriority, 
-			driver->engine->control->real_time, 
-			io_thread, driver) < 0)
-		{
-			jack_error("sun_driver: jack_client_create_thread() failed: %s@%i",
-				__FILE__, __LINE__);
-			return -1;
-		}
-		driver->threads |= 2;
-	}
+	sem_post(&driver->sem_start);
 
-	if (driver->threads & 1) sem_post(&driver->sem_start);
-	if (driver->threads & 2) sem_post(&driver->sem_start);
-
-	driver->last_periodtime = jack_get_microseconds();
-	driver->next_periodtime = 0;
 	driver->iodelay = 0.0F;
 
 	return 0;
@@ -686,30 +801,15 @@ static int sun_driver_stop (sun_driver_t *driver)
 	void *retval;
 
 	driver->run = 0;
-	if (driver->threads & 1)
+	if (pthread_join(driver->io_thread, &retval) < 0)
 	{
-		if (pthread_join(driver->thread_in, &retval) < 0)
-		{
-			jack_error("sun_driver: pthread_join() failed: %s@%i",
-				__FILE__, __LINE__);
-			return -1;
-		}
+		jack_error("sun_driver: pthread_join() failed: %s@%i",
+			__FILE__, __LINE__);
+		return -1;
 	}
-	if (driver->threads & 2)
-	{
-		if (pthread_join(driver->thread_out, &retval) < 0)
-		{
-			jack_error("sun_driver: pthread_join() failed: %s@%i",
-				__FILE__, __LINE__);
-			return -1;
-		}
-	}
+
 	sem_destroy(&driver->sem_start);
-#	ifdef USE_BARRIER
-	pthread_barrier_destroy(&driver->barrier);
-#	endif
-	pthread_mutex_destroy(&driver->mutex_in);
-	pthread_mutex_destroy(&driver->mutex_out);
+	pthread_mutex_destroy(&driver->io_mutex);
 
 	if (driver->outfd >= 0 && driver->outfd != driver->infd)
 	{
@@ -744,16 +844,18 @@ static int sun_driver_read (sun_driver_t *driver, jack_nframes_t nframes)
 	JSList *node;
 	jack_port_t *port;
 
-	if (!driver->run) return 0;
+	if (!driver->run)
+		return 0;
+
 	if (nframes != driver->period_size)
 	{
-		jack_error(
-			"sun_driver: read failed nframes != period_size  (%u/%u): %s@%i",
-			nframes, driver->period_size, __FILE__, __LINE__);
+		jack_error("sun_driver: read failed: nframes != period_size: "
+			"(%u/%u): %s@%i", nframes, driver->period_size,
+			__FILE__, __LINE__);
 		return -1;
 	}
 
-	pthread_mutex_lock(&driver->mutex_in);
+	pthread_mutex_lock(&driver->io_mutex);
 
 	node = driver->capture_ports;
 	channel = 0;
@@ -774,7 +876,7 @@ static int sun_driver_read (sun_driver_t *driver, jack_nframes_t nframes)
 		channel++;
 	}
 
-	pthread_mutex_unlock(&driver->mutex_in);
+	pthread_mutex_unlock(&driver->io_mutex);
 
 	return 0;
 }
@@ -787,16 +889,18 @@ static int sun_driver_write (sun_driver_t *driver, jack_nframes_t nframes)
 	JSList *node;
 	jack_port_t *port;
 
-	if (!driver->run) return 0;
+	if (!driver->run)
+		return 0;
+
 	if (nframes != driver->period_size)
 	{
-		jack_error(
-			"sun_driver: write failed nframes != period_size  (%u/%u): %s@%i",
-			nframes, driver->period_size, __FILE__, __LINE__);
+		jack_error("sun_driver: write failed: nframes != period_size "
+			"(%u/%u): %s@%i", nframes, driver->period_size,
+			__FILE__, __LINE__);
 		return -1;
 	}
 
-	pthread_mutex_lock(&driver->mutex_out);
+	pthread_mutex_lock(&driver->io_mutex);
 
 	node = driver->playback_ports;
 	channel = 0;
@@ -817,7 +921,7 @@ static int sun_driver_write (sun_driver_t *driver, jack_nframes_t nframes)
 		channel++;
 	}
 
-	pthread_mutex_unlock(&driver->mutex_out);
+	pthread_mutex_unlock(&driver->io_mutex);
 
 	return 0;
 }
@@ -825,13 +929,10 @@ static int sun_driver_write (sun_driver_t *driver, jack_nframes_t nframes)
 
 static int sun_driver_null_cycle (sun_driver_t *driver, jack_nframes_t nframes)
 {
-	pthread_mutex_lock(&driver->mutex_in);
+	pthread_mutex_lock(&driver->io_mutex);
 	memset(driver->indevbuf, 0x00, driver->indevbufsize);
-	pthread_mutex_unlock(&driver->mutex_in);
-
-	pthread_mutex_lock(&driver->mutex_out);
 	memset(driver->outdevbuf, 0x00, driver->outdevbufsize);
-	pthread_mutex_unlock(&driver->mutex_out);
+	pthread_mutex_unlock(&driver->io_mutex);
 
 	return 0;
 }
@@ -853,154 +954,96 @@ static int sun_driver_bufsize (sun_driver_t *driver, jack_nframes_t nframes)
 
 /* internal driver thread */
 
-
-#ifdef USE_BARRIER
-static inline void synchronize (sun_driver_t *driver)
-{
-	if (driver->threads == 3)
-	{
-		if (pthread_barrier_wait(&driver->barrier) ==
-			PTHREAD_BARRIER_SERIAL_THREAD)
-		{
-			driver_cycle(driver);
-		}
-	}
-	else
-	{
-		driver_cycle(driver);
-	}
-}
-#endif
-
-
 static void *io_thread (void *param)
 {
 	size_t localsize;
 	ssize_t io_res;
 	void *localbuf;
 	sun_driver_t *driver = (sun_driver_t *) param;
+	audio_info_t audio_if;
+
+	if (driver->outfd >= 0)
+	{
+		/* "prime" the playback buffer */
+		sun_driver_write_silence(driver, driver->nperiods);
+	}
 
 	sem_wait(&driver->sem_start);
 
-#	ifdef USE_BARRIER
-	if (pthread_self() == driver->thread_in)
+	/* start DMA engine(s) */
+
+	if (driver->infd >= 0)
 	{
-		localsize = driver->indevbufsize;
-		localbuf = malloc(localsize);
-		if (localbuf == NULL)
-		{
-			jack_error("sun_driver: malloc() failed: %s@%i",
-				__FILE__, __LINE__);
-			return NULL;
-		}
-
-		while (driver->run)
-		{
-			io_res = read(driver->infd, localbuf, localsize);
-			if (io_res < (ssize_t) localsize)
-			{
-				jack_error(
-					"sun_driver: read() failed: %s@%i, count=%d/%d, errno=%d",
-					__FILE__, __LINE__, io_res, localsize,
-					errno);
-				break;
-			}
-
-			pthread_mutex_lock(&driver->mutex_in);
-			memcpy(driver->indevbuf, localbuf, localsize);
-			pthread_mutex_unlock(&driver->mutex_in);
-
-			synchronize(driver);
-		}
-
-		free(localbuf);
+		AUDIO_INITINFO(&audio_if);
+		audio_if.record.pause = 0;
+		if (ioctl(driver->infd, AUDIO_SETINFO, &audio_if) < 0)
+			jack_error("sun_driver: trigger capture failed: %s: "
+				"%s@%i", strerror(errno), __FILE__, __LINE__);
 	}
-	else if (pthread_self() == driver->thread_out)
+
+	if (driver->outfd >= 0)
 	{
-		localsize = driver->outdevbufsize;
-		localbuf = malloc(localsize);
-		if (localbuf == NULL)
-		{
-			jack_error("sun_driver: malloc() failed: %s@%i",
-				__FILE__, __LINE__);
-			return NULL;
-		}
-		while (driver->run)
-		{
-			pthread_mutex_lock(&driver->mutex_out);
-			memcpy(localbuf, driver->outdevbuf, localsize);
-			pthread_mutex_unlock(&driver->mutex_out);
-
-			io_res = write(driver->outfd, localbuf, localsize);
-			if (io_res < (ssize_t) localsize)
-			{
-				jack_error(
-					"sun_driver: write() failed: %s@%i, count=%d/%d, errno=%d",
-					__FILE__, __LINE__, io_res, localsize,
-					errno);
-				break;
-			}
-
-			synchronize(driver);
-		}
-
-		free(localbuf);
+		AUDIO_INITINFO(&audio_if);
+		audio_if.play.pause = 0;
+		if (ioctl(driver->outfd, AUDIO_SETINFO, &audio_if) < 0)
+			jack_error("sun_driver: trigger playback failed: %s: "
+				"%s@%i", strerror(errno), __FILE__, __LINE__);
 	}
-#	else
+
 	localsize = (driver->indevbufsize >= driver->outdevbufsize) ?
 		driver->indevbufsize : driver->outdevbufsize;
 	localbuf = malloc(localsize);
 	if (localbuf == NULL)
 	{
-		jack_error("sun_driver: malloc() failed: %s@%i", __FILE__, __LINE__);
+		jack_error("sun_driver: malloc() failed: %s@%i",
+			__FILE__, __LINE__);
 		return NULL;
 	}
 
 	while (driver->run)
 	{
-		if (driver->outfd >= 0 && driver->playback_channels > 0)
+		if (driver->playback_ready > 0)
 		{
-			pthread_mutex_lock(&driver->mutex_out);
+			pthread_mutex_lock(&driver->io_mutex);
 			memcpy(localbuf, driver->outdevbuf, 
 				driver->outdevbufsize);
-			pthread_mutex_unlock(&driver->mutex_out);
+			pthread_mutex_unlock(&driver->io_mutex);
 
 			io_res = write(driver->outfd, localbuf, 
 				driver->outdevbufsize);
 			if (io_res < (ssize_t) driver->outdevbufsize)
 			{
-				jack_error(
-					"sun_driver: write() failed: %s@%i, count=%d/%d, errno=%d",
-					__FILE__, __LINE__, io_res,
-					driver->outdevbufsize, errno);
+				jack_error("sun_driver: write() failed: %s:, "
+					"count=%d/%d: %s@%i", strerror(errno),
+					io_res, driver->outdevbufsize,
+					__FILE__, __LINE__);
 				break;
 			}
 		}
 
-		if (driver->capture_channels > 0)
+		if (driver->capture_ready > 0)
 		{
 			io_res = read(driver->infd, localbuf, 
 				driver->indevbufsize);
 			if (io_res < (ssize_t) driver->indevbufsize)
 			{
-				jack_error(
-					"sun_driver: read() failed: %s@%i, count=%d/%d, errno=%d",
-					__FILE__, __LINE__, io_res,
-					driver->indevbufsize, errno);
+				jack_error("sun_driver: read() failed: %s:, "
+					"count=%d/%d: %s@%i", strerror(errno),
+					io_res, driver->indevbufsize,
+					__FILE__, __LINE__);
 				break;
 			}
 
-			pthread_mutex_lock(&driver->mutex_in);
+			pthread_mutex_lock(&driver->io_mutex);
 			memcpy(driver->indevbuf, localbuf, 
 				driver->indevbufsize);
-			pthread_mutex_unlock(&driver->mutex_in);
+			pthread_mutex_unlock(&driver->io_mutex);
 		}
 
 		driver_cycle(driver);
 	}
 
 	free(localbuf);
-#	endif
 
 	return NULL;
 }
@@ -1023,8 +1066,8 @@ jack_driver_desc_t * driver_get_descriptor ()
 	desc = (jack_driver_desc_t *) calloc(1, sizeof(jack_driver_desc_t));
 	if (desc == NULL)
 	{
-		printf("sun_driver: calloc() failed: %s@%i, errno=%d\n",
-			__FILE__, __LINE__, errno);
+		jack_error("sun_driver: calloc() failed: %s: %s@%i",
+			strerror(errno), __FILE__, __LINE__);
 		return NULL;
 	}
 	strcpy(desc->name, driver_client_name);
@@ -1033,8 +1076,8 @@ jack_driver_desc_t * driver_get_descriptor ()
 	params = calloc(desc->nparams, sizeof(jack_driver_param_desc_t));
 	if (params == NULL)
 	{
-		printf("sun_driver: calloc() failed: %s@%i, errno=%d\n",
-			__FILE__, __LINE__, errno);
+		jack_error("sun_driver: calloc() failed: %s: %s@%i",
+			strerror(errno), __FILE__, __LINE__);
 		return NULL;
 	}
 	memcpy(params, sun_params, 
@@ -1063,8 +1106,8 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	driver = (sun_driver_t *) malloc(sizeof(sun_driver_t));
 	if (driver == NULL)
 	{
-		jack_error("sun_driver: malloc() failed: %s@%i, errno=%d",
-			__FILE__, __LINE__, errno);
+		jack_error("sun_driver: malloc() failed: %s: %s@%i",
+			strerror(errno), __FILE__, __LINE__);
 		return NULL;
 	}
 	jack_driver_init((jack_driver_t *) driver);
@@ -1082,7 +1125,6 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	driver->indev = NULL;
 	driver->outdev = NULL;
 	driver->ignorehwbuf = 0;
-	driver->trigger = 0;
 
 	pnode = params;
 	while (pnode != NULL)
@@ -1172,4 +1214,3 @@ void driver_finish (jack_driver_t *driver)
 		free(sun_driver->outdev);
 	free(driver);
 }
-

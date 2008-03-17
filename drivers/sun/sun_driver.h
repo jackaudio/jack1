@@ -66,7 +66,6 @@ typedef struct _sun_driver
 	int outfd;
 	int format;
 	int ignorehwbuf;
-	int trigger;
 
 	size_t indevbufsize;
 	size_t outdevbufsize;
@@ -75,8 +74,6 @@ typedef struct _sun_driver
 	void *outdevbuf;
 
 	float iodelay;
-	jack_time_t last_periodtime;
-	jack_time_t next_periodtime;
 	jack_nframes_t sys_in_latency;
 	jack_nframes_t sys_out_latency;
 
@@ -86,15 +83,15 @@ typedef struct _sun_driver
 	jack_engine_t *engine;
 	jack_client_t *client;
 
+	int playback_ready;
+	int capture_ready;
+
+	int playback_drops;
+	int capture_drops;
+
 	volatile int run;
-	volatile int threads;
-	pthread_t thread_in;
-	pthread_t thread_out;
-	pthread_mutex_t mutex_in;
-	pthread_mutex_t mutex_out;
-#	ifdef USE_BARRIER
-	pthread_barrier_t barrier;
-#	endif
+	pthread_t io_thread;
+	pthread_mutex_t io_mutex;
 	sem_t sem_start;
 } sun_driver_t;
 
