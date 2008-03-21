@@ -22,8 +22,10 @@ SOURCE_FILES = \
              time.c \
 	     timestamps.c \
 	     transclient.c \
-	     unlock.c \
-	     simd.c
+	     unlock.c
+
+simd.lo: simd.c
+	$(LIBTOOL) --mode=compile $(CC) $(JACK_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo simd.c
 
 lib_LTLIBRARIES	= libjack.la
 
@@ -35,6 +37,6 @@ AM_CXXFLAGS = $(JACK_CFLAGS)
 libjack_la_CFLAGS = $(AM_CFLAGS)
 
 libjack_la_SOURCES = $(SOURCE_FILES)
-libjack_la_LIBADD  = @OS_LDFLAGS@
+libjack_la_LIBADD  = simd.lo @OS_LDFLAGS@
 libjack_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@
 
