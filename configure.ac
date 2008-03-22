@@ -17,7 +17,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=109
-JACK_MICRO_VERSION=11
+JACK_MICRO_VERSION=12
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -648,7 +648,7 @@ HAVE_FIREWIRE="false"
 if test "x$TRY_FIREWIRE" = "xyes"
 then
 	# check for FFADO libraries
-	PKG_CHECK_MODULES(LIBFFADO, libffado >= 1.999.14,
+	PKG_CHECK_MODULES(LIBFFADO, libffado >= 1.999.17,
 	     [HAVE_FIREWIRE="true"
               JACK_DEFAULT_DRIVER=\"firewire\"
 	     ], AC_MSG_RESULT([no]))

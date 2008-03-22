@@ -50,7 +50,7 @@
 
 static int ffado_driver_stop (ffado_driver_t *driver);
 
-#define FIREWIRE_REQUIRED_FFADO_API_VERSION 7
+#define FIREWIRE_REQUIRED_FFADO_API_VERSION 8
 
 // enable verbose messages
 static int g_verbose=0;
@@ -526,8 +526,10 @@ ffado_driver_wait (ffado_driver_t *driver, int extra_fd, int *status,
 	driver->wait_last = wait_ret;
 	driver->wait_next = wait_ret + driver->period_usecs;
 	driver->engine->transport_cycle_start (driver->engine, wait_ret);
-	
-	if (response == ffado_wait_xrun) {
+	if (response == ffado_wait_ok) {
+		// all good
+		*status=0;
+	} else if (response == ffado_wait_xrun) {
 		// xrun happened, but it's handled
 		*status=0;
 		return 0;
@@ -536,9 +538,19 @@ ffado_driver_wait (ffado_driver_t *driver, int extra_fd, int *status,
 		// this should be fatal
 		*status=-1;
 		return 0;
+	} else if (response == ffado_wait_shutdown) {
+		// we are to shutdown the ffado system
+		// this should be fatal
+		*status=-1;
+		return 0;
+	} else {
+		// we don't know about this response code
+		printError("unknown wait response (%d) from ffado", response);
+		// this should be fatal
+		*status=-1;
+		return 0;
 	}
 
-	*status = 0;
 	driver->last_wait_ust = wait_ret;
 
 	// FIXME: this should do something more useful
