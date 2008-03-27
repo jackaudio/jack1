@@ -82,6 +82,7 @@ AC_C_BIGENDIAN
 
 AC_MSG_CHECKING([platform dependencies])
 
+HOST_DEFAULT_TMP_DIR=/dev/shm
 case "${host_os}" in
   freebsd*)
     # current FreeBSD header files conflict with the OSS driver's
@@ -101,6 +102,7 @@ case "${host_os}" in
     JACK_USE_MACH_THREADS=1
     OS_LDFLAGS="-framework CoreAudio -framework CoreServices -framework AudioUnit"
     TRY_POSIX_SHM=yes			# POSIX shm works better
+    HOST_DEFAULT_TMP_DIR=/tmp
     ;;
 esac
 
@@ -525,7 +527,7 @@ AC_ARG_WITH(default-tmpdir,
             [  --with-default-tmpdir=PATH    where jackd and clients will put tmp files (/dev/shm)])
 
 if test "x$with_default_tmpdir" = "x" ; then
-	DEFAULT_TMP_DIR=/dev/shm
+	DEFAULT_TMP_DIR=$HOST_DEFAULT_TMP_DIR
 else
 	DEFAULT_TMP_DIR=$with_default_tmpdir
 fi
@@ -783,6 +785,7 @@ echo \| Install dir for libjack + backends.................... : $libdir/jack
 echo \|
 echo \| Default driver backend................................ : $JACK_DEFAULT_DRIVER
 echo \| Shared memory interface............................... : $JACK_SHM_TYPE
+echo \| IPC Temporary directory............................... : $DEFAULT_TMP_DIR
 echo \| Install prefix........................................ : $prefix
 echo
 
