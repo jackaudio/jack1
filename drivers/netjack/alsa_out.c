@@ -53,7 +53,6 @@ int max_diff = 0;	    /* the diff value, when a hard readpointer skip should occ
 int catch_factor = 1000;
 
 // Debug stuff:
-
 int print_counter = 10;
 
 // Alsa stuff... i dont want to touch this bullshit in the next years.... please...
@@ -219,7 +218,6 @@ static snd_pcm_t *open_audiofd( char *device_name, int capture, int rate, int ch
     ALSASAMPLE *tmp = alloca( num_null_samples * sizeof( ALSASAMPLE ) );
     memset( tmp, 0, num_null_samples * sizeof( ALSASAMPLE ) );
     snd_pcm_writei( handle, tmp, num_null_samples );
-
 
     return handle;
 }

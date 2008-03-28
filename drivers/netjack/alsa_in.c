@@ -18,14 +18,13 @@
 
 #define ALSA_PCM_OLD_HW_PARAMS_API
 #define ALSA_PCM_OLD_SW_PARAMS_API
-#include "alsa/asoundlib.h"
 
+#include "alsa/asoundlib.h"
 #include <samplerate.h>
 
 typedef signed short ALSASAMPLE;
 
 // Here are the lists of the jack ports...
-
 JSList	   *capture_ports = NULL;
 JSList	   *capture_srcs = NULL;
 JSList	   *playback_ports = NULL;
@@ -48,12 +47,11 @@ int num_channels = 2;				 /* count of channels */
 int period_size = 1024;
 int num_periods = 2;
 
-int target_delay = 0;	    /* the delay which the program should try to approach. */
+int target_delay = 0;	/* the delay which the program should try to approach. */
 int max_diff = 0;	    /* the diff value, when a hard readpointer skip should occur */
 int catch_factor = 1000;
 
 // Debug stuff:
-
 int print_counter = 10;
 
 // Alsa stuff... i dont want to touch this bullshit in the next years.... please...
@@ -188,7 +186,6 @@ static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams, int pe
 }
 
 // ok... i only need this function to communicate with the alsa bloat api...
-
 static snd_pcm_t *open_audiofd( char *device_name, int capture, int rate, int channels, int period, int nperiods )
 {
     int err;
@@ -219,21 +216,18 @@ static snd_pcm_t *open_audiofd( char *device_name, int capture, int rate, int ch
     return handle;
 }
 
-
 /**
  * The process callback for this JACK application.
  * It is called by JACK at the appropriate times.
  */
 int process (jack_nframes_t nframes, void *arg)
 {
-
     ALSASAMPLE *outbuf;
     float *floatbuf, *resampbuf;
     int rlen;
     int err;
     snd_pcm_sframes_t delay;
     int put_back_samples = 0;
-
 
     snd_pcm_delay( alsa_handle, &delay );
 
@@ -296,7 +290,6 @@ int process (jack_nframes_t nframes, void *arg)
      */
 
     outbuf = alloca( rlen * sizeof( ALSASAMPLE ) * num_channels );
-
     floatbuf = alloca( rlen * sizeof( float ) );
     resampbuf = alloca( nframes * sizeof( float ) );
 
@@ -363,14 +356,12 @@ again:
     return 0;
 }
 
-
 /**
  * Allocate the necessary jack ports...
  */
 
 void alloc_ports( int n_capture, int n_playback )
 {
-
     int port_flags = JackPortIsOutput;
     int chn;
     jack_port_t *port;
@@ -421,7 +412,6 @@ void alloc_ports( int n_capture, int n_playback )
 
 void jack_shutdown (void *arg)
 {
-
     exit (1);
 }
 
@@ -433,7 +423,7 @@ void jack_shutdown (void *arg)
 
 void printUsage()
 {
-    fprintf(stderr, "usage: alsa_out [options]\n"
+    fprintf(stderr, "usage: alsa_in [options]\n"
             "\n"
             "  -j <jack name> - reports a different name to jack\n"
             "  -d <alsa_device> \n"
@@ -447,11 +437,9 @@ void printUsage()
             "\n");
 }
 
-
 /**
  * the main function....
  */
-
 
 int main (int argc, char *argv[])
 {
@@ -536,7 +524,6 @@ int main (int argc, char *argv[])
 
     jack_on_shutdown (client, jack_shutdown, 0);
 
-
     // alloc input ports, which are blasted out to alsa...
     alloc_ports( num_channels, 0 );
 
@@ -553,7 +540,6 @@ int main (int argc, char *argv[])
     alsa_handle = open_audiofd( alsa_device, 1, sample_rate, num_channels, period_size, num_periods);
     if ( alsa_handle < 0 )
         exit(20);
-
 
     /* tell the JACK server that we are ready to roll */
 
