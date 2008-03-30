@@ -16,8 +16,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=109
-JACK_MICRO_VERSION=13
+JACK_MINOR_VERSION=110
+JACK_MICRO_VERSION=0
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
