@@ -34,11 +34,8 @@ jack_client_t *client;
 
 // TODO: make the sample format configurable soon...
 snd_pcm_format_t format = SND_PCM_FORMAT_S16;	 /* sample format */
-
 snd_pcm_t *alsa_handle;
-
 int jack_sample_rate;
-
 double current_resample_factor = 1.0;
 
 // ------------------------------------------------------ commandline parameters
@@ -300,7 +297,7 @@ int process (jack_nframes_t nframes, void *arg)
     JSList *node = playback_ports;
     JSList *src_node = playback_srcs;
     SRC_DATA src;
-    while ( node != NULL) {
+    while (node != NULL) {
         int i;
         jack_port_t *port = (jack_port_t *) node->data;
         float *buf = jack_port_get_buffer (port, nframes);
@@ -368,7 +365,7 @@ void alloc_ports(int n_capture, int n_playback)
                                    port_flags, 0);
 
         if (!port) {
-            printf( "jacknet_client: cannot register port for %s", buf);
+            printf( "alsa_out: cannot register port for %s", buf);
             break;
         }
 
@@ -387,7 +384,7 @@ void alloc_ports(int n_capture, int n_playback)
                                    port_flags, 0);
 
         if (!port) {
-            printf( "jacknet_client: cannot register port for %s", buf);
+            printf( "alsa_out: cannot register port for %s", buf);
             break;
         }
 
