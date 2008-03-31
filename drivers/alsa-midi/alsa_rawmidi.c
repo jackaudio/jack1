@@ -702,8 +702,6 @@ midi_port_t** scan_port_open(alsa_rawmidi_t *midi, midi_port_t **list)
  fail_1:
 	midi_port_close(midi, port);
 	port->state = PORT_ZOMBIFIED;
-	error_log("scan: can't open port %s %s, zombified", port->dev, port->name);
-	return &port->next;
  fail_0:
 	error_log("scan: can't open port %s %s", port->dev, port->name);
 	return &port->next;
