@@ -27,6 +27,9 @@
 #include <jack/port.h>
 
 
+enum { MIDI_INLINE_MAX = sizeof(jack_shmsize_t) };
+
+
 typedef struct _jack_midi_port_info_private {
 	jack_nframes_t        nframes; /**< Number of frames in buffer */
  	size_t                buffer_size; /**< Size of buffer in bytes */
@@ -38,8 +41,22 @@ typedef struct _jack_midi_port_info_private {
 typedef struct _jack_midi_port_internal_event {
 	int32_t        time;
 	jack_shmsize_t size;
-	jack_shmsize_t byte_offset;
+	union {
+		jack_shmsize_t byte_offset;
+		jack_midi_data_t inline_data[MIDI_INLINE_MAX];
+	};
 } jack_midi_port_internal_event_t;
+
+
+static inline jack_midi_data_t*
+jack_midi_event_data(void* port_buffer,
+                     const jack_midi_port_internal_event_t* event)
+{
+	if (event->size <= MIDI_INLINE_MAX)
+		return event->inline_data;
+	else
+		return ((jack_midi_data_t *)port_buffer) + event->byte_offset;
+}
 
 
 /* jack_midi_port_functions.buffer_init */
@@ -88,8 +105,7 @@ jack_midi_event_get(jack_midi_event_t *event,
 	port_event += event_idx;
 	event->time = port_event->time;
 	event->size = port_event->size;
-	event->buffer =
-		((jack_midi_data_t *) port_buffer) + port_event->byte_offset;
+	event->buffer = jack_midi_event_data(port_buffer, port_event);
 	
 	return 0;
 }
@@ -112,6 +128,8 @@ jack_midi_max_event_size(void           *port_buffer)
 	
 	if (used_size > buffer_size)
 		return 0;
+	else if ((buffer_size - used_size) < MIDI_INLINE_MAX)
+		return MIDI_INLINE_MAX;
 	else
 		return (buffer_size - used_size);
 }
@@ -138,19 +156,23 @@ jack_midi_event_reserve(void           *port_buffer,
  		goto failed;
 
 	/* Check if data_size is >0 and there is enough space in the buffer for the event. */
-	if (data_size <=0 ||
-	    info->last_write_loc + sizeof(jack_midi_port_info_private_t)
-			+ ((info->event_count + 1)
-			   * sizeof(jack_midi_port_internal_event_t))
-			+ data_size > buffer_size) {
+	if (data_size <=0) {
+		goto failed; // return NULL?
+	} else if (jack_midi_max_event_size (port_buffer) < data_size) {
 		goto failed;
 	} else {
-		info->last_write_loc += data_size;
-		retbuf = &retbuf[buffer_size - 1 - info->last_write_loc];
-		event_buffer[info->event_count].time = time;
-		event_buffer[info->event_count].size = data_size;
-		event_buffer[info->event_count].byte_offset =
-			buffer_size - 1 - info->last_write_loc;
+		jack_midi_port_internal_event_t *event = &event_buffer[info->event_count];
+
+		event->time = time;
+		event->size = data_size;
+		if (data_size <= MIDI_INLINE_MAX) {
+			retbuf = event->inline_data;
+		} else {
+			info->last_write_loc += data_size;
+			retbuf = &retbuf[buffer_size - 1 - info->last_write_loc];
+			event->byte_offset =
+				buffer_size - 1 - info->last_write_loc;
+		}
 		info->event_count += 1;
 		return retbuf;
 	}
@@ -271,7 +293,7 @@ jack_midi_port_mixdown(jack_port_t    *port, jack_nframes_t nframes)
 			err = jack_midi_event_write(
 				jack_port_buffer(port),
 				earliest_event->time,
-				&earliest_buffer[earliest_event->byte_offset],
+				jack_midi_event_data(earliest_buffer, earliest_event),
 				earliest_event->size);
 			
 			earliest_info->last_write_loc++;
