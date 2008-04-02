@@ -756,6 +756,7 @@ drivers/freebob/Makefile
 drivers/firewire/Makefile
 drivers/netjack/Makefile
 example-clients/Makefile
+tools/Makefile
 jack.pc
 jack.spec
 jack/Makefile
