@@ -1938,6 +1938,11 @@ alsa_driver_delete (alsa_driver_t *driver)
 	}
 	jack_slist_free (driver->clock_sync_listeners);
 
+	if (driver->ctl_handle) {
+		snd_ctl_close (driver->ctl_handle);
+		driver->ctl_handle = 0;
+	} 
+
 	if (driver->capture_handle) {
 		snd_pcm_close (driver->capture_handle);
 		driver->capture_handle = 0;
