@@ -24,6 +24,18 @@ dist-check-readline:
 	@false
 endif
 
+if HAVE_SAMPLERATE
+NETJACK_TOOLS = jacknet_client alsa_in alsa_out
+dist-check-readline:
+else
+NETJACK_TOOLS =
+dist-check-readline:
+	@echo
+	@echo ' ******' You need libsamplerate installed to make dist.' ******'
+	@echo
+	@false
+endif
+
 bin_PROGRAMS = jack_load \
 	       jack_unload \
 	       jack_monitor_client \
@@ -35,9 +47,7 @@ bin_PROGRAMS = jack_load \
 	       jack_alias \
 	       $(JACKREC) \
 	       $(JACK_TRANSPORT) \
-	       jacknet_client \
-	       alsa_in \
-	       alsa_out
+	       $(NETJACK_TOOLS)
 
 noinst_PROGRAMS = jack_thread_wait
 
@@ -108,7 +118,7 @@ jack_unload_LDADD = ../libjack/libjack.la
 #
 # Netjack slave tools
 #
-
+if HAVE_SAMPLERATE
 jacknet_client_SOURCES = net_source.c ../drivers/netjack/netjack_packet.c
 jacknet_client_CFLAGS = -I../drivers/netjack
 jacknet_client_LDFLAGS = -lsamplerate @OS_LDFLAGS@
@@ -122,6 +132,7 @@ alsa_in_LDADD = ../libjack/libjack.la
 alsa_out_SOURCES = alsa_out.c
 alsa_out_LDFLAGS = -lasound -lsamplerate @OS_LDFLAGS@
 alsa_out_LDADD = ../libjack/libjack.la
-endif
+endif #HAVE_ALSA
+endif #HAVE_SAMPLERATE
 
 dist-hook: dist-check-sndfile
