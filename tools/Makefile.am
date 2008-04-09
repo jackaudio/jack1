@@ -34,7 +34,10 @@ bin_PROGRAMS = jack_load \
 	       jack_evmon \
 	       jack_alias \
 	       $(JACKREC) \
-	       $(JACK_TRANSPORT)
+	       $(JACK_TRANSPORT) \
+	       jacknet_client \
+	       alsa_in \
+	       alsa_out
 
 noinst_PROGRAMS = jack_thread_wait
 
@@ -91,7 +94,7 @@ jack_transport_LDADD = ../libjack/libjack.la
 endif
 
 #
-# general purpose in-process loader
+# General purpose in-process loader/unloader
 #
 
 jack_load_SOURCES = ipload.c
@@ -101,5 +104,24 @@ jack_load_LDADD = ../libjack/libjack.la
 jack_unload_SOURCES = ipunload.c
 jack_unload_LDFLAGS = @OS_LDFLAGS@
 jack_unload_LDADD = ../libjack/libjack.la
+
+#
+# Netjack slave tools
+#
+
+jacknet_client_SOURCES = net_source.c ../drivers/netjack/netjack_packet.c
+jacknet_client_CFLAGS = -I../drivers/netjack
+jacknet_client_LDFLAGS = -lsamplerate @OS_LDFLAGS@
+jacknet_client_LDADD = ../libjack/libjack.la
+
+if HAVE_ALSA
+alsa_in_SOURCES = alsa_in.c
+alsa_in_LDFLAGS = -lasound -lsamplerate @OS_LDFLAGS@
+alsa_in_LDADD = ../libjack/libjack.la
+
+alsa_out_SOURCES = alsa_out.c
+alsa_out_LDFLAGS = -lasound -lsamplerate @OS_LDFLAGS@
+alsa_out_LDADD = ../libjack/libjack.la
+endif
 
 dist-hook: dist-check-sndfile
