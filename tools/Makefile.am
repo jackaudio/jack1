@@ -25,7 +25,10 @@ dist-check-readline:
 endif
 
 if HAVE_SAMPLERATE
-NETJACK_TOOLS = jacknet_client alsa_in alsa_out
+NETJACK_TOOLS = jacknet_client
+if HAVE_ALSA
+NETJACK_TOOLS += alsa_in alsa_out
+endif
 dist-check-readline:
 else
 NETJACK_TOOLS =
