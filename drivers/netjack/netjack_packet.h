@@ -31,6 +31,8 @@
 #include <jack/types.h>
 #include <jack/engine.h>
 
+#include <jack/midiport.h>
+
 #include <netinet/in.h>
 // The Packet Header.
 
@@ -39,7 +41,10 @@ typedef struct _jacknet_packet_header jacknet_packet_header;
 struct _jacknet_packet_header
 {
     // General AutoConf Data
-    jack_nframes_t channels;
+    jack_nframes_t capture_channels_audio;
+    jack_nframes_t playback_channels_audio;
+    jack_nframes_t capture_channels_midi;
+    jack_nframes_t playback_channels_midi;
     jack_nframes_t period_size;
     jack_nframes_t sample_rate;
 

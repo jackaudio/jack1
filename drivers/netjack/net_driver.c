@@ -2,6 +2,7 @@
 /*
 NetJack Driver
 
+Copyright (C) 2008 Pieter Palmers <pieterpalmers@users.sourceforge.net>
 Copyright (C) 2006 Torben Hohn <torbenh@gmx.de>
 Copyright (C) 2003 Robert Ham <rah@bash.sh>
 Copyright (C) 2001 Paul Davis
@@ -331,14 +332,14 @@ net_driver_attach (net_driver_t *driver)
 
     port_flags = JackPortIsOutput | JackPortIsPhysical | JackPortIsTerminal;
 
-    for (chn = 0; chn < driver->capture_channels; chn++) {
+    for (chn = 0; chn < driver->capture_channels_audio; chn++) {
         snprintf (buf, sizeof(buf) - 1, "capture_%u", chn + 1);
 
         port = jack_port_register (driver->client, buf,
                                    JACK_DEFAULT_AUDIO_TYPE,
                                    port_flags, 0);
         if (!port) {
-            jack_error ("DUMMY: cannot register port for %s", buf);
+            jack_error ("NET: cannot register port for %s", buf);
             break;
         }
 
@@ -346,10 +347,25 @@ net_driver_attach (net_driver_t *driver)
             jack_slist_append (driver->capture_ports, port);
         driver->capture_srcs = jack_slist_append(driver->capture_srcs, src_new(SRC_LINEAR, 1, NULL));
     }
+    for (chn = driver->capture_channels_audio; chn < driver->capture_channels; chn++) {
+        snprintf (buf, sizeof(buf) - 1, "capture_%u", chn + 1);
+
+        port = jack_port_register (driver->client, buf,
+                                   JACK_DEFAULT_MIDI_TYPE,
+                                   port_flags, 0);
+        if (!port) {
+            jack_error ("NET: cannot register port for %s", buf);
+            break;
+        }
+
+        driver->capture_ports =
+            jack_slist_append (driver->capture_ports, port);
+        //driver->capture_srcs = jack_slist_append(driver->capture_srcs, src_new(SRC_LINEAR, 1, NULL));
+    }
 
     port_flags = JackPortIsInput | JackPortIsPhysical | JackPortIsTerminal;
 
-    for (chn = 0; chn < driver->playback_channels; chn++) {
+    for (chn = 0; chn < driver->playback_channels_audio; chn++) {
         snprintf (buf, sizeof(buf) - 1, "playback_%u", chn + 1);
 
         port = jack_port_register (driver->client, buf,
@@ -357,13 +373,29 @@ net_driver_attach (net_driver_t *driver)
                                    port_flags, 0);
 
         if (!port) {
-            jack_error ("DUMMY: cannot register port for %s", buf);
+            jack_error ("NET: cannot register port for %s", buf);
             break;
         }
 
         driver->playback_ports =
             jack_slist_append (driver->playback_ports, port);
         driver->playback_srcs = jack_slist_append(driver->playback_srcs, src_new(SRC_LINEAR, 1, NULL));
+    }
+    for (chn = driver->playback_channels_audio; chn < driver->playback_channels; chn++) {
+        snprintf (buf, sizeof(buf) - 1, "playback_%u", chn + 1);
+
+        port = jack_port_register (driver->client, buf,
+                                   JACK_DEFAULT_MIDI_TYPE,
+                                   port_flags, 0);
+
+        if (!port) {
+            jack_error ("NET: cannot register port for %s", buf);
+            break;
+        }
+
+        driver->playback_ports =
+            jack_slist_append (driver->playback_ports, port);
+        //driver->playback_srcs = jack_slist_append(driver->playback_srcs, src_new(SRC_LINEAR, 1, NULL));
     }
 
     jack_activate (driver->client);
@@ -408,6 +440,8 @@ net_driver_new (jack_client_t * client,
                 char *name,
                 unsigned int capture_ports,
                 unsigned int playback_ports,
+                unsigned int capture_ports_midi,
+                unsigned int playback_ports_midi,
                 jack_nframes_t sample_rate,
                 jack_nframes_t period_size,
                 unsigned int listen_port,
@@ -445,9 +479,13 @@ net_driver_new (jack_client_t * client,
     driver->listen_port   = listen_port;
     driver->last_wait_ust = 0;
 
-    driver->capture_channels  = capture_ports;
+    driver->capture_channels  = capture_ports + capture_ports_midi;
+    driver->capture_channels_audio  = capture_ports;
+    driver->capture_channels_midi   = capture_ports_midi;
     driver->capture_ports     = NULL;
-    driver->playback_channels = playback_ports;
+    driver->playback_channels = playback_ports + playback_ports_midi;
+    driver->playback_channels_audio = playback_ports;
+    driver->playback_channels_midi = playback_ports_midi;
     driver->playback_ports    = NULL;
 
     driver->handle_transport_sync = transport_sync;
@@ -512,6 +550,25 @@ net_driver_new (jack_client_t * client,
             jack_info("AutoConfig Override: period_size = %d", first_packet->period_size);
             driver->period_size = first_packet->period_size;
         }
+        // autoconfig channel counts
+        if (driver->capture_channels_audio != first_packet->capture_channels_audio) {
+            jack_info("AutoConfig Override: capture_channels_audio = %d", first_packet->capture_channels_audio);
+            driver->capture_channels_audio = first_packet->capture_channels_audio;
+        }
+        if (driver->capture_channels_midi != first_packet->capture_channels_midi) {
+            jack_info("AutoConfig Override: capture_channels_midi = %d", first_packet->capture_channels_midi);
+            driver->capture_channels_midi = first_packet->capture_channels_midi;
+        }
+        if (driver->playback_channels_audio != first_packet->playback_channels_audio) {
+            jack_info("AutoConfig Override: playback_channels_audio = %d", first_packet->playback_channels_audio);
+            driver->playback_channels_audio = first_packet->playback_channels_audio;
+        }
+        if (driver->playback_channels_midi != first_packet->playback_channels_midi) {
+            jack_info("AutoConfig Override: playback_channels_midi = %d", first_packet->playback_channels_midi);
+            driver->playback_channels_midi = first_packet->playback_channels_midi;
+        }
+        driver->capture_channels  = driver->capture_channels_audio + driver->capture_channels_midi;
+        driver->playback_channels = driver->playback_channels_audio + driver->playback_channels_midi;
 
         driver->mtu = first_packet->mtu;
         driver->latency = first_packet->latency;
@@ -533,7 +590,11 @@ net_driver_new (jack_client_t * client,
     int rx_bufsize = sizeof(jacknet_packet_header) + driver->net_period_down * driver->capture_channels * get_sample_size(driver->bitdepth);
     global_packcache = packet_cache_new(driver->latency + 5, rx_bufsize, 1400);
 
-    jack_info("net_period: (up:%d/dn:%d)", driver->net_period_up, driver->net_period_down);
+    jack_info("netjack: period   : up: %d / dn: %d", driver->net_period_up, driver->net_period_down);
+    jack_info("netjack: framerate: %d", driver->sample_rate);
+    jack_info("netjack: audio    : cap: %d / pbk: %d)", driver->capture_channels_audio, driver->playback_channels_audio);
+    jack_info("netjack: midi     : cap: %d / pbk: %d)", driver->capture_channels_midi, driver->playback_channels_midi);
+    jack_info("netjack: buffsize : rx: %d)", rx_bufsize);
     return (jack_driver_t *) driver;
 }
 
@@ -548,7 +609,7 @@ driver_get_descriptor ()
 
     desc = calloc (1, sizeof (jack_driver_desc_t));
     strcpy (desc->name, "net");
-    desc->nparams = 9;
+    desc->nparams = 11;
 
     params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
@@ -566,6 +627,22 @@ driver_get_descriptor ()
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 2U;
     strcpy (params[i].short_desc, "Number of playback channels (defaults to 2)");
+    strcpy (params[i].long_desc, params[i].short_desc);
+
+    i++;
+    strcpy (params[i].name, "midi inchannels");
+    params[i].character  = 'I';
+    params[i].type       = JackDriverParamUInt;
+    params[i].value.ui   = 1U;
+    strcpy (params[i].short_desc, "Number of midi capture channels (defaults to 1)");
+    strcpy (params[i].long_desc, params[i].short_desc);
+
+    i++;
+    strcpy (params[i].name, "midi outchannels");
+    params[i].character  = 'O';
+    params[i].type       = JackDriverParamUInt;
+    params[i].value.ui   = 1U;
+    strcpy (params[i].short_desc, "Number of midi playback channels (defaults to 1)");
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
@@ -644,6 +721,8 @@ driver_initialize (jack_client_t *client, const JSList * params)
     jack_nframes_t period_size = 1024;
     unsigned int capture_ports = 2;
     unsigned int playback_ports = 2;
+    unsigned int capture_ports_midi = 1;
+    unsigned int playback_ports_midi = 1;
     unsigned int listen_port = 3000;
     unsigned int resample_factor_up = 0;
     unsigned int bitdepth = 0;
@@ -662,6 +741,14 @@ driver_initialize (jack_client_t *client, const JSList * params)
 
             case 'o':
                 playback_ports = param->value.ui;
+                break;
+
+            case 'I':
+                capture_ports_midi = param->value.ui;
+                break;
+
+            case 'O':
+                playback_ports_midi = param->value.ui;
                 break;
 
             case 'r':
@@ -694,8 +781,9 @@ driver_initialize (jack_client_t *client, const JSList * params)
         }
     }
 
-    return net_driver_new (client, "net_pcm", capture_ports,
-                           playback_ports, sample_rate, period_size,
+    return net_driver_new (client, "net_pcm", capture_ports, playback_ports,
+                           capture_ports_midi, playback_ports_midi,
+                           sample_rate, period_size,
                            listen_port, handle_transport_sync,
                            resample_factor, resample_factor_up, bitdepth);
 }

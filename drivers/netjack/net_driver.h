@@ -34,7 +34,7 @@ typedef struct _net_driver net_driver_t;
 
 struct _net_driver
 {
-    JACK_DRIVER_NT_DECL
+    JACK_DRIVER_NT_DECL;
 
     jack_nframes_t  net_period_up;
     jack_nframes_t  net_period_down;
@@ -47,6 +47,10 @@ struct _net_driver
 
     unsigned int    capture_channels;
     unsigned int    playback_channels;
+    unsigned int    capture_channels_audio;
+    unsigned int    playback_channels_audio;
+    unsigned int    capture_channels_midi;
+    unsigned int    playback_channels_midi;
 
     JSList	    *capture_ports;
     JSList	    *playback_ports;

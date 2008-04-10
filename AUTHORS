@@ -76,6 +76,7 @@ Dmitry Baikov
 
 Pieter Palmers
 	wrote the freebob and firewire backends and some bugfixes.
+	add jack-midi support to netjack
 
 Nedko Arnaudov
 	contributed several fixes

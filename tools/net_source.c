@@ -1,7 +1,28 @@
-/** @file simple_client.c
+/*
+NetJack Client
+
+Copyright (C) 2008 Pieter Palmers <pieterpalmers@users.sourceforge.net>
+Copyright (C) 2006 Torben Hohn <torbenh@gmx.de>
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+*/
+
+/** @file net_source.c
  *
- * @brief This simple client demonstrates the basic features of JACK
- * as they would be used by many applications.
+ * @brief This client connects to a netjack server
  */
 
 #include <stdio.h>
@@ -23,10 +44,14 @@
 
 JSList	   *capture_ports = NULL;
 JSList	   *capture_srcs = NULL;
-int capture_channels = 2;
+int capture_channels = 0;
+int capture_channels_audio = 2;
+int capture_channels_midi = 1;
 JSList	   *playback_ports = NULL;
 JSList	   *playback_srcs = NULL;
-int playback_channels = 2;
+int playback_channels = 0;
+int playback_channels_audio = 2;
+int playback_channels_midi = 1;
 
 int latency = 1;
 jack_nframes_t factor = 1;
@@ -54,10 +79,9 @@ int cont_miss = 0;
 SRC_STATE *src_state;
 /*
  * This Function allocates all the I/O Ports which are added the lists.
- * XXX: jack-midi is underway... so dont forget it.
  */
 
-void alloc_ports( int n_capture, int n_playback ) {
+void alloc_ports( int n_capture_audio, int n_playback_audio, int n_capture_midi, int n_playback_midi ) {
 
     int port_flags = JackPortIsOutput;
     int chn;
@@ -65,7 +89,7 @@ void alloc_ports( int n_capture, int n_playback ) {
     char buf[32];
 
     capture_ports = NULL;
-    for (chn = 0; chn < n_capture; chn++)
+    for (chn = 0; chn < n_capture_audio; chn++)
     {
 	snprintf (buf, sizeof(buf) - 1, "capture_%u", chn+1);
 
@@ -82,11 +106,27 @@ void alloc_ports( int n_capture, int n_playback ) {
 	capture_srcs = jack_slist_append( capture_srcs, src_new( SRC_LINEAR, 1, NULL ) );
 	capture_ports = jack_slist_append (capture_ports, port);
     }
+    for (chn = n_capture_audio; chn < n_capture_midi + n_capture_audio; chn++)
+    {
+	snprintf (buf, sizeof(buf) - 1, "capture_%u", chn+1);
+
+	port = jack_port_register (client, buf,
+		JACK_DEFAULT_MIDI_TYPE,
+		port_flags, 0);
+
+	if (!port)
+	{
+	    printf( "jacknet_client: cannot register port for %s", buf);
+	    break;
+	}
+
+	capture_ports = jack_slist_append (capture_ports, port);
+    }
 
     port_flags = JackPortIsInput;
 
     playback_ports = NULL;
-    for (chn = 0; chn < n_playback; chn++)
+    for (chn = 0; chn < n_playback_audio; chn++)
     {
 	snprintf (buf, sizeof(buf) - 1, "playback_%u", chn+1);
 
@@ -101,6 +141,22 @@ void alloc_ports( int n_capture, int n_playback ) {
 	}
 
 	playback_srcs = jack_slist_append( playback_srcs, src_new( SRC_LINEAR, 1, NULL ) );
+	playback_ports = jack_slist_append (playback_ports, port);
+    }
+    for (chn = n_playback_audio; chn < n_playback_midi + n_playback_audio; chn++)
+    {
+	snprintf (buf, sizeof(buf) - 1, "playback_%u", chn+1);
+
+	port = jack_port_register (client, buf,
+		JACK_DEFAULT_MIDI_TYPE,
+		port_flags, 0);
+
+	if (!port)
+	{
+	    printf( "jacknet_client: cannot register port for %s", buf);
+	    break;
+	}
+
 	playback_ports = jack_slist_append (playback_ports, port);
     }
 }
@@ -207,10 +263,14 @@ ReadAgain:
 		int i;
 		port = (jack_port_t *) node->data;
 		buf = jack_port_get_buffer (port, nframes);
-	
-		for (i = 0; i < nframes; i++)
-		{
-			buf[i] = 0.0;
+		const char *porttype = jack_port_type(port);
+		if (strncmp(porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+			for (i = 0; i < nframes; i++)
+			{
+				buf[i] = 0.0;
+			}
+        	} else if (strncmp(porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+			jack_midi_clear_buffer(buf);
 		}
 		node = jack_slist_next (node);
 		chn++;
@@ -239,6 +299,12 @@ ReadAgain:
     
     pkthdr->sample_rate = jack_get_sample_rate( client );
     pkthdr->period_size = nframes;
+
+    // playback for us is capture on the other side
+    pkthdr->capture_channels_audio = playback_channels_audio;
+    pkthdr->playback_channels_audio = capture_channels_audio;
+    pkthdr->capture_channels_midi = playback_channels_midi;
+    pkthdr->playback_channels_midi = capture_channels_midi;
     
     packet_header_hton( pkthdr );
     if( cont_miss < 10 ) {
@@ -288,8 +354,10 @@ fprintf(stderr, "usage: net_source [-n <jack name>] [-s <socket>] [-C <num chann
 		"  -n <jack name> - reports a different name to jack\n"
 		"  -s <socket> select another socket than the default (3000).\n"
 		"  -p <host peer> the hostname of the \"other\" machine running the jack-slave.\n"
-		"  -P <num channels> number of playback channels.\n"
-		"  -C <num channels> number of capture channels.\n"
+		"  -P <num channels> number of audio playback channels.\n"
+		"  -C <num channels> number of audio capture channels.\n"
+		"  -o <num channels> number of midi playback channels.\n"
+		"  -i <num channels> number of midi capture channels.\n"
 		"  -l <latency in periods> number of packets on the wire to approach\n"
 		"  -r <reply port> When using a firewall use this port for incoming packets\n"
 		"  -f <downsample ratio> downsample data in the wire by this factor.\n"
@@ -313,7 +381,7 @@ main (int argc, char *argv[])
     int errflg=0;
     int c;
 
-    while ((c = getopt(argc, argv, ":n:p:s:C:P:l:r:f:b:")) != -1) {
+    while ((c = getopt(argc, argv, ":n:p:s:C:P:i:o:l:r:f:b:")) != -1) {
 	switch(c) {
 	    case 'n':
 		strcpy(jack_name,optarg);
@@ -325,10 +393,16 @@ main (int argc, char *argv[])
 		peer_socket = atoi(optarg);
 		break;
 	    case 'P':
-		playback_channels = atoi(optarg);
+		playback_channels_audio = atoi(optarg);
 		break;
 	    case 'C':
-		capture_channels = atoi(optarg);
+		capture_channels_audio = atoi(optarg);
+		break;
+	    case 'o':
+		playback_channels_midi = atoi(optarg);
+		break;
+	    case 'i':
+		capture_channels_midi = atoi(optarg);
 		break;
 	    case 'l':
 		latency = atoi(optarg);
@@ -358,6 +432,9 @@ main (int argc, char *argv[])
 	exit(2);
     }
 
+    capture_channels = capture_channels_audio + capture_channels_midi;
+    playback_channels = playback_channels_audio + playback_channels_midi;
+    
     //src_state = src_new( SRC_LINEAR, 1, NULL );
 
     outsockfd = socket( PF_INET, SOCK_DGRAM, 0 );
@@ -404,7 +481,7 @@ main (int argc, char *argv[])
 	    jack_get_sample_rate (client));
 
 
-    alloc_ports( capture_channels, playback_channels );
+    alloc_ports( capture_channels_audio, playback_channels_audio, capture_channels_midi, playback_channels_midi );
 
     jack_nframes_t net_period = (float) jack_get_buffer_size(client) / (float) factor;
     int rx_bufsize =  get_sample_size( bitdepth ) * capture_channels * net_period + sizeof(jacknet_packet_header);

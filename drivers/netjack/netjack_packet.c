@@ -4,6 +4,7 @@
  *
  * used by the driver and the jacknet_client
  *
+ * Copyright (C) 2008 Pieter Palmers <pieterpalmers@users.sourceforge.net>
  * Copyright (C) 2006 Torben Hohn <torbenh@gmx.de>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -52,7 +53,10 @@ packet_cache *global_packcache;
 void
 packet_header_hton(jacknet_packet_header *pkthdr)
 {
-    pkthdr->channels = htonl(pkthdr->channels);
+    pkthdr->capture_channels_audio = htonl(pkthdr->capture_channels_audio);
+    pkthdr->playback_channels_audio = htonl(pkthdr->playback_channels_audio);
+    pkthdr->capture_channels_midi = htonl(pkthdr->capture_channels_midi);
+    pkthdr->playback_channels_midi = htonl(pkthdr->playback_channels_midi);
     pkthdr->period_size = htonl(pkthdr->period_size);
     pkthdr->sample_rate = htonl(pkthdr->sample_rate);
     pkthdr->sync_state = htonl(pkthdr->sync_state);
@@ -68,7 +72,10 @@ packet_header_hton(jacknet_packet_header *pkthdr)
 void
 packet_header_ntoh(jacknet_packet_header *pkthdr)
 {
-    pkthdr->channels = ntohl(pkthdr->channels);
+    pkthdr->capture_channels_audio = ntohl(pkthdr->capture_channels_audio);
+    pkthdr->playback_channels_audio = ntohl(pkthdr->playback_channels_audio);
+    pkthdr->capture_channels_midi = ntohl(pkthdr->capture_channels_midi);
+    pkthdr->playback_channels_midi = ntohl(pkthdr->playback_channels_midi);
     pkthdr->period_size = ntohl(pkthdr->period_size);
     pkthdr->sample_rate = ntohl(pkthdr->sample_rate);
     pkthdr->sync_state = ntohl(pkthdr->sync_state);
@@ -100,14 +107,14 @@ packet_cache *packet_cache_new(int num_packets, int pkt_size, int mtu)
 
     packet_cache *pcache = malloc(sizeof(packet_cache));
     if (pcache == NULL) {
-        printf("could not allocate packet cache (1)\n");
+        jack_error("could not allocate packet cache (1)\n");
         return NULL;
     }
 
     pcache->size = num_packets;
     pcache->packets = malloc(sizeof(cache_packet) * num_packets);
     if (pcache->packets == NULL) {
-        printf("could not allocate packet cache (2)\n");
+        jack_error("could not allocate packet cache (2)\n");
         return NULL;
     }
 
@@ -121,7 +128,7 @@ packet_cache *packet_cache_new(int num_packets, int pkt_size, int mtu)
         pcache->packets[i].packet_buf = malloc(pkt_size);
 
         if ((pcache->packets[i].fragment_array == NULL) || (pcache->packets[i].packet_buf == NULL)) {
-            printf("could not allocate packet cache (3)\n");
+            jack_error("could not allocate packet cache (3)\n");
             return NULL;
         }
     }
@@ -235,7 +242,7 @@ void cache_packet_add_fragment(cache_packet *pack, char *packet_buf, int rcv_len
     jack_nframes_t framecnt    = ntohl(pkthdr->framecnt);
 
     if (framecnt != pack->framecnt) {
-        printf("errror. framecnts dont match\n");
+        jack_error("errror. framecnts dont match\n");
         return;
     }
 
@@ -251,7 +258,7 @@ void cache_packet_add_fragment(cache_packet *pack, char *packet_buf, int rcv_len
             memcpy(packet_bufX + fragment_nr * fragment_payload_size, dataX, rcv_len - sizeof(jacknet_packet_header));
             pack->fragment_array[fragment_nr] = 1;
         } else {
-            printf("too long packet received...");
+            jack_error("too long packet received...");
         }
     }
 }
@@ -570,11 +577,71 @@ void netjack_sendto(int sockfd, char *packet_buf, int pkt_size, int flags, struc
         int last_payload_size = packet_buf + pkt_size - packet_bufX;
         memcpy(dataX, packet_bufX, last_payload_size);
         pkthdr->fragment_nr = htonl(frag_cnt);
-        //printf("last fragment_count = %d, payload_size = %d\n", fragment_count, last_payload_size);
+        //jack_error("last fragment_count = %d, payload_size = %d\n", fragment_count, last_payload_size);
 
         // sendto(last_pack_size);
         sendto(sockfd, tx_packet, last_payload_size + sizeof(jacknet_packet_header), flags, addr, addr_size);
     }
+}
+
+void decode_midi_buffer(uint32_t *buffer_uint32, unsigned int buffer_size_uint32, jack_default_audio_sample_t* buf) {
+    int i;
+    jack_midi_clear_buffer(buf);
+    for (i = 0; i < buffer_size_uint32-3;) {
+        uint32_t payload_size;
+        payload_size = buffer_uint32[i];
+        payload_size = ntohl(payload_size);
+        if(payload_size) {
+            jack_midi_event_t event;
+            event.time = ntohl(buffer_uint32[i+1]);
+            event.size = ntohl(buffer_uint32[i+2]);
+            event.buffer = (jack_midi_data_t*)(&(buffer_uint32[i+3]));
+            jack_midi_event_write(buf, event.time, event.buffer, event.size);
+
+            // skip to the next event
+            unsigned int nb_data_quads = (((event.size-1) & ~0x3) >> 2)+1;
+            i += 3+nb_data_quads;
+        } else {
+            // no events can follow an empty event, we're done
+            break;
+        }
+    }
+}
+
+void encode_midi_buffer(uint32_t *buffer_uint32, unsigned int buffer_size_uint32, jack_default_audio_sample_t* buf)
+{
+    int i;
+    unsigned int written = 0;
+    // midi port, encode midi events
+    unsigned int nevents = jack_midi_get_event_count(buf);
+    for (i=0; i<nevents; ++i) {
+        jack_midi_event_t event;
+        jack_midi_event_get(&event, buf, i);
+        unsigned int nb_data_quads = (((event.size-1) & ~0x3) >> 2)+1;
+        unsigned int payload_size = 3+nb_data_quads;
+        // only write if we have sufficient space for the event
+        // otherwise drop it
+        if(written + payload_size < buffer_size_uint32 - 1) {
+            // write header
+            buffer_uint32[written]=htonl(payload_size);
+            written++;
+            buffer_uint32[written]=htonl(event.time);
+            written++;
+            buffer_uint32[written]=htonl(event.size);
+            written++;
+
+            // write data
+            jack_midi_data_t* tmpbuff = (jack_midi_data_t*)(&(buffer_uint32[written]));
+            memcpy(tmpbuff, event.buffer, event.size);
+            written += nb_data_quads;
+        } else {
+            // buffer overflow
+            jack_error("midi buffer overflow");
+            break;
+        }
+    }
+    // now put a netjack_midi 'no-payload' event, signaling EOF
+    buffer_uint32[written]=0;
 }
 
 // render functions for float
@@ -594,32 +661,42 @@ void render_payload_to_jack_ports_float( void *packet_payload, jack_nframes_t ne
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
-        if (net_period_down != nframes) {
-            SRC_STATE *src_state = src_node->data;
-            for (i = 0; i < net_period_down; i++) {
-                packet_bufX[i] = ntohl(packet_bufX[i]);
+        const char *porttype = jack_port_type(port);
+
+        if (strncmp(porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+            // audio port, resample if necessary
+            if (net_period_down != nframes) {
+                SRC_STATE *src_state = src_node->data;
+                for (i = 0; i < net_period_down; i++) {
+                    packet_bufX[i] = ntohl(packet_bufX[i]);
+                }
+    
+                src.data_in = (float *)packet_bufX;
+                src.input_frames = net_period_down;
+    
+                src.data_out = buf;
+                src.output_frames = nframes;
+    
+                src.src_ratio = (float) nframes / (float) net_period_down;
+                src.end_of_input = 0;
+    
+                src_set_ratio(src_state, src.src_ratio);
+                src_process(src_state, &src);
+                src_node = jack_slist_next (src_node);
+            } else {
+                for (i = 0; i < net_period_down; i++) {
+                    val.i = packet_bufX[i];
+                    val.i = ntohl(val.i);
+                    buf[i] = val.f;
+                }
             }
-
-            src.data_in = (float *)packet_bufX;
-            src.input_frames = net_period_down;
-
-            src.data_out = buf;
-            src.output_frames = nframes;
-
-            src.src_ratio = (float) nframes / (float) net_period_down;
-            src.end_of_input = 0;
-
-            src_set_ratio(src_state, src.src_ratio);
-            src_process(src_state, &src);
-            src_node = jack_slist_next (src_node);
-        } else {
-            for (i = 0; i < net_period_down; i++) {
-                val.i = packet_bufX[i];
-                val.i = ntohl(val.i);
-                buf[i] = val.f;
-            }
+        } else if (strncmp(porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+            // midi port, decode midi events
+            // convert the data buffer to a standard format (uint32_t based)
+            unsigned int buffer_size_uint32 = net_period_down;
+            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
+            decode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
         }
-
         packet_bufX = (packet_bufX + net_period_down);
         node = jack_slist_next (node);
         chn++;
@@ -641,32 +718,43 @@ void render_jack_ports_to_payload_float(JSList *playback_ports, JSList *playback
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
-        if (net_period_up != nframes) {
-            SRC_STATE *src_state = src_node->data;
-            src.data_in = buf;
-            src.input_frames = nframes;
+        const char *porttype = jack_port_type(port);
 
-            src.data_out = (float *) packet_bufX;
-            src.output_frames = net_period_up;
-
-            src.src_ratio = (float) net_period_up / (float) nframes;
-            src.end_of_input = 0;
-
-            src_set_ratio(src_state, src.src_ratio);
-            src_process(src_state, &src);
-
-            for (i = 0; i < net_period_up; i++) {
-                packet_bufX[i] = htonl(packet_bufX[i]);
+        if (strncmp(porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+            // audio port, resample if necessary
+    
+            if (net_period_up != nframes) {
+                SRC_STATE *src_state = src_node->data;
+                src.data_in = buf;
+                src.input_frames = nframes;
+    
+                src.data_out = (float *) packet_bufX;
+                src.output_frames = net_period_up;
+    
+                src.src_ratio = (float) net_period_up / (float) nframes;
+                src.end_of_input = 0;
+    
+                src_set_ratio(src_state, src.src_ratio);
+                src_process(src_state, &src);
+    
+                for (i = 0; i < net_period_up; i++) {
+                    packet_bufX[i] = htonl(packet_bufX[i]);
+                }
+                src_node = jack_slist_next (src_node);
+            } else {
+                for (i = 0; i < net_period_up; i++) {
+                    val.f = buf[i];
+                    val.i = htonl(val.i);
+                    packet_bufX[i] = val.i;
+                }
             }
-            src_node = jack_slist_next (src_node);
-        } else {
-            for (i = 0; i < net_period_up; i++) {
-                val.f = buf[i];
-                val.i = htonl(val.i);
-                packet_bufX[i] = val.i;
-            }
+        } else if (strncmp(porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+            // encode midi events from port to packet
+            // convert the data buffer to a standard format (uint32_t based)
+            unsigned int buffer_size_uint32 = net_period_up;
+            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
+            encode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
         }
-
         packet_bufX = (packet_bufX + net_period_up);
         node = jack_slist_next (node);
         chn++;
@@ -691,31 +779,41 @@ void render_payload_to_jack_ports_16bit(void *packet_payload, jack_nframes_t net
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
         float *floatbuf = alloca(sizeof(float) * net_period_down);
+        const char *portname = jack_port_type(port);
 
-        if (net_period_down != nframes) {
-            SRC_STATE *src_state = src_node->data;
-            for (i = 0; i < net_period_down; i++) {
-                floatbuf[i] = ((float) ntohs(packet_bufX[i])) / 32767.0 - 1.0;
+        if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+            // audio port, resample if necessary
+    
+            if (net_period_down != nframes) {
+                SRC_STATE *src_state = src_node->data;
+                for (i = 0; i < net_period_down; i++) {
+                    floatbuf[i] = ((float) ntohs(packet_bufX[i])) / 32767.0 - 1.0;
+                }
+    
+                src.data_in = floatbuf;
+                src.input_frames = net_period_down;
+    
+                src.data_out = buf;
+                src.output_frames = nframes;
+    
+                src.src_ratio = (float) nframes / (float) net_period_down;
+                src.end_of_input = 0;
+    
+                src_set_ratio(src_state, src.src_ratio);
+                src_process(src_state, &src);
+                src_node = jack_slist_next (src_node);
+            } else {
+                for (i = 0; i < net_period_down; i++) {
+                    buf[i] = ((float) ntohs(packet_bufX[i])) / 32768.0 - 1.0;
+                }
             }
-
-            src.data_in = floatbuf;
-            src.input_frames = net_period_down;
-
-            src.data_out = buf;
-            src.output_frames = nframes;
-
-            src.src_ratio = (float) nframes / (float) net_period_down;
-            src.end_of_input = 0;
-
-            src_set_ratio(src_state, src.src_ratio);
-            src_process(src_state, &src);
-            src_node = jack_slist_next (src_node);
-        } else {
-            for (i = 0; i < net_period_down; i++) {
-                buf[i] = ((float) ntohs(packet_bufX[i])) / 32768.0 - 1.0;
-            }
+        } else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+            // midi port, decode midi events
+            // convert the data buffer to a standard format (uint32_t based)
+            unsigned int buffer_size_uint32 = net_period_down/2;
+            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
+            decode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
         }
-
         packet_bufX = (packet_bufX + net_period_down);
         node = jack_slist_next (node);
         chn++;
@@ -735,34 +833,44 @@ void render_jack_ports_to_payload_16bit(JSList *playback_ports, JSList *playback
         int i;
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        const char *portname = jack_port_type(port);
 
-        if (net_period_up != nframes) {
-            SRC_STATE *src_state = src_node->data;
-
-            float *floatbuf = alloca(sizeof(float) * net_period_up);
-
-            src.data_in = buf;
-            src.input_frames = nframes;
-
-            src.data_out = floatbuf;
-            src.output_frames = net_period_up;
-
-            src.src_ratio = (float) net_period_up / (float) nframes;
-            src.end_of_input = 0;
-
-            src_set_ratio(src_state, src.src_ratio);
-            src_process(src_state, &src);
-
-            for (i = 0; i < net_period_up; i++) {
-                packet_bufX[i] = htons((floatbuf[i] + 1.0) * 32767.0);
+        if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+            // audio port, resample if necessary
+    
+            if (net_period_up != nframes) {
+                SRC_STATE *src_state = src_node->data;
+    
+                float *floatbuf = alloca(sizeof(float) * net_period_up);
+    
+                src.data_in = buf;
+                src.input_frames = nframes;
+    
+                src.data_out = floatbuf;
+                src.output_frames = net_period_up;
+    
+                src.src_ratio = (float) net_period_up / (float) nframes;
+                src.end_of_input = 0;
+    
+                src_set_ratio(src_state, src.src_ratio);
+                src_process(src_state, &src);
+    
+                for (i = 0; i < net_period_up; i++) {
+                    packet_bufX[i] = htons((floatbuf[i] + 1.0) * 32767.0);
+                }
+                src_node = jack_slist_next (src_node);
+            } else {
+                for (i = 0; i < net_period_up; i++) {
+                    packet_bufX[i] = htons((buf[i] + 1.0) * 32767.0);
+                }
             }
-            src_node = jack_slist_next (src_node);
-        } else {
-            for (i = 0; i < net_period_up; i++) {
-                packet_bufX[i] = htons((buf[i] + 1.0) * 32767.0);
-            }
+        } else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+            // encode midi events from port to packet
+            // convert the data buffer to a standard format (uint32_t based)
+            unsigned int buffer_size_uint32 = net_period_up/2;
+            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
+            encode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
         }
-
         packet_bufX = (packet_bufX + net_period_up);
         node = jack_slist_next (node);
         chn++;
@@ -787,31 +895,41 @@ void render_payload_to_jack_ports_8bit(void *packet_payload, jack_nframes_t net_
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
         float *floatbuf = alloca(sizeof(float) * net_period_down);
+        const char *portname = jack_port_type(port);
 
-        if (net_period_down != nframes) {
-            SRC_STATE *src_state = src_node->data;
-            for (i = 0; i < net_period_down; i++) {
-                floatbuf[i] = ((float) packet_bufX[i]) / 127.0;
+        if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+            // audio port, resample if necessary
+    
+            if (net_period_down != nframes) {
+                SRC_STATE *src_state = src_node->data;
+                for (i = 0; i < net_period_down; i++) {
+                    floatbuf[i] = ((float) packet_bufX[i]) / 127.0;
+                }
+    
+                src.data_in = floatbuf;
+                src.input_frames = net_period_down;
+    
+                src.data_out = buf;
+                src.output_frames = nframes;
+    
+                src.src_ratio = (float) nframes / (float) net_period_down;
+                src.end_of_input = 0;
+    
+                src_set_ratio(src_state, src.src_ratio);
+                src_process(src_state, &src);
+                src_node = jack_slist_next (src_node);
+            } else {
+                for (i = 0; i < net_period_down; i++) {
+                    buf[i] = ((float) packet_bufX[i]) / 127.0;
+                }
             }
-
-            src.data_in = floatbuf;
-            src.input_frames = net_period_down;
-
-            src.data_out = buf;
-            src.output_frames = nframes;
-
-            src.src_ratio = (float) nframes / (float) net_period_down;
-            src.end_of_input = 0;
-
-            src_set_ratio(src_state, src.src_ratio);
-            src_process(src_state, &src);
-            src_node = jack_slist_next (src_node);
-        } else {
-            for (i = 0; i < net_period_down; i++) {
-                buf[i] = ((float) packet_bufX[i]) / 127.0;
-            }
+        } else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+            // midi port, decode midi events
+            // convert the data buffer to a standard format (uint32_t based)
+            unsigned int buffer_size_uint32 = net_period_down/2;
+            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
+            decode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
         }
-
         packet_bufX = (packet_bufX + net_period_down);
         node = jack_slist_next (node);
         chn++;
@@ -830,35 +948,45 @@ void render_jack_ports_to_payload_8bit(JSList *playback_ports, JSList *playback_
         SRC_DATA src;
         int i;
         jack_port_t *port = (jack_port_t *) node->data;
+
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        const char *portname = jack_port_type(port);
 
-        if (net_period_up != nframes) {
-            SRC_STATE *src_state = src_node->data;
-
-            float *floatbuf = alloca(sizeof(float) * net_period_up);
-
-            src.data_in = buf;
-            src.input_frames = nframes;
-
-            src.data_out = floatbuf;
-            src.output_frames = net_period_up;
-
-            src.src_ratio = (float) net_period_up / (float) nframes;
-            src.end_of_input = 0;
-
-            src_set_ratio(src_state, src.src_ratio);
-            src_process(src_state, &src);
-
-            for (i = 0; i < net_period_up; i++) {
-                packet_bufX[i] = floatbuf[i] * 127.0;
+        if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+            // audio port, resample if necessary
+            if (net_period_up != nframes) {
+                SRC_STATE *src_state = src_node->data;
+    
+                float *floatbuf = alloca(sizeof(float) * net_period_up);
+    
+                src.data_in = buf;
+                src.input_frames = nframes;
+    
+                src.data_out = floatbuf;
+                src.output_frames = net_period_up;
+    
+                src.src_ratio = (float) net_period_up / (float) nframes;
+                src.end_of_input = 0;
+    
+                src_set_ratio(src_state, src.src_ratio);
+                src_process(src_state, &src);
+    
+                for (i = 0; i < net_period_up; i++) {
+                    packet_bufX[i] = floatbuf[i] * 127.0;
+                }
+                src_node = jack_slist_next (src_node);
+            } else {
+                for (i = 0; i < net_period_up; i++) {
+                    packet_bufX[i] = buf[i] * 127.0;
+                }
             }
-            src_node = jack_slist_next (src_node);
-        } else {
-            for (i = 0; i < net_period_up; i++) {
-                packet_bufX[i] = buf[i] * 127.0;
-            }
+        } else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+            // encode midi events from port to packet
+            // convert the data buffer to a standard format (uint32_t based)
+            unsigned int buffer_size_uint32 = net_period_up/4;
+            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
+            encode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
         }
-
         packet_bufX = (packet_bufX + net_period_up);
         node = jack_slist_next (node);
         chn++;
