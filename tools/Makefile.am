@@ -25,7 +25,7 @@ dist-check-readline:
 endif
 
 if HAVE_SAMPLERATE
-NETJACK_TOOLS = jacknet_client
+NETJACK_TOOLS = jack_netsource
 if HAVE_ALSA
 NETJACK_TOOLS += alsa_in alsa_out
 endif
@@ -122,10 +122,10 @@ jack_unload_LDADD = ../libjack/libjack.la
 # Netjack slave tools
 #
 if HAVE_SAMPLERATE
-jacknet_client_SOURCES = net_source.c ../drivers/netjack/netjack_packet.c
-jacknet_client_CFLAGS = -I../drivers/netjack
-jacknet_client_LDFLAGS = -lsamplerate @OS_LDFLAGS@
-jacknet_client_LDADD = ../libjack/libjack.la
+jack_netsource_SOURCES = net_source.c ../drivers/netjack/netjack_packet.c
+jack_netsource_CFLAGS = -I../drivers/netjack
+jack_netsource_LDFLAGS = -lsamplerate @OS_LDFLAGS@
+jack_netsource_LDADD = ../libjack/libjack.la
 
 if HAVE_ALSA
 alsa_in_SOURCES = alsa_in.c
