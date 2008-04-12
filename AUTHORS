@@ -84,5 +84,8 @@ Nedko Arnaudov
 Jacob Meuser
 	contributed the sun backend.
 
+Marc-Olivier Barre
+	help with netjack integration and cleanup
+
 Many others have contributed patches and/or test results, and we thank
 them all.

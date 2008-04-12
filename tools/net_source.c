@@ -199,7 +199,9 @@ process (jack_nframes_t nframes, void *arg)
 
     packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (uint32_t);
 
-    /* Receive */
+    /* Receive
+     * TODO: We don't want a goto there. Let's make it a real loop.
+     */
 ReadAgain:
     if (reply_port)
         size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
@@ -207,8 +209,7 @@ ReadAgain:
         size = netjack_recv (outsockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
     
     packet_header_ntoh (pkthdr);
-    /* evaluate received data
-       TODO: think about this a little more... */
+    /* evaluate received data */
     if ((size == rx_bufsize)) 
     {
         cont_miss = 0;
@@ -308,47 +309,62 @@ void
 printUsage ()
 {
 fprintf (stderr, "usage: jack_netsource [options] -h <host peer>\n"
-		"\n"
-		"  -n <jack name> - Reports a different name to jack\n"
-		"  -p <port> - Select another socket than the default (3000)\n"
-		"  -h <host peer> - The hostname/IP of the \"other\" machine running the jack-slave\n"
-		"  -P <num channels> - Number of audio playback channels\n"
-		"  -C <num channels> - Number of audio capture channels\n"
-		"  -o <num channels> - Number of midi playback channels\n"
-		"  -i <num channels> - Number of midi capture channels\n"
-		"  -l <latency in periods> - Number of packets on the wire to approach\n"
-		"  -r <reply port> - When using a firewall use this port for incoming packets\n"
-		"  -f <downsample ratio> - Downsample data in the wire by this factor\n"
-		"  -b <bitdepth> - Set transport to use 16bit or 8bit\n"
-		"\n");
+        "\n"
+        "  -n <jack name> - Reports a different name to jack\n"
+        "  -s <server name> - The name of the jack server to connect to\n"
+        "  -h <host peer> - The hostname/IP of the \"other\" machine running the jack-slave\n"
+        "  -p <port> - Select another socket than the default (3000)\n"
+        "  -P <num channels> - Number of audio playback channels\n"
+        "  -C <num channels> - Number of audio capture channels\n"
+        "  -o <num channels> - Number of midi playback channels\n"
+        "  -i <num channels> - Number of midi capture channels\n"
+        "  -l <latency in periods> - Number of packets on the wire to approach\n"
+        "  -r <reply port> - When using a firewall use this port for incoming packets\n"
+        "  -f <downsample ratio> - Downsample data in the wire by this factor\n"
+        "  -b <bitdepth> - Set transport to use 16bit or 8bit\n"
+        "\n");
 }
 
 int
 main (int argc, char *argv[])
 {
-    char jack_name[30] = "netsource";
-    char *peer_ip = "localhost";
+    char *client_name, *server_name = NULL, *peer_ip;
     int peer_port = 3000;
+    jack_options_t options = JackNullOption;
+    jack_status_t status;
     extern char *optarg;
     extern int optind, optopt;
-    int errflg=0;
-    int c;
+    int errflg=0, c;
 
     if (argc < 3)
     {
         printUsage ();
         return 1;
     }
+    
+    client_name = (char *) malloc (sizeof (char) * 9);
+    peer_ip = (char *) malloc (sizeof (char) * 9);
+    sprintf(client_name, "netsource");
+    sprintf(peer_ip, "localhost");
 
-    while ((c = getopt (argc, argv, ":n:h:p:C:P:i:o:l:r:f:b:")) != -1)
+    while ((c = getopt (argc, argv, ":n:s:h:p:C:P:i:o:l:r:f:b:")) != -1)
     {
-        switch(c)
+        switch (c)
         {
             case 'n':
-            strcpy (jack_name,optarg);
+            free(client_name);
+            client_name = (char *) malloc (sizeof (char) * strlen (optarg));
+            strcpy (client_name, optarg);
+            break;
+            case 's':
+            server_name = (char *) malloc (sizeof (char) * strlen (optarg));
+            strcpy (server_name, optarg);
+            options |= JackServerName;
             break;
             case 'h':
-            peer_ip = optarg;
+            free(peer_ip);
+            peer_ip = (char *) malloc (sizeof (char) * strlen (optarg));
+            strcpy (peer_ip, optarg);
             break;
             case 'p':
             peer_port = atoi (optarg);
@@ -405,9 +421,11 @@ main (int argc, char *argv[])
     }
 
     /* try to become a client of the JACK server */
-    if ((client = jack_client_new (jack_name)) == 0)
+    client = jack_client_open (client_name, options, &status, server_name);
+    if (client == NULL)
     {
-        fprintf (stderr, "jack server not running?\n");
+        fprintf (stderr, "jack_client_open() failed, status = 0x%2.0x\n"
+                         "Is the JACK server running ?\n", status);
         return 1;
     }
 
@@ -425,7 +443,7 @@ main (int argc, char *argv[])
     /* tell the JACK server that we are ready to roll */
     if (jack_activate (client))
     {
-        fprintf (stderr, "cannot activate client");
+        fprintf (stderr, "Cannot activate client");
         return 1;
     }
 
