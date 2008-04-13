@@ -186,7 +186,8 @@ process (jack_nframes_t nframes, void *arg)
     jack_port_t *port;
     JSList *node;
     channel_t chn;
-    int size;
+    int size, i;
+    const char *porttype;
 
     jack_position_t local_trans_pos;
 
@@ -199,44 +200,48 @@ process (jack_nframes_t nframes, void *arg)
 
     packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (uint32_t);
 
-    /* Receive
-     * TODO: We don't want a goto there. Let's make it a real loop.
-     */
-ReadAgain:
+    /* ---------- Receive ---------- */
     if (reply_port)
         size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
     else
         size = netjack_recv (outsockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
-    
     packet_header_ntoh (pkthdr);
-    /* evaluate received data */
-    if ((size == rx_bufsize)) 
+    /* Loop till we get the right packet at the right momment */
+    while (size == rx_bufsize && (framecnt - pkthdr->framecnt) > latency)
+    {
+        printf ("Frame %d  \tLate packet (expected frame %d, got frame %d). Packet received with a latency of %d frames\n", framecnt, framecnt - latency, pkthdr->framecnt, framecnt - pkthdr->framecnt);
+        if (reply_port)
+            size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
+        else
+            size = netjack_recv (outsockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
+        packet_header_ntoh (pkthdr);
+    }
+
+    /* First alternative : we received what we expected. Render the data
+     * to the JACK ports so it can be played. */
+    if (size == rx_bufsize)
     {
         cont_miss = 0;
-        /* Check if packet has expected size */
-        if ((framecnt - pkthdr->framecnt) > latency)
-        {
-            printf ("FRAMCNT_DIFF = %d  -----  A Packet was lost, or came too late (try -l %d) \n", pkthdr->framecnt - framecnt, framecnt - pkthdr->framecnt);
-            goto ReadAgain;
-        }
-	    render_payload_to_jack_ports (bitdepth, packet_bufX, net_period, capture_ports, capture_srcs, nframes);
+        render_payload_to_jack_ports (bitdepth, packet_bufX, net_period, capture_ports, capture_srcs, nframes);
         /* Now evaluate packet header */
         if (sync_state != pkthdr->sync_state)
-            printf ("sync = %d\n", pkthdr->sync_state);
+            printf ("Frame %d  \tSync has been set\n", framecnt);
         sync_state = pkthdr->sync_state;
     }
+    /* Second alternative : we've received something that's not
+     * as big as expected or we missed a packet. We render silence
+     * to the ouput ports */
     else
     {
-        printf ("Packet Miss: (expected: %d bytes, got: %d bytes) framecnt=%d\n", rx_bufsize, size, framecnt);
+        printf ("Frame %d  \tPacket missed or incomplete (expected: %d bytes, got: %d bytes)\n", framecnt, rx_bufsize, size);
         cont_miss += 1;
         chn = 0;
         node = capture_ports;
         while (node != NULL)
         {
-            int i;
             port = (jack_port_t *) node->data;
             buf = jack_port_get_buffer (port, nframes);
-            const char *porttype = jack_port_type (port);
+            porttype = jack_port_type (port);
             if (strncmp (porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size ()) == 0)
                 for (i = 0; i < nframes; i++)
                     buf[i] = 0.0;
@@ -246,11 +251,10 @@ ReadAgain:
             chn++;
         }
     }
-
     /* reset packet_bufX... */
     packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (jack_default_audio_sample_t);
 
-    /* send */
+    /* ---------- Send ---------- */
     render_jack_ports_to_payload (bitdepth, playback_ports, playback_srcs, nframes, packet_bufX, net_period);
 
     /* fill in packet hdr */
