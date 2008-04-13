@@ -4,6 +4,7 @@
  *
  * used by the driver and the jacknet_client
  *
+ * Copyright (C) 2008 Marc-Olivier Barre <marco@marcochapeau.org>
  * Copyright (C) 2008 Pieter Palmers <pieterpalmers@users.sourceforge.net>
  * Copyright (C) 2006 Torben Hohn <torbenh@gmx.de>
  *
@@ -275,69 +276,51 @@ int cache_packet_is_complete(cache_packet *pack)
 
 // fragmented packet IO
 
-int netjack_recvfrom(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu)
+int
+netjack_recvfrom (int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu)
 {
-    if (pkt_size <= mtu) {
-        return recvfrom(sockfd, packet_buf, pkt_size, flags, addr, addr_size);
-    } else {
-
-        char *rx_packet = alloca(mtu);
-        jacknet_packet_header *pkthdr = (jacknet_packet_header *)rx_packet;
-        int rcv_len;
-        jack_nframes_t framecnt;
-
-        cache_packet *cpack;
-
-rx_again:
-        rcv_len = recvfrom(sockfd, rx_packet, mtu, 0, addr, addr_size);
+    if (pkt_size <= mtu)
+        return recvfrom (sockfd, packet_buf, pkt_size, flags, addr, addr_size);
+    char *rx_packet = alloca (mtu);
+    jacknet_packet_header *pkthdr = (jacknet_packet_header *) rx_packet;
+    int rcv_len;
+    jack_nframes_t framecnt;
+    cache_packet *cpack;
+    do
+    {
+        rcv_len = recvfrom (sockfd, rx_packet, mtu, 0, addr, addr_size);
         if (rcv_len < 0)
             return rcv_len;
-
-        framecnt = ntohl(pkthdr->framecnt);
-
-        cpack = packet_cache_get_packet(global_packcache, framecnt);
-        cache_packet_add_fragment(cpack, rx_packet, rcv_len);
-        if (cache_packet_is_complete(cpack)) {
-            memcpy(packet_buf, cpack->packet_buf, pkt_size);
-            cache_packet_reset(cpack);
-            return pkt_size;
-        }
-
-        goto rx_again;
-    }
+        framecnt = ntohl (pkthdr->framecnt);
+        cpack = packet_cache_get_packet (global_packcache, framecnt);
+        cache_packet_add_fragment (cpack, rx_packet, rcv_len);
+    } while (!cache_packet_is_complete (cpack));
+    memcpy (packet_buf, cpack->packet_buf, pkt_size);
+    cache_packet_reset (cpack);
+    return pkt_size;
 }
 
 int netjack_recv(int sockfd, char *packet_buf, int pkt_size, int flags, int mtu)
 {
-
-    if (pkt_size <= mtu) {
-        return recv(sockfd, packet_buf, pkt_size, flags);
-    } else {
-
-        char *rx_packet = alloca(mtu);
-        jacknet_packet_header *pkthdr = (jacknet_packet_header *)rx_packet;
-        int rcv_len;
-        jack_nframes_t framecnt;
-
-        cache_packet *cpack;
-
-rx_again:
-        rcv_len = recv(sockfd, rx_packet, mtu, flags);
+    if (pkt_size <= mtu)
+        return recv (sockfd, packet_buf, pkt_size, flags);
+    char *rx_packet = alloca (mtu);
+    jacknet_packet_header *pkthdr = (jacknet_packet_header *) rx_packet;
+    int rcv_len;
+    jack_nframes_t framecnt;
+    cache_packet *cpack;
+    do
+    {
+        rcv_len = recv (sockfd, rx_packet, mtu, flags);
         if (rcv_len < 0)
             return rcv_len;
-
-        framecnt = ntohl(pkthdr->framecnt);
-
-        cpack = packet_cache_get_packet(global_packcache, framecnt);
-        cache_packet_add_fragment(cpack, rx_packet, rcv_len);
-        if (cache_packet_is_complete(cpack)) {
-            memcpy(packet_buf, cpack->packet_buf, pkt_size);
-            cache_packet_reset(cpack);
-            return pkt_size;
-        }
-
-        goto rx_again;
-    }
+        framecnt = ntohl (pkthdr->framecnt);
+        cpack = packet_cache_get_packet (global_packcache, framecnt);
+        cache_packet_add_fragment (cpack, rx_packet, rcv_len);
+    } while (!cache_packet_is_complete (cpack));
+    memcpy (packet_buf, cpack->packet_buf, pkt_size);
+    cache_packet_reset (cpack);
+    return pkt_size;
 }
 #if 0
 int netjack_recvfrom(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu)
