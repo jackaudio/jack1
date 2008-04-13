@@ -395,7 +395,7 @@ int jack_deactivate (jack_client_t *client);
  *
  * All ports have a type, which may be any non-NULL and non-zero
  * length string, passed as an argument.  Some port types are built
- * into the JACK API, currently only JACK_DEFAULT_AUDIO_TYPE.
+ * into the JACK API, like JACK_DEFAULT_AUDIO_TYPE or JACK_DEFAULT_MIDI_TYPE
  *
  * @param client pointer to JACK client structure.
  * @param port_name non-empty short name for the new port (not
