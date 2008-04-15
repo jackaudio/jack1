@@ -21,9 +21,9 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 */
 
-/** @file net_source.c
+/** @file netsource.c
  *
- * @brief This client connects a remote netjack slave to a local jackd master server
+ * @brief This client connects a remote slave JACK to a local JACK server assumed to be the master
  */
 #include <stdio.h>
 #include <errno.h>
@@ -53,7 +53,7 @@ int playback_channels = 0;
 int playback_channels_audio = 2;
 int playback_channels_midi = 1;
 
-int latency = 1;
+int latency = 5;
 jack_nframes_t factor = 1;
 int bitdepth = 0;
 int reply_port = 0;
@@ -63,9 +63,6 @@ int outsockfd;
 int insockfd;
 struct sockaddr destaddr;
 struct sockaddr bindaddr;
-
-int recv_channels;
-int recv_smaple_format;
 
 int sync_state;
 jack_transport_state_t last_transport_state;
@@ -94,7 +91,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
         port = jack_port_register (client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0);
         if (!port)
         {
-            printf( "jacknet_client: cannot register port for %s", buf);
+            printf( "jack_netsource: cannot register port for %s", buf);
             break;
         }
         capture_srcs = jack_slist_append (capture_srcs, src_new (SRC_LINEAR, 1, NULL));
@@ -108,7 +105,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
         port = jack_port_register (client, buf, JACK_DEFAULT_MIDI_TYPE, port_flags, 0);
         if (!port)
         {
-            printf ("jacknet_client: cannot register port for %s", buf);
+            printf ("jack_netsource: cannot register port for %s", buf);
             break;
         }
         capture_ports = jack_slist_append(capture_ports, port);
@@ -123,7 +120,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
         port = jack_port_register (client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0);
         if (!port)
         {
-            printf ("jacknet_client: cannot register port for %s", buf);
+            printf ("jack_netsource: cannot register port for %s", buf);
             break;
         }
 	    playback_srcs = jack_slist_append (playback_srcs, src_new (SRC_LINEAR, 1, NULL));
@@ -137,7 +134,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
         port = jack_port_register (client, buf, JACK_DEFAULT_MIDI_TYPE, port_flags, 0);
         if (!port)
         {
-            printf ("jacknet_client: cannot register port for %s", buf);
+            printf ("jack_netsource: cannot register port for %s", buf);
             break;
         }
         playback_ports = jack_slist_append (playback_ports, port);
@@ -209,7 +206,8 @@ process (jack_nframes_t nframes, void *arg)
     /* Loop till we get the right packet at the right momment */
     while (size == rx_bufsize && (framecnt - pkthdr->framecnt) > latency)
     {
-        printf ("Frame %d  \tLate packet (expected frame %d, got frame %d). Packet received with a latency of %d frames\n", framecnt, framecnt - latency, pkthdr->framecnt, framecnt - pkthdr->framecnt);
+        //printf ("Frame %d  \tLate packet received with a latency of %d frames (expected frame %d, got frame %d)\n", framecnt, framecnt - pkthdr->framecnt, framecnt - latency, pkthdr->framecnt);
+        printf ("Frame %d  \tLate packet received with a latency of %d frames\n", framecnt, framecnt - pkthdr->framecnt);
         if (reply_port)
             size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
         else
@@ -221,7 +219,11 @@ process (jack_nframes_t nframes, void *arg)
      * to the JACK ports so it can be played. */
     if (size == rx_bufsize)
     {
-        cont_miss = 0;
+        if (cont_miss)
+        {
+            //printf("Frame %d  \tRecovered from dropouts\n", framecnt);
+            cont_miss = 0;
+        }
         render_payload_to_jack_ports (bitdepth, packet_bufX, net_period, capture_ports, capture_srcs, nframes);
         /* Now evaluate packet header */
         if (sync_state != pkthdr->sync_state)
@@ -233,7 +235,8 @@ process (jack_nframes_t nframes, void *arg)
      * to the ouput ports */
     else
     {
-        printf ("Frame %d  \tPacket missed or incomplete (expected: %d bytes, got: %d bytes)\n", framecnt, rx_bufsize, size);
+        //printf ("Frame %d  \tPacket missed or incomplete (expected: %d bytes, got: %d bytes)\n", framecnt, rx_bufsize, size);
+        printf ("Frame %d  \tPacket missed or incomplete\n", framecnt);
         cont_miss += 1;
         chn = 0;
         node = capture_ports;
@@ -275,8 +278,13 @@ process (jack_nframes_t nframes, void *arg)
     packet_header_hton (pkthdr);
     if (cont_miss < 10)
         netjack_sendto (outsockfd, (char *) packet_buf, tx_bufsize, 0, &destaddr, sizeof (destaddr), 1400);
+//    else if (cont_miss >= 10 && cont_miss <= 50)
+//        printf ("Frame %d  \tToo many packets missed (%d). We have stopped sending data\n", framecnt, cont_miss);
     else if (cont_miss > 50)
+    {
+        //printf ("Frame %d  \tRealy too many packets missed (%d). Let's reset the counter\n", framecnt, cont_miss);
         cont_miss = 5;
+    }
 
     framecnt++;
     return 0;      
@@ -312,18 +320,18 @@ init_sockaddr_in (struct sockaddr_in *name , const char *hostname , uint16_t por
 void 
 printUsage ()
 {
-fprintf (stderr, "usage: jack_netsource [options] -h <host peer>\n"
+fprintf (stderr, "usage: jack_netsource -h <host peer> [options]\n"
         "\n"
         "  -n <jack name> - Reports a different name to jack\n"
-        "  -s <server name> - The name of the jack server to connect to\n"
-        "  -h <host peer> - The hostname/IP of the \"other\" machine running the jack-slave\n"
-        "  -p <port> - Select another socket than the default (3000)\n"
+        "  -s <server name> - The name of the local jack server\n"
+        "  -h <host_peer> - Host name of the slave JACK\n"
+        "  -p <port> - UDP port used by the slave JACK\n"
         "  -P <num channels> - Number of audio playback channels\n"
         "  -C <num channels> - Number of audio capture channels\n"
         "  -o <num channels> - Number of midi playback channels\n"
         "  -i <num channels> - Number of midi capture channels\n"
-        "  -l <latency in periods> - Number of packets on the wire to approach\n"
-        "  -r <reply port> - When using a firewall use this port for incoming packets\n"
+        "  -l <latency> - Network latency in number of NetJack frames\n"
+        "  -r <reply port> - Local UDP port to use\n"
         "  -f <downsample ratio> - Downsample data in the wire by this factor\n"
         "  -b <bitdepth> - Set transport to use 16bit or 8bit\n"
         "\n");
