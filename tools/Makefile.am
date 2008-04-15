@@ -122,7 +122,7 @@ jack_unload_LDADD = ../libjack/libjack.la
 # Netjack slave tools
 #
 if HAVE_SAMPLERATE
-jack_netsource_SOURCES = net_source.c ../drivers/netjack/netjack_packet.c
+jack_netsource_SOURCES = netsource.c ../drivers/netjack/netjack_packet.c
 jack_netsource_CFLAGS = -I../drivers/netjack
 jack_netsource_LDFLAGS = -lsamplerate @OS_LDFLAGS@
 jack_netsource_LDADD = ../libjack/libjack.la
