@@ -107,7 +107,7 @@ rx_again:
         return 0;
     }
     int len = netjack_recvfrom(driver->sockfd, (char *)driver->rx_buf, bufsize,
-                                MSG_WAITALL, (struct sockaddr*) & driver->syncsource_address, &address_size, 1400);
+                                MSG_WAITALL, (struct sockaddr*) & driver->syncsource_address, &address_size, driver->mtu);
 
 
     if (len != bufsize) {
@@ -133,7 +133,7 @@ static inline int
 net_driver_run_cycle (net_driver_t *driver)
 {
     jack_engine_t *engine = driver->engine;
-    int wait_status;
+    int wait_status = -1;
     float delayed_usecs;
 
     jack_nframes_t nframes = net_driver_wait (driver, -1, &wait_status,
@@ -194,7 +194,7 @@ net_driver_null_cycle (net_driver_t* driver, jack_nframes_t nframes)
             driver->syncsource_address.sin_port = htons(driver->reply_port);
 
     netjack_sendto(driver->outsockfd, (char *)packet_buf, tx_size,
-                    0, (struct sockaddr*)&driver->syncsource_address, sizeof(struct sockaddr_in), 1400);
+                    0, (struct sockaddr*)&driver->syncsource_address, sizeof(struct sockaddr_in), driver->mtu);
 
     return 0;
 }
@@ -312,7 +312,7 @@ net_driver_write (net_driver_t* driver, jack_nframes_t nframes)
         if (driver->reply_port)
             driver->syncsource_address.sin_port = htons(driver->reply_port);
     netjack_sendto(driver->outsockfd, (char *)packet_buf, packet_size,
-                    0, (struct sockaddr*)&driver->syncsource_address, sizeof(struct sockaddr_in), 1400);
+                    0, (struct sockaddr*)&driver->syncsource_address, sizeof(struct sockaddr_in), driver->mtu);
 
     return 0;
 }
@@ -596,6 +596,7 @@ net_driver_new (jack_client_t * client,
             driver->playback_channels = driver->playback_channels_audio + driver->playback_channels_midi;
 
             driver->mtu = first_packet->mtu;
+	    jack_info("mtu = %d", first_packet->mtu);
             driver->latency = first_packet->latency;
         }
 
@@ -613,7 +614,7 @@ net_driver_new (jack_client_t * client,
         driver->pkt_buf = malloc(sizeof(jacknet_packet_header) + driver->net_period_down * driver->capture_channels * get_sample_size(driver->bitdepth));
 
         int rx_bufsize = sizeof(jacknet_packet_header) + driver->net_period_down * driver->capture_channels * get_sample_size(driver->bitdepth);
-        global_packcache = packet_cache_new(driver->latency + 5, rx_bufsize, 1400);
+        global_packcache = packet_cache_new(driver->latency + 5, rx_bufsize, driver->mtu);
 
         jack_info("netjack: period   : up: %d / dn: %d", driver->net_period_up, driver->net_period_down);
         jack_info("netjack: framerate: %d", driver->sample_rate);

@@ -56,6 +56,7 @@ int playback_channels_midi = 1;
 int latency = 5;
 jack_nframes_t factor = 1;
 int bitdepth = 0;
+int mtu = 1400;
 int reply_port = 0;
 jack_client_t *client;
 
@@ -199,9 +200,9 @@ process (jack_nframes_t nframes, void *arg)
 
     /* ---------- Receive ---------- */
     if (reply_port)
-        size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
+        size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, mtu);
     else
-        size = netjack_recv (outsockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
+        size = netjack_recv (outsockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, mtu);
     packet_header_ntoh (pkthdr);
     /* Loop till we get the right packet at the right momment */
     while (size == rx_bufsize && (framecnt - pkthdr->framecnt) > latency)
@@ -209,9 +210,9 @@ process (jack_nframes_t nframes, void *arg)
         //printf ("Frame %d  \tLate packet received with a latency of %d frames (expected frame %d, got frame %d)\n", framecnt, framecnt - pkthdr->framecnt, framecnt - latency, pkthdr->framecnt);
         printf ("Frame %d  \tLate packet received with a latency of %d frames\n", framecnt, framecnt - pkthdr->framecnt);
         if (reply_port)
-            size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
+            size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, mtu);
         else
-            size = netjack_recv (outsockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, 1400);
+            size = netjack_recv (outsockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, mtu);
         packet_header_ntoh (pkthdr);
     }
 
@@ -274,10 +275,11 @@ process (jack_nframes_t nframes, void *arg)
     pkthdr->playback_channels_audio = capture_channels_audio;
     pkthdr->capture_channels_midi = playback_channels_midi;
     pkthdr->playback_channels_midi = capture_channels_midi;
+    pkthdr->mtu = mtu;
     
     packet_header_hton (pkthdr);
     if (cont_miss < 10)
-        netjack_sendto (outsockfd, (char *) packet_buf, tx_bufsize, 0, &destaddr, sizeof (destaddr), 1400);
+        netjack_sendto (outsockfd, (char *) packet_buf, tx_bufsize, 0, &destaddr, sizeof (destaddr), mtu);
 //    else if (cont_miss >= 10 && cont_miss <= 50)
 //        printf ("Frame %d  \tToo many packets missed (%d). We have stopped sending data\n", framecnt, cont_miss);
     else if (cont_miss > 50)
@@ -295,6 +297,7 @@ process (jack_nframes_t nframes, void *arg)
  * It is called by JACK if the server ever shuts down or
  * decides to disconnect the client.
  */
+
 void
 jack_shutdown (void *arg)
 {
@@ -334,6 +337,7 @@ fprintf (stderr, "usage: jack_netsource -h <host peer> [options]\n"
         "  -r <reply port> - Local UDP port to use\n"
         "  -f <downsample ratio> - Downsample data in the wire by this factor\n"
         "  -b <bitdepth> - Set transport to use 16bit or 8bit\n"
+        "  -m <mtu> - Assume this mtu for the link\n"
         "\n");
 }
 
@@ -359,7 +363,7 @@ main (int argc, char *argv[])
     sprintf(client_name, "netsource");
     sprintf(peer_ip, "localhost");
 
-    while ((c = getopt (argc, argv, ":n:s:h:p:C:P:i:o:l:r:f:b:")) != -1)
+    while ((c = getopt (argc, argv, ":n:s:h:p:C:P:i:o:l:r:f:b:m:")) != -1)
     {
         switch (c)
         {
@@ -404,6 +408,9 @@ main (int argc, char *argv[])
             break;
             case 'b':
             bitdepth = atoi (optarg);
+            break;
+            case 'm':
+            mtu = atoi (optarg);
             break;
             case ':':
             fprintf (stderr, "Option -%c requires an operand\n", optopt);
@@ -450,7 +457,7 @@ main (int argc, char *argv[])
 
     jack_nframes_t net_period = (float) jack_get_buffer_size (client) / (float) factor;
     int rx_bufsize =  get_sample_size (bitdepth) * capture_channels * net_period + sizeof (jacknet_packet_header);
-    global_packcache = packet_cache_new (latency + 5, rx_bufsize, 1400);
+    global_packcache = packet_cache_new (latency + 5, rx_bufsize, mtu);
 
     /* tell the JACK server that we are ready to roll */
     if (jack_activate (client))
