@@ -228,8 +228,8 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
     //packet_header_ntoh(pkthdr);
     // fill framecnt from pkthdr.
 
-    if (pkthdr->framecnt != framecnt + 1)
-        jack_info("bogus framecount %d", pkthdr->framecnt);
+    //if (pkthdr->framecnt != framecnt + 1)
+    //    jack_info("bogus framecount %d", pkthdr->framecnt);
 
     framecnt = pkthdr->framecnt;
     driver->reply_port = pkthdr->reply_port;
@@ -274,7 +274,7 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
 //				    jack_info("running locate to %d", pkthdr->transport_frame + (pkthdr->latency)*nframes);
 //		    		}
                 if (local_trans_state != JackTransportRolling)
-                    jack_transport_start(driver->client);
+                    jack_transport_start (driver->client);
                 break;
 
             case JackTransportLooping:
@@ -282,8 +282,7 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
         }
     }
 
-
-    render_payload_to_jack_ports(driver->bitdepth, packet_bufX, driver->net_period_down, driver->capture_ports, driver->capture_srcs, nframes);
+    render_payload_to_jack_ports (driver->bitdepth, packet_bufX, driver->net_period_down, driver->capture_ports, driver->capture_srcs, nframes);
 
     return 0;
 }
@@ -321,7 +320,7 @@ net_driver_write (net_driver_t* driver, jack_nframes_t nframes)
 static int
 net_driver_attach (net_driver_t *driver)
 {
-    puts ("net_driver_attach");
+    //puts ("net_driver_attach");
     jack_port_t * port;
     char buf[32];
     unsigned int chn;
@@ -557,7 +556,7 @@ net_driver_new (jack_client_t * client,
     {
         int first_pack_len = recvfrom (driver->sockfd, first_packet, sizeof (jacknet_packet_header), 0, (struct sockaddr*) & driver->syncsource_address, &address_size);
         driver->srcaddress_valid = 1;
-        jack_info ("first_pack_len=%d", first_pack_len);
+        //jack_info ("first_pack_len=%d", first_pack_len);
         // A packet is here.... If it wasnt the old trigger packet containing only 'x' evaluate the autoconf data...
 
         driver->mtu = 0;
@@ -596,7 +595,7 @@ net_driver_new (jack_client_t * client,
             driver->playback_channels = driver->playback_channels_audio + driver->playback_channels_midi;
 
             driver->mtu = first_packet->mtu;
-	    jack_info("mtu = %d", first_packet->mtu);
+            jack_info("mtu = %d", first_packet->mtu);
             driver->latency = first_packet->latency;
         }
 

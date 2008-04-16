@@ -60,6 +60,12 @@ int mtu = 1400;
 int reply_port = 0;
 jack_client_t *client;
 
+int state_connected = 0;
+int state_latency = 0;
+int state_netxruns = 0;
+int state_currentframe = 0;
+
+
 int outsockfd;
 int insockfd;
 struct sockaddr destaddr;
@@ -92,7 +98,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
         port = jack_port_register (client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0);
         if (!port)
         {
-            printf( "jack_netsource: cannot register port for %s", buf);
+            printf( "jack_netsource: cannot register %s port\n", buf);
             break;
         }
         capture_srcs = jack_slist_append (capture_srcs, src_new (SRC_LINEAR, 1, NULL));
@@ -106,7 +112,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
         port = jack_port_register (client, buf, JACK_DEFAULT_MIDI_TYPE, port_flags, 0);
         if (!port)
         {
-            printf ("jack_netsource: cannot register port for %s", buf);
+            printf ("jack_netsource: cannot register %s port\n", buf);
             break;
         }
         capture_ports = jack_slist_append(capture_ports, port);
@@ -121,7 +127,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
         port = jack_port_register (client, buf, JACK_DEFAULT_AUDIO_TYPE, port_flags, 0);
         if (!port)
         {
-            printf ("jack_netsource: cannot register port for %s", buf);
+            printf ("jack_netsource: cannot register %s port\n", buf);
             break;
         }
 	    playback_srcs = jack_slist_append (playback_srcs, src_new (SRC_LINEAR, 1, NULL));
@@ -135,7 +141,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
         port = jack_port_register (client, buf, JACK_DEFAULT_MIDI_TYPE, port_flags, 0);
         if (!port)
         {
-            printf ("jack_netsource: cannot register port for %s", buf);
+            printf ("jack_netsource: cannot register %s port\n", buf);
             break;
         }
         playback_ports = jack_slist_append (playback_ports, port);
@@ -208,7 +214,8 @@ process (jack_nframes_t nframes, void *arg)
     while (size == rx_bufsize && (framecnt - pkthdr->framecnt) > latency)
     {
         //printf ("Frame %d  \tLate packet received with a latency of %d frames (expected frame %d, got frame %d)\n", framecnt, framecnt - pkthdr->framecnt, framecnt - latency, pkthdr->framecnt);
-        printf ("Frame %d  \tLate packet received with a latency of %d frames\n", framecnt, framecnt - pkthdr->framecnt);
+        //printf ("Frame %d  \tLate packet received with a latency of %d frames\n", framecnt, framecnt - pkthdr->framecnt);
+
         if (reply_port)
             size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, mtu);
         else
@@ -226,9 +233,14 @@ process (jack_nframes_t nframes, void *arg)
             cont_miss = 0;
         }
         render_payload_to_jack_ports (bitdepth, packet_bufX, net_period, capture_ports, capture_srcs, nframes);
+
         /* Now evaluate packet header */
-        if (sync_state != pkthdr->sync_state)
-            printf ("Frame %d  \tSync has been set\n", framecnt);
+        //if (sync_state != pkthdr->sync_state)
+        //    printf ("Frame %d  \tSync has been set\n", framecnt);
+
+	state_currentframe = framecnt;
+	state_latency = framecnt - pkthdr->framecnt;
+	state_connected = 1;
         sync_state = pkthdr->sync_state;
     }
     /* Second alternative : we've received something that's not
@@ -236,8 +248,13 @@ process (jack_nframes_t nframes, void *arg)
      * to the ouput ports */
     else
     {
+	// Set the counters up.
+	state_currentframe = framecnt;
+	state_latency = framecnt - pkthdr->framecnt;
+	state_netxruns += 1;
+
         //printf ("Frame %d  \tPacket missed or incomplete (expected: %d bytes, got: %d bytes)\n", framecnt, rx_bufsize, size);
-        printf ("Frame %d  \tPacket missed or incomplete\n", framecnt);
+        //printf ("Frame %d  \tPacket missed or incomplete\n", framecnt);
         cont_miss += 1;
         chn = 0;
         node = capture_ports;
@@ -284,6 +301,7 @@ process (jack_nframes_t nframes, void *arg)
 //        printf ("Frame %d  \tToo many packets missed (%d). We have stopped sending data\n", framecnt, cont_miss);
     else if (cont_miss > 50)
     {
+	state_connected = 0;
         //printf ("Frame %d  \tRealy too many packets missed (%d). Let's reset the counter\n", framecnt, cont_miss);
         cont_miss = 5;
     }
@@ -344,10 +362,16 @@ fprintf (stderr, "usage: jack_netsource -h <host peer> [options]\n"
 int
 main (int argc, char *argv[])
 {
+    /* Some startup related basics */    
     char *client_name, *server_name = NULL, *peer_ip;
     int peer_port = 3000;
     jack_options_t options = JackNullOption;
     jack_status_t status;
+
+    /* Torben's famous state variables, aka "the reporting API" ! */
+    int statecopy_connected, statecopy_latency, statecopy_netxruns;
+
+    /* Argument parsing stuff */    
     extern char *optarg;
     extern int optind, optopt;
     int errflg=0, c;
@@ -466,9 +490,44 @@ main (int argc, char *argv[])
         return 1;
     }
 
-    /* Now sleep forever... */
+    /* Now sleep forever... and evaluate the state_ vars */
+
+    statecopy_connected = 2; // make it report unconnected on start.
+    statecopy_latency = state_latency;
+    statecopy_netxruns = state_netxruns;
+
     while (1)
-        sleep (100);
+    {
+        sleep (1);
+        if (statecopy_connected != state_connected)
+        {
+            statecopy_connected = state_connected;
+            if (statecopy_connected)
+            {
+                state_netxruns = 1; // We want to reset the netxrun count on each new connection
+                printf ("Connected :-)\n");
+            }
+            else
+                printf ("Not Connected\n");
+        }
+
+	    if (statecopy_connected)
+	    {
+            if (statecopy_netxruns != state_netxruns) {
+            statecopy_netxruns = state_netxruns;
+            printf ("at frame %06d -> total netxruns %d\n", state_currentframe, statecopy_netxruns);
+            }
+        }
+        else
+        {
+            if (statecopy_latency != state_latency)
+            {
+                statecopy_latency = state_latency;
+                if (statecopy_latency > 1)
+                printf ("current latency %d\n", statecopy_latency);
+            }
+        }
+    }
 
     /* Never reached. Well we will be a GtkApp someday... */
     packet_cache_free (global_packcache);
