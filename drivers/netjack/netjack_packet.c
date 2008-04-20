@@ -52,7 +52,7 @@ int fraggo = 0;
 packet_cache *global_packcache;
 
 void
-packet_header_hton(jacknet_packet_header *pkthdr)
+packet_header_hton (jacknet_packet_header *pkthdr)
 {
     pkthdr->capture_channels_audio = htonl(pkthdr->capture_channels_audio);
     pkthdr->playback_channels_audio = htonl(pkthdr->playback_channels_audio);
@@ -71,7 +71,7 @@ packet_header_hton(jacknet_packet_header *pkthdr)
 }
 
 void
-packet_header_ntoh(jacknet_packet_header *pkthdr)
+packet_header_ntoh (jacknet_packet_header *pkthdr)
 {
     pkthdr->capture_channels_audio = ntohl(pkthdr->capture_channels_audio);
     pkthdr->playback_channels_audio = ntohl(pkthdr->playback_channels_audio);
@@ -89,47 +89,51 @@ packet_header_ntoh(jacknet_packet_header *pkthdr)
     pkthdr->fragment_nr = ntohl(pkthdr->fragment_nr);
 }
 
-int get_sample_size(int bitdepth)
+int get_sample_size (int bitdepth)
 {
     if (bitdepth == 8)
-        return sizeof(int8_t);
+        return sizeof (int8_t);
     if (bitdepth == 16)
-        return sizeof(int16_t);
-    return sizeof(int32_t);
+        return sizeof (int16_t);
+    return sizeof (int32_t);
 }
 
 // fragment management functions.
 
-packet_cache *packet_cache_new(int num_packets, int pkt_size, int mtu)
+packet_cache
+*packet_cache_new (int num_packets, int pkt_size, int mtu)
 {
-    int fragment_payload_size = mtu - sizeof(jacknet_packet_header);
-    int fragment_number = (pkt_size - sizeof(jacknet_packet_header) - 1) / fragment_payload_size + 1;
+    int fragment_payload_size = mtu - sizeof (jacknet_packet_header);
+    int fragment_number = (pkt_size - sizeof (jacknet_packet_header) - 1) / fragment_payload_size + 1;
     int i;
 
-    packet_cache *pcache = malloc(sizeof(packet_cache));
-    if (pcache == NULL) {
-        jack_error("could not allocate packet cache (1)\n");
+    packet_cache *pcache = malloc (sizeof (packet_cache));
+    if (pcache == NULL)
+    {
+        jack_error ("could not allocate packet cache (1)\n");
         return NULL;
     }
 
     pcache->size = num_packets;
-    pcache->packets = malloc(sizeof(cache_packet) * num_packets);
-    if (pcache->packets == NULL) {
-        jack_error("could not allocate packet cache (2)\n");
+    pcache->packets = malloc (sizeof (cache_packet) * num_packets);
+    if (pcache->packets == NULL)
+    {
+        jack_error ("could not allocate packet cache (2)\n");
         return NULL;
     }
 
-    for (i = 0; i < num_packets; i++) {
+    for (i = 0; i < num_packets; i++)
+    {
         pcache->packets[i].valid = 0;
         pcache->packets[i].num_fragments = fragment_number;
         pcache->packets[i].packet_size = pkt_size;
         pcache->packets[i].mtu = mtu;
         pcache->packets[i].framecnt = 0;
-        pcache->packets[i].fragment_array = malloc(sizeof(char) * fragment_number);
-        pcache->packets[i].packet_buf = malloc(pkt_size);
-
-        if ((pcache->packets[i].fragment_array == NULL) || (pcache->packets[i].packet_buf == NULL)) {
-            jack_error("could not allocate packet cache (3)\n");
+        pcache->packets[i].fragment_array = malloc (sizeof (char) * fragment_number);
+        pcache->packets[i].packet_buf = malloc (pkt_size);
+        if ((pcache->packets[i].fragment_array == NULL) || (pcache->packets[i].packet_buf == NULL))
+        {
+            jack_error ("could not allocate packet cache (3)\n");
             return NULL;
         }
     }
@@ -137,25 +141,29 @@ packet_cache *packet_cache_new(int num_packets, int pkt_size, int mtu)
     return pcache;
 }
 
-void packet_cache_free(packet_cache *pcache)
+void
+packet_cache_free (packet_cache *pcache)
 {
     int i;
 
-    for (i = 0; i < pcache->size; i++) {
-        free(pcache->packets[i].fragment_array);
-        free(pcache->packets[i].packet_buf);
+    for (i = 0; i < pcache->size; i++)
+    {
+        free (pcache->packets[i].fragment_array);
+        free (pcache->packets[i].packet_buf);
     }
 
-    free(pcache->packets);
-    free(pcache);
+    free (pcache->packets);
+    free (pcache);
 }
 
-cache_packet *packet_cache_get_packet(packet_cache *pcache, jack_nframes_t framecnt)
+cache_packet
+*packet_cache_get_packet (packet_cache *pcache, jack_nframes_t framecnt)
 {
     int i;
     cache_packet *retval;
 
-    for (i = 0; i < pcache->size; i++) {
+    for (i = 0; i < pcache->size; i++)
+    {
         if (pcache->packets[i].valid && (pcache->packets[i].framecnt == framecnt))
             return &(pcache->packets[i]);
     }
@@ -163,30 +171,34 @@ cache_packet *packet_cache_get_packet(packet_cache *pcache, jack_nframes_t frame
     // The Packet is not in the packet cache.
     // find a free packet.
 
-    retval = packet_cache_get_free_packet(pcache);
-    if (retval != NULL) {
-        cache_packet_set_framecnt(retval, framecnt);
+    retval = packet_cache_get_free_packet (pcache);
+    if (retval != NULL)
+    {
+        cache_packet_set_framecnt (retval, framecnt);
         return retval;
     }
 
     // No Free Packet available
     // Get The Oldest packet and reset it.
 
-    retval = packet_cache_get_oldest_packet(pcache);
-    cache_packet_reset(retval);
-    cache_packet_set_framecnt(retval, framecnt);
+    retval = packet_cache_get_oldest_packet (pcache);
+    cache_packet_reset (retval);
+    cache_packet_set_framecnt (retval, framecnt);
 
     return retval;
 }
 
-cache_packet *packet_cache_get_oldest_packet(packet_cache *pcache)
+cache_packet
+*packet_cache_get_oldest_packet (packet_cache *pcache)
 {
     jack_nframes_t minimal_frame = 0;
     cache_packet *retval = &(pcache->packets[0]);
     int i;
 
-    for (i = 0; i < pcache->size; i++) {
-        if (pcache->packets[i].valid && (pcache->packets[i].framecnt < minimal_frame)) {
+    for (i = 0; i < pcache->size; i++)
+    {
+        if (pcache->packets[i].valid && (pcache->packets[i].framecnt < minimal_frame))
+        {
             minimal_frame = pcache->packets[i].framecnt;
             retval = &(pcache->packets[i]);
         }
@@ -196,11 +208,13 @@ cache_packet *packet_cache_get_oldest_packet(packet_cache *pcache)
 }
 
 
-cache_packet *packet_cache_get_free_packet(packet_cache *pcache)
+cache_packet
+*packet_cache_get_free_packet (packet_cache *pcache)
 {
     int i;
 
-    for (i = 0; i < pcache->size; i++) {
+    for (i = 0; i < pcache->size; i++)
+    {
         if (pcache->packets[i].valid == 0)
             return &(pcache->packets[i]);
     }
@@ -208,7 +222,8 @@ cache_packet *packet_cache_get_free_packet(packet_cache *pcache)
     return NULL;
 }
 
-void cache_packet_reset(cache_packet *pack)
+void
+cache_packet_reset (cache_packet *pack)
 {
     int i;
     pack->valid = 0;
@@ -220,7 +235,8 @@ void cache_packet_reset(cache_packet *pack)
         pack->fragment_array[i] = 0;
 }
 
-void cache_packet_set_framecnt(cache_packet *pack, jack_nframes_t framecnt)
+void
+cache_packet_set_framecnt (cache_packet *pack, jack_nframes_t framecnt)
 {
     int i;
 
@@ -232,39 +248,45 @@ void cache_packet_set_framecnt(cache_packet *pack, jack_nframes_t framecnt)
     pack->valid = 1;
 }
 
-void cache_packet_add_fragment(cache_packet *pack, char *packet_buf, int rcv_len)
+void
+cache_packet_add_fragment (cache_packet *pack, char *packet_buf, int rcv_len)
 {
     jacknet_packet_header *pkthdr = (jacknet_packet_header *) packet_buf;
-    int fragment_payload_size = pack->mtu - sizeof(jacknet_packet_header);
-    char *packet_bufX = pack->packet_buf + sizeof(jacknet_packet_header);
-    char *dataX = packet_buf + sizeof(jacknet_packet_header);
+    int fragment_payload_size = pack->mtu - sizeof (jacknet_packet_header);
+    char *packet_bufX = pack->packet_buf + sizeof (jacknet_packet_header);
+    char *dataX = packet_buf + sizeof (jacknet_packet_header);
 
-    jack_nframes_t fragment_nr = ntohl(pkthdr->fragment_nr);
-    jack_nframes_t framecnt    = ntohl(pkthdr->framecnt);
+    jack_nframes_t fragment_nr = ntohl (pkthdr->fragment_nr);
+    jack_nframes_t framecnt    = ntohl (pkthdr->framecnt);
 
-    if (framecnt != pack->framecnt) {
-        jack_error("errror. framecnts dont match\n");
+    if (framecnt != pack->framecnt)
+    {
+        jack_error ("errror. framecnts dont match\n");
         return;
     }
 
-    if (fragment_nr == 0) {
-        memcpy(pack->packet_buf, packet_buf, pack->mtu);
+    if (fragment_nr == 0)
+    {
+        memcpy (pack->packet_buf, packet_buf, pack->mtu);
         pack->fragment_array[0] = 1;
 
         return;
     }
 
-    if ((fragment_nr < pack->num_fragments) && (fragment_nr > 0)) {
-        if ((fragment_nr * fragment_payload_size + rcv_len - sizeof(jacknet_packet_header)) <= (pack->packet_size - sizeof(jacknet_packet_header))) {
-            memcpy(packet_bufX + fragment_nr * fragment_payload_size, dataX, rcv_len - sizeof(jacknet_packet_header));
+    if ((fragment_nr < pack->num_fragments) && (fragment_nr > 0))
+    {
+        if ((fragment_nr * fragment_payload_size + rcv_len - sizeof (jacknet_packet_header)) <= (pack->packet_size - sizeof (jacknet_packet_header)))
+        {
+            memcpy (packet_bufX + fragment_nr * fragment_payload_size, dataX, rcv_len - sizeof (jacknet_packet_header));
             pack->fragment_array[fragment_nr] = 1;
-        } else {
-            jack_error("too long packet received...");
         }
+        else
+            jack_error ("too long packet received...");
     }
 }
 
-int cache_packet_is_complete(cache_packet *pack)
+int
+cache_packet_is_complete (cache_packet *pack)
 {
     int i;
     for (i = 0; i < pack->num_fragments; i++)
@@ -300,7 +322,8 @@ netjack_recvfrom (int sockfd, char *packet_buf, int pkt_size, int flags, struct 
     return pkt_size;
 }
 
-int netjack_recv(int sockfd, char *packet_buf, int pkt_size, int flags, int mtu)
+int
+netjack_recv (int sockfd, char *packet_buf, int pkt_size, int flags, int mtu)
 {
     if (pkt_size <= mtu)
         return recv (sockfd, packet_buf, pkt_size, flags);
@@ -322,244 +345,41 @@ int netjack_recv(int sockfd, char *packet_buf, int pkt_size, int flags, int mtu)
     cache_packet_reset (cpack);
     return pkt_size;
 }
-#if 0
-int netjack_recvfrom(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu)
-{
-    char *rx_packet;
-    char *dataX;
-    int i;
 
-    int fragment_payload_size;
-
-    char *fragment_array;
-    int   fragment_number;
-    int   rx_frag_count, framenum;
-
-    jacknet_packet_header *pkthdr;
-
-    // Now loop and send all
-    char *packet_bufX;
-
-    // wait for fragment_nr == 0
-    int rcv_len;
-
-    rx_packet = alloca(mtu);
-    dataX = rx_packet + sizeof(jacknet_packet_header);
-
-    fragment_payload_size = mtu - sizeof(jacknet_packet_header);
-
-    pkthdr = (jacknet_packet_header *)rx_packet;
-
-    packet_bufX = packet_buf + sizeof(jacknet_packet_header);
-
-    fragment_number = (pkt_size - sizeof(jacknet_packet_header) - 1) / fragment_payload_size + 1;
-    fragment_array = alloca(fragment_number);
-    for (i = 0; i < fragment_number; i++)
-        fragment_array[i] = 0;
-
-    if (pkt_size <= mtu) {
-        return recvfrom(sockfd, packet_buf, pkt_size, flags, addr, addr_size);
-    } else {
-rx_again:
-        rcv_len = recvfrom(sockfd, rx_packet, mtu, 0, addr, addr_size);
-        if (rcv_len < 0)
-            return rcv_len;
-
-        if (rcv_len >= sizeof(jacknet_packet_header)) {
-            //printf("got fragmentooooo_nr = %d recv_len = %d\n",  ntohl(pkthdr->fragment_nr), rcv_len);
-            if ((ntohl(pkthdr->fragment_nr)) != 0)
-                goto rx_again;
-        } else {
-            goto rx_again;
-        }
-
-        // ok... we have read a fragement 0;
-        // copy the data into the packet buffer...
-        memcpy(packet_buf, rx_packet, mtu);
-
-        rx_frag_count = 1;
-        framenum = ntohl(pkthdr->framecnt);
-
-        fragment_array[0] = 1;
-
-        while (rx_frag_count < fragment_number) {
-
-
-            rcv_len = recvfrom(sockfd, rx_packet, mtu, 0, addr, addr_size);
-            if (rcv_len < 0)
-                return -1;
-
-            if (ntohl(pkthdr->framecnt) < framenum) {
-                //printf("Out of Order Framecnt: i abort on this packet\n");
-                printf("Old Fragment !!! (got: %d, exp: %d)\n", ntohl(pkthdr->framecnt),  framenum);
-                continue;
-            }
-
-            if (ntohl(pkthdr->framecnt) > framenum) {
-                printf("Newer Fragment !!! (got: %d, exp: %d) Switching to new Packet.\n", ntohl(pkthdr->framecnt),  framenum);
-                // Copy the new Packetheader up Front
-                memcpy(packet_buf, rx_packet, sizeof(jacknet_packet_header));
-
-                rx_frag_count = 0;
-                framenum = ntohl(pkthdr->framecnt);
-            }
-#if 0
-            if (ntohl(pkthdr->framecnt) > framenum) {
-                printf("Newer Fragment !!! (got: %d, exp: %d) Dropping it\n", ntohl(pkthdr->framecnt),  framenum);
-                continue;
-            }
-#endif
-
-            // copy the payload into the packet buffer...
-            if ((ntohl(pkthdr->fragment_nr) < fragment_number) && (ntohl(pkthdr->fragment_nr) >= 0)) {
-                if ((ntohl(pkthdr->fragment_nr) * fragment_payload_size + rcv_len - sizeof(jacknet_packet_header)) <= (pkt_size - sizeof(jacknet_packet_header))) {
-                    memcpy(packet_bufX + (ntohl(pkthdr->fragment_nr) * fragment_payload_size), dataX, rcv_len - sizeof(jacknet_packet_header));
-                    rx_frag_count++;
-                } else {
-                    printf("too long packet received...");
-                }
-            }
-		}
-	}
-    return pkt_size;
-}
-#endif
-
-#if 0
-int netjack_recv(int sockfd, char *packet_buf, int pkt_size, int flags, int mtu)
-{
-	char *rx_packet;
-    char *dataX;
-    int i;
-
-    int fragment_payload_size;
-
-    char *fragment_array;
-    int   fragment_number;
-    int   rx_frag_count, framenum;
-
-    jacknet_packet_header *pkthdr;
-
-    // Now loop and send all
-    char *packet_bufX;
-
-    // wait for fragment_nr == 0
-    int rcv_len;
-
-    rx_packet = alloca(mtu);
-    dataX = rx_packet + sizeof(jacknet_packet_header);
-
-    fragment_payload_size = mtu - sizeof(jacknet_packet_header);
-
-    pkthdr = (jacknet_packet_header *)rx_packet;
-
-    packet_bufX = packet_buf + sizeof(jacknet_packet_header);
-
-    fragment_number = (pkt_size - sizeof(jacknet_packet_header) - 1) / fragment_payload_size + 1;
-    fragment_array = alloca(fragment_number);
-    for (i = 0; i < fragment_number; i++)
-        fragment_array[i] = 0;
-
-    if (pkt_size <= mtu) {
-        return recv(sockfd, packet_buf, pkt_size, flags);
-    } else {
-rx_again:
-        rcv_len = recv(sockfd, rx_packet, mtu, flags);
-        if (rcv_len < 0)
-            return rcv_len;
-
-        if (rcv_len >= sizeof(jacknet_packet_header)) {
-            if ((ntohl(pkthdr->fragment_nr)) != 0)
-                goto rx_again;
-        } else {
-            goto rx_again;
-        }
-
-        // ok... we have read a fragement 0;
-        // copy the data into the packet buffer...
-        memcpy(packet_buf, rx_packet, mtu);
-
-        rx_frag_count = 1;
-        framenum = ntohl(pkthdr->framecnt);
-
-        fragment_array[0] = 1;
-
-        while (rx_frag_count < fragment_number) {
-
-            rcv_len = recv(sockfd, rx_packet, mtu, flags);
-            if (rcv_len < 0)
-                return -1;
-///////////////////
-            if (ntohl(pkthdr->framecnt) < framenum) {
-                //printf("Out of Order Framecnt: i abort on this packet\n");
-                printf("Old Fragment !!! (got: %d, exp: %d)\n", ntohl(pkthdr->framecnt),  framenum);
-                continue;
-            }
-
-#if 0
-            if (ntohl(pkthdr->framecnt) > framenum) {
-                printf("Newer Fragment !!! (got: %d, exp: %d) Switching to new Packet.\n", ntohl(pkthdr->framecnt),  framenum);
-                // Copy the new Packetheader up Front
-                memcpy(packet_buf, rx_packet, sizeof(jacknet_packet_header));
-
-                rx_frag_count = 0;
-                framenum = ntohl(pkthdr->framecnt);
-            }
-#endif
-            if (ntohl(pkthdr->framecnt) > framenum) {
-                printf("Newer Fragment !!! (got: %d, exp: %d) Dropping it\n", ntohl(pkthdr->framecnt),  framenum);
-                continue;
-            }
-
-/////////////////////////////////
-//
-            // copy the payload into the packet buffer...
-            if ((ntohl(pkthdr->fragment_nr) < fragment_number) && (ntohl(pkthdr->fragment_nr) >= 0)) {
-                if ((ntohl(pkthdr->fragment_nr) * fragment_payload_size + rcv_len - sizeof(jacknet_packet_header)) <= (pkt_size - sizeof(jacknet_packet_header))) {
-                    memcpy(packet_bufX + (ntohl(pkthdr->fragment_nr) * fragment_payload_size), dataX, rcv_len - sizeof(jacknet_packet_header));
-                    rx_frag_count++;
-                } else {
-                    printf("too long packet received...");
-                }
-            }
-        }
-    }
-    return pkt_size;
-}
-#endif
-
-void netjack_sendto(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, int addr_size, int mtu)
+void
+netjack_sendto (int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, int addr_size, int mtu)
 {
     int frag_cnt = 0;
     char *tx_packet, *dataX;
     jacknet_packet_header *pkthdr;
 
-    tx_packet = alloca(mtu + 10);
-    dataX = tx_packet + sizeof(jacknet_packet_header);
-    pkthdr = (jacknet_packet_header *)tx_packet;
+    tx_packet = alloca (mtu + 10);
+    dataX = tx_packet + sizeof (jacknet_packet_header);
+    pkthdr = (jacknet_packet_header *) tx_packet;
 
-    int fragment_payload_size = mtu - sizeof(jacknet_packet_header);
+    int fragment_payload_size = mtu - sizeof (jacknet_packet_header);
 
-    if (pkt_size <= mtu) {
+    if (pkt_size <= mtu)
         sendto(sockfd, packet_buf, pkt_size, flags, addr, addr_size);
-    } else {
-
+    else
+    {
         // Copy the packet header to the tx pack first.
-        memcpy(tx_packet, packet_buf, sizeof(jacknet_packet_header));
+        memcpy(tx_packet, packet_buf, sizeof (jacknet_packet_header));
 
         // Now loop and send all
-        char *packet_bufX = packet_buf + sizeof(jacknet_packet_header);
+        char *packet_bufX = packet_buf + sizeof (jacknet_packet_header);
 
-        while (packet_bufX < (packet_buf + pkt_size - fragment_payload_size)) {
-            pkthdr->fragment_nr = htonl(frag_cnt++);
-            memcpy(dataX, packet_bufX, fragment_payload_size);
-            sendto(sockfd, tx_packet, mtu, flags, addr, addr_size);
+        while (packet_bufX < (packet_buf + pkt_size - fragment_payload_size))
+        {
+            pkthdr->fragment_nr = htonl (frag_cnt++);
+            memcpy (dataX, packet_bufX, fragment_payload_size);
+            sendto (sockfd, tx_packet, mtu, flags, addr, addr_size);
             packet_bufX += fragment_payload_size;
         }
 
         int last_payload_size = packet_buf + pkt_size - packet_bufX;
-        memcpy(dataX, packet_bufX, last_payload_size);
-        pkthdr->fragment_nr = htonl(frag_cnt);
+        memcpy (dataX, packet_bufX, last_payload_size);
+        pkthdr->fragment_nr = htonl (frag_cnt);
         //jack_error("last fragment_count = %d, payload_size = %d\n", fragment_count, last_payload_size);
 
         // sendto(last_pack_size);
@@ -567,59 +387,67 @@ void netjack_sendto(int sockfd, char *packet_buf, int pkt_size, int flags, struc
     }
 }
 
-void decode_midi_buffer(uint32_t *buffer_uint32, unsigned int buffer_size_uint32, jack_default_audio_sample_t* buf) {
+void
+decode_midi_buffer (uint32_t *buffer_uint32, unsigned int buffer_size_uint32, jack_default_audio_sample_t* buf)
+{
     int i;
-    jack_midi_clear_buffer(buf);
-    for (i = 0; i < buffer_size_uint32-3;) {
+    jack_midi_clear_buffer (buf);
+    for (i = 0; i < buffer_size_uint32 - 3;)
+    {
         uint32_t payload_size;
         payload_size = buffer_uint32[i];
-        payload_size = ntohl(payload_size);
-        if(payload_size) {
+        payload_size = ntohl (payload_size);
+        if (payload_size)
+        {
             jack_midi_event_t event;
-            event.time = ntohl(buffer_uint32[i+1]);
-            event.size = ntohl(buffer_uint32[i+2]);
-            event.buffer = (jack_midi_data_t*)(&(buffer_uint32[i+3]));
-            jack_midi_event_write(buf, event.time, event.buffer, event.size);
+            event.time = ntohl (buffer_uint32[i+1]);
+            event.size = ntohl (buffer_uint32[i+2]);
+            event.buffer = (jack_midi_data_t*) (&(buffer_uint32[i+3]));
+            jack_midi_event_write (buf, event.time, event.buffer, event.size);
 
             // skip to the next event
             unsigned int nb_data_quads = (((event.size-1) & ~0x3) >> 2)+1;
             i += 3+nb_data_quads;
-        } else {
-            // no events can follow an empty event, we're done
-            break;
         }
+        else
+            break; // no events can follow an empty event, we're done
     }
 }
 
-void encode_midi_buffer(uint32_t *buffer_uint32, unsigned int buffer_size_uint32, jack_default_audio_sample_t* buf)
+void
+encode_midi_buffer (uint32_t *buffer_uint32, unsigned int buffer_size_uint32, jack_default_audio_sample_t* buf)
 {
     int i;
     unsigned int written = 0;
     // midi port, encode midi events
-    unsigned int nevents = jack_midi_get_event_count(buf);
-    for (i=0; i<nevents; ++i) {
+    unsigned int nevents = jack_midi_get_event_count (buf);
+    for (i = 0; i < nevents; ++i)
+    {
         jack_midi_event_t event;
-        jack_midi_event_get(&event, buf, i);
-        unsigned int nb_data_quads = (((event.size-1) & ~0x3) >> 2)+1;
-        unsigned int payload_size = 3+nb_data_quads;
+        jack_midi_event_get (&event, buf, i);
+        unsigned int nb_data_quads = (((event.size - 1) & ~0x3) >> 2) + 1;
+        unsigned int payload_size = 3 + nb_data_quads;
         // only write if we have sufficient space for the event
         // otherwise drop it
-        if(written + payload_size < buffer_size_uint32 - 1) {
+        if (written + payload_size < buffer_size_uint32 - 1)
+        {
             // write header
-            buffer_uint32[written]=htonl(payload_size);
+            buffer_uint32[written]=htonl (payload_size);
             written++;
-            buffer_uint32[written]=htonl(event.time);
+            buffer_uint32[written]=htonl (event.time);
             written++;
-            buffer_uint32[written]=htonl(event.size);
+            buffer_uint32[written]=htonl (event.size);
             written++;
 
             // write data
             jack_midi_data_t* tmpbuff = (jack_midi_data_t*)(&(buffer_uint32[written]));
-            memcpy(tmpbuff, event.buffer, event.size);
+            memcpy (tmpbuff, event.buffer, event.size);
             written += nb_data_quads;
-        } else {
+        }
+        else
+        {
             // buffer overflow
-            jack_error("midi buffer overflow");
+            jack_error ("midi buffer overflow");
             break;
         }
     }
@@ -628,7 +456,8 @@ void encode_midi_buffer(uint32_t *buffer_uint32, unsigned int buffer_size_uint32
 }
 
 // render functions for float
-void render_payload_to_jack_ports_float( void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
+void
+render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
 {
     channel_t chn = 0;
     JSList *node = capture_ports;
@@ -636,7 +465,8 @@ void render_payload_to_jack_ports_float( void *packet_payload, jack_nframes_t ne
 
     uint32_t *packet_bufX = (uint32_t *)packet_payload;
 
-    while (node != NULL) {
+    while (node != NULL)
+    {
         int i;
         int_float_t val;
         SRC_DATA src;
@@ -644,17 +474,20 @@ void render_payload_to_jack_ports_float( void *packet_payload, jack_nframes_t ne
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
-        const char *porttype = jack_port_type(port);
+        const char *porttype = jack_port_type (port);
 
-        if (strncmp(porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+        if (strncmp (porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
+        {
             // audio port, resample if necessary
-            if (net_period_down != nframes) {
+            if (net_period_down != nframes)
+            {
                 SRC_STATE *src_state = src_node->data;
-                for (i = 0; i < net_period_down; i++) {
-                    packet_bufX[i] = ntohl(packet_bufX[i]);
+                for (i = 0; i < net_period_down; i++)
+                {
+                    packet_bufX[i] = ntohl (packet_bufX[i]);
                 }
     
-                src.data_in = (float *)packet_bufX;
+                src.data_in = (float *) packet_bufX;
                 src.input_frames = net_period_down;
     
                 src.data_out = buf;
@@ -663,22 +496,27 @@ void render_payload_to_jack_ports_float( void *packet_payload, jack_nframes_t ne
                 src.src_ratio = (float) nframes / (float) net_period_down;
                 src.end_of_input = 0;
     
-                src_set_ratio(src_state, src.src_ratio);
-                src_process(src_state, &src);
+                src_set_ratio (src_state, src.src_ratio);
+                src_process (src_state, &src);
                 src_node = jack_slist_next (src_node);
-            } else {
-                for (i = 0; i < net_period_down; i++) {
+            }
+            else
+            {
+                for (i = 0; i < net_period_down; i++)
+                {
                     val.i = packet_bufX[i];
-                    val.i = ntohl(val.i);
+                    val.i = ntohl (val.i);
                     buf[i] = val.f;
                 }
             }
-        } else if (strncmp(porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+        }
+        else if (strncmp (porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
+        {
             // midi port, decode midi events
             // convert the data buffer to a standard format (uint32_t based)
             unsigned int buffer_size_uint32 = net_period_down;
             uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
-            decode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
+            decode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
         }
         packet_bufX = (packet_bufX + net_period_down);
         node = jack_slist_next (node);
@@ -686,24 +524,27 @@ void render_payload_to_jack_ports_float( void *packet_payload, jack_nframes_t ne
     }
 }
 
-void render_jack_ports_to_payload_float(JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
+void
+render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
 {
     channel_t chn = 0;
     JSList *node = playback_ports;
     JSList *src_node = playback_srcs;
 
-    uint32_t *packet_bufX = (uint32_t *)packet_payload;
+    uint32_t *packet_bufX = (uint32_t *) packet_payload;
 
-    while (node != NULL) {
+    while (node != NULL)
+    {
         SRC_DATA src;
         int i;
         int_float_t val;
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
-        const char *porttype = jack_port_type(port);
+        const char *porttype = jack_port_type (port);
 
-        if (strncmp(porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+        if (strncmp (porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
+        {
             // audio port, resample if necessary
     
             if (net_period_up != nframes) {
@@ -717,26 +558,32 @@ void render_jack_ports_to_payload_float(JSList *playback_ports, JSList *playback
                 src.src_ratio = (float) net_period_up / (float) nframes;
                 src.end_of_input = 0;
     
-                src_set_ratio(src_state, src.src_ratio);
-                src_process(src_state, &src);
+                src_set_ratio (src_state, src.src_ratio);
+                src_process (src_state, &src);
     
-                for (i = 0; i < net_period_up; i++) {
-                    packet_bufX[i] = htonl(packet_bufX[i]);
+                for (i = 0; i < net_period_up; i++)
+                {
+                    packet_bufX[i] = htonl (packet_bufX[i]);
                 }
                 src_node = jack_slist_next (src_node);
-            } else {
-                for (i = 0; i < net_period_up; i++) {
+            }
+            else
+            {
+                for (i = 0; i < net_period_up; i++)
+                {
                     val.f = buf[i];
-                    val.i = htonl(val.i);
+                    val.i = htonl (val.i);
                     packet_bufX[i] = val.i;
                 }
             }
-        } else if (strncmp(porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+        }
+        else if (strncmp(porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
+        {
             // encode midi events from port to packet
             // convert the data buffer to a standard format (uint32_t based)
             unsigned int buffer_size_uint32 = net_period_up;
-            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
-            encode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
+            uint32_t * buffer_uint32 = (uint32_t*) packet_bufX;
+            encode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
         }
         packet_bufX = (packet_bufX + net_period_up);
         node = jack_slist_next (node);
@@ -745,7 +592,8 @@ void render_jack_ports_to_payload_float(JSList *playback_ports, JSList *playback
 }
 
 // render functions for 16bit
-void render_payload_to_jack_ports_16bit(void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
+void
+render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
 {
     channel_t chn = 0;
     JSList *node = capture_ports;
@@ -753,7 +601,8 @@ void render_payload_to_jack_ports_16bit(void *packet_payload, jack_nframes_t net
 
     uint16_t *packet_bufX = (uint16_t *)packet_payload;
 
-    while (node != NULL) {
+    while (node != NULL)
+    {
         int i;
         //uint32_t val;
         SRC_DATA src;
@@ -761,15 +610,18 @@ void render_payload_to_jack_ports_16bit(void *packet_payload, jack_nframes_t net
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
-        float *floatbuf = alloca(sizeof(float) * net_period_down);
-        const char *portname = jack_port_type(port);
+        float *floatbuf = alloca (sizeof(float) * net_period_down);
+        const char *portname = jack_port_type (port);
 
-        if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+        if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
+        {
             // audio port, resample if necessary
     
-            if (net_period_down != nframes) {
+            if (net_period_down != nframes)
+            {
                 SRC_STATE *src_state = src_node->data;
-                for (i = 0; i < net_period_down; i++) {
+                for (i = 0; i < net_period_down; i++)
+                {
                     floatbuf[i] = ((float) ntohs(packet_bufX[i])) / 32767.0 - 1.0;
                 }
     
@@ -782,20 +634,21 @@ void render_payload_to_jack_ports_16bit(void *packet_payload, jack_nframes_t net
                 src.src_ratio = (float) nframes / (float) net_period_down;
                 src.end_of_input = 0;
     
-                src_set_ratio(src_state, src.src_ratio);
-                src_process(src_state, &src);
+                src_set_ratio (src_state, src.src_ratio);
+                src_process (src_state, &src);
                 src_node = jack_slist_next (src_node);
-            } else {
-                for (i = 0; i < net_period_down; i++) {
-                    buf[i] = ((float) ntohs(packet_bufX[i])) / 32768.0 - 1.0;
-                }
             }
-        } else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+            else
+                for (i = 0; i < net_period_down; i++)
+                    buf[i] = ((float) ntohs (packet_bufX[i])) / 32768.0 - 1.0;
+        }
+        else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
+        {
             // midi port, decode midi events
             // convert the data buffer to a standard format (uint32_t based)
-            unsigned int buffer_size_uint32 = net_period_down/2;
-            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
-            decode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
+            unsigned int buffer_size_uint32 = net_period_down / 2;
+            uint32_t * buffer_uint32 = (uint32_t*) packet_bufX;
+            decode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
         }
         packet_bufX = (packet_bufX + net_period_down);
         node = jack_slist_next (node);
@@ -803,7 +656,8 @@ void render_payload_to_jack_ports_16bit(void *packet_payload, jack_nframes_t net
     }
 }
 
-void render_jack_ports_to_payload_16bit(JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
+void
+render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
 {
     channel_t chn = 0;
     JSList *node = playback_ports;
@@ -811,20 +665,23 @@ void render_jack_ports_to_payload_16bit(JSList *playback_ports, JSList *playback
 
     uint16_t *packet_bufX = (uint16_t *)packet_payload;
 
-    while (node != NULL) {
+    while (node != NULL)
+    {
         SRC_DATA src;
         int i;
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
-        const char *portname = jack_port_type(port);
+        const char *portname = jack_port_type (port);
 
-        if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+        if (strncmp (portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
+        {
             // audio port, resample if necessary
     
-            if (net_period_up != nframes) {
+            if (net_period_up != nframes)
+            {
                 SRC_STATE *src_state = src_node->data;
     
-                float *floatbuf = alloca(sizeof(float) * net_period_up);
+                float *floatbuf = alloca (sizeof(float) * net_period_up);
     
                 src.data_in = buf;
                 src.input_frames = nframes;
@@ -835,24 +692,26 @@ void render_jack_ports_to_payload_16bit(JSList *playback_ports, JSList *playback
                 src.src_ratio = (float) net_period_up / (float) nframes;
                 src.end_of_input = 0;
     
-                src_set_ratio(src_state, src.src_ratio);
-                src_process(src_state, &src);
+                src_set_ratio (src_state, src.src_ratio);
+                src_process (src_state, &src);
     
-                for (i = 0; i < net_period_up; i++) {
-                    packet_bufX[i] = htons((floatbuf[i] + 1.0) * 32767.0);
+                for (i = 0; i < net_period_up; i++)
+                {
+                    packet_bufX[i] = htons ((floatbuf[i] + 1.0) * 32767.0);
                 }
                 src_node = jack_slist_next (src_node);
-            } else {
-                for (i = 0; i < net_period_up; i++) {
-                    packet_bufX[i] = htons((buf[i] + 1.0) * 32767.0);
-                }
             }
-        } else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+            else
+                for (i = 0; i < net_period_up; i++)
+                    packet_bufX[i] = htons((buf[i] + 1.0) * 32767.0);
+        }
+        else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
+        {
             // encode midi events from port to packet
             // convert the data buffer to a standard format (uint32_t based)
-            unsigned int buffer_size_uint32 = net_period_up/2;
-            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
-            encode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
+            unsigned int buffer_size_uint32 = net_period_up / 2;
+            uint32_t * buffer_uint32 = (uint32_t*) packet_bufX;
+            encode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
         }
         packet_bufX = (packet_bufX + net_period_up);
         node = jack_slist_next (node);
@@ -861,7 +720,8 @@ void render_jack_ports_to_payload_16bit(JSList *playback_ports, JSList *playback
 }
 
 // render functions for 8bit
-void render_payload_to_jack_ports_8bit(void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
+void
+render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
 {
     channel_t chn = 0;
     JSList *node = capture_ports;
@@ -869,7 +729,8 @@ void render_payload_to_jack_ports_8bit(void *packet_payload, jack_nframes_t net_
 
     int8_t *packet_bufX = (int8_t *)packet_payload;
 
-    while (node != NULL) {
+    while (node != NULL)
+    {
         int i;
         //uint32_t val;
         SRC_DATA src;
@@ -877,17 +738,18 @@ void render_payload_to_jack_ports_8bit(void *packet_payload, jack_nframes_t net_
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
-        float *floatbuf = alloca(sizeof(float) * net_period_down);
-        const char *portname = jack_port_type(port);
+        float *floatbuf = alloca (sizeof (float) * net_period_down);
+        const char *portname = jack_port_type (port);
 
-        if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+        if (strncmp (portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
+        {
             // audio port, resample if necessary
     
-            if (net_period_down != nframes) {
+            if (net_period_down != nframes)
+            {
                 SRC_STATE *src_state = src_node->data;
-                for (i = 0; i < net_period_down; i++) {
+                for (i = 0; i < net_period_down; i++)
                     floatbuf[i] = ((float) packet_bufX[i]) / 127.0;
-                }
     
                 src.data_in = floatbuf;
                 src.input_frames = net_period_down;
@@ -898,20 +760,21 @@ void render_payload_to_jack_ports_8bit(void *packet_payload, jack_nframes_t net_
                 src.src_ratio = (float) nframes / (float) net_period_down;
                 src.end_of_input = 0;
     
-                src_set_ratio(src_state, src.src_ratio);
-                src_process(src_state, &src);
+                src_set_ratio (src_state, src.src_ratio);
+                src_process (src_state, &src);
                 src_node = jack_slist_next (src_node);
-            } else {
-                for (i = 0; i < net_period_down; i++) {
-                    buf[i] = ((float) packet_bufX[i]) / 127.0;
-                }
             }
-        } else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+            else
+                for (i = 0; i < net_period_down; i++)
+                    buf[i] = ((float) packet_bufX[i]) / 127.0;
+        }
+        else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
+        {
             // midi port, decode midi events
             // convert the data buffer to a standard format (uint32_t based)
-            unsigned int buffer_size_uint32 = net_period_down/2;
-            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
-            decode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
+            unsigned int buffer_size_uint32 = net_period_down / 2;
+            uint32_t * buffer_uint32 = (uint32_t*) packet_bufX;
+            decode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
         }
         packet_bufX = (packet_bufX + net_period_down);
         node = jack_slist_next (node);
@@ -919,7 +782,8 @@ void render_payload_to_jack_ports_8bit(void *packet_payload, jack_nframes_t net_
     }
 }
 
-void render_jack_ports_to_payload_8bit(JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
+void
+render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
 {
     channel_t chn = 0;
     JSList *node = playback_ports;
@@ -927,20 +791,23 @@ void render_jack_ports_to_payload_8bit(JSList *playback_ports, JSList *playback_
 
     int8_t *packet_bufX = (int8_t *)packet_payload;
 
-    while (node != NULL) {
+    while (node != NULL)
+    {
         SRC_DATA src;
         int i;
         jack_port_t *port = (jack_port_t *) node->data;
 
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
-        const char *portname = jack_port_type(port);
+        const char *portname = jack_port_type (port);
 
-        if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0) {
+        if (strncmp (portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
+        {
             // audio port, resample if necessary
-            if (net_period_up != nframes) {
+            if (net_period_up != nframes)
+            {
                 SRC_STATE *src_state = src_node->data;
     
-                float *floatbuf = alloca(sizeof(float) * net_period_up);
+                float *floatbuf = alloca (sizeof (float) * net_period_up);
     
                 src.data_in = buf;
                 src.input_frames = nframes;
@@ -951,24 +818,24 @@ void render_jack_ports_to_payload_8bit(JSList *playback_ports, JSList *playback_
                 src.src_ratio = (float) net_period_up / (float) nframes;
                 src.end_of_input = 0;
     
-                src_set_ratio(src_state, src.src_ratio);
-                src_process(src_state, &src);
+                src_set_ratio (src_state, src.src_ratio);
+                src_process (src_state, &src);
     
-                for (i = 0; i < net_period_up; i++) {
+                for (i = 0; i < net_period_up; i++)
                     packet_bufX[i] = floatbuf[i] * 127.0;
-                }
                 src_node = jack_slist_next (src_node);
-            } else {
-                for (i = 0; i < net_period_up; i++) {
-                    packet_bufX[i] = buf[i] * 127.0;
-                }
             }
-        } else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0) {
+            else
+                for (i = 0; i < net_period_up; i++)
+                    packet_bufX[i] = buf[i] * 127.0;
+        }
+        else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
+        {
             // encode midi events from port to packet
             // convert the data buffer to a standard format (uint32_t based)
-            unsigned int buffer_size_uint32 = net_period_up/4;
-            uint32_t * buffer_uint32 = (uint32_t*)packet_bufX;
-            encode_midi_buffer(buffer_uint32, buffer_size_uint32, buf);
+            unsigned int buffer_size_uint32 = net_period_up / 4;
+            uint32_t * buffer_uint32 = (uint32_t*) packet_bufX;
+            encode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
         }
         packet_bufX = (packet_bufX + net_period_up);
         node = jack_slist_next (node);
@@ -976,23 +843,25 @@ void render_jack_ports_to_payload_8bit(JSList *playback_ports, JSList *playback_
     }
 }
 
-// wrapper functions with bitdepth argument...
-void render_payload_to_jack_ports(int bitdepth, void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
+/* Wrapper functions with bitdepth argument... */
+void
+render_payload_to_jack_ports (int bitdepth, void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
 {
     if (bitdepth == 8)
-        render_payload_to_jack_ports_8bit(packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
+        render_payload_to_jack_ports_8bit (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
     else if (bitdepth == 16)
-        render_payload_to_jack_ports_16bit(packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
+        render_payload_to_jack_ports_16bit (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
     else
-        render_payload_to_jack_ports_float(packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
+        render_payload_to_jack_ports_float (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
 }
 
-void render_jack_ports_to_payload (int bitdepth, JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
+void
+render_jack_ports_to_payload (int bitdepth, JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
 {
     if (bitdepth == 8)
-        render_jack_ports_to_payload_8bit(playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
+        render_jack_ports_to_payload_8bit (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
     else if (bitdepth == 16)
-        render_jack_ports_to_payload_16bit(playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
+        render_jack_ports_to_payload_16bit (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
     else
-        render_jack_ports_to_payload_float(playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
+        render_jack_ports_to_payload_float (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
 }
