@@ -43,6 +43,7 @@
 #include <netinet/in.h>
 #include <poll.h>
 #include <errno.h>
+#include <signal.h>
 
 #include <samplerate.h>
 
@@ -303,14 +304,27 @@ netjack_poll (int sockfd, int timeout)
 {
     struct pollfd fds;
     int poll_err = 0;
+    sigset_t sigmask, rsigmask;
+
+    sigemptyset(&sigmask);
+	sigaddset(&sigmask, SIGHUP);
+	sigaddset(&sigmask, SIGINT);
+	sigaddset(&sigmask, SIGQUIT);
+	sigaddset(&sigmask, SIGPIPE);
+	sigaddset(&sigmask, SIGTERM);
+	sigaddset(&sigmask, SIGUSR1);
+	sigaddset(&sigmask, SIGUSR2);
 
     fds.fd = sockfd;
     fds.events = POLLIN;
 
+    sigprocmask(SIG_UNBLOCK, &sigmask, &rsigmask);
     while (poll_err == 0)
     {
         poll_err = poll (&fds, 1, timeout);
     }
+    sigprocmask(SIG_SETMASK, &rsigmask, NULL);
+
     if (poll_err == -1)
     {
         switch (errno)

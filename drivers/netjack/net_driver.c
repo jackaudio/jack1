@@ -32,7 +32,6 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 #include <errno.h>
 #include <stdarg.h>
 #include <sys/mman.h>
-#include <sys/poll.h>
 
 #include <jack/types.h>
 #include <jack/engine.h>
@@ -41,9 +40,6 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <errno.h>
-#include <signal.h>
-#include <poll.h>
 
 #include <samplerate.h>
 
@@ -437,12 +433,10 @@ net_driver_new (jack_client_t * client,
                 unsigned int bitdepth)
 {
     net_driver_t * driver;
+    int first_pack_len, rx_bufsize;
     struct sockaddr_in address;
-    struct pollfd fds;
-    sigset_t sigmask, rsigmask;
-    int poll_err = 0;
 
-    jack_info("creating net driver ... %s|%" PRIu32 "|%" PRIu32
+    jack_info ("creating net driver ... %s|%" PRIu32 "|%" PRIu32
             "|%u|%u|%u|transport_sync:%u", name, sample_rate, period_size, listen_port,
             capture_ports, playback_ports, transport_sync);
 
@@ -481,8 +475,9 @@ net_driver_new (jack_client_t * client,
     driver->client = client;
     driver->engine = NULL;
 
-    if ((bitdepth != 0) && (bitdepth != 8) && (bitdepth != 16)) {
-        jack_info("Invalid bitdepth: %d (8,16 or 0 for float) !!!", bitdepth);
+    if ((bitdepth != 0) && (bitdepth != 8) && (bitdepth != 16))
+    {
+        jack_info ("Invalid bitdepth: %d (8, 16 or 0 for float) !!!", bitdepth);
         return NULL;
     }
     driver->bitdepth = bitdepth;
@@ -492,120 +487,108 @@ net_driver_new (jack_client_t * client,
         resample_factor_up = resample_factor;
 
     // Now open the socket, and wait for the first packet to arrive...
-    driver->sockfd = socket(PF_INET, SOCK_DGRAM, 0);
-    if (driver->sockfd == -1) {
-        jack_info("socket error");
+    driver->sockfd = socket (PF_INET, SOCK_DGRAM, 0);
+    if (driver->sockfd == -1)
+    {
+        jack_info ("socket error");
         return NULL;
     }
     address.sin_family = AF_INET;
     address.sin_port = htons(driver->listen_port);
     address.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(driver->sockfd, (struct sockaddr *) &address, sizeof(address)) < 0) {
+    if (bind (driver->sockfd, (struct sockaddr *) &address, sizeof (address)) < 0)
+    {
         jack_info("bind error");
         return NULL;
     }
 
-    driver->outsockfd = socket(PF_INET, SOCK_DGRAM, 0);
-    if (driver->sockfd == -1) {
-        jack_info("socket error");
+    driver->outsockfd = socket (PF_INET, SOCK_DGRAM, 0);
+    if (driver->sockfd == -1)
+    {
+        jack_info ("socket error");
         return NULL;
     }
     driver->srcaddress_valid = 0;
 
-    jacknet_packet_header *first_packet = alloca(sizeof(jacknet_packet_header));
-    socklen_t address_size = sizeof(struct sockaddr_in);
+    jacknet_packet_header *first_packet = alloca (sizeof (jacknet_packet_header));
+    socklen_t address_size = sizeof (struct sockaddr_in);
 
-    jack_info("Waiting for an incoming packet !!!");
-    jack_info("*** IMPORTANT *** Dont connect a client to jackd until the driver is attached to a clock source !!!");
+    jack_info ("Waiting for an incoming packet !!!");
+    jack_info ("*** IMPORTANT *** Dont connect a client to jackd until the driver is attached to a clock source !!!");
 
-    fds.fd = driver->sockfd;
-    fds.events = POLLIN;
-    sigemptyset(&sigmask);
-    sigaddset(&sigmask, SIGINT);
-    sigaddset(&sigmask, SIGTERM);
-
-    sigprocmask (SIG_UNBLOCK, &sigmask, &rsigmask);
-    while (poll_err == 0)
-    {
-        poll_err = poll (&fds, 1, 500);
-    }
-    sigprocmask (SIG_SETMASK, &rsigmask, NULL);
-
-    if (poll_err == -1)
-    {
-        jack_error ("error %i: We did not or could not receive data...", errno);
-        return NULL;
-    }
+    if (netjack_poll (driver->sockfd, 500))
+        first_pack_len = recvfrom (driver->sockfd, first_packet, sizeof (jacknet_packet_header), 0, (struct sockaddr*) & driver->syncsource_address, &address_size);
     else
+        first_pack_len = 0;
+
+    driver->srcaddress_valid = 1;
+
+    driver->mtu = 0;
+
+    if (first_pack_len == sizeof (jacknet_packet_header))
     {
-        int first_pack_len = recvfrom (driver->sockfd, first_packet, sizeof (jacknet_packet_header), 0, (struct sockaddr*) & driver->syncsource_address, &address_size);
-        driver->srcaddress_valid = 1;
-        //jack_info ("first_pack_len=%d", first_pack_len);
-        // A packet is here.... If it wasnt the old trigger packet containing only 'x' evaluate the autoconf data...
+        packet_header_ntoh (first_packet);
 
-        driver->mtu = 0;
-
-        if (first_pack_len == sizeof(jacknet_packet_header)) {
-            packet_header_ntoh(first_packet);
-
-            jack_info("AutoConfig Override !!!");
-            if (driver->sample_rate != first_packet->sample_rate) {
-                jack_info("AutoConfig Override: sample_rate = %d", first_packet->sample_rate);
-                driver->sample_rate = first_packet->sample_rate;
-            }
-
-            if (driver->period_size != first_packet->period_size) {
-                jack_info("AutoConfig Override: period_size = %d", first_packet->period_size);
-                driver->period_size = first_packet->period_size;
-            }
-            // autoconfig channel counts
-            if (driver->capture_channels_audio != first_packet->capture_channels_audio) {
-                jack_info("AutoConfig Override: capture_channels_audio = %d", first_packet->capture_channels_audio);
-                driver->capture_channels_audio = first_packet->capture_channels_audio;
-            }
-            if (driver->capture_channels_midi != first_packet->capture_channels_midi) {
-                jack_info("AutoConfig Override: capture_channels_midi = %d", first_packet->capture_channels_midi);
-                driver->capture_channels_midi = first_packet->capture_channels_midi;
-            }
-            if (driver->playback_channels_audio != first_packet->playback_channels_audio) {
-                jack_info("AutoConfig Override: playback_channels_audio = %d", first_packet->playback_channels_audio);
-                driver->playback_channels_audio = first_packet->playback_channels_audio;
-            }
-            if (driver->playback_channels_midi != first_packet->playback_channels_midi) {
-                jack_info("AutoConfig Override: playback_channels_midi = %d", first_packet->playback_channels_midi);
-                driver->playback_channels_midi = first_packet->playback_channels_midi;
-            }
-            driver->capture_channels  = driver->capture_channels_audio + driver->capture_channels_midi;
-            driver->playback_channels = driver->playback_channels_audio + driver->playback_channels_midi;
-
-            driver->mtu = first_packet->mtu;
-            jack_info("mtu = %d", first_packet->mtu);
-            driver->latency = first_packet->latency;
+        jack_info ("AutoConfig Override !!!");
+        if (driver->sample_rate != first_packet->sample_rate)
+        {
+            jack_info ("AutoConfig Override: Master JACK sample rate = %d", first_packet->sample_rate);
+            driver->sample_rate = first_packet->sample_rate;
         }
 
-        // After possible Autoconfig: do all calculations...
-        driver->period_usecs =
-            (jack_time_t) floor ((((float) driver->period_size) / driver->sample_rate)
-                                 * 1000000.0f);
+        if (driver->period_size != first_packet->period_size)
+        {
+            jack_info ("AutoConfig Override: Master JACK period size is %d", first_packet->period_size);
+            driver->period_size = first_packet->period_size;
+        }
+        if (driver->capture_channels_audio != first_packet->capture_channels_audio)
+        {
+            jack_info ("AutoConfig Override: capture_channels_audio = %d", first_packet->capture_channels_audio);
+            driver->capture_channels_audio = first_packet->capture_channels_audio;
+        }
+        if (driver->capture_channels_midi != first_packet->capture_channels_midi)
+        {
+            jack_info ("AutoConfig Override: capture_channels_midi = %d", first_packet->capture_channels_midi);
+            driver->capture_channels_midi = first_packet->capture_channels_midi;
+        }
+        if (driver->playback_channels_audio != first_packet->playback_channels_audio)
+        {
+            jack_info ("AutoConfig Override: playback_channels_audio = %d", first_packet->playback_channels_audio);
+            driver->playback_channels_audio = first_packet->playback_channels_audio;
+        }
+        if (driver->playback_channels_midi != first_packet->playback_channels_midi)
+        {
+            jack_info ("AutoConfig Override: playback_channels_midi = %d", first_packet->playback_channels_midi);
+            driver->playback_channels_midi = first_packet->playback_channels_midi;
+        }
+        driver->capture_channels  = driver->capture_channels_audio + driver->capture_channels_midi;
+        driver->playback_channels = driver->playback_channels_audio + driver->playback_channels_midi;
 
-        driver->net_period_down = (float) driver->period_size / (float) resample_factor;
-        driver->net_period_up = (float) driver->period_size / (float) resample_factor_up;
-
-        driver->rx_buf = malloc(sizeof(jacknet_packet_header) + driver->net_period_down * driver->capture_channels * get_sample_size(driver->bitdepth));
-
-        // XXX: dont need it when packet size < mtu
-        driver->pkt_buf = malloc(sizeof(jacknet_packet_header) + driver->net_period_down * driver->capture_channels * get_sample_size(driver->bitdepth));
-
-        int rx_bufsize = sizeof(jacknet_packet_header) + driver->net_period_down * driver->capture_channels * get_sample_size(driver->bitdepth);
-        global_packcache = packet_cache_new(driver->latency + 5, rx_bufsize, driver->mtu);
-
-        jack_info("netjack: period   : up: %d / dn: %d", driver->net_period_up, driver->net_period_down);
-        jack_info("netjack: framerate: %d", driver->sample_rate);
-        jack_info("netjack: audio    : cap: %d / pbk: %d)", driver->capture_channels_audio, driver->playback_channels_audio);
-        jack_info("netjack: midi     : cap: %d / pbk: %d)", driver->capture_channels_midi, driver->playback_channels_midi);
-        jack_info("netjack: buffsize : rx: %d)", rx_bufsize);
-        return (jack_driver_t *) driver;
+        driver->mtu = first_packet->mtu;
+        jack_info ("MTU is set to %d bytes", first_packet->mtu);
+        driver->latency = first_packet->latency;
     }
+
+    // After possible Autoconfig: do all calculations...
+    driver->period_usecs =
+        (jack_time_t) floor ((((float) driver->period_size) / driver->sample_rate)
+                             * 1000000.0f);
+
+    driver->net_period_down = (float) driver->period_size / (float) resample_factor;
+    driver->net_period_up = (float) driver->period_size / (float) resample_factor_up;
+
+    /* TODO: this seems... useles */
+    rx_bufsize = sizeof (jacknet_packet_header) + driver->net_period_down * driver->capture_channels * get_sample_size (driver->bitdepth);
+    driver->rx_buf = malloc (rx_bufsize);
+    driver->pkt_buf = malloc (rx_bufsize);
+    global_packcache = packet_cache_new (driver->latency + 5, rx_bufsize, driver->mtu);
+
+    jack_info ("netjack: period   : up: %d / dn: %d", driver->net_period_up, driver->net_period_down);
+    jack_info ("netjack: framerate: %d", driver->sample_rate);
+    jack_info ("netjack: audio    : cap: %d / pbk: %d)", driver->capture_channels_audio, driver->playback_channels_audio);
+    jack_info ("netjack: midi     : cap: %d / pbk: %d)", driver->capture_channels_midi, driver->playback_channels_midi);
+    jack_info ("netjack: buffsize : rx: %d)", rx_bufsize);
+    return (jack_driver_t *) driver;
 }
 
 /* DRIVER "PLUGIN" INTERFACE */
