@@ -54,8 +54,10 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 
 static int sync_state = TRUE;
 static jack_transport_state_t last_transport_state;
-static int framecnt; // this is set upon reading a packet.
-// and will be written into the pkthdr of an outgoing packet.
+
+/* This is set upon reading a packetand will be
+ * written into the pkthdr of an outgoing packet */
+static int framecnt; 
 
 static int
 net_driver_sync_cb(jack_transport_state_t state, jack_position_t *pos, net_driver_t *driver)
@@ -72,8 +74,7 @@ net_driver_sync_cb(jack_transport_state_t state, jack_position_t *pos, net_drive
 }
 
 static jack_nframes_t
-net_driver_wait (net_driver_t *driver, int extra_fd, int *status,
-                 float *delayed_usecs)
+net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed_usecs)
 {
     // ok... we wait for a packet on the socket
     // TODO:
@@ -84,45 +85,28 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status,
     // on packet loss we should either detect an xrun or just continue running when we
     // think, that the sync source is not running anymore.
 
-#if 0
-    fd_set read_fds;
-    int res = 0;
-    while (res == 0) {
-        FD_ZERO(&read_fds);
-        FD_SET(driver->sockfd, &read_fds);
-        res = select(driver->sockfd + 1, &read_fds, NULL, NULL, NULL); // wait here until there is a packet to get
-    }
-#endif
+    socklen_t address_size = sizeof (struct sockaddr_in);
+    int bufsize, len;
+    jacknet_packet_header *pkthdr = (jacknet_packet_header *) driver->rx_buf;
+    
+    bufsize =  get_sample_size (driver->bitdepth) * driver->capture_channels * driver->net_period_down + sizeof (jacknet_packet_header);
 
-    socklen_t address_size = sizeof(struct sockaddr_in);
-
-    int bufsize =  get_sample_size(driver->bitdepth) * driver->capture_channels * driver->net_period_down + sizeof(jacknet_packet_header);
-
-    jacknet_packet_header *pkthdr = (jacknet_packet_header *)driver->rx_buf;
-
-rx_again:
-    if (!driver->srcaddress_valid) {
-        // XXX: Somthings really bad ;)
-        puts("!driver->srcaddress_valid");
-        return 0;
-    }
-    int len = netjack_recvfrom(driver->sockfd, (char *)driver->rx_buf, bufsize,
-                                MSG_WAITALL, (struct sockaddr*) & driver->syncsource_address, &address_size, driver->mtu);
-
-
-    if (len != bufsize) {
-        jack_info("wrong_packet_len: len=%d, expected=%d", len, bufsize);
-        goto rx_again;
+    if (netjack_poll (driver->sockfd, 500))
+        len = netjack_recvfrom (driver->sockfd, (char *)driver->rx_buf, bufsize, MSG_WAITALL, (struct sockaddr*) & driver->syncsource_address, &address_size, driver->mtu);
+    else
+        len = 0;
+    while (len != bufsize)
+    {
+        jack_error ("wrong_packet_len: len=%d, expected=%d", len, bufsize);
+        if (netjack_poll (driver->sockfd, 500))
+            len = netjack_recvfrom (driver->sockfd, (char *)driver->rx_buf, bufsize, MSG_WAITALL, (struct sockaddr*) & driver->syncsource_address, &address_size, driver->mtu);
+        else
+            len = 0;
     }
 
-    packet_header_ntoh(pkthdr);
-
-    //driver->srcaddress_valid = 0;
-
+    packet_header_ntoh (pkthdr);
     driver->last_wait_ust = jack_get_microseconds ();
-    driver->engine->transport_cycle_start (driver->engine,
-                                           driver->last_wait_ust);
-
+    driver->engine->transport_cycle_start (driver->engine, driver->last_wait_ust);
     /* this driver doesn't work so well if we report a delay */
     *delayed_usecs = 0;		/* lie about it */
     *status = 0;

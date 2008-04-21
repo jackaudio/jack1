@@ -41,6 +41,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <poll.h>
+#include <errno.h>
 
 #include <samplerate.h>
 
@@ -296,8 +298,45 @@ cache_packet_is_complete (cache_packet *pack)
     return TRUE;
 }
 
-// fragmented packet IO
+int
+netjack_poll (int sockfd, int timeout)
+{
+    struct pollfd fds;
+    int poll_err = 0;
 
+    fds.fd = sockfd;
+    fds.events = POLLIN;
+
+    while (poll_err == 0)
+    {
+        poll_err = poll (&fds, 1, timeout);
+    }
+    if (poll_err == -1)
+    {
+        switch (errno)
+        {
+            case EBADF:
+            jack_error ("Error %d: An invalid file descriptor was given in one of the sets", errno);
+            break;
+            case EFAULT:
+            jack_error ("Error %d: The array given as argument was not contained in the calling program's address space", errno);
+            break;
+            case EINTR:
+            jack_error ("Error %d: A signal occurred before any requested event", errno);
+            break;
+            case EINVAL:
+            jack_error ("Error %d: The nfds value exceeds the RLIMIT_NOFILE value", errno);
+            break;
+            case ENOMEM:
+            jack_error ("Error %d: There was no space to allocate file descriptor tables", errno);
+            break;
+        }
+        return FALSE;
+    }
+    return TRUE;
+}
+
+// fragmented packet IO
 int
 netjack_recvfrom (int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu)
 {

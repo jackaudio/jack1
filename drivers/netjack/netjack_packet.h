@@ -108,7 +108,7 @@ void	cache_packet_add_fragment(cache_packet *pack, char *packet_buf, int rcv_len
 int		cache_packet_is_complete(cache_packet *pack);
 
 // Function Prototypes
-
+int netjack_poll(int sockfd, int timeout);
 void netjack_sendto(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, int addr_size, int mtu);
 int netjack_recvfrom(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu);
 int netjack_recv(int sockfd, char *packet_buf, int pkt_size, int flags, int mtu);
