@@ -908,11 +908,14 @@ static void *
 jack_watchdog_thread (void *arg)
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
-
+    struct timespec timo;
+    
+    timo.tv_sec = JACKD_WATCHDOG_TIMEOUT / 1000;
+    timo.tv_nsec = (JACKD_WATCHDOG_TIMEOUT - (timo.tv_sec * 1000)) * 1000;
 	engine->watchdog_check = 0;
 
 	while (1) {
-		usleep (1000 * JACKD_WATCHDOG_TIMEOUT);
+        nanosleep (&timo, NULL);
 		if (!engine->freewheeling && engine->watchdog_check == 0) {
 
 			jack_error ("jackd watchdog: timeout - killing jackd");
