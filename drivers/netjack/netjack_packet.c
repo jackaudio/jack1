@@ -303,8 +303,9 @@ int
 netjack_poll (int sockfd, int timeout)
 {
     struct pollfd fds;
-    int poll_err = 0;
+    int i, poll_err = 0;
     sigset_t sigmask, rsigmask;
+    struct sigaction action;
 
     sigemptyset(&sigmask);
 	sigaddset(&sigmask, SIGHUP);
@@ -314,6 +315,14 @@ netjack_poll (int sockfd, int timeout)
 	sigaddset(&sigmask, SIGTERM);
 	sigaddset(&sigmask, SIGUSR1);
 	sigaddset(&sigmask, SIGUSR2);
+	
+	action.sa_handler = SIG_DFL;
+	action.sa_mask = sigmask;
+	action.sa_flags = SA_RESTART;
+
+    for (i = 1; i < NSIG; i++)
+        if (sigismember (&sigmask, i))
+            sigaction (i, &action, 0);
 
     fds.fd = sockfd;
     fds.events = POLLIN;
