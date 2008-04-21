@@ -175,10 +175,7 @@ sun_driver_write_silence (sun_driver_t *driver, jack_nframes_t nframes)
 		return;
 	}
 
-	printf("sun_driver: writing %ld bytes of silence: "
-		"nframes = %ld, bits = %d, channels = %d\n",
-		(long)localsize, (long)nframes, driver->bits,
-		driver->playback_channels);
+	printf("sun_driver: writing %ld frames of silence\n", (long)nframes);
 
 	bzero(localbuf, localsize);
 	io_res = write(driver->outfd, localbuf, localsize);
@@ -208,10 +205,7 @@ sun_driver_read_silence (sun_driver_t *driver, jack_nframes_t nframes)
 		return;
 	}
 
-	printf("sun_driver: reading %ld bytes of silence: "
-		"nframes = %ld, bits = %d, channels = %d\n",
-		(long)localsize, (long)nframes, driver->bits,
-		driver->capture_channels);
+	printf("sun_driver: reading %ld frames of silence\n", (long)nframes);
 
 	io_res = read(driver->infd, localbuf, localsize);
 	if (io_res < (ssize_t) localsize)
@@ -232,14 +226,12 @@ sun_driver_wait (sun_driver_t *driver, int *status, float *iodelay)
 	float delay;
 	jack_time_t poll_enter;
 	jack_time_t poll_ret = 0;
-	int capture_avail = 0;
-	int playback_avail = 0;
 	int need_capture = 0;
 	int need_playback = 0;
 	int capture_errors = 0;
 	int playback_errors = 0;
 
-	*status = 0;
+	*status = -1;
 	*iodelay = 0;
 
 	if (driver->infd >= 0)
@@ -248,19 +240,19 @@ sun_driver_wait (sun_driver_t *driver, int *status, float *iodelay)
 	if (driver->outfd >= 0)
 		need_playback = 1;
 
+	poll_enter = jack_get_microseconds();
+	if (poll_enter > driver->poll_next)
+	{
+		/* late. don't count as wakeup delay. */
+		driver->poll_next = 0;
+	}
+
 	while (need_capture || need_playback)
 	{
 		pfd[0].fd = driver->infd;
 		pfd[0].events = POLLIN;
 		pfd[1].fd = driver->outfd;
 		pfd[1].events = POLLOUT;
-
-		poll_enter = jack_get_microseconds();
-		if (poll_enter > driver->poll_next)
-		{
-			/* late. don't count as wakeup delay. */
-			driver->poll_next = 0;
-		}
 
 		nfds = poll(pfd, 2, driver->poll_timeout);
 		if ( nfds == -1 ||
@@ -269,36 +261,33 @@ sun_driver_wait (sun_driver_t *driver, int *status, float *iodelay)
 		{
 			jack_error("sun_driver: poll() error: %s: %s@%i",  
 				strerror(errno), __FILE__, __LINE__);
-			*status = -1;
+			*status = -3;
 			return 0;
 		}
-		poll_ret = jack_get_microseconds();
-
-		if (driver->poll_next && poll_ret > driver->poll_next)
-			*iodelay = poll_ret - driver->poll_next;
-		driver->poll_last = poll_ret;
-		driver->poll_next = poll_ret + driver->period_usecs;
-		driver->engine->transport_cycle_start(driver->engine, poll_ret);
 
 		if (nfds == 0)
 		{
-			jack_error("sun_driver: poll() timeout, waited "
-				"%" PRIu64 " usecs: %s@%i",  
-				poll_ret - poll_enter, __FILE__, __LINE__);
+			jack_error("sun_driver: poll() timeout: %s@%i",
+				__FILE__, __LINE__);
+			*status = -5;
 			return 0;
 		}
 
 		if (need_capture && (pfd[0].revents & POLLIN))
-		{
-			capture_avail = 1;
 			need_capture = 0;
-		}
+
 		if (need_playback && (pfd[1].revents & POLLOUT))
-		{
-			playback_avail = 1;
 			need_playback = 0;
-		}
 	}
+
+	poll_ret = jack_get_microseconds();
+
+	if (driver->poll_next && poll_ret > driver->poll_next)
+		*iodelay = poll_ret - driver->poll_next;
+
+	driver->poll_last = poll_ret;
+	driver->poll_next = poll_ret + driver->period_usecs;
+	driver->engine->transport_cycle_start(driver->engine, poll_ret);
 
 	if (driver->infd >= 0)
 	{
@@ -314,11 +303,11 @@ sun_driver_wait (sun_driver_t *driver, int *status, float *iodelay)
 	if (capture_errors > 0)
 	{
 		delay = (capture_errors * 1000.0) / driver->sample_rate;
-		jack_error("sun_driver: capture xrun of %d frames (%f msec)",
+		printf("sun_driver: capture xrun of %d frames (%f msec)\n",
 			capture_errors, delay);
 		delay = (driver->capture_drops * 1000.0) / driver->sample_rate;
-		jack_error("sun_driver: total cpature xruns: %d frames "
-			"(%f msec)", driver->capture_drops, delay);
+		printf("sun_driver: total cpature xruns: %d frames "
+			"(%f msec)\n", driver->capture_drops, delay);
 	}
 
 	if (driver->outfd >= 0)
@@ -335,14 +324,25 @@ sun_driver_wait (sun_driver_t *driver, int *status, float *iodelay)
 	if (playback_errors > 0)
 	{
 		delay = (playback_errors * 1000.0) / driver->sample_rate;
-		jack_error("sun_driver: playback xrun of %d frames (%f msec)",
+		printf("sun_driver: playback xrun of %d frames (%f msec)\n",
 			playback_errors, delay);
 		delay = (driver->playback_drops * 1000.0) / driver->sample_rate;
-		jack_error("sun_driver: total playback xruns: %d frames "
-			"(%f msec)", driver->playback_drops, delay);
+		printf("sun_driver: total playback xruns: %d frames "
+			"(%f msec)\n", driver->playback_drops, delay);
 	}
 
+	/* if the capture buffer overruns in duplex mode, the playback
+	 * buffer has underrun as well, and has no chance of catching
+	 * back up to realtime because the capture buffer no longer
+	 * represents realtime.  write enough silence to resync the
+	 * buffers.
+	 */
+	if ((driver->outfd == driver->infd) && (capture_errors > 0))
+		sun_driver_write_silence(driver, capture_errors);
+
 	driver->last_wait_ust = poll_ret;
+
+	*status = 0;
 
 	return driver->period_size;
 }
@@ -352,13 +352,30 @@ static inline int
 sun_driver_run_cycle (sun_driver_t *driver)
 {
 	jack_nframes_t nframes;
+	jack_time_t now;
 	int wait_status;
 	float iodelay;
 
 	nframes = sun_driver_wait (driver, &wait_status, &iodelay);
 
 	if (wait_status < 0)
-		return -1;
+	{
+		switch (wait_status)
+		{
+		case -3:
+			/* poll() error */
+			return -1;
+		case -5:
+			/* poll() timeout */
+			now = jack_get_microseconds();
+			iodelay = now - driver->poll_next;
+			driver->poll_next = now + driver->period_usecs;
+			driver->engine->delay(driver->engine, iodelay);
+			return 0;
+		default:
+			return -1;
+		}
+	}
 
 	return driver->engine->run_cycle(driver->engine, nframes, iodelay);
 }
@@ -568,6 +585,45 @@ sun_driver_start (sun_driver_t *driver)
 {
 	audio_info_t audio_if;
 
+	if (driver->infd >= 0)
+	{
+		if (ioctl(driver->infd, AUDIO_FLUSH, NULL) < 0)
+		{
+			jack_error("sun_driver: capture flush failed: %s: "
+				"%s@%i", strerror(errno), __FILE__, __LINE__);
+			return -1;
+		}
+		AUDIO_INITINFO(&audio_if);
+		audio_if.record.pause = 1;
+		if (driver->outfd == driver->infd)
+			audio_if.play.pause = 1;
+		if (ioctl(driver->infd, AUDIO_SETINFO, &audio_if) < 0)
+		{
+			jack_error("sun_driver: pause capture failed: %s: "
+				"%s@%i", strerror(errno), __FILE__, __LINE__);
+			return -1;
+		}
+	}
+	if ((driver->outfd >= 0) && (driver->outfd != driver->infd))
+	{
+		if (ioctl(driver->outfd, AUDIO_FLUSH, NULL) < 0)
+		{
+			jack_error("sun_driver: playback flush failed: %s: "
+				"%s@%i", strerror(errno), __FILE__, __LINE__);
+			return -1;
+		}
+		AUDIO_INITINFO(&audio_if);
+		audio_if.play.pause = 1;
+		if (ioctl(driver->outfd, AUDIO_SETINFO, &audio_if) < 0)
+		{
+			jack_error("sun_driver: pause playback failed: %s: "
+				"%s@%i", strerror(errno), __FILE__, __LINE__);
+			return -1;
+		}
+	}
+
+	driver->playback_drops = driver->capture_drops = 0;
+
 	if (driver->outfd >= 0)
 	{
 		/* "prime" the playback buffer */
@@ -579,15 +635,16 @@ sun_driver_start (sun_driver_t *driver)
 	{
 		AUDIO_INITINFO(&audio_if);
 		audio_if.record.pause = 0;
+		if (driver->outfd == driver->infd)
+			audio_if.play.pause = 0;
 		if (ioctl(driver->infd, AUDIO_SETINFO, &audio_if) < 0)
 		{
-			jack_error("sun_driver: trigger capture failed: %s: "
+			jack_error("sun_driver: start capture failed: %s: "
 				"%s@%i", strerror(errno), __FILE__, __LINE__);
 			return -1;
 		}
 	}
-
-	if (driver->outfd >= 0)
+	if ((driver->outfd >= 0) && (driver->outfd != driver->infd))
 	{
 		AUDIO_INITINFO(&audio_if);
 		audio_if.play.pause = 0;
@@ -1194,7 +1251,7 @@ sun_driver_new (char *indev, char *outdev, jack_client_t *client,
 		driver->outdev = strdup(SUN_DRIVER_DEF_DEV);
 	driver->infd = -1;
 	driver->outfd = -1;
-	driver->format = AUDIO_ENCODING_SLINEAR_LE;
+	driver->format = AUDIO_ENCODING_SLINEAR;
 
 	driver->indevbuf = driver->outdevbuf = NULL;
 
