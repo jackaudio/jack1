@@ -1365,10 +1365,17 @@ handle_external_client_request (jack_engine_t *engine, int fd)
 
 	if ((r = read (client->request_fd, &req, sizeof (req)))
 	    < (ssize_t) sizeof (req)) {
-		jack_error ("cannot read request from client (%d/%d/%s)",
-			    r, sizeof(req), strerror (errno));
-		client->error++;
-		return -1;
+		if (r == 0) {
+			/* 0 byte read() signals EOF */
+			client->error++;
+			jack_client_disconnect(engine, fd);
+			return 0;
+		} else {
+			jack_error ("cannot read request from client (%d/%d/%s)",
+				    r, sizeof(req), strerror (errno));
+			client->error++;
+			return -1;
+		}
 	}
 
 	reply_fd = client->request_fd;
