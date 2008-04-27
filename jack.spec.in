@@ -17,12 +17,13 @@
 %define freebob 1
 # use preemption check
 %define preemption_check 0
-
+# use dynamic SIMD (ix86)
+%define dynsimd 1
 
 Summary:	The Jack Audio Connection Kit
 Name:		@PACKAGE@
 Version:	@VERSION@
-Release:	5
+Release:	6
 License:	GPL
 Group:		System Environment/Daemons
 Source0:	%{name}-%{version}.tar.gz
@@ -97,6 +98,9 @@ Small example clients that use the Jack Audio Connection Kit.
 %if %{preemption_check}
 	--enable-preemption-check \
 %endif
+%if %{dynsimd}
+	--enable-dynsimd \
+%endif
 	--enable-optimize
 make
 
@@ -131,9 +135,9 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 %{_bindir}/jackd
 %{_bindir}/jack_load
 %{_bindir}/jack_unload
-%{_bindir}/jack_bufsize
 %{_bindir}/jack_freewheel
 %{_bindir}/jack_transport
+%{_bindir}/jack_netsource
 %{_libdir}/libjack.so
 %{_libdir}/libjack.so.0
 %{_libdir}/libjack.so.0.0.*
@@ -163,6 +167,8 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 
 %files example-clients
 %defattr(-,root,root)
+%{_bindir}/alsa_in
+%{_bindir}/alsa_out
 %{_bindir}/jackrec
 %{_bindir}/jack_alias
 %{_bindir}/jack_connect
