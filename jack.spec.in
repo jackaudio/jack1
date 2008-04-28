@@ -30,7 +30,9 @@ Source0:	%{name}-%{version}.tar.gz
 URL:		http://jackaudio.org
 BuildRoot:	%{_tmppath}/%{name}-%{version}-root-%(id -u -n)
 
-BuildRequires: automake >= 1.6 libsndfile-devel >= 1.0.0
+BuildRequires: automake >= 1.6
+BuildRequires: libsndfile-devel >= 1.0.11
+BuildRequires: libsamplerate-devel >= 0.1.2
 BuildRequires: pkgconfig
 BuildRequires: doxygen
 
@@ -135,9 +137,18 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 %{_bindir}/jackd
 %{_bindir}/jack_load
 %{_bindir}/jack_unload
+%{_bindir}/jack_monitor_client
+%{_bindir}/jack_connect
+%{_bindir}/jack_disconnect
+%{_bindir}/jack_lsp
 %{_bindir}/jack_freewheel
+%{_bindir}/jack_evmon
+%{_bindir}/jack_alias
+%{_bindir}/jackrec
 %{_bindir}/jack_transport
 %{_bindir}/jack_netsource
+%{_bindir}/alsa_in
+%{_bindir}/alsa_out
 %{_libdir}/libjack.so
 %{_libdir}/libjack.so.0
 %{_libdir}/libjack.so.0.0.*
@@ -167,24 +178,18 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 
 %files example-clients
 %defattr(-,root,root)
-%{_bindir}/alsa_in
-%{_bindir}/alsa_out
-%{_bindir}/jackrec
-%{_bindir}/jack_alias
-%{_bindir}/jack_connect
-%{_bindir}/jack_disconnect
-%{_bindir}/jack_evmon
-%{_bindir}/jack_impulse_grabber
-%{_bindir}/jack_lsp
-%{_bindir}/jack_metro
-%{_bindir}/jack_midiseq
-%{_bindir}/jack_midisine
-%{_bindir}/jack_monitor_client
-%{_bindir}/jack_showtime
 %{_bindir}/jack_simple_client
+%{_bindir}/jack_impulse_grabber
+%{_bindir}/jack_metro
+%{_bindir}/jack_showtime
+%{_bindir}/jack_midisine
+%{_bindir}/jack_midiseq
 
 
 %changelog
+
+* Mon Apr 28 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.111.4-6
+- moved all bin tools from example-clients to nominal package
 
 * Sat Jan  5 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.108.1-5
 - added jack_alias and jack_evmon to example-clients package
