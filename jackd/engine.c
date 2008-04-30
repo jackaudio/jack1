@@ -1051,8 +1051,7 @@ jack_engine_load_driver (jack_engine_t *engine,
 	driver->internal_client = client;
 	free (info);
 
-	if (jack_use_driver (engine, driver)) {
-		jack_driver_unload (driver);
+	if (jack_use_driver (engine, driver) < 0) {
 		jack_client_delete (engine, client);
 		return -1;
 	}
