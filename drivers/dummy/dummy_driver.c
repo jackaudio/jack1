@@ -72,6 +72,97 @@ FakeVideoSync( dummy_driver_t *driver )
                 position->valid = (jack_position_bits_t) (position->valid | JackVideoFrameOffset);
         }
 }
+jack_time_t 
+jack_get_microseconds_from_system (void) {
+	jack_time_t jackTime;
+	struct timespec time;
+
+	clock_gettime(CLOCK_MONOTONIC, &time);
+	jackTime = (jack_time_t) time.tv_sec * 1e6 +
+		(jack_time_t) time.tv_nsec / 1e3;
+	return jackTime;
+}
+
+#ifdef HAVE_CLOCK_GETTIME
+static inline unsigned long long ts_to_nsec(struct timespec ts)
+{
+    return ts.tv_sec * 1000000000LL + ts.tv_nsec;
+}
+
+static inline struct timespec nsec_to_ts(unsigned long long nsecs)
+{
+    struct timespec ts;
+    ts.tv_sec = nsecs / (1000000000LL);
+    ts.tv_nsec = nsecs % (1000000000LL);
+    return ts;
+}
+
+static inline struct timespec add_ts(struct timespec ts, unsigned int usecs)
+{
+    unsigned long long nsecs = ts_to_nsec(ts);
+    nsecs += usecs * 1000LL;
+    return nsec_to_ts(nsecs);
+}
+
+static inline int cmp_lt_ts(struct timespec ts1, struct timespec ts2)
+{
+    if(ts1.tv_sec < ts2.tv_sec) {
+        return 1;
+    } else if (ts1.tv_sec == ts2.tv_sec && ts1.tv_nsec < ts2.tv_nsec) {
+        return 1;
+    } else return 0;
+}
+
+static jack_nframes_t 
+dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
+		   float *delayed_usecs)
+{
+	jack_nframes_t nframes = driver->period_size;
+	struct timespec now;
+
+	*status = 0;
+	/* this driver doesn't work so well if we report a delay */
+	*delayed_usecs = 0;		/* lie about it */
+
+	clock_gettime(CLOCK_REALTIME, &now);
+	
+	if (cmp_lt_ts(driver->next_wakeup, now)) {
+		if (driver->next_wakeup.tv_sec == 0) {
+			/* first time through */
+			clock_gettime(CLOCK_REALTIME, &driver->next_wakeup);
+		}  else if ((ts_to_nsec(now) - ts_to_nsec(driver->next_wakeup))/1000LL
+			    > (PRETEND_BUFFER_SIZE * 1000000LL
+			       / driver->sample_rate)) {
+			/* xrun */
+			jack_error("**** dummy: xrun of %ju usec",
+				(uintmax_t)(ts_to_nsec(now) - ts_to_nsec(driver->next_wakeup))/1000LL);
+			nframes = 0;
+		} else {
+			/* late, but handled by our "buffer"; try to
+			 * get back on track */
+		}
+		driver->next_wakeup = add_ts(driver->next_wakeup, driver->wait_time);
+	} else {
+		if(clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &driver->next_wakeup, NULL)) {
+			jack_error("error while sleeping");
+			*status = -1;
+		} else {
+			clock_gettime(CLOCK_REALTIME, &now);
+			// guaranteed to sleep long enough for this to be correct
+			*delayed_usecs = (ts_to_nsec(now) - ts_to_nsec(driver->next_wakeup));
+			*delayed_usecs /= 1000.0;
+		}
+		driver->next_wakeup = add_ts(driver->next_wakeup, driver->wait_time);
+	}
+
+	driver->last_wait_ust = jack_get_microseconds ();
+	driver->engine->transport_cycle_start (driver->engine,
+					       driver->last_wait_ust);
+
+	return nframes;
+}
+
+#else
 
 static jack_nframes_t 
 dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
@@ -112,6 +203,7 @@ dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
 	*status = 0;
 	return driver->period_size;
 }
+#endif
 
 static inline int
 dummy_driver_run_cycle (dummy_driver_t *driver)
@@ -288,7 +380,7 @@ dummy_driver_new (jack_client_t * client,
 	driver->sample_rate = sample_rate;
 	driver->period_size = period_size;
 	driver->wait_time   = wait_time;
-	driver->next_time   = 0;
+	//driver->next_time   = 0; // not needed since calloc clears the memory
 	driver->last_wait_ust = 0;
 
 	driver->capture_channels  = capture_ports;
