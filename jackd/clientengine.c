@@ -25,6 +25,7 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 
 #include <jack/internal.h>
@@ -36,8 +37,6 @@
 
 #include "clientengine.h"
 #include "transengine.h"
-
-#define JACK_ERROR_WITH_SOCKETS 10000000
 
 static void
 jack_client_disconnect_ports (jack_engine_t *engine,
@@ -68,7 +67,10 @@ jack_client_do_deactivate (jack_engine_t *engine,
 			   jack_client_internal_t *client, int sort_graph)
 {
 	/* caller must hold engine->client_lock and must have checked for and/or
-	 *   cleared all connections held by client. */
+	 *   cleared all connections held by client. 
+	 */
+	VERBOSE(engine,"+++ deactivate %s", client->control->name);
+
 	client->control->active = FALSE;
 
 	jack_transport_client_exit (engine, client);
@@ -77,7 +79,7 @@ jack_client_do_deactivate (jack_engine_t *engine,
 	    engine->external_client_cnt > 0) {	
 		engine->external_client_cnt--;
 	}
-
+	
 	if (sort_graph) {
 		jack_sort_graph (engine);
 	}
@@ -166,6 +168,12 @@ jack_remove_clients (jack_engine_t* engine)
 	JSList *tmp, *node;
 	int need_sort = FALSE;
 	jack_client_internal_t *client;
+
+	if (engine->removing_clients) {
+		return;
+	}
+
+	engine->removing_clients++;
 	
 	/* remove all dead clients */
 
@@ -174,6 +182,8 @@ jack_remove_clients (jack_engine_t* engine)
 		tmp = jack_slist_next (node);
 		
 		client = (jack_client_internal_t *) node->data;
+
+		VERBOSE(engine, "client %s error status %d", client->control->name, client->error);
 		
 		if (client->error) {
 			
@@ -220,6 +230,8 @@ jack_remove_clients (jack_engine_t* engine)
 	}
 	
 	jack_engine_reset_rolling_usecs (engine);
+
+	engine->removing_clients--;
 }
 
 static int
@@ -848,6 +860,10 @@ jack_client_disconnect (jack_engine_t *engine, int fd)
 
 		if (((jack_client_internal_t *) node->data)->request_fd == fd) {
 			client = (jack_client_internal_t *) node->data;
+			VERBOSE (engine, "marking socket error on client %s state = "
+				 "%s errors = %d", client->control->name,
+				 jack_client_state_name (client),
+				 client->error);
 			if (client->error < JACK_ERROR_WITH_SOCKETS) {
 				client->error += JACK_ERROR_WITH_SOCKETS;
 			}
@@ -961,3 +977,4 @@ jack_intclient_unload_request (jack_engine_t *engine, jack_request_t *req)
 		req->status = JackFailure;
 	}
 }
+

@@ -116,6 +116,7 @@ struct _jack_engine {
     int		    reordered;
     int		    watchdog_check;
     int		    feedbackcount;
+    int             removing_clients;
     pid_t           wait_pid;
     pthread_t       freewheel_thread;
     int             nozombies;

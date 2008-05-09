@@ -40,6 +40,8 @@ jack_client_state_name (jack_client_internal_t *client)
 	return client_state_names[client->control->state];
 }
 
+#define JACK_ERROR_WITH_SOCKETS 10000000
+
 int	jack_client_activate (jack_engine_t *engine, jack_client_id_t id);
 int	jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id);
 int	jack_client_create (jack_engine_t *engine, int client_fd);

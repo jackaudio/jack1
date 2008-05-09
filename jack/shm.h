@@ -95,7 +95,7 @@ static inline char* jack_shm_addr (jack_shm_info_t* si) {
 
 /* here beginneth the API */
 
-extern int  jack_register_server (const char *server_name);
+extern int  jack_register_server (const char *server_name, int new_registry);
 extern void jack_unregister_server (const char *server_name);
 
 extern int  jack_initialize_shm (const char *server_name);

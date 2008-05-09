@@ -58,6 +58,13 @@ variable.  It will be "default" if that is not defined.
 Set the maximum number of ports the JACK server can manage.  
 The default value is 256.
 .TP
+\fB\-r, \-\-replace-registry\fR 
+.br
+Remove the shared memory registry used by all JACK server instances
+before startup. This should rarely be used, and is intended only
+for occasions when the structure of this registry changes in ways
+that are incompatible across JACK versions (which is rare).
+.TP
 \fB\-R, \-\-realtime\fR 
 .br
 Use realtime scheduling.  This is needed for reliable low\-latency

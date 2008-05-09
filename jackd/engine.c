@@ -1018,8 +1018,9 @@ jack_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc)
 void
 jack_driver_unload (jack_driver_t *driver)
 {
+	void* handle = driver->handle;
 	driver->finish (driver);
-	dlclose (driver->handle);
+	dlclose (handle);
 }
 
 int
@@ -1471,6 +1472,7 @@ jack_server_thread (void *arg)
 			}
 
 			if (pfd[i].revents & ~POLLIN) {
+				VERBOSE (engine, "client poll reports non-input condition, fd was %d", pfd[i].fd);
 				jack_client_disconnect (engine, pfd[i].fd);
 			} else if (pfd[i].revents & POLLIN) {
 				if (handle_external_client_request
@@ -1630,6 +1632,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->feedbackcount = 0;
 	engine->wait_pid = wait_pid;
 	engine->nozombies = nozombies;
+	engine->removing_clients = 0;
 
 	engine->audio_out_cnt = 0;
 	engine->audio_in_cnt = 0;
@@ -1815,7 +1818,6 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 static void
 jack_engine_delay (jack_engine_t *engine, float delayed_usecs)
 {
-	JSList *node;
 	jack_event_t event;
 	
 	engine->control->frame_timer.reset_pending = 1;
@@ -1827,13 +1829,7 @@ jack_engine_delay (jack_engine_t *engine, float delayed_usecs)
 
 	event.type = XRun;
 
-	jack_lock_graph (engine);
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		jack_deliver_event (engine,
-				    (jack_client_internal_t *) node->data,
-				    &event);
-	}
-	jack_unlock_graph (engine);
+	jack_deliver_event_to_all (engine, &event);
 }
 
 static inline void
@@ -2265,6 +2261,7 @@ jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event)
 				    event);
 	}
 	jack_unlock_graph (engine);
+	jack_remove_clients (engine);
 }
 
 static void
@@ -2307,9 +2304,8 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 	   our check on a client's continued well-being
 	*/
 
-	if (client->control->dead
-	    || (client->control->type == ClientExternal
-		&& kill (client->control->pid, 0))) {
+	if (client->control->dead || client->error >= JACK_ERROR_WITH_SOCKETS 
+	    || (client->control->type == ClientExternal && kill (client->control->pid, 0))) {
 		DEBUG ("client %s is dead - no event sent",
 		       client->control->name);
 		return 0;
@@ -2378,32 +2374,74 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 				jack_error ("cannot send event to client [%s]"
 					    " (%s)", client->control->name,
 					    strerror (errno));
-				client->error++;
-			}
-			
-			DEBUG ("engine reading from event fd");
-			
-			if (!client->error &&
-			    (read (client->event_fd, &status, sizeof (status))
-			     != sizeof (status))) {
-				jack_error ("cannot read event response from "
-					    "client [%s] (%s)",
-					    client->control->name,
-					    strerror (errno));
-				client->error++;
+				client->error = JACK_ERROR_WITH_SOCKETS+99;
 			}
 
-			DEBUG ("engine reading from event fd DONE");
-			
-			if (status != 0) {
-				jack_error ("bad status for client event "
-					    "handling (type = %d)",
-					    event->type);
-				client->error++;
-			}
+ 			if (client->error) {
+ 				status = 1;
+ 			} else {
+ 				// then we check whether there really is an error.... :)
+ 
+ 				struct pollfd pfd[1];
+ 				pfd[0].fd = client->event_fd;
+ 				//pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
+ 				pfd[0].events = POLLIN;
+ 
+ 				int poll_timeout = (engine->client_timeout_msecs > 0 ?
+ 						engine->client_timeout_msecs :
+ 						1 + engine->driver->period_usecs/1000);
+ 
+ 				//poll_timeout = 200;
+ 				//poll_timeout = 30000; // 30 seconds
+ 
+ 				int poll_ret;
+ 				// printf("################ poll_timeout = %d (%d or 1 + %d/1000)\n", poll_timeout, engine->client_timeout_msecs, engine->driver->period_usecs);
+ 
+ 				if ( (poll_ret = poll (pfd, 1, poll_timeout)) < 0) {
+ 					DEBUG ("client event poll not ok! (-1) poll returned an error");
+ 					jack_error ("poll on subgraph processing failed (%s)", strerror (errno));
+ 					status = -1; 
+ 				} else {
+ 
+ 					DEBUG ("\n\n\n\n\n back from client event poll, revents = 0x%x\n\n\n", pfd[0].revents);
+ 
+ 					if (pfd[0].revents & ~POLLIN) {
+ 						DEBUG ("client event poll not ok! (-2), revents = %d\n", pfd[0].revents);
+ 						jack_error ("subgraph starting at %s lost client", client->control->name);
+ 						status = -2; 
+ 					}
+ 
+ 					if (pfd[0].revents & POLLIN) {
+ 						DEBUG ("client event poll ok!");
+ 						status = 0;
+ 					} else {
+ 						DEBUG ("client event poll not ok! (1 = poll timed out, revents = 0x%04x, poll_ret = %d)", pfd[0].revents, poll_ret);
+ 						jack_error ("subgraph starting at %s timed out "
+ 								"(subgraph_wait_fd=%d, status = %d, state = %s, revents = 0x%04x)", 
+ 								client->control->name,
+ 								client->subgraph_wait_fd, status, 
+ 								jack_client_state_name (client), pfd[0].revents);
+ 						status = 1;
+ 					}
+ 				}
+  			}
+ 
+ 			if (status == 0) {
+ 				if (read (client->event_fd, &status, sizeof (status)) != sizeof (status)) {
+ 					jack_error ("cannot read event response from "
+ 							"client [%s] (%s)",
+ 							client->control->name,
+ 							strerror (errno));
+					client->error = JACK_ERROR_WITH_SOCKETS+99;
+ 				}
+ 			} else {
+ 				jack_error ("bad status (%d) for client event "
+  					    "handling (type = %d)",
+ 					    status,event->type);
+				client->error = JACK_ERROR_WITH_SOCKETS+99;
+  			}
 		}
 	}
-
 	DEBUG ("event delivered");
 
 	return 0;
@@ -2430,6 +2468,10 @@ jack_rechain_graph (jack_engine_t *engine)
 	for (n = 0, node = engine->clients, next = NULL; node; node = next) {
 
 		next = jack_slist_next (node);
+
+		VERBOSE(engine, "+++ client is now %s active ? %d",
+			((jack_client_internal_t *) node->data)->control->name,
+			((jack_client_internal_t *) node->data)->control->active);
 
 		if (((jack_client_internal_t *) node->data)->control->active) {
 
@@ -2559,6 +2601,8 @@ jack_rechain_graph (jack_engine_t *engine)
 			 subgraph_client->control->name,
 			 subgraph_client->subgraph_wait_fd, n);
 	}
+
+	jack_remove_clients (engine);
 
 	VERBOSE (engine, "-- jack_rechain_graph()");
 
@@ -3161,6 +3205,8 @@ jack_port_do_connect (jack_engine_t *engine,
 	}
 
 	jack_unlock_graph (engine);
+	jack_remove_clients (engine);
+
 	return 0;
 }
 
@@ -3261,6 +3307,8 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 			break;
 		}
 	}
+
+	jack_remove_clients (engine);
 
 	if (check_acyclic) {
 		jack_check_acyclic (engine);
@@ -3785,6 +3833,8 @@ jack_port_registration_notify (jack_engine_t *engine,
 			}
 		}
 	}
+
+	jack_remove_clients (engine);
 }
 
 void
@@ -3820,6 +3870,8 @@ jack_client_registration_notify (jack_engine_t *engine,
 			}
 		}
 	}
+
+	jack_remove_clients (engine);
 }
 
 int

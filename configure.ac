@@ -789,5 +789,6 @@ echo \| Default driver backend................................ : $JACK_DEFAULT_D
 echo \| Shared memory interface............................... : $JACK_SHM_TYPE
 echo \| IPC Temporary directory............................... : $DEFAULT_TMP_DIR
 echo \| Install prefix........................................ : $prefix
+echo \| Default tmp dir....................................... : $DEFAULT_TMP_DIR
 echo
 

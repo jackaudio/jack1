@@ -243,7 +243,7 @@ jack_set_server_prefix (const char *server_name)
  * returns: 0 if successful
  */
 static int
-jack_server_initialize_shm (void)
+jack_server_initialize_shm (int new_registry)
 {
 	int rc;
 
@@ -253,6 +253,11 @@ jack_server_initialize_shm (void)
 	jack_shm_lock_registry ();
 
 	rc = jack_access_registry (&registry_info);
+
+	if (new_registry) {
+		jack_remove_shm (&registry_id);
+		rc = ENOENT;
+	}
 
 	switch (rc) {
 	case ENOENT:			/* registry does not exist */
@@ -302,6 +307,7 @@ jack_initialize_shm (const char *server_name)
 	jack_set_server_prefix (server_name);
 
 	jack_shm_lock_registry ();
+
 	if ((rc = jack_access_registry (&registry_info)) == 0) {
 		if ((rc = jack_shm_validate_registry ()) != 0) {
 			jack_error ("Incompatible shm registry, "
@@ -373,7 +379,7 @@ jack_release_shm_info (jack_shm_registry_index_t index)
  *	   ENOMEM if unable to access shared memory registry
  */
 int
-jack_register_server (const char *server_name)
+jack_register_server (const char *server_name, int new_registry)
 {
 	int i;
 	pid_t my_pid = getpid ();
@@ -382,7 +388,7 @@ jack_register_server (const char *server_name)
 
 	jack_info ("JACK compiled with %s SHM support.", JACK_SHM_TYPE);
 
-	if (jack_server_initialize_shm ())
+	if (jack_server_initialize_shm (new_registry))
 		return ENOMEM;
 
 	jack_shm_lock_registry ();

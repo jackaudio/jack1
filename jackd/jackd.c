@@ -371,6 +371,7 @@ static void usage (FILE *file)
 "             [ --debug-timer OR -D ]\n"
 "             [ --verbose OR -v ]\n"
 "             [ --clocksource OR -c [ c(ycle) | h(pet) | s(ystem) ]\n"
+"             [ --replace-registry OR -r ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
 "             [ --nozombies OR -Z ]\n"
@@ -520,6 +521,7 @@ main (int argc, char *argv[])
 		{ "name", 1, 0, 'n' },
 		{ "unlock", 0, 0, 'u' },
 		{ "realtime", 0, 0, 'R' },
+		{ "replace-registry", 0, 0, 'r' },
 		{ "realtime-priority", 1, 0, 'P' },
 		{ "timeout", 1, 0, 't' },
 		{ "temporary", 0, 0, 'T' },
@@ -537,6 +539,7 @@ main (int argc, char *argv[])
 	JSList * driver_params;
 	int driver_nargs = 1;
 	int show_version = 0;
+	int replace_registry = 0;
 	int i;
 	int rc;
 
@@ -591,6 +594,10 @@ main (int argc, char *argv[])
 
 		case 'P':
 			realtime_priority = atoi (optarg);
+			break;
+
+		case 'r':
+			replace_registry = 1;
 			break;
 
 		case 'R':
@@ -695,7 +702,7 @@ main (int argc, char *argv[])
 
 	copyright (stdout);
 
-	rc = jack_register_server (server_name);
+	rc = jack_register_server (server_name, replace_registry);
 	switch (rc) {
 	case EEXIST:
 		fprintf (stderr, "`%s' server already active\n", server_name);

@@ -1301,6 +1301,8 @@ jack_client_process_events (jack_client_t* client)
 	JSList *node;
 	jack_port_t* port;
 
+	DEBUG ("process events");
+
 	if (client->pollfd[EVENT_POLL_INDEX].revents & POLLIN) {
 		
 		DEBUG ("client receives an event, "
@@ -1683,14 +1685,26 @@ jack_client_thread_aux (void *arg)
 	/* wait for first wakeup from server */
 
 	if (jack_thread_first_wait (client) == control->nframes) {
+
 		/* now run till we're done */
+
 		if (control->process) {
+
 			/* run process callback, then wait... ad-infinitum */
-			while (jack_thread_wait (client, 
-						 control->process (control->nframes, 
-								   control->process_arg)) ==
-			       control->nframes)
-				;
+
+			while (1) {
+				DEBUG("client calls process()");
+				int status = (control->process (control->nframes, 
+								control->process_arg) ==
+					      control->nframes);
+				control->state = Finished;
+				DEBUG("client leaves process(), re-enters wait");
+				if (!jack_thread_wait (client, status)) {
+					break;
+				}
+				DEBUG("client done with wait");
+			}
+
 		} else {
 			/* no process handling but still need to process events */
 			while (jack_thread_wait (client, 0) == control->nframes)
