@@ -632,7 +632,7 @@ ffado_driver_start (ffado_driver_t *driver)
 	int retval=0;
 
 	if((retval=ffado_streaming_start(driver->dev))) {
-		printError("Could not start streaming threads");
+		printError("Could not start streaming threads: %d", retval);
 		return retval;
 	}
 

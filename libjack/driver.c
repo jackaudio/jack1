@@ -153,11 +153,13 @@ jack_driver_nt_start (jack_driver_nt_t * driver)
 					      driver->engine->control->real_time,
 					      jack_driver_nt_thread, driver)) != 0) {
 		jack_error ("DRIVER NT: could not start driver thread!");
-		driver->nt_stop (driver);
 		return err;
 	}
-	    
+
 	if ((err = driver->nt_start (driver)) != 0) {
+		/* make the thread run and exit immediately */
+		driver->nt_run = DRIVER_NT_EXIT;
+		pthread_mutex_unlock (&driver->nt_run_lock);
 		jack_error ("DRIVER NT: could not start driver");
 		return err;
 	}
