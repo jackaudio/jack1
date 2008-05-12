@@ -908,10 +908,10 @@ static void *
 jack_watchdog_thread (void *arg)
 {
 	jack_engine_t *engine = (jack_engine_t *) arg;
-    struct timespec timo;
-    
-    timo.tv_sec = JACKD_WATCHDOG_TIMEOUT / 1000;
-    timo.tv_nsec = (JACKD_WATCHDOG_TIMEOUT - (timo.tv_sec * 1000)) * 1000;
+	struct timespec timo;
+
+	timo.tv_sec = JACKD_WATCHDOG_TIMEOUT / 1000;
+	timo.tv_nsec = (JACKD_WATCHDOG_TIMEOUT - (timo.tv_sec * 1000)) * 1000;
 	engine->watchdog_check = 0;
 
 	while (1) {
@@ -1606,7 +1606,8 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	jack_init_time ();
 
-	engine = (jack_engine_t *) malloc (sizeof (jack_engine_t));
+	/* allocate the engine, zero the structure to ease debugging */
+	engine = (jack_engine_t *) calloc (1, sizeof (jack_engine_t));
 
 	engine->drivers = drivers;
 	engine->driver = NULL;
@@ -1623,6 +1624,8 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	engine->next_client_id = 1;	/* 0 is a NULL client ID */
 	engine->port_max = port_max;
+	engine->server_thread = 0;
+	engine->watchdog_thread = 0;
 	engine->rtpriority = rtpriority;
 	engine->silent_buffer = 0;
 	engine->verbose = verbose;
