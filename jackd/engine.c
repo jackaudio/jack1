@@ -1392,7 +1392,7 @@ handle_external_client_request (jack_engine_t *engine, int fd)
 
 	DEBUG ("HIT: before lock");
 	
-	jack_lock_graph (engine);
+	jack_rdlock_graph (engine);
 
 	DEBUG ("HIT: before for");
 	
@@ -1694,7 +1694,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	jack_engine_reset_rolling_usecs (engine);
 	engine->max_usecs = 0.0f;
 
-	pthread_mutex_init (&engine->client_lock, 0);
+	pthread_rwlock_init (&engine->client_lock, 0);
 	pthread_mutex_init (&engine->port_lock, 0);
 	pthread_mutex_init (&engine->request_lock, 0);
 
@@ -2051,7 +2051,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		consecutive_excessive_delays = 0;
 	}
 
-	if (jack_try_lock_graph (engine)) {
+	if (jack_try_rdlock_graph (engine)) {
 		/* engine can't run. just throw away an entire cycle */
 		driver->null_cycle (driver, nframes);
 		return 0;
@@ -3514,10 +3514,11 @@ jack_use_driver (jack_engine_t *engine, jack_driver_t *driver)
 		engine->driver = 0;
 	}
 
-	engine->driver = driver;
-
 	if (driver) {
+		engine->driver = driver;
+
 		if (driver->attach (driver, engine)) {
+			engine->driver = 0;
 			return -1;
 		}
 
@@ -3773,7 +3774,7 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req,
 	int ret = -1;
 	int internal = FALSE;
 
-	jack_lock_graph (engine);
+	jack_rdlock_graph (engine);
 
 	port = &engine->internal_ports[req->x.port_info.port_id];
 

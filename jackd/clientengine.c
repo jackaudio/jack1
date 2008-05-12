@@ -292,7 +292,7 @@ jack_client_by_name (jack_engine_t *engine, const char *name)
 	jack_client_internal_t *client = NULL;
 	JSList *node;
 
-	jack_lock_graph (engine);
+	jack_rdlock_graph (engine);
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		if (strcmp ((const char *) ((jack_client_internal_t *)
@@ -313,7 +313,7 @@ jack_client_id_by_name (jack_engine_t *engine, const char *name)
 	jack_client_id_t id = 0;	/* NULL client ID */
 	JSList *node;
 
-	jack_lock_graph (engine);
+	jack_rdlock_graph (engine);
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		if (strcmp ((const char *) ((jack_client_internal_t *)
@@ -948,7 +948,7 @@ jack_intclient_name_request (jack_engine_t *engine, jack_request_t *req)
 {
 	jack_client_internal_t *client;
 
-	jack_lock_graph (engine);
+	jack_rdlock_graph (engine);
 	if ((client = jack_client_internal_by_id (engine,
 						  req->x.intclient.id))) {
 		strncpy ((char *) req->x.intclient.name,

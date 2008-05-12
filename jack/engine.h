@@ -76,7 +76,7 @@ struct _jack_engine {
 
     /* engine serialization -- use precedence for deadlock avoidance */
     pthread_mutex_t request_lock;	/* precedes client_lock */
-    pthread_mutex_t client_lock;
+    pthread_rwlock_t client_lock;
     pthread_mutex_t port_lock;
     int		    process_errors;
     int		    period_msecs;
@@ -184,21 +184,26 @@ extern jack_timer_type_t clock_source;
 extern jack_client_internal_t *
 jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
 
-static inline void jack_lock_graph (jack_engine_t* engine) {
-	DEBUG ("acquiring graph lock");
-	pthread_mutex_lock (&engine->client_lock);
+static inline void jack_rdlock_graph (jack_engine_t* engine) {
+	DEBUG ("acquiring graph read lock");
+	pthread_rwlock_rdlock (&engine->client_lock);
 }
 
-static inline int jack_try_lock_graph (jack_engine_t *engine)
+static inline void jack_lock_graph (jack_engine_t* engine) {
+	DEBUG ("acquiring graph lock");
+	pthread_rwlock_wrlock (&engine->client_lock);
+}
+
+static inline int jack_try_rdlock_graph (jack_engine_t *engine)
 {
-	DEBUG ("TRYING to acquiring graph lock");
-	return pthread_mutex_trylock (&engine->client_lock);
+	DEBUG ("TRYING to acquiring graph read lock");
+	return pthread_rwlock_tryrdlock (&engine->client_lock);
 }
 
 static inline void jack_unlock_graph (jack_engine_t* engine) 
 {
 	DEBUG ("releasing graph lock");
-	pthread_mutex_unlock (&engine->client_lock);
+	pthread_rwlock_unlock (&engine->client_lock);
 }
 
 static inline unsigned int jack_power_of_two (unsigned int n)
