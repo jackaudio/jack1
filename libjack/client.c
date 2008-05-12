@@ -199,8 +199,12 @@ jack_error (const char *fmt, ...)
 void 
 default_jack_error_callback (const char *desc)
 {
+#ifdef DEBUG_ENABLED
+	DEBUG("%s", desc);
+#else
 	fprintf(stderr, "%s\n", desc);
 	fflush(stderr);
+#endif
 }
 
 void 

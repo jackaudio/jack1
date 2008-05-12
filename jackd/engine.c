@@ -637,6 +637,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
 	jack_time_t now, then;
+	int pollret;
 
 	client = (jack_client_internal_t *) node->data;
 	
@@ -673,13 +674,14 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 				1 + engine->driver->period_usecs/1000);
 	}
 
+     again:
 	pfd[0].fd = client->subgraph_wait_fd;
 	pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
 
 	DEBUG ("waiting on fd==%d for process() subgraph to finish (timeout = %d, period_usecs = %d)",
 	       client->subgraph_wait_fd, poll_timeout, engine->driver->period_usecs);
 
-	if (poll (pfd, 1, poll_timeout) < 0) {
+	if ((pollret = poll (pfd, 1, poll_timeout)) < 0) {
 		jack_error ("poll on subgraph processing failed (%s)",
 			    strerror (errno));
 		status = -1; 
@@ -694,8 +696,22 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	}
 
 	if (pfd[0].revents & POLLIN) {
+
 		status = 0;
-	} else {
+
+	} else if (status == 0) {
+
+		/* no events, no errors, we woke up because poll()
+		   decided that time was up ...
+		*/
+
+		now = jack_get_microseconds ();
+
+		if ((now - then) < 1000) {
+			jack_error ("FALSE WAKEUP poll returned %d (%dusecs vs. %d msec)", pollret, (now - then), poll_timeout);
+			goto again;
+		}
+
 		jack_error ("subgraph starting at %s timed out "
 			    "(subgraph_wait_fd=%d, status = %d, state = %s)", 
 			    client->control->name,
@@ -2427,11 +2443,11 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
  						status = 0;
  					} else {
  						DEBUG ("client event poll not ok! (1 = poll timed out, revents = 0x%04x, poll_ret = %d)", pfd[0].revents, poll_ret);
- 						jack_error ("subgraph starting at %s timed out "
- 								"(subgraph_wait_fd=%d, status = %d, state = %s, revents = 0x%04x)", 
- 								client->control->name,
- 								client->subgraph_wait_fd, status, 
- 								jack_client_state_name (client), pfd[0].revents);
+ 						jack_error ("client %s did not respond to event type %d in time"
+							    "(fd=%d, revents = 0x%04x)", 
+							    client->control->name, event->type,
+							    client->event_fd,
+							    pfd[0].revents);
  						status = 1;
  					}
  				}
