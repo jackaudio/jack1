@@ -80,6 +80,7 @@ static int dummy_nt_detach    (jack_driver_nt_t *drv) { return 0; }
 #define DRIVER_NT_RUN   0
 #define DRIVER_NT_EXIT  1
 #define DRIVER_NT_PAUSE 2
+#define DRIVER_NT_DYING 3
 
 static int
 jack_driver_nt_attach (jack_driver_nt_t * driver, jack_engine_t * engine)
@@ -130,6 +131,7 @@ jack_driver_nt_thread (void * arg)
 
  out:
 	if (rc) {
+		driver->nt_run = DRIVER_NT_DYING;
 		driver->engine->driver_exit (driver->engine);
 	}
 	pthread_exit (NULL);
@@ -177,10 +179,14 @@ jack_driver_nt_do_stop (jack_driver_nt_t * driver, int run)
 	int err;
 
 	pthread_mutex_lock (&driver->nt_run_lock);
-	driver->nt_run = run;
+	if(driver->nt_run != DRIVER_NT_DYING) {
+		driver->nt_run = run;
+	}
 	pthread_mutex_unlock (&driver->nt_run_lock);
 
-	if ((err = pthread_join (driver->nt_thread, NULL)) != 0) {
+	/* detect when called while the thread is shutting itself down */
+	if (driver->nt_thread && driver->nt_run != DRIVER_NT_DYING
+	    && (err = pthread_join (driver->nt_thread, NULL)) != 0) {
 		jack_error ("DRIVER NT: error waiting for driver thread: %s",
                             strerror (err));
 		return err;

@@ -2070,8 +2070,16 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 static void
 jack_engine_driver_exit (jack_engine_t* engine)
 {
+	jack_driver_t* driver = engine->driver;
+
+	VERBOSE (engine, "stopping driver");
+	driver->stop (driver);
+	VERBOSE (engine, "detaching driver");
+	driver->detach (driver, engine);
+
 	/* tell anyone waiting that the driver exited. */
 	kill (engine->wait_pid, SIGUSR2);
+	
 	engine->driver = NULL;
 }
 
