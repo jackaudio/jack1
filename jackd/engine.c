@@ -601,6 +601,40 @@ jack_process_internal(jack_engine_t *engine, JSList *node,
 		return jack_slist_next (node);
 }
 
+#ifdef __linux
+
+/* Linux kernels somewhere between 2.6.18 and 2.6.24 had a bug
+   in poll(2) that led poll to return early. To fix it, we need
+   to know that that jack_get_microseconds() is monotonic.
+*/
+
+#ifdef HAVE_CLOCK_GETTIME
+static const int system_clock_monotonic = 1;
+#else
+static const int system_clock_monotonic = 0;
+#endif
+
+static int
+linux_poll_bug_encountered (jack_engine_t* engine, jack_time_t then, int* poll_timeout)
+{
+	if (engine->control->clock_source != JACK_TIMER_SYSTEM_CLOCK || system_clock_monotonic) {
+		jack_time_t now = jack_get_microseconds ();
+		
+		if ((now - then) < ((*poll_timeout) * 1000)) {
+			
+			/*
+			   So, adjust poll timeout to account for time already spent waiting.
+			*/
+			
+			*poll_timeout -= (now - then) / 1000;
+			VERBOSE (engine, "FALSE WAKEUP (%dusecs vs. %d msec)", (now - then), *poll_timeout);
+			return 1;
+		}
+	}
+	return 0;
+}
+#endif
+
 #ifdef JACK_USE_MACH_THREADS
 static JSList * 
 jack_process_external(jack_engine_t *engine, JSList *node)
@@ -705,18 +739,18 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 		   decided that time was up ...
 		*/
 
-		now = jack_get_microseconds ();
-
-		if ((now - then) < 1000) {
-			jack_error ("FALSE WAKEUP poll returned %d (%dusecs vs. %d msec)", pollret, (now - then), poll_timeout);
+#ifdef __linux		
+		if (linux_poll_bug_encountered (engine, then, &poll_timeout)) {
 			goto again;
 		}
-
+#endif
+			
 		jack_error ("subgraph starting at %s timed out "
-			    "(subgraph_wait_fd=%d, status = %d, state = %s)", 
+			    "(subgraph_wait_fd=%d, status = %d, state = %s, pollret = %d revents = 0x%x)", 
 			    client->control->name,
 			    client->subgraph_wait_fd, status, 
-			    jack_client_state_name (client));
+			    jack_client_state_name (client),
+			    pollret, pfd[0].revents);
 		status = 1;
 	}
 
@@ -777,7 +811,6 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 }
 
 #endif /* JACK_USE_MACH_THREADS */
-
 
 static int
 jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
@@ -2411,18 +2444,10 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
  
  				struct pollfd pfd[1];
  				pfd[0].fd = client->event_fd;
- 				//pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
- 				pfd[0].events = POLLIN;
- 
- 				int poll_timeout = (engine->client_timeout_msecs > 0 ?
- 						engine->client_timeout_msecs :
- 						1 + engine->driver->period_usecs/1000);
- 
- 				//poll_timeout = 200;
- 				//poll_timeout = 30000; // 30 seconds
- 
+ 				pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
+
+ 				int poll_timeout = JACKD_CLIENT_EVENT_TIMEOUT;
  				int poll_ret;
- 				// printf("################ poll_timeout = %d (%d or 1 + %d/1000)\n", poll_timeout, engine->client_timeout_msecs, engine->driver->period_usecs);
  
  				if ( (poll_ret = poll (pfd, 1, poll_timeout)) < 0) {
  					DEBUG ("client event poll not ok! (-1) poll returned an error");
