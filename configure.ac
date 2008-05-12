@@ -229,8 +229,19 @@ dnl
 
 dnl ----------------------------------------------------------------------
 
-                                                                                
-if test "$target_cpu" = "powerpc"; then
+if test "$target_cpu" = "powerpc64" ; then
+
+    AC_ARG_ENABLE(cell,
+	[  --enable-cell           enable Cell BE support (default=no)],,
+	[ enable_cell=no ])
+
+    if test "x$enable_cell" = xyes; then
+        AC_DEFINE(ENABLE_CELLBE, 1, [Define to 1 if you need support for the Cell BE.])
+    fi
+
+fi
+
+if test "$target_cpu" = "powerpc" -o "$target_cpu" = "powerpc64" ; then
 
     AC_DEFINE(POWERPC, 1, "Are we running a ppc CPU?")
     
@@ -261,7 +272,11 @@ if test "$target_cpu" = "powerpc"; then
 
     dnl -mcpu=7450 does not reliably work with gcc 3.*
     
-    JACK_OPT_CFLAGS="-D_REENTRANT -O2 -mcpu=7400 $ALTIVEC_OPT_FLAGS_FLAGS -mhard-float -mpowerpc-gfxopt"
+    JACK_OPT_CFLAGS="-D_REENTRANT -O2 -mcpu=7400 $ALTIVEC_OPT_FLAGS -mhard-float -mpowerpc-gfxopt"
+
+    if test "$target_cpu" = "powerpc64"; then
+	JACK_OPT_CFLAGS="-D_REENTRANT -O2 -mcpu=powerpc64 $ALTIVEC_OPT_FLAGS -mhard-float" 
+    fi
 
 elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 
