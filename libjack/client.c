@@ -952,6 +952,8 @@ jack_client_open_aux (const char *client_name,
 	jack_port_type_id_t ptid;
 	jack_status_t my_status;
 
+	jack_messagebuffer_init ();
+	
 	if (status == NULL)		/* no status from caller? */
 		status = &my_status;	/* use local status word */
 	*status = 0;
@@ -1099,10 +1101,10 @@ jack_client_open_aux (const char *client_name,
 jack_client_t* jack_client_open(const char* ext_client_name, jack_options_t options, jack_status_t* status, ...)
 {
 	va_list ap;
-    va_start(ap, status);
-    jack_client_t* res = jack_client_open_aux(ext_client_name, options, status, ap);
-    va_end(ap);
-    return res;
+	va_start(ap, status);
+	jack_client_t* res = jack_client_open_aux(ext_client_name, options, status, ap);
+	va_end(ap);
+	return res;
 }
 
 jack_client_t *
@@ -1201,7 +1203,7 @@ jack_internal_client_close (const char *client_name)
 		jack_error ("cannot deliver ClientUnload request to JACK "
 			    "server.");
 	}
-	
+
 	/* no response to this request */
 	
 	close (fd);
@@ -2095,6 +2097,7 @@ jack_client_close_aux (jack_client_t *client)
 	}
 	jack_slist_free (client->ports_ext);
 	jack_client_free (client);
+	jack_messagebuffer_exit ();
 
 	return rc;
 }

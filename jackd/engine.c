@@ -676,8 +676,8 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	pfd[0].fd = client->subgraph_wait_fd;
 	pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
 
-	DEBUG ("waiting on fd==%d for process() subgraph to finish",
-	       client->subgraph_wait_fd);
+	DEBUG ("waiting on fd==%d for process() subgraph to finish (timeout = %d, period_usecs = %d)",
+	       client->subgraph_wait_fd, poll_timeout, engine->driver->period_usecs);
 
 	if (poll (pfd, 1, poll_timeout) < 0) {
 		jack_error ("poll on subgraph processing failed (%s)",
