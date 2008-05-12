@@ -3514,15 +3514,16 @@ jack_use_driver (jack_engine_t *engine, jack_driver_t *driver)
 		engine->driver = 0;
 	}
 
+	engine->driver = driver;
+
 	if (driver) {
-		if (driver->attach (driver, engine))
+		if (driver->attach (driver, engine)) {
 			return -1;
+		}
 
 		engine->rolling_interval =
 			jack_rolling_interval (driver->period_usecs);
 	}
-
-	engine->driver = driver;
 
 	return 0;
 }
