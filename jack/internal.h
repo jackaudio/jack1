@@ -61,9 +61,25 @@ const char* jack_clock_source_name (jack_timer_type_t);
 #include <sysdeps/mach_port.h>
 #endif
 
+#include <jack/messagebuffer.h>
+
 #ifdef DEBUG_ENABLED
+
+/* grab thread id instead of PID on linux */
+#if defined(__gnu_linux__)
+    #ifdef gettid  /* glibc has a version */
+        #define GETTID() gettid()
+    #else /* use our own version */
+        #include <sys/syscall.h>
+        #define GETTID() syscall(__NR_gettid)
+    #endif
+#else
+    #define GETTID() getpid()
+#endif
+
 #define DEBUG(format,args...) \
-	fprintf (stderr, "jack:%5d:%" PRIu64 " %s:%s:%d: " format "\n", getpid(), jack_get_microseconds(), __FILE__, __FUNCTION__, __LINE__ , ## args)
+	MESSAGE("jack:%5d:%" PRIu64 " %s:%s:%d: " format "", GETTID(), jack_get_microseconds(), __FILE__, __FUNCTION__, __LINE__ , ## args)
+
 #else
 #if JACK_CPP_VARARGS_BROKEN
     #define DEBUG(format...)
