@@ -72,16 +72,6 @@ FakeVideoSync( dummy_driver_t *driver )
                 position->valid = (jack_position_bits_t) (position->valid | JackVideoFrameOffset);
         }
 }
-jack_time_t 
-jack_get_microseconds_from_system (void) {
-	jack_time_t jackTime;
-	struct timespec time;
-
-	clock_gettime(CLOCK_MONOTONIC, &time);
-	jackTime = (jack_time_t) time.tv_sec * 1e6 +
-		(jack_time_t) time.tv_nsec / 1e3;
-	return jackTime;
-}
 
 #ifdef HAVE_CLOCK_GETTIME
 static inline unsigned long long ts_to_nsec(struct timespec ts)
