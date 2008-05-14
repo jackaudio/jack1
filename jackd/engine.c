@@ -615,19 +615,19 @@ static const int system_clock_monotonic = 0;
 #endif
 
 static int
-linux_poll_bug_encountered (jack_engine_t* engine, jack_time_t then, int* poll_timeout)
+linux_poll_bug_encountered (jack_engine_t* engine, jack_time_t then, jack_time_t *required)
 {
 	if (engine->control->clock_source != JACK_TIMER_SYSTEM_CLOCK || system_clock_monotonic) {
 		jack_time_t now = jack_get_microseconds ();
-		
-		if ((now - then) < ((*poll_timeout) * 1000)) {
+
+		if ((now - then) < *required) {
 			
 			/*
 			   So, adjust poll timeout to account for time already spent waiting.
 			*/
 			
-			*poll_timeout -= (now - then) / 1000;
-			VERBOSE (engine, "FALSE WAKEUP (%lldusecs vs. %d msec)", (now - then), *poll_timeout);
+			VERBOSE (engine, "FALSE WAKEUP (%lldusecs vs. %lld usec)", (now - then), *required);
+			*required -= (now - then);
 			return 1;
 		}
 	}
@@ -668,6 +668,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	char c = 0;
 	struct pollfd pfd[1];
 	int poll_timeout;
+	jack_time_t poll_timeout_usecs;
 	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
 	jack_time_t now, then;
@@ -701,14 +702,15 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	then = jack_get_microseconds ();
 
 	if (engine->freewheeling) {
-		poll_timeout = 10000; /* 10 seconds */
+		poll_timeout_usecs = 10000000; /* 10 seconds */
 	} else {
-		poll_timeout = (engine->client_timeout_msecs > 0 ?
-				engine->client_timeout_msecs :
-				1 + engine->driver->period_usecs/1000);
+		poll_timeout_usecs = (engine->client_timeout_msecs > 0 ?
+				engine->client_timeout_msecs * 1000 :
+				engine->driver->period_usecs);
 	}
 
      again:
+	poll_timeout = 1 + poll_timeout_usecs / 1000;
 	pfd[0].fd = client->subgraph_wait_fd;
 	pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
 
@@ -740,7 +742,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 		*/
 
 #ifdef __linux		
-		if (linux_poll_bug_encountered (engine, then, &poll_timeout)) {
+		if (linux_poll_bug_encountered (engine, then, &poll_timeout_usecs)) {
 			goto again;
 		}
 #endif
