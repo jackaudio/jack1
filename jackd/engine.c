@@ -627,7 +627,7 @@ linux_poll_bug_encountered (jack_engine_t* engine, jack_time_t then, int* poll_t
 			*/
 			
 			*poll_timeout -= (now - then) / 1000;
-			VERBOSE (engine, "FALSE WAKEUP (%dusecs vs. %d msec)", (now - then), *poll_timeout);
+			VERBOSE (engine, "FALSE WAKEUP (%lldusecs vs. %d msec)", (now - then), *poll_timeout);
 			return 1;
 		}
 	}
