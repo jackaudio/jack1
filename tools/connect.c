@@ -22,6 +22,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <getopt.h>
+
+#include <config.h>
 
 #include <jack/jack.h>
 
@@ -31,12 +34,66 @@ int connecting, disconnecting;
 #define TRUE 1
 #define FALSE 0
 
+void
+show_version (char *my_name)
+{
+	fprintf (stderr, "%s: JACK Audio Connection Kit version " VERSION "\n", my_name);
+}
+
+void
+show_usage (char *my_name)
+{
+	show_version (my_name);
+	fprintf (stderr, "\nusage: %s [options] <src_port> <dst_port>\n", my_name);
+	fprintf (stderr, "Connects two JACK ports together.\n\n");
+	fprintf (stderr, "        The source port must be an output port of the source client.\n");
+	fprintf (stderr, "        The destination port must be an input port of the destination client.\n");
+	fprintf (stderr, "        -s, --server <name>   Connect to the jack server named <name>\n");
+	fprintf (stderr, "        -v, --version         Output version information and exit\n");
+	fprintf (stderr, "        -h, --help            Display this help message\n\n");
+	fprintf (stderr, "For more information see http://jackaudio.org/\n");
+}
+
 int
 main (int argc, char *argv[])
-
 {
 	jack_client_t *client;
+	jack_status_t status;
+	char *server_name = NULL;
+    int c;
+    int option_index;
+    jack_options_t options = JackNoStartServer;
 	char *my_name = strrchr(argv[0], '/');
+
+	struct option long_options[] = {
+	    { "server", 1, 0, 's' },
+		{ "help", 0, 0, 'h' },
+		{ "version", 0, 0, 'v' },
+		{ 0, 0, 0, 0 }
+	};
+
+	while ((c = getopt_long (argc, argv, "s:AclLphvt", long_options, &option_index)) >= 0) {
+		switch (c) {
+		case 's':
+            server_name = (char *) malloc (sizeof (char) * strlen(optarg));
+            strcpy (server_name, optarg);
+            options |= JackServerName;
+            break;
+		case 'h':
+			show_usage (my_name);
+			return 1;
+			break;
+		case 'v':
+			show_version (my_name);
+			return 1;
+			break;
+		default:
+			show_usage (my_name);
+			return 1;
+			break;
+		}
+	}
+
 	connecting = disconnecting = FALSE;
 	if (my_name == 0) {
 		my_name = argv[0];
@@ -54,16 +111,11 @@ main (int argc, char *argv[])
 		return 1;
 	}
 
-	if (argc != 3) {
-		fprintf (stderr, "usage: %s <src_port> <dst_port>\n", my_name);
-		fprintf(stderr, "The source port must be an output port of the source client.\n");
-		fprintf (stderr, "The destination port must be an input port of the destination client.\n");
-		return 1;
-	}
+	if (argc < 3) show_usage(my_name);
 
 	/* try to become a client of the JACK server */
 
-	if ((client = jack_client_new (my_name)) == 0) {
+	if ((client = jack_client_open (my_name, options, &status, server_name)) == 0) {
 		fprintf (stderr, "jack server not running?\n");
 		return 1;
 	}
@@ -78,12 +130,12 @@ main (int argc, char *argv[])
 
 	/* find the two ports */
 
-	if ((input_port = jack_port_by_name(client, argv[1])) == 0) {
-		fprintf (stderr, "ERROR %s not a valid port\n", argv[1]);
+	if ((input_port = jack_port_by_name(client, argv[argc-1])) == 0) {
+		fprintf (stderr, "ERROR %s not a valid port\n", argv[argc-1]);
 		return 1;
 		}
-	if ((output_port = jack_port_by_name(client, argv[2])) == 0) {
-		fprintf (stderr, "ERROR %s not a valid port\n", argv[2]);
+	if ((output_port = jack_port_by_name(client, argv[argc-2])) == 0) {
+		fprintf (stderr, "ERROR %s not a valid port\n", argv[argc-2]);
 		return 1;
 		}
 
