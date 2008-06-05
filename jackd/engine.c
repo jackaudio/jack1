@@ -628,6 +628,8 @@ linux_poll_bug_encountered (jack_engine_t* engine, jack_time_t then, jack_time_t
 			
 			VERBOSE (engine, "FALSE WAKEUP (%lldusecs vs. %lld usec)", (now - then), *required);
 			*required -= (now - then);
+
+			/* allow 0.25msec slop */
 			return 1;
 		}
 	}
@@ -650,8 +652,6 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	// a race exists if we do this after the write(2) 
         ctl->state = Triggered; 
         ctl->signalled_at = jack_get_microseconds();
-        ctl->awake_at = 0;
-        ctl->finished_at = 0;
         
         if (jack_client_resume(client) < 0) {
             jack_error("Client will be removed\n");
@@ -684,8 +684,6 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	ctl->state = Triggered; 
 
 	ctl->signalled_at = jack_get_microseconds();
-	ctl->awake_at = 0;
-	ctl->finished_at = 0;
 
 	engine->current_client = client;
 
@@ -696,6 +694,9 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 		jack_error ("cannot initiate graph processing (%s)",
 			    strerror (errno));
 		engine->process_errors++;
+		jack_lock_problems (engine);
+		engine->problems++;
+		jack_unlock_problems (engine);
 		return NULL; /* will stop the loop */
 	} 
 
@@ -745,6 +746,10 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 		if (linux_poll_bug_encountered (engine, then, &poll_timeout_usecs)) {
 			goto again;
 		}
+
+		if (poll_timeout_usecs < 200) {
+			VERBOSE (engine, "FALSE WAKEUP skipped, remaining = %lld usec", poll_timeout_usecs);
+		} else {
 #endif
 			
 		jack_error ("subgraph starting at %s timed out "
@@ -754,6 +759,9 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 			    jack_client_state_name (client),
 			    pollret, pfd[0].revents);
 		status = 1;
+#ifdef __linux
+		}
+#endif
 	}
 
 	now = jack_get_microseconds ();
@@ -774,14 +782,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 			 ctl->finished_at? (ctl->finished_at -
 					    ctl->signalled_at): 0);
 
-		/* we can only consider the timeout a client error if
-		 * it actually woke up.  its possible that the kernel
-		 * scheduler screwed us up and never woke up the
-		 * client in time. sigh.
-		 */
-		if (ctl->awake_at > 0) {
-			ctl->timed_out++;
-		}
+		jack_check_clients (engine, 1);
 
 		engine->process_errors++;
 		return NULL;		/* will stop the loop */
@@ -830,6 +831,8 @@ jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
 		ctl->state = NotTriggered;
 		ctl->nframes = nframes;
 		ctl->timed_out = 0;
+		ctl->awake_at = 0;
+		ctl->finished_at = 0;
 	}
 
 	for (node = engine->clients; engine->process_errors == 0 && node; ) {
@@ -910,51 +913,26 @@ static void
 jack_engine_post_process (jack_engine_t *engine)
 {
 	/* precondition: caller holds the graph lock. */
-	jack_client_control_t *ctl;
-	jack_client_internal_t *client;
-	JSList *node;
-	int need_remove = FALSE;
 
 	jack_transport_cycle_end (engine);
-	
-	/* find any clients that need removal due to timeouts, etc. */
-	for (node = engine->clients; node; node = jack_slist_next (node) ) {
-
-		client = (jack_client_internal_t *) node->data;
-		ctl = client->control;
-
-		/* this check is invalid for internal clients and
-		   external clients with no process callback.
-		*/
-		if (!jack_client_is_internal (client) && ctl->process) {
-			if (ctl->awake_at != 0 &&
-			    ctl->state > NotTriggered &&
-			    ctl->state != Finished &&
-			    ctl->timed_out++) {
-				VERBOSE(engine, "client %s error: awake_at = %"
-					 PRIu64
-					 " state = %d timed_out = %d",
-					 ctl->name,
-					 ctl->awake_at,
-					 ctl->state,
-					 ctl->timed_out);
-				client->error++;
-			}
-		}
-
-		if (client->error) {
-			need_remove = TRUE;
-		}
-	}
-	
-	if (need_remove) {
-		jack_remove_clients (engine);
-	}
-
 	jack_calc_cpu_load (engine);
+	jack_check_clients (engine, 0);
 }
 
-#ifndef JACK_USE_MACH_THREADS
+#ifdef JACK_USE_MACH_THREADS
+
+static int
+jack_start_watchdog (jack_engine_t *engine)
+{
+	/* Stephane Letz : letz@grame.fr Watch dog thread is
+	 * not needed on MacOSX since CoreAudio drivers
+	 * already contains a similar mechanism.
+	 */
+	return 0;
+}
+
+#else
+
 static void *
 jack_watchdog_thread (void *arg)
 {
@@ -1009,6 +987,7 @@ jack_start_watchdog (jack_engine_t *engine)
 	return 0;
 }
 #endif /* !JACK_USE_MACH_THREADS */
+
 
 static jack_driver_info_t *
 jack_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc)
@@ -1112,16 +1091,10 @@ jack_engine_load_driver (jack_engine_t *engine,
 	engine->driver_params = driver_params;
 
 	if (engine->control->real_time) {
-		/* Stephane Letz : letz@grame.fr Watch dog thread is
-		 * not needed on MacOSX since CoreAudio drivers
-		 * already contains a similar mechanism.
-		 */
-#ifndef JACK_USE_MACH_THREADS
 		if (jack_start_watchdog (engine)) {
 			return -1;
 		}
 		engine->watchdog_check = 1;
-#endif
 	}
 	return 0;
 }
@@ -1237,8 +1210,9 @@ static void
 do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 {
 	/* The request_lock serializes internal requests (from any
-	 * server thread) with external requests (always from the
-	 * server thread). */
+	 * thread in the server) with external requests (always from "the"
+	 * server thread). 
+	 */
 	pthread_mutex_lock (&engine->request_lock);
 
 	DEBUG ("got a request of type %d", req->type);
@@ -1386,28 +1360,20 @@ internal_client_request (void* ptr, jack_request_t *request)
 static int
 handle_external_client_request (jack_engine_t *engine, int fd)
 {
+	/* CALLER holds read lock on graph */
+
 	jack_request_t req;
 	jack_client_internal_t *client = 0;
 	int reply_fd;
 	JSList *node;
 	ssize_t r;
 
-	DEBUG ("HIT: before lock");
-	
-	jack_rdlock_graph (engine);
-
-	DEBUG ("HIT: before for");
-	
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		if (((jack_client_internal_t *) node->data)->request_fd == fd) {
-			DEBUG ("HIT: in for");
 			client = (jack_client_internal_t *) node->data;
 			break;
 		}
 	}
-	DEBUG ("HIT: after for");
-
-	jack_unlock_graph (engine);
 
 	if (client == NULL) {
 		jack_error ("client input on unknown fd %d!", fd);
@@ -1417,22 +1383,34 @@ handle_external_client_request (jack_engine_t *engine, int fd)
 	if ((r = read (client->request_fd, &req, sizeof (req)))
 	    < (ssize_t) sizeof (req)) {
 		if (r == 0) {
-			/* 0 byte read() signals EOF */
-			client->error++;
-			jack_client_disconnect(engine, fd);
-			return 0;
+#ifdef JACK_USE_MACH_THREADS
+			/* poll is implemented using
+			   select (see the macosx/fakepoll
+			   code). When the socket is closed
+			   select does not return any error,
+			   POLLIN is true and the next read
+			   will return 0 bytes. This
+			   behaviour is diffrent from the
+			   Linux poll behaviour. Thus we use
+			   this condition as a socket error
+			   and remove the client.
+			*/
+			jack_mark_client_socket_error (engine, engine->pfd[i].fd);
+#endif /* JACK_USE_MACH_THREADS */
+			return 1;
 		} else {
 			jack_error ("cannot read request from client (%d/%d/%s)",
 				    r, sizeof(req), strerror (errno));
-			client->error++;
 			return -1;
 		}
 	}
 
 	reply_fd = client->request_fd;
 	
+	jack_unlock_graph (engine);
 	do_request (engine, &req, &reply_fd);
-	
+	jack_lock_graph (engine);
+
 	if (reply_fd >= 0) {
 		DEBUG ("replying to client");
 		if (write (reply_fd, &req, sizeof (req))
@@ -1466,6 +1444,8 @@ handle_client_ack_connection (jack_engine_t *engine, int client_fd)
 	}
 
 	client->event_fd = client_fd;
+	VERBOSE (engine, "new client %s using %d for events", client->control->name,
+		 client->event_fd);
 
 	res.status = 0;
 
@@ -1477,6 +1457,7 @@ handle_client_ack_connection (jack_engine_t *engine, int client_fd)
 	return 0;
 }
 
+
 static void *
 jack_server_thread (void *arg)
 
@@ -1484,78 +1465,138 @@ jack_server_thread (void *arg)
 	jack_engine_t *engine = (jack_engine_t *) arg;
 	struct sockaddr_un client_addr;
 	socklen_t client_addrlen;
-	struct pollfd *pfd;
+	int problemsProblemsPROBLEMS = 0;
 	int client_socket;
 	int done = 0;
 	int i;
-	int max;
-	
-	engine->pfd[0].fd = engine->fds[0];
-	engine->pfd[0].events = POLLIN|POLLERR;
-	engine->pfd[1].fd = engine->fds[1];
-	engine->pfd[1].events = POLLIN|POLLERR;
-	engine->pfd_max = 2;
-	pfd = engine->pfd;
-	max = engine->pfd_max;
+	const int fixed_fd_cnt = 3;
 
 	while (!done) {
-		DEBUG ("start while");
+		JSList* node;
+		int clients;
+
+		jack_rdlock_graph (engine);
+
+		clients = jack_slist_length (engine->clients);
+
+		if (engine->pfd_size < fixed_fd_cnt + clients) {
+			if (engine->pfd) {
+				free (engine->pfd);
+			}
+			engine->pfd = (struct pollfd *) malloc (sizeof(struct pollfd) * (fixed_fd_cnt + clients));
+		}
+
+		engine->pfd[0].fd = engine->fds[0];
+		engine->pfd[0].events = POLLIN|POLLERR;
+		engine->pfd[1].fd = engine->fds[1];
+		engine->pfd[1].events = POLLIN|POLLERR;
+		engine->pfd[2].fd = engine->cleanup_fifo[0];
+		engine->pfd[2].events = POLLIN|POLLERR;
+		engine->pfd_max = fixed_fd_cnt;
 		
-	
-		if (poll (pfd, max, 10000) < 0) {
+		for (node = engine->clients; node; node = node->next) {
+
+			jack_client_internal_t* client = (jack_client_internal_t*)(node->data);
+
+			if (client->request_fd < 0 || client->control->dead || client->error >= JACK_ERROR_WITH_SOCKETS) {
+				continue;
+			}
+			engine->pfd[engine->pfd_max].fd = client->request_fd;
+			engine->pfd[engine->pfd_max].events = POLLIN|POLLPRI|POLLERR|POLLHUP|POLLNVAL;
+			engine->pfd_max++;
+		}
+
+		jack_unlock_graph (engine);
+		
+		VERBOSE (engine, "start poll on %d fd's", engine->pfd_max);
+		
+		/* go to sleep for a long, long time, or until a request
+		   arrives, or until a communication channel is broken
+		*/
+
+		if (poll (engine->pfd, engine->pfd_max, -1) < 0) {
 			if (errno == EINTR) {
 				continue;
 			}
 			jack_error ("poll failed (%s)", strerror (errno));
 			break;
 		}
-
-		DEBUG("server thread back from poll");
+		
+		VERBOSE(engine, "server thread back from poll");
 		
 		/* Stephane Letz: letz@grame.fr : has to be added
 		 * otherwise pthread_cancel() does not work on MacOSX */
 		pthread_testcancel();
-			
+
+
+		/* empty cleanup FIFO if necessary */
+
+		if (engine->pfd[2].revents & ~POLLIN) {
+			/* time to die */
+			break;
+		}
+
+		if (engine->pfd[2].revents & POLLIN) {
+			char c;
+			while (read (engine->cleanup_fifo[0], &c, 1) == 1);
+		}
+
 		/* check each client socket before handling other request*/
-		for (i = 2; i < max; i++) {
-			if (pfd[i].fd < 0) {
+		
+		jack_rdlock_graph (engine);
+
+		for (i = fixed_fd_cnt; i < engine->pfd_max; i++) {
+
+			if (engine->pfd[i].fd < 0) {
 				continue;
 			}
 
-			if (pfd[i].revents & ~POLLIN) {
-				VERBOSE (engine, "client poll reports non-input condition, fd was %d", pfd[i].fd);
-				jack_client_disconnect (engine, pfd[i].fd);
-			} else if (pfd[i].revents & POLLIN) {
-				if (handle_external_client_request
-				    (engine, pfd[i].fd)) {
+			if (engine->pfd[i].revents & ~POLLIN) {
+
+				jack_mark_client_socket_error (engine, engine->pfd[i].fd);
+				jack_lock_problems (engine);
+				engine->problems++;	
+				jack_unlock_problems (engine);
+
+			} else if (engine->pfd[i].revents & POLLIN) {
+
+				if (handle_external_client_request (engine, engine->pfd[i].fd)) {
 					jack_error ("could not handle external"
 						    " client request");
-#ifdef JACK_USE_MACH_THREADS
-                                    /* poll is implemented using
-				       select (see the macosx/fakepoll
-				       code). When the socket is closed
-				       select does not return any error,
-				       POLLIN is true and the next read
-				       will return 0 bytes. This
-				       behaviour is diffrent from the
-				       Linux poll behaviour. Thus we use
-				       this condition as a socket error
-				       and remove the client.
-                                    */
-                                    jack_client_disconnect(engine, pfd[i].fd);
-#endif /* JACK_USE_MACH_THREADS */
+					jack_lock_problems (engine);
+					engine->problems++;	
+					jack_unlock_problems (engine);
 				}
 			}
 		}
+
+		problemsProblemsPROBLEMS = engine->problems;
+
+		jack_unlock_graph (engine);
+
+		/* need to take write lock since we may/will rip out some clients,
+		   and reset engine->problems
+		 */
+
+		if (problemsProblemsPROBLEMS) {
+			jack_lock_graph (engine);
+			jack_lock_problems (engine);
+			VERBOSE (engine, "we have problem clients");
+			jack_remove_clients (engine);
+			engine->problems = 0;
+			jack_unlock_problems (engine);
+			jack_unlock_graph (engine);
+		}
 		
+			
 		/* check the master server socket */
 
-		if (pfd[0].revents & POLLERR) {
+		if (engine->pfd[0].revents & POLLERR) {
 			jack_error ("error on server socket");
 			break;
 		}
 	
-		if (engine->control->engine_ok && pfd[0].revents & POLLIN) {
+		if (engine->control->engine_ok && engine->pfd[0].revents & POLLIN) {
 			DEBUG ("pfd[0].revents & POLLIN");
 
 			memset (&client_addr, 0, sizeof (client_addr));
@@ -1574,22 +1615,14 @@ jack_server_thread (void *arg)
 			}
 		}
 		
-		/* Possibly, jack_client_create() may have
-		 * realloced engine->pfd.  We depend on that being
-		 * done within this thread.  That is currently true,
-		 * since external clients are only created here. 
-		 */
-		pfd = engine->pfd;
-		max = engine->pfd_max;
-
 		/* check the ACK server socket */
 
-		if (pfd[1].revents & POLLERR) {
+		if (engine->pfd[1].revents & POLLERR) {
 			jack_error ("error on server ACK socket");
 			break;
 		}
 
-		if (engine->control->engine_ok && pfd[1].revents & POLLIN) {
+		if (engine->control->engine_ok && engine->pfd[1].revents & POLLIN) {
 			DEBUG ("pfd[1].revents & POLLIN");
 
 			memset (&client_addr, 0, sizeof (client_addr));
@@ -1672,6 +1705,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->driver_exit = jack_engine_driver_exit;
 	engine->transport_cycle_start = jack_transport_cycle_start;
 	engine->client_timeout_msecs = client_timeout;
+	engine->problems = 0;
 
 	engine->next_client_id = 1;	/* 0 is a NULL client ID */
 	engine->port_max = port_max;
@@ -1699,18 +1733,33 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	pthread_rwlock_init (&engine->client_lock, 0);
 	pthread_mutex_init (&engine->port_lock, 0);
 	pthread_mutex_init (&engine->request_lock, 0);
+	pthread_mutex_init (&engine->problem_lock, 0);
 
 	engine->clients = 0;
 
-	engine->pfd_size = 16;
+	engine->pfd_size = 0;
 	engine->pfd_max = 0;
-	engine->pfd = (struct pollfd *) malloc (sizeof (struct pollfd)
-						* engine->pfd_size);
+	engine->pfd = 0;
 
 	engine->fifo_size = 16;
 	engine->fifo = (int *) malloc (sizeof (int) * engine->fifo_size);
 	for (i = 0; i < engine->fifo_size; i++) {
 		engine->fifo[i] = -1;
+	}
+
+	if (pipe (engine->cleanup_fifo)) {
+		jack_error ("cannot create cleanup FIFOs (%s)", strerror (errno));
+		return NULL;
+	}
+
+	if (fcntl (engine->cleanup_fifo[0], F_SETFL, O_NONBLOCK)) {
+		jack_error ("cannot set O_NONBLOCK on cleanup read FIFO (%s)", strerror (errno));
+		return NULL;
+	}
+
+	if (fcntl (engine->cleanup_fifo[1], F_SETFL, O_NONBLOCK)) {
+		jack_error ("cannot set O_NONBLOCK on cleanup write FIFO (%s)", strerror (errno));
+		return NULL;
 	}
 
 	engine->external_client_cnt = 0;
@@ -2053,8 +2102,18 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		consecutive_excessive_delays = 0;
 	}
 
+	DEBUG ("trying to acquire read lock");
 	if (jack_try_rdlock_graph (engine)) {
 		/* engine can't run. just throw away an entire cycle */
+		VERBOSE (engine, "null cycle");
+		driver->null_cycle (driver, nframes);
+		return 0;
+	}
+
+	if (engine->problems) {
+		/* engine can't run. just throw away an entire cycle */
+		VERBOSE (engine, "problem-driven null cycle");
+		jack_unlock_graph (engine);
 		driver->null_cycle (driver, nframes);
 		return 0;
 	}
@@ -2111,13 +2170,17 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	}
 
 	jack_engine_post_process (engine);
+
 	if (delayed_usecs > engine->control->max_delayed_usecs)
 		engine->control->max_delayed_usecs = delayed_usecs;
+	
 	ret = 0;
 
   unlock:
 	jack_unlock_graph (engine);
-	DEBUG("cycle finished, status = %d", ret);
+	DEBUG("cycle finished, status = %d, graph locked = %d", 
+	      ret, leave_graph_locked);
+
 	return ret;
 }
 
@@ -2220,6 +2283,11 @@ jack_engine_delete (jack_engine_t *engine)
 
 	engine->control->engine_ok = 0;	/* tell clients we're going away */
 
+	/* this will wake the server thread and cause it to exit */
+
+	close (engine->cleanup_fifo[0]);
+	close (engine->cleanup_fifo[1]);
+
 	/* shutdown master socket to prevent new clients arriving */
 	shutdown (engine->fds[0], SHUT_RDWR);
 	// close (engine->fds[0]);
@@ -2316,14 +2384,13 @@ jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event)
 {
 	JSList *node;
 
-	jack_lock_graph (engine);
+	jack_rdlock_graph (engine);
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_deliver_event (engine,
 				    (jack_client_internal_t *) node->data,
 				    event);
 	}
 	jack_unlock_graph (engine);
-	jack_remove_clients (engine);
 }
 
 static void
@@ -2436,7 +2503,10 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 				jack_error ("cannot send event to client [%s]"
 					    " (%s)", client->control->name,
 					    strerror (errno));
-				client->error = JACK_ERROR_WITH_SOCKETS+99;
+				client->error += JACK_ERROR_WITH_SOCKETS;
+				jack_lock_problems (engine);
+				engine->problems++;
+				jack_unlock_problems (engine);
 			}
 
  			if (client->error) {
@@ -2447,35 +2517,66 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
  				struct pollfd pfd[1];
  				pfd[0].fd = client->event_fd;
  				pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
-
- 				int poll_timeout = JACKD_CLIENT_EVENT_TIMEOUT;
+ 				jack_time_t poll_timeout = JACKD_CLIENT_EVENT_TIMEOUT;
  				int poll_ret;
- 
- 				if ( (poll_ret = poll (pfd, 1, poll_timeout)) < 0) {
+				jack_time_t then = jack_get_microseconds ();
+				jack_time_t now;
+				
+			again:
+				VERBOSE(engine,"client event poll on %d for %s starts at %lld", 
+					client->event_fd, client->control->name, then);
+ 				if ((poll_ret = poll (pfd, 1, poll_timeout)) < 0) {
  					DEBUG ("client event poll not ok! (-1) poll returned an error");
  					jack_error ("poll on subgraph processing failed (%s)", strerror (errno));
  					status = -1; 
  				} else {
  
  					DEBUG ("\n\n\n\n\n back from client event poll, revents = 0x%x\n\n\n", pfd[0].revents);
- 
+					now = jack_get_microseconds();
+					VERBOSE(engine,"back from client event poll after %lld usecs", now - then);
+
  					if (pfd[0].revents & ~POLLIN) {
+
+						/* some kind of OOB socket event */
+
  						DEBUG ("client event poll not ok! (-2), revents = %d\n", pfd[0].revents);
  						jack_error ("subgraph starting at %s lost client", client->control->name);
  						status = -2; 
- 					}
- 
- 					if (pfd[0].revents & POLLIN) {
+
+ 					} else if (pfd[0].revents & POLLIN) {
+
+						/* client responded normally */
+
  						DEBUG ("client event poll ok!");
  						status = 0;
- 					} else {
- 						DEBUG ("client event poll not ok! (1 = poll timed out, revents = 0x%04x, poll_ret = %d)", pfd[0].revents, poll_ret);
- 						jack_error ("client %s did not respond to event type %d in time"
-							    "(fd=%d, revents = 0x%04x)", 
-							    client->control->name, event->type,
-							    client->event_fd,
-							    pfd[0].revents);
- 						status = 1;
+
+ 					} else if (poll_ret == 0) {
+
+						/* no events, no errors, we woke up because poll()
+						   decided that time was up ...
+						*/
+						
+#ifdef __linux		
+						if (linux_poll_bug_encountered (engine, then, &poll_timeout)) {
+							goto again;
+						}
+						
+						if (poll_timeout < 200) {
+							VERBOSE (engine, "FALSE WAKEUP skipped, remaining = %lld usec", poll_timeout);
+							status = 0;
+						} else {
+#endif
+							DEBUG ("client event poll not ok! (1 = poll timed out, revents = 0x%04x, poll_ret = %d)", pfd[0].revents, poll_ret);
+							VERBOSE (engine,"client %s did not respond to event type %d in time"
+								    "(fd=%d, revents = 0x%04x, timeout was %lld)", 
+								    client->control->name, event->type,
+								    client->event_fd,
+								    pfd[0].revents,
+								    poll_timeout);
+							status = 1;
+#ifdef __linux
+						}
+#endif
  					}
  				}
   			}
@@ -2486,13 +2587,21 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
  							"client [%s] (%s)",
  							client->control->name,
  							strerror (errno));
-					client->error = JACK_ERROR_WITH_SOCKETS+99;
+					client->error += JACK_ERROR_WITH_SOCKETS;
+					jack_lock_problems (engine);
+					engine->problems++;
+					jack_unlock_problems (engine);
  				}
  			} else {
- 				jack_error ("bad status (%d) for client event "
-  					    "handling (type = %d)",
- 					    status,event->type);
-				client->error = JACK_ERROR_WITH_SOCKETS+99;
+ 				jack_error ("bad status (%d) for client %s "
+					    "handling event (type = %d)",
+ 					    status,
+					    client->control->name,
+					    event->type);
+				client->error += JACK_ERROR_WITH_SOCKETS;
+				jack_lock_problems (engine);
+				engine->problems++;
+				jack_unlock_problems (engine);
   			}
 		}
 	}
@@ -2655,8 +2764,6 @@ jack_rechain_graph (jack_engine_t *engine)
 			 subgraph_client->control->name,
 			 subgraph_client->subgraph_wait_fd, n);
 	}
-
-	jack_remove_clients (engine);
 
 	VERBOSE (engine, "-- jack_rechain_graph()");
 
@@ -2841,10 +2948,12 @@ jack_sort_graph (jack_engine_t *engine)
 {
 	/* called, obviously, must hold engine->client_lock */
 
+	VERBOSE (engine, "++ jack_sort_graph");
 	engine->clients = jack_slist_sort (engine->clients,
 					   (JCompareFunc) jack_client_sort);
 	jack_compute_all_port_total_latencies (engine);
 	jack_rechain_graph (engine);
+	VERBOSE (engine, "-- jack_sort_graph");
 }
 
 static int 
@@ -3011,7 +3120,7 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 	jack_info ("engine.c: <-- dump begins -->");
 
 	if (take_lock) {
-		jack_lock_graph (engine);
+		jack_rdlock_graph (engine);
 	}
 
 	for (n = 0, clientnode = engine->clients; clientnode;
@@ -3259,7 +3368,6 @@ jack_port_do_connect (jack_engine_t *engine,
 	}
 
 	jack_unlock_graph (engine);
-	jack_remove_clients (engine);
 
 	return 0;
 }
@@ -3361,8 +3469,6 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 			break;
 		}
 	}
-
-	jack_remove_clients (engine);
 
 	if (check_acyclic) {
 		jack_check_acyclic (engine);
@@ -3889,8 +3995,6 @@ jack_port_registration_notify (jack_engine_t *engine,
 			}
 		}
 	}
-
-	jack_remove_clients (engine);
 }
 
 void
@@ -3926,8 +4030,6 @@ jack_client_registration_notify (jack_engine_t *engine,
 			}
 		}
 	}
-
-	jack_remove_clients (engine);
 }
 
 int

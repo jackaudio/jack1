@@ -52,7 +52,7 @@ typedef struct _jack_port_buffer_list {
 } jack_port_buffer_list_t;
 
 #define JACKD_WATCHDOG_TIMEOUT 10000
-#define JACKD_CLIENT_EVENT_TIMEOUT 5000
+#define JACKD_CLIENT_EVENT_TIMEOUT 2000
 
 /* The main engine structure in local memory. */
 struct _jack_engine {
@@ -75,9 +75,10 @@ struct _jack_engine {
     /* "private" sections starts here */
 
     /* engine serialization -- use precedence for deadlock avoidance */
-    pthread_mutex_t request_lock;	/* precedes client_lock */
+    pthread_mutex_t request_lock; /* precedes client_lock */
     pthread_rwlock_t client_lock;
     pthread_mutex_t port_lock;
+    pthread_mutex_t problem_lock; /* must hold write lock on client_lock */
     int		    process_errors;
     int		    period_msecs;
 
@@ -100,6 +101,7 @@ struct _jack_engine {
     pthread_t	    watchdog_thread;
 
     int		    fds[2];
+    int		    cleanup_fifo[2];
     jack_client_id_t next_client_id;
     size_t	    pfd_size;
     size_t	    pfd_max;
@@ -121,6 +123,7 @@ struct _jack_engine {
     pid_t           wait_pid;
     pthread_t       freewheel_thread;
     int             nozombies;
+    int             problems;
 
     /* these lists are protected by `client_lock' */
     JSList	   *clients;
@@ -184,6 +187,15 @@ extern jack_timer_type_t clock_source;
 extern jack_client_internal_t *
 jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
 
+#define jack_rdlock_graph(e) { DEBUG ("acquiring graph read lock"); if (pthread_rwlock_rdlock (&e->client_lock)) abort(); }
+#define jack_lock_graph(e) { DEBUG ("acquiring graph write lock"); if (pthread_rwlock_wrlock (&e->client_lock)) abort(); }
+#define jack_try_rdlock_graph(e) pthread_rwlock_tryrdlock (&e->client_lock)
+#define jack_unlock_graph(e) { DEBUG ("release graph lock"); if (pthread_rwlock_unlock (&e->client_lock)) abort(); }
+
+#define jack_lock_problems(e) { DEBUG ("release problem lock"); if (pthread_mutex_lock (&e->problem_lock)) abort(); }
+#define jack_unlock_problems(e) { DEBUG ("release problem lock"); if (pthread_mutex_unlock (&e->problem_lock)) abort(); }
+
+#if 0
 static inline void jack_rdlock_graph (jack_engine_t* engine) {
 	DEBUG ("acquiring graph read lock");
 	pthread_rwlock_rdlock (&engine->client_lock);
@@ -205,6 +217,7 @@ static inline void jack_unlock_graph (jack_engine_t* engine)
 	DEBUG ("releasing graph lock");
 	pthread_rwlock_unlock (&engine->client_lock);
 }
+#endif
 
 static inline unsigned int jack_power_of_two (unsigned int n)
 {

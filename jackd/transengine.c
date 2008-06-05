@@ -360,10 +360,16 @@ jack_transport_client_set_sync (jack_engine_t *engine,
 	int ret;
 	jack_client_internal_t *client;
 
+	DEBUG ("set sync client");
+
 	/* The process cycle runs with this lock. */
 	jack_lock_graph (engine);
 
+	DEBUG ("got write lock");
+
 	client = jack_client_internal_by_id (engine, client_id);
+
+	DEBUG ("client was %p");
 
 	if (client) {
 		if (!client->control->is_slowsync) {
@@ -375,13 +381,17 @@ jack_transport_client_set_sync (jack_engine_t *engine,
 		}
 
 		/* force poll of the new slow-sync client, if active */
-		if (client->control->active_slowsync)
+		if (client->control->active_slowsync) {
+			DEBUG ("sync poll new");
 			jack_sync_poll_new (engine, client);
+		}
 		ret = 0;
 	}  else
 		ret = EINVAL;
 
+	DEBUG ("unlocking write lock for set_sync");
 	jack_unlock_graph (engine);
+
 
 	return ret;
 }

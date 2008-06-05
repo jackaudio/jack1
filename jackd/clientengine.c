@@ -94,7 +94,7 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	/* caller must hold the client_lock */
 
-	/* this stops jack_deliver_event() from doing anything */
+	/* this stops jack_deliver_event() from contacing this client */
 
 	client->control->dead = TRUE;
 
@@ -105,11 +105,9 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 static void
 jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
-	/* called *without* the request_lock */
-	unsigned int i;
 	JSList *node;
 
-	/* caller must hold the client_lock */
+	/* caller must write-hold the client lock */
 
 	VERBOSE (engine, "removing client \"%s\"", client->control->name);
 
@@ -125,22 +123,6 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	
 		close (client->event_fd);
 		close (client->request_fd);
-
-		/* rearrange the pollfd array so that things work right the 
-		   next time we go into poll(2).
-		*/
-		
-		for (i = 0; i < engine->pfd_max; i++) {
-			if (engine->pfd[i].fd == client->request_fd) {
-				if (i+1 < engine->pfd_max) {
-					memmove (&engine->pfd[i],
-						 &engine->pfd[i+1],
-						 sizeof (struct pollfd)
-						 * (engine->pfd_max - i));
-				}
-				engine->pfd_max--;
-			}
-		}
 	}
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
@@ -162,6 +144,64 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	
 }
 
+static void
+jack_wake_server_thread (jack_engine_t* engine)
+{
+	char c = 0;
+	/* we don't actually care if this fails */
+	VERBOSE (engine, "waking server thread");
+	write (engine->cleanup_fifo[1], &c, 1);
+}
+
+void
+jack_check_clients (jack_engine_t* engine, int with_timeout_check)
+{
+	/* CALLER MUST HOLD graph read lock */
+
+	JSList* node;
+	jack_client_internal_t* client;
+	int errs = 0;
+
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+
+		client = (jack_client_internal_t *) node->data;
+
+		if (client->error) {
+			errs++;
+			continue;
+		}
+
+		if (with_timeout_check) {
+
+			/* we can only consider the timeout a client error if
+			 * it actually woke up.  its possible that the kernel
+			 * scheduler screwed us up and never woke up the
+			 * client in time. sigh.
+			 */
+			
+			VERBOSE (engine, "checking client %s: awake at %" PRIu64 " finished at %" PRIu64, 
+				 client->control->name,
+				 client->control->awake_at,
+				 client->control->finished_at);
+			
+			if (client->control->awake_at > 0) {
+				if (client->control->finished_at == 0) {
+					client->control->timed_out++;
+					client->error++;
+					VERBOSE (engine, "client %s has timed out", client->control->name);
+				}
+			}
+		}
+	}
+		
+	if (errs) {
+		jack_lock_problems (engine);
+		engine->problems++;
+		jack_unlock_problems (engine);
+		jack_wake_server_thread (engine);
+	}
+}
+
 void
 jack_remove_clients (jack_engine_t* engine)
 {
@@ -169,12 +209,10 @@ jack_remove_clients (jack_engine_t* engine)
 	int need_sort = FALSE;
 	jack_client_internal_t *client;
 
-	if (engine->removing_clients) {
-		return;
-	}
+	/* CALLER MUST HOLD GRAPH LOCK */
 
-	engine->removing_clients++;
-	
+	VERBOSE (engine, "++ Removing failed clients ...");
+
 	/* remove all dead clients */
 
 	for (node = engine->clients; node; ) {
@@ -231,7 +269,7 @@ jack_remove_clients (jack_engine_t* engine)
 	
 	jack_engine_reset_rolling_usecs (engine);
 
-	engine->removing_clients--;
+	VERBOSE (engine, "-- Removing failed clients ...");
 }
 
 static int
@@ -339,6 +377,7 @@ jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id)
 	/* call tree ***MUST HOLD*** the graph lock */
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
+
 		if (((jack_client_internal_t *) node->data)->control->id
 		    == id) {
 			client = (jack_client_internal_t *) node->data;
@@ -596,18 +635,6 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 		}
 
 	} else {			/* external client */
-		
-		if (engine->pfd_max >= engine->pfd_size) {
-			engine->pfd = (struct pollfd *)
-				realloc (engine->pfd, sizeof (struct pollfd)
-					 * (engine->pfd_size + 16));
-			engine->pfd_size += 16;
-		}
-		
-		engine->pfd[engine->pfd_max].fd = client->request_fd;
-		engine->pfd[engine->pfd_max].events =
-			POLLIN|POLLPRI|POLLERR|POLLHUP|POLLNVAL;
-		engine->pfd_max++;
 
 		jack_unlock_graph (engine);
 	}
@@ -814,14 +841,12 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 }	
 
 int
-jack_client_disconnect (jack_engine_t *engine, int fd)
+jack_mark_client_socket_error (jack_engine_t *engine, int fd)
 {
+	/* CALLER MUST HOLD GRAPH LOCK */
+
 	jack_client_internal_t *client = 0;
 	JSList *node;
-
-#ifndef DEFER_CLIENT_REMOVE_TO_AUDIO_THREAD
-
-        jack_lock_graph (engine);
 
         for (node = engine->clients; node; node = jack_slist_next (node)) {
 
@@ -837,43 +862,13 @@ jack_client_disconnect (jack_engine_t *engine, int fd)
         }
 
         if (client) {
-		VERBOSE (engine, "removing disconnected client %s state = "
+		VERBOSE (engine, "marking client %s with SOCKET error state = "
 			 "%s errors = %d", client->control->name,
 			 jack_client_state_name (client),
 			 client->error);
-		jack_remove_client(engine, client);
-		jack_sort_graph (engine);
+		client->error += JACK_ERROR_WITH_SOCKETS;
 	}
 
-        jack_unlock_graph (engine);
-
-#else /* DEFER_CLIENT_REMOVE_TO_AUDIO_THREAD */
-
-	jack_lock_graph (engine);
-
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-
-		if (jack_client_is_internal((jack_client_internal_t *)
-					    node->data)) {
-			continue;
-		}
-
-		if (((jack_client_internal_t *) node->data)->request_fd == fd) {
-			client = (jack_client_internal_t *) node->data;
-			VERBOSE (engine, "marking socket error on client %s state = "
-				 "%s errors = %d", client->control->name,
-				 jack_client_state_name (client),
-				 client->error);
-			if (client->error < JACK_ERROR_WITH_SOCKETS) {
-				client->error += JACK_ERROR_WITH_SOCKETS;
-			}
-			break;
-		}
-	}
-
-	jack_unlock_graph (engine);
-
-#endif /* DEFER_CLIENT_REMOVE_TO_AUDIO_THREAD */
 
 	return 0;
 }
