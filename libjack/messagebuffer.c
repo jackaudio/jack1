@@ -113,8 +113,6 @@ jack_messagebuffer_exit ()
 	if (mb_overruns)
 		jack_error("WARNING: %d message buffer overruns!",
 			mb_overruns);
-	else
-		jack_info("no message buffer overruns");
 
 	pthread_mutex_destroy(&mb_write_lock);
 	pthread_cond_destroy(&mb_ready_cond);

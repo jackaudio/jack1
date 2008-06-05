@@ -138,10 +138,10 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	jack_client_delete (engine, client);
 
 	/* ignore the driver, which counts as a client. */
+
 	if (engine->temporary && (jack_slist_length(engine->clients) <= 1)) {
-		exit(0);
+		exit (0);
 	}
-	
 }
 
 static void
@@ -868,7 +868,6 @@ jack_mark_client_socket_error (jack_engine_t *engine, int fd)
 			 client->error);
 		client->error += JACK_ERROR_WITH_SOCKETS;
 	}
-
 
 	return 0;
 }

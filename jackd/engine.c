@@ -1395,7 +1395,7 @@ handle_external_client_request (jack_engine_t *engine, int fd)
 			   this condition as a socket error
 			   and remove the client.
 			*/
-			jack_mark_client_socket_error (engine, engine->pfd[i].fd);
+			jack_mark_client_socket_error (engine, fd);
 #endif /* JACK_USE_MACH_THREADS */
 			return 1;
 		} else {
@@ -2522,7 +2522,9 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 				jack_time_t then = jack_get_microseconds ();
 				jack_time_t now;
 				
+#ifdef __linux
 			again:
+#endif
 				VERBOSE(engine,"client event poll on %d for %s starts at %lld", 
 					client->event_fd, client->control->name, then);
  				if ((poll_ret = poll (pfd, 1, poll_timeout)) < 0) {

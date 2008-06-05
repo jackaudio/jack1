@@ -1,6 +1,10 @@
 #!/bin/sh
 
-if which libtoolize >/dev/null
+#
+# on OS X, which(1) returns 0 even when it can't find a program 
+#
+
+if type libtoolize >/dev/null 2>&1
 then
     LIBTOOLIZE=libtoolize
 else
