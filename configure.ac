@@ -218,9 +218,13 @@ AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
 
 JACK_CORE_CFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
 -I\$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall -g"
-JACK_OPT_CFLAGS="$JACK_CORE_CFLAGS -march=pentium2 -mcpu=pentium4 -O3 \
+JACK_OPT_CFLAGS="$JACK_CORE_CFLAGS -O3 \
 -ffast-math -funroll-loops -fprefetch-loop-arrays"
 JACK_CFLAGS="$JACK_CORE_CFLAGS $CFLAGS"
+
+AC_ARG_WITH(cpu-target,
+            [  --with-cpu-target=cpu-type    explicit, overriding argument for gcc -march= flag])
+
 
 dnl
 dnl figure out how best to optimize
@@ -364,16 +368,20 @@ elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
     AC_DEFINE(x86, 1, "Nope it's intel")
     COMMON_X86_OPT_FLAGS="-DREENTRANT -O3 -fomit-frame-pointer -ffast-math -funroll-loops"
     
-    if test "$target_cpu" = "i586"; then
-	JACK_OPT_CFLAGS="-march=i586 "
-    elif test "$target_cpu" = "i686"; then
-	JACK_OPT_CFLAGS="-march=i686"
-    elif test "$target_cpu" = "x86_64"; then
-	JACK_OPT_CFLAGS="-march=k8"
+    if test x$with_cpu_target != x ; then
+        JACK_OPT_CFLAGS="-march=$with_cpu_target"
     else
-	:
+        if test "$target_cpu" = "i586"; then
+	   JACK_OPT_CFLAGS="-march=i586 "
+	elif test "$target_cpu" = "i686"; then
+	    JACK_OPT_CFLAGS="-march=i686"
+	elif test "$target_cpu" = "x86_64"; then
+	    JACK_OPT_CFLAGS="-march=k8"
+	else
+	    :
+	fi
     fi
-    
+
     JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS $JACK_OPT_CFLAGS $MMX_FLAGS $SSE_FLAGS"
 
 fi
@@ -574,8 +582,10 @@ HAVE_SAMPLERATE=false
 PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 0.1.2,[HAVE_SAMPLERATE=true], [true])
 if test x$HAVE_SAMPLERATE = xfalse; then
              AC_MSG_WARN([*** the NetJack backend and internal client will not be built])
+else
+	CFLAGS="$CFLAGS $SAMPLERATE_CFLAGS"
+	LIBS="$LIBS $SAMPLERATE_LIBS"
 fi
-
 
 # Note: A bug in pkg-config causes problems if the first occurence of
 # PKG_CHECK_MODULES can be disabled. So, if you're going to use
