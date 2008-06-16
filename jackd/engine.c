@@ -2178,8 +2178,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 
   unlock:
 	jack_unlock_graph (engine);
-	DEBUG("cycle finished, status = %d, graph locked = %d", 
-	      ret, leave_graph_locked);
+	DEBUG("cycle finished, status = %d", ret);
 
 	return ret;
 }
