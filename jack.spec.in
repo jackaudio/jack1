@@ -18,12 +18,12 @@
 # use preemption check
 %define preemption_check 0
 # use dynamic SIMD (ix86)
-%define dynsimd 1
+%define dynsimd 0
 
 Summary:	The Jack Audio Connection Kit
 Name:		@PACKAGE@
 Version:	@VERSION@
-Release:	6
+Release:	7
 License:	GPL
 Group:		System Environment/Daemons
 Source0:	%{name}-%{version}.tar.gz
@@ -43,7 +43,6 @@ BuildRequires: portaudio >= 18.1
 BuildRequires: libfreebob >= 1.0.0
 %endif
 
-
 %description
 JACK is a low-latency audio server, written primarily for the Linux
 operating system. It can connect a number of different applications to
@@ -57,21 +56,33 @@ designed from the ground up to be suitable for professional audio
 work. This means that it focuses on two key areas: synchronous
 execution of all clients, and low latency operation.
 
-%package devel
-Summary:	Header files for Jack 
-Group:		Development/Libraries
+
+%package -n libjack0
+Summary:	Shared library to access JACK
+Group:		System/Libraries
 Requires:	%{name} = %{version}
 
-%description devel
-Header files for the Jack Audio Connection Kit.
+%description -n libjack0
+Shared library to access JACK (Jack Audio Connection Kit).
+
+
+%package -n libjack-devel
+Summary:	Development package for JACK
+Group:		Development/Libraries/C and C++
+Requires:	libjack0 = %{version}
+
+%description -n libjack-devel
+Files needed for JACK application development (Jack Audio Connection Kit).
+
 
 %package example-clients
-Summary:	Example clients that use Jack 
+Summary:	Example clients that use JACK
 Group:		Applications/Multimedia
 Requires:	%{name} = %{version}
 
 %description example-clients
-Small example clients that use the Jack Audio Connection Kit.
+Small example clients that use JACK (Jack Audio Connection Kit).
+
 
 %prep
 
@@ -108,8 +119,7 @@ make
 
 
 %install
-[ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
-make install DESTDIR=$RPM_BUILD_ROOT
+%makeinstall
 
 %if %{enable_capabilities}
 # make jackstart suid root
@@ -119,11 +129,9 @@ chmod 04755 $RPM_BUILD_ROOT%{_bindir}/jackstart
 # remove extra install of the documentation
 rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 
-%post
-/sbin/ldconfig
+%post -n libjack0 -p /sbin/ldconfig
 
-%postun
-/sbin/ldconfig
+%postun -n libjack0 -p /sbin/ldconfig
 
 %clean
 [ "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
@@ -131,62 +139,65 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 %files 
 %defattr(-,root,root)
 %doc AUTHORS TODO COPYING*
+%doc %{_mandir}/man1/*
 %if %{enable_capabilities}
 %attr(4755, root, root) %{_bindir}/jackstart
+%doc %{_mandir}/man1/jackstart*
 %endif
 %{_bindir}/jackd
-%{_bindir}/jack_load
-%{_bindir}/jack_unload
-%{_bindir}/jack_monitor_client
-%{_bindir}/jack_connect
-%{_bindir}/jack_disconnect
-%{_bindir}/jack_lsp
+#{_bindir}/jack_bufsize
 %{_bindir}/jack_freewheel
-%{_bindir}/jack_evmon
-%{_bindir}/jack_alias
-%{_bindir}/jackrec
-%{_bindir}/jack_transport
+%{_bindir}/jack_load
 %{_bindir}/jack_netsource
+%{_bindir}/jack_transport
+%{_bindir}/jack_unload
 %{_bindir}/alsa_in
 %{_bindir}/alsa_out
-%{_libdir}/libjack.so
-%{_libdir}/libjack.so.0
-%{_libdir}/libjack.so.0.0.*
-%{_libdir}/libjackserver.so
-%{_libdir}/libjackserver.so.0
-%{_libdir}/libjackserver.so.0.0.*
-%{_libdir}/jack/inprocess.so
-%{_libdir}/jack/intime.so
-%{_libdir}/jack/jack_*.so
-%{_mandir}/man1/*
+%dir %{_libdir}/%{name}
+%{_libdir}/%{name}/*.so
 
-%files devel
+%files -n libjack0
+%defattr(-,root,root)
+%{_libdir}/lib*.so.*
+
+%files -n libjack-devel
 %defattr(-,root,root)
 %doc doc/reference
-%{_libdir}/*.la
-%{_libdir}/jack/*.la
-%{_includedir}/jack/jack.h
-%{_includedir}/jack/ringbuffer.h
-%{_includedir}/jack/timestamps.h
-%{_includedir}/jack/transport.h
-%{_includedir}/jack/types.h
-%{_includedir}/jack/thread.h
-%{_includedir}/jack/intclient.h
-%{_includedir}/jack/statistics.h
-%{_includedir}/jack/midiport.h
-%{_libdir}/pkgconfig/jack.pc
+%{_libdir}/lib*.so
+%{_libdir}/lib*.la
+%{_libdir}/%{name}/*.*a
+%{_libdir}/pkgconfig/*
+%{_includedir}/%{name}
 
 %files example-clients
 %defattr(-,root,root)
-%{_bindir}/jack_simple_client
+%{_bindir}/jackrec
+%{_bindir}/jack_alias
+#{_bindir}/jack_bufsize
+%{_bindir}/jack_connect
+%{_bindir}/jack_disconnect
+%{_bindir}/jack_evmon
+#{_bindir}/jack_freewheel
 %{_bindir}/jack_impulse_grabber
+%{_bindir}/jack_lsp
+#{_bindir}/jack_load
 %{_bindir}/jack_metro
-%{_bindir}/jack_showtime
-%{_bindir}/jack_midisine
 %{_bindir}/jack_midiseq
+%{_bindir}/jack_midisine
+%{_bindir}/jack_monitor_client
+#{_bindir}/jack_netsource
+%{_bindir}/jack_showtime
+%{_bindir}/jack_simple_client
+#{_bindir}/jack_transport
+#{_bindir}/jack_unload
+#{_bindir}/alsa_in
+#{_bindir}/alsa_out
 
 
 %changelog
+
+* Tue Jul  8 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.112.0-7
+- refactored packaging to accomodate libjack0 and libjack-devel
 
 * Mon Apr 28 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.111.4-6
 - moved all bin tools from example-clients to nominal package
