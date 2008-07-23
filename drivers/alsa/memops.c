@@ -49,8 +49,28 @@ inline unsigned int fast_rand() {
 	return seed;
 }
 
-void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 
+/* functions for native float sample data */
+
+void sample_move_floatLE_sSs (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip) {
+	while (nsamples--) {
+		*dst = *((float *) src);
+		dst++;
+		src += src_skip;
+	}
+}
+
+void sample_move_dS_floatLE (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state) {
+	while (nsamples--) {
+		*((float *) dst) = *src;
+		dst += dst_skip;
+		src++;
+	}
+}
+
+/* functions for native integer sample data */
+
+void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 {
         long long y;
 	int z;
@@ -81,9 +101,8 @@ void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsign
 }	
 
 void sample_move_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-
 {
-        long long y;
+    long long y;
 
 	while (nsamples--) {
 		y = (long long)(*src * SAMPLE_MAX_24BIT) << 8;
@@ -140,7 +159,6 @@ void sample_move_dS_s32u24 (jack_default_audio_sample_t *dst, char *src, unsigne
 }	
 
 void sample_move_dither_rect_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-
 {
 	/* ALERT: signed sign-extension portability !!! */
 	jack_default_audio_sample_t  x;
@@ -176,7 +194,6 @@ void sample_move_dither_rect_d32u24_sSs (char *dst, jack_default_audio_sample_t 
 }	
 
 void sample_move_dither_rect_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-
 {
 	/* ALERT: signed sign-extension portability !!! */
 	jack_default_audio_sample_t  x;
@@ -199,8 +216,7 @@ void sample_move_dither_rect_d32u24_sS (char *dst, jack_default_audio_sample_t *
 	}
 }	
 
-void sample_move_dither_tri_d32u24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_tri_d32u24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t  x;
 	float     r;
@@ -240,8 +256,7 @@ void sample_move_dither_tri_d32u24_sSs (char *dst,  jack_default_audio_sample_t 
 	state->rm1 = rm1;
 }
 
-void sample_move_dither_tri_d32u24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_tri_d32u24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t  x;
 	float     r;
@@ -270,8 +285,7 @@ void sample_move_dither_tri_d32u24_sS (char *dst,  jack_default_audio_sample_t *
 	state->rm1 = rm1;
 }
 
-void sample_move_dither_shaped_d32u24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_shaped_d32u24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t     x;
 	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
@@ -330,8 +344,7 @@ void sample_move_dither_shaped_d32u24_sSs (char *dst,  jack_default_audio_sample
 	state->idx = idx;
 }
 
-void sample_move_dither_shaped_d32u24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_shaped_d32u24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t     x;
 	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
@@ -379,7 +392,6 @@ void sample_move_dither_shaped_d32u24_sS (char *dst,  jack_default_audio_sample_
 }
 
 void sample_move_d24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-
 {
         long long y;
 	int z;
@@ -409,7 +421,6 @@ void sample_move_d24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned 
 }	
 
 void sample_move_d24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-
 {
         long long y;
 
@@ -483,7 +494,6 @@ void sample_move_dS_s24 (jack_default_audio_sample_t *dst, char *src, unsigned l
 }	
 
 void sample_move_dither_rect_d24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-
 {
 	/* ALERT: signed sign-extension portability !!! */
 	jack_default_audio_sample_t  x;
@@ -519,7 +529,6 @@ void sample_move_dither_rect_d24_sSs (char *dst, jack_default_audio_sample_t *sr
 }	
 
 void sample_move_dither_rect_d24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-
 {
 	/* ALERT: signed sign-extension portability !!! */
 	jack_default_audio_sample_t  x;
@@ -548,8 +557,7 @@ void sample_move_dither_rect_d24_sS (char *dst, jack_default_audio_sample_t *src
 	}
 }	
 
-void sample_move_dither_tri_d24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_tri_d24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t  x;
 	float     r;
@@ -588,8 +596,7 @@ void sample_move_dither_tri_d24_sSs (char *dst,  jack_default_audio_sample_t *sr
 	state->rm1 = rm1;
 }
 
-void sample_move_dither_tri_d24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_tri_d24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t  x;
 	float     r;
@@ -622,8 +629,7 @@ void sample_move_dither_tri_d24_sS (char *dst,  jack_default_audio_sample_t *src
 	state->rm1 = rm1;
 }
 
-void sample_move_dither_shaped_d24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_shaped_d24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t     x;
 	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
@@ -680,8 +686,7 @@ void sample_move_dither_shaped_d24_sSs (char *dst,  jack_default_audio_sample_t 
 	state->idx = idx;
 }
 
-void sample_move_dither_shaped_d24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_shaped_d24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t     x;
 	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
@@ -732,8 +737,7 @@ void sample_move_dither_shaped_d24_sS (char *dst,  jack_default_audio_sample_t *
 	state->idx = idx;
 }
 
-void sample_move_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	int tmp;
 
@@ -758,8 +762,7 @@ void sample_move_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned
 	}
 }
 
-void sample_move_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	int tmp;
 
@@ -779,8 +782,7 @@ void sample_move_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned 
 	}
 }
 
-void sample_move_dither_rect_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_rect_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t val;
 	int      tmp;
@@ -806,8 +808,7 @@ void sample_move_dither_rect_d16_sSs (char *dst,  jack_default_audio_sample_t *s
 	}
 }
 
-void sample_move_dither_rect_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_rect_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t val;
 	int      tmp;
@@ -828,8 +829,7 @@ void sample_move_dither_rect_d16_sS (char *dst,  jack_default_audio_sample_t *sr
 	}
 }
 
-void sample_move_dither_tri_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_tri_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t x;
 	float    r;
@@ -861,8 +861,7 @@ void sample_move_dither_tri_d16_sSs (char *dst,  jack_default_audio_sample_t *sr
 	state->rm1 = rm1;
 }
 
-void sample_move_dither_tri_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_tri_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t x;
 	float    r;
@@ -890,8 +889,7 @@ void sample_move_dither_tri_d16_sS (char *dst,  jack_default_audio_sample_t *src
 	state->rm1 = rm1;
 }
 
-void sample_move_dither_shaped_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_shaped_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t     x;
 	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
@@ -941,8 +939,7 @@ void sample_move_dither_shaped_d16_sSs (char *dst,  jack_default_audio_sample_t 
 	state->idx = idx;
 }
 
-void sample_move_dither_shaped_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-	
+void sample_move_dither_shaped_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t     x;
 	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
@@ -987,8 +984,7 @@ void sample_move_dither_shaped_d16_sS (char *dst,  jack_default_audio_sample_t *
 	state->idx = idx;
 }
 
-void sample_move_dS_s16s (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip) 
-	
+void sample_move_dS_s16s (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip) 	
 {
 	short z;
 
@@ -1042,7 +1038,6 @@ void sample_merge_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned
 }	
 
 void sample_merge_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-
 {
 	/* ALERT: signed sign-extension portability !!! */
 
@@ -1129,7 +1124,6 @@ merge_memcpy_d32_s32 (char *dst, char *src, unsigned long src_bytes,
 void 
 merge_memcpy_interleave_d16_s16 (char *dst, char *src, unsigned long src_bytes, 
 				 unsigned long dst_skip_bytes, unsigned long src_skip_bytes)
-
 {
 	while (src_bytes) {
 		*((short *) dst) += *((short *) src);
@@ -1201,3 +1195,4 @@ memcpy_interleave_d32_s32 (char *dst, char *src, unsigned long src_bytes,
 		src_bytes -= 4;
 	}
 }
+

@@ -1519,6 +1519,8 @@ jack_client_core_wait (jack_client_t* client)
 static int
 jack_wake_next_client (jack_client_t* client)
 {
+	struct pollfd pfds[1];
+	int pret = 0;
 	char c = 0;
 
 	if (write (client->graph_next_fd, &c, sizeof (c))
@@ -1530,18 +1532,34 @@ jack_wake_next_client (jack_client_t* client)
 		return -1;
 	}
 	
-	DEBUG ("client sent message to next stage by %" PRIu64
-	       ", client reading on graph_wait_fd==%d", 
-	       jack_get_microseconds(), client->graph_wait_fd);
+	DEBUG ("client sent message to next stage by %" PRIu64 "",
+	       jack_get_microseconds());
 	
 	DEBUG("reading cleanup byte from pipe %d\n", client->graph_wait_fd);
-	
-	if ((read (client->graph_wait_fd, &c, sizeof (c))
-	     != sizeof (c))) {
-		jack_error ("cannot complete execution of the "
-			    "processing graph (%s)",
-			    strerror(errno));
-		return -1;
+
+	/* "upstream client went away?  readability is checked in
+	 * jack_client_core_wait(), but that's almost a whole cycle
+	 * before we get here.
+	 */
+
+	if (client->graph_wait_fd >= 0) {
+		pfds[0].fd = client->graph_wait_fd;
+		pfds[0].events = POLLIN;
+
+		/* 0 timeout, don't actually wait */
+		pret = poll(pfds, 1, 0);
+	}
+
+	if (pret > 0 && (pfds[0].revents & POLLIN)) {
+		if (read (client->graph_wait_fd, &c, sizeof (c))
+		    != sizeof (c)) {
+			jack_error ("cannot complete execution of the "
+				"processing graph (%s)", strerror(errno));
+			return -1;
+		}
+	} else {
+		DEBUG("cleanup byte from pipe %d not available?\n",
+			client->graph_wait_fd);
 	}
 	
 	return 0;
@@ -2073,11 +2091,11 @@ jack_client_close_aux (jack_client_t *client)
 		}
 
 #ifndef JACK_USE_MACH_THREADS
-		if (client->graph_wait_fd) {
+		if (client->graph_wait_fd >= 0) {
 			close (client->graph_wait_fd);
 		}
 		
-		if (client->graph_next_fd) {
+		if (client->graph_next_fd >= 0) {
 			close (client->graph_next_fd);
 		}
 #endif		

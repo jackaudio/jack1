@@ -39,7 +39,11 @@ typedef struct {
     float e[DITHER_BUF_SIZE];
 } dither_state_t;
 
+/* float functions */
+void sample_move_floatLE_sSs (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long dst_skip);
+void sample_move_dS_floatLE (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 
+/* integer functions */
 void sample_move_d32u24_sSs          (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_d32u24_sS           (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_d24_sSs             (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
