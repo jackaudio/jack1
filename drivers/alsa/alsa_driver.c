@@ -233,7 +233,7 @@ alsa_driver_hw_specific (alsa_driver_t *driver, int hw_monitoring,
 static void
 alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 {
-  if (SNDRV_PCM_FORMAT_FLOAT_LE == driver->playback_sample_format) {
+  if (SND_PCM_FORMAT_FLOAT_LE == driver->playback_sample_format) {
 	  if (driver->playback_interleaved) {
 		  driver->channel_copy = memcpy_interleave_d32_s32;
 		} else {
