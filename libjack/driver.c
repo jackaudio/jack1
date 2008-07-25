@@ -241,8 +241,8 @@ jack_driver_nt_init (jack_driver_nt_t * driver)
 	driver->attach       = (JackDriverAttachFunction)    jack_driver_nt_attach;
 	driver->detach       = (JackDriverDetachFunction)    jack_driver_nt_detach;
 	driver->bufsize      = (JackDriverBufSizeFunction)   jack_driver_nt_bufsize;
-	driver->stop         = (JackDriverStartFunction)     jack_driver_nt_stop;
-	driver->start        = (JackDriverStopFunction)      jack_driver_nt_start;
+	driver->stop         = (JackDriverStopFunction)      jack_driver_nt_stop;
+	driver->start        = (JackDriverStartFunction)     jack_driver_nt_start;
 
 	driver->nt_bufsize   = (JackDriverNTBufSizeFunction) dummy_bufsize;
 	driver->nt_start     = (JackDriverNTStartFunction)   dummy_start;
