@@ -405,7 +405,6 @@ jack_transport_cycle_end (jack_engine_t *engine)
 {
 	jack_control_t *ectl = engine->control;
 	transport_command_t cmd;	/* latest transport command */
-	int dont_trans_advance = FALSE;
 
 	/* Promote pending_time to current_time.  Maintain the usecs,
 	 * frame_rate and frame values, clients may not set them. */
@@ -420,10 +419,6 @@ jack_transport_cycle_end (jack_engine_t *engine)
 		if ((ectl->sync_remain == 0) ||
 		    (jack_sync_timeout(engine))) {
 			ectl->transport_state = JackTransportRolling;
-
-			// dont advance the transport this is a statechange not seen
-			// by the switch statement below
-			dont_trans_advance = TRUE;
 			VERBOSE (engine, "transport Rolling, %8.6f sec"
 				 " left for poll",
 				 (double) (ectl->sync_time_left / 1000000.0));
@@ -483,18 +478,19 @@ jack_transport_cycle_end (jack_engine_t *engine)
 				ectl->transport_state = JackTransportStarting;
 				jack_sync_poll_start(engine);
 			}
-		} else if ( ! dont_trans_advance ) {
-		    // ok... no statechange happened go transport go...
-		    ectl->pending_time.frame =
-			ectl->current_time.frame + ectl->buffer_size;
 		}
-
 		break;
 
 	default:
 		jack_error ("invalid JACK transport state: %d",
 			    ectl->transport_state);
 	}
+
+	/* Update timebase, if needed. */
+	if (ectl->transport_state == JackTransportRolling) {
+		ectl->pending_time.frame =
+			ectl->current_time.frame + ectl->buffer_size;
+	} 
 
 	/* See if an asynchronous position request arrived during the
 	 * last cycle.  The request_time could change during the
