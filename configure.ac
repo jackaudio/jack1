@@ -146,7 +146,7 @@ if test "x$JACK_USE_MACH_THREADS" != "x"; then
 fi
 
 # headers
-AC_CHECK_HEADERS(string.h strings.h)
+AC_CHECK_HEADERS(string.h strings.h alloca.h)
 AC_CHECK_HEADERS(getopt.h, [], [
     for d in /Developer/SDKs/MacOSX10.3.0.sdk/usr/include/ ; do
 	AC_CHECK_HEADERS($d/getopt.h, [], [CFLAGS="$CFLAGS -I$d"])

@@ -25,6 +25,9 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  * @brief This client connects a remote slave JACK to a local JACK server assumed to be the master
  */
+
+#include "config.h" 
+ 
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -34,7 +37,13 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #include <netinet/in.h>
 #include <netdb.h>
 
+/* These two required by FreeBSD. */
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#if HAVE_ALLOCA_H
 #include <alloca.h>
+#endif
 
 #include <jack/jack.h>
 
