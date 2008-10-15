@@ -34,6 +34,21 @@
 #include <sys/types.h>
 #include <sys/time.h>
 
+#ifndef POST_PACKED_STRUCTURE
+#ifdef __GNUC__
+/* POST_PACKED_STRUCTURE needs to be a macro which
+   expands into a compiler directive. The directive must
+   tell the compiler to arrange the preceding structure
+   declaration so that it is packed on byte-boundaries rather 
+   than use the natural alignment of the processor and/or
+   compiler.
+*/
+#define POST_PACKED_STRUCTURE __attribute__((__packed__))
+#else
+/* Add other things here for non-gcc platforms */
+#endif
+#endif
+
 /* Needed by <sysdeps/time.h> */
 extern void jack_error (const char *fmt, ...);
 
@@ -136,7 +151,7 @@ typedef struct {
 	int32_t  reset_pending;      /* xrun happened, deal with it */
 	float    filter_coefficient; /* set once, never altered */
 
-} jack_frame_timer_t;
+} POST_PACKED_STRUCTURE jack_frame_timer_t;
 
 /* JACK engine shared memory data structure. */
 typedef struct {
@@ -175,7 +190,7 @@ typedef struct {
     jack_port_type_info_t port_types[JACK_MAX_PORT_TYPES];
     jack_port_shared_t    ports[0];
 
-} jack_control_t;
+} POST_PACKED_STRUCTURE jack_control_t;
 
 typedef enum  {
   BufferSizeChange,
@@ -206,7 +221,7 @@ typedef struct {
 	jack_port_type_id_t ptid;
 	jack_port_id_t other_id;
     } y;
-} jack_event_t;
+} POST_PACKED_STRUCTURE jack_event_t;
 
 typedef enum {
 	ClientInternal, /* connect request just names .so */
@@ -245,48 +260,28 @@ typedef volatile struct {
     volatile uint64_t	finished_at;
     volatile int32_t	last_status;         /* w: client, r: engine and client */
 
-    /* JOQ: all these pointers are trouble for 32/64 compatibility,
-     * they should move to non-shared memory. 
+    /* indicators for whether callbacks have been set for this client.
+       We do not include ptrs to the callbacks here (or their arguments)
+       so that we can avoid 32/64 bit pointer size mismatches between
+       the jack server and a client. The pointers are in the client-
+       local structure which is part of the libjack compiled for
+       either 32 bit or 64 bit clients.
      */
+    volatile uint8_t	process_cbset;
+    volatile uint8_t	thread_init_cbset;
+    volatile uint8_t	bufsize_cbset;
+    volatile uint8_t	srate_cbset;
+    volatile uint8_t	port_register_cbset;
+    volatile uint8_t	port_connect_cbset;
+    volatile uint8_t	graph_order_cbset;
+    volatile uint8_t	xrun_cbset;
+    volatile uint8_t	sync_cb_cbset;
+    volatile uint8_t	timebase_cb_cbset;
+    volatile uint8_t	freewheel_cb_cbset;
+    volatile uint8_t	client_register_cbset;
+    volatile uint8_t	thread_cb_cbset;
 
-    /* callbacks 
-     */
-    JackProcessCallback process;
-    void *process_arg;
-    JackThreadInitCallback thread_init;
-    void *thread_init_arg;
-    JackBufferSizeCallback bufsize;
-    void *bufsize_arg;
-    JackSampleRateCallback srate;
-    void *srate_arg;
-    JackPortRegistrationCallback port_register;
-    void *port_register_arg;
-    JackPortConnectCallback port_connect;
-    void *port_connect_arg;
-    JackGraphOrderCallback graph_order;
-    void *graph_order_arg;
-    JackXRunCallback xrun;
-    void *xrun_arg;
-    JackSyncCallback sync_cb;
-    void *sync_arg;
-    JackTimebaseCallback timebase_cb;
-    void *timebase_arg;
-    JackFreewheelCallback freewheel_cb;
-    void *freewheel_arg;
-    JackClientRegistrationCallback client_register;	
-    void *client_register_arg;
-	JackThreadCallback thread_cb;	
-    void *thread_cb_arg;
-
-    /* external clients: set by libjack
-     * internal clients: set by engine */
-    int (*deliver_request)(void*, jack_request_t*); /* JOQ: 64/32 bug! */
-    void *deliver_arg;
-
-    /* for engine use only */
-    void *private_client;
-
-} jack_client_control_t;
+} POST_PACKED_STRUCTURE jack_client_control_t;
 
 typedef struct {
     
@@ -299,14 +294,14 @@ typedef struct {
     char object_path[PATH_MAX+1];
     char object_data[1024];
 
-} jack_client_connect_request_t;
+} POST_PACKED_STRUCTURE jack_client_connect_request_t;
 
 typedef struct {
 
     jack_status_t status;
 
-    jack_shm_info_t client_shm;
-    jack_shm_info_t engine_shm;
+    jack_shm_registry_index_t client_shm_index;
+    jack_shm_registry_index_t engine_shm_index;
 
     char	fifo_prefix[PATH_MAX+1];
 
@@ -315,24 +310,29 @@ typedef struct {
 
     char name[JACK_CLIENT_NAME_SIZE];	/* unique name, if assigned */
 
-    /* these two are valid only for internal clients */
-    jack_client_control_t *client_control;
-    jack_control_t        *engine_control;
+    /* these two are valid only for internal clients, and thus
+       are exempt from the requirement that we not export
+       pointers back to clients. an internal client must
+       necessarily match the host, so 32/64 bit issues
+       do not apply to these pointers.
+    */
+    jack_client_control_t* client_control;
+    jack_control_t* engine_control;
 
 #ifdef JACK_USE_MACH_THREADS
     /* specific resources for server/client real-time thread communication */
     int32_t	portnum;
 #endif
 
-} jack_client_connect_result_t;
+} POST_PACKED_STRUCTURE jack_client_connect_result_t;
 
 typedef struct {
     jack_client_id_t client_id;
-} jack_client_connect_ack_request_t;
+} POST_PACKED_STRUCTURE jack_client_connect_ack_request_t;
 
 typedef struct {
     int8_t status;
-} jack_client_connect_ack_result_t;
+} POST_PACKED_STRUCTURE jack_client_connect_ack_result_t;
 
 typedef enum {
 	RegisterPort = 1,
@@ -363,7 +363,8 @@ typedef enum {
 
 struct _jack_request {
     
-    RequestType type;
+    //RequestType type;
+    uint32_t type;
     union {
 	struct {
 	    char name[JACK_PORT_NAME_SIZE];
@@ -372,33 +373,35 @@ struct _jack_request {
 	    jack_shmsize_t   buffer_size;
 	    jack_port_id_t   port_id;
 	    jack_client_id_t client_id;
-	} port_info;
+	} POST_PACKED_STRUCTURE port_info;
 	struct {
 	    char source_port[JACK_PORT_NAME_SIZE];
 	    char destination_port[JACK_PORT_NAME_SIZE];
-	} connect;
+	} POST_PACKED_STRUCTURE connect;
 	struct {
 	    int32_t nports;
-	    const char **ports;		/* JOQ: 32/64 problem? */
-	} port_connections;
+	    //const char **ports;		/* JOQ: 32/64 problem? */
+	    uint64_t ports;
+	} POST_PACKED_STRUCTURE port_connections;
 	struct {
 	    jack_client_id_t client_id;
 	    int32_t conditional;
-	} timebase;
+	} POST_PACKED_STRUCTURE timebase;
 	struct {
-	    jack_options_t options;
+	    //jack_options_t options;
+	    uint32_t options;
 	    jack_client_id_t id;
 	    char name[JACK_CLIENT_NAME_SIZE];
 	    char path[PATH_MAX+1];
 	    char init[JACK_LOAD_INIT_LIMIT];
-	} intclient;
+	} POST_PACKED_STRUCTURE intclient;
 	jack_client_id_t client_id;
 	jack_nframes_t nframes;
 	jack_time_t timeout;
         pid_t cap_pid;
-    } x;
+    } POST_PACKED_STRUCTURE x;
     int32_t status;
-};
+} POST_PACKED_STRUCTURE;
 
 /* Per-client structure allocated in the server's address space.
  * It's here because its not part of the engine structure.
@@ -432,7 +435,42 @@ typedef struct _jack_client_internal {
     int running;
     int portnum;
 #endif /* JACK_USE_MACH_THREADS */
-    
+   
+#if 0
+    /* callbacks 
+     */
+    JackProcessCallback process;
+    void *process_arg;
+    JackThreadInitCallback thread_init;
+    void *thread_init_arg;
+    JackBufferSizeCallback bufsize;
+    void *bufsize_arg;
+    JackSampleRateCallback srate;
+    void *srate_arg;
+    JackPortRegistrationCallback port_register;
+    void *port_register_arg;
+    JackPortConnectCallback port_connect;
+    void *port_connect_arg;
+    JackGraphOrderCallback graph_order;
+    void *graph_order_arg;
+    JackXRunCallback xrun;
+    void *xrun_arg;
+    JackSyncCallback sync_cb;
+    void *sync_arg;
+    JackTimebaseCallback timebase_cb;
+    void *timebase_arg;
+    JackFreewheelCallback freewheel_cb;
+    void *freewheel_arg;
+    JackClientRegistrationCallback client_register;	
+    void *client_register_arg;
+	JackThreadCallback thread_cb;	
+    void *thread_cb_arg;
+#endif
+    /* external clients: set by libjack
+     * internal clients: set by engine */
+    //int (*deliver_request)(void*, jack_request_t*); /* JOQ: 64/32 bug! */
+    //void *deliver_arg;
+    jack_client_t *private_client;
 } jack_client_internal_t;
 
 typedef struct _jack_thread_arg {

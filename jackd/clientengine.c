@@ -38,6 +38,8 @@
 #include "clientengine.h"
 #include "transengine.h"
 
+#include "libjack/local.h"
+
 static void
 jack_client_disconnect_ports (jack_engine_t *engine,
 			      jack_client_internal_t *client)
@@ -318,7 +320,7 @@ jack_client_unload (jack_client_internal_t *client)
 {
 	if (client->handle) {
 		if (client->finish) {
-			client->finish (client->control->process_arg);
+			client->finish (client->private_client->process_arg);
 		}
 		dlclose (client->handle);
 	}
@@ -516,25 +518,38 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	client->subgraph_start_fd = -1;
 	client->subgraph_wait_fd = -1;
 
-	client->control->process = NULL;
-	client->control->process_arg = NULL;
-	client->control->bufsize = NULL;
-	client->control->bufsize_arg = NULL;
-	client->control->srate = NULL;
-	client->control->srate_arg = NULL;
-	client->control->xrun = NULL;
-	client->control->xrun_arg = NULL;
-	client->control->port_register = NULL;
-	client->control->port_register_arg = NULL;
-	client->control->port_connect = NULL;
-	client->control->port_connect_arg = NULL;
-	client->control->graph_order = NULL;
-	client->control->graph_order_arg = NULL;
-	client->control->client_register = NULL;
-	client->control->client_register_arg = NULL;
-	client->control->thread_cb = NULL;
-	client->control->thread_cb_arg = NULL;
+	client->control->process_cbset = FALSE;
+	client->control->bufsize_cbset = FALSE;
+	client->control->srate_cbset = FALSE;
+	client->control->xrun_cbset = FALSE;
+	client->control->port_register_cbset = FALSE;
+	client->control->port_connect_cbset = FALSE;
+	client->control->graph_order_cbset = FALSE;
+	client->control->client_register_cbset = FALSE;
+	client->control->thread_cb_cbset = FALSE;
 
+#if 0
+	if (type != ClientExternal) {
+	    client->process = NULL;
+	    client->process_arg = NULL;
+	    client->bufsize = NULL;
+	    client->bufsize_arg = NULL;
+	    client->srate = NULL;
+	    client->srate_arg = NULL;
+	    client->xrun = NULL;
+	    client->xrun_arg = NULL;
+	    client->port_register = NULL;
+	    client->port_register_arg = NULL;
+	    client->port_connect = NULL;
+	    client->port_connect_arg = NULL;
+	    client->graph_order = NULL;
+	    client->graph_order_arg = NULL;
+	    client->client_register = NULL;
+	    client->client_register_arg = NULL;
+	    client->thread_cb = NULL;
+	    client->thread_cb_arg = NULL;
+	}
+#endif
 	jack_transport_client_new (client);
         
 #ifdef JACK_USE_MACH_THREADS
@@ -586,12 +601,22 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 
 	if (jack_client_is_internal(client)) {
 
+	    // XXX: do i need to lock the graph here ?
+	    // i moved this one up in the init process, lets see what happens.
+
+		/* Internal clients need to make regular JACK API
+		 * calls, which need a jack_client_t structure.
+		 * Create one here.
+		 */
+		client->private_client =
+			jack_client_alloc_internal (client->control, engine);
+
 		/* Set up the pointers necessary for the request
 		 * system to work.  The client is in the same address
 		 * space */
 
-		client->control->deliver_request = internal_client_request;
-		client->control->deliver_arg = engine;
+		client->private_client->deliver_request = internal_client_request;
+		client->private_client->deliver_arg = engine;
 	}
 
 	/* add new client to the clients list */
@@ -601,12 +626,6 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 	
 	if (jack_client_is_internal(client)) {
 
-		/* Internal clients need to make regular JACK API
-		 * calls, which need a jack_client_t structure.
-		 * Create one here.
-		 */
-		client->control->private_client =
-			jack_client_alloc_internal (client->control, engine);
 
 		jack_unlock_graph (engine);
 
@@ -616,7 +635,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 		if (client->control->type == ClientInternal) {
 
 			pthread_mutex_unlock (&engine->request_lock);
-			if (client->initialize (client->control->private_client,
+			if (client->initialize (client->private_client,
 						object_data)) {
 
 				/* failed: clean up client data */
@@ -735,8 +754,8 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 		res.status |= JackFailure; /* just making sure */
 		return -1;
 	}
-	res.client_shm = client->control_shm;
-	res.engine_shm = engine->control_shm;
+	res.client_shm_index = client->control_shm.index;
+	res.engine_shm_index = engine->control_shm.index;
 	res.realtime = engine->control->real_time;
 	res.realtime_priority = engine->rtpriority - 1;
 	strncpy (res.name, req.name, sizeof(res.name));
@@ -880,7 +899,7 @@ jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 	if (jack_client_is_internal (client)) {
 
 		jack_client_unload (client);
-		free (client->control->private_client);
+		free (client->private_client);
 		free ((void *) client->control);
 
 	} else {

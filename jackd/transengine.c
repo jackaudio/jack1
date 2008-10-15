@@ -321,10 +321,18 @@ jack_transport_client_new (jack_client_internal_t *client)
 	client->control->active_slowsync = 0;
 	client->control->sync_poll = 0;
 	client->control->sync_new = 0;
-	client->control->sync_cb = NULL;
-	client->control->sync_arg = NULL;
-	client->control->timebase_cb = NULL;
-	client->control->timebase_arg = NULL;
+	
+	client->control->sync_cb_cbset = FALSE;
+	client->control->timebase_cb_cbset = FALSE;
+
+#if 0
+	if (client->control->type != ClientExternal) {
+	client->sync_cb = NULL;
+	client->sync_arg = NULL;
+	client->timebase_cb = NULL;
+	client->timebase_arg = NULL;
+	}
+#endif
 }
 
 /* on ResetSyncClient request */

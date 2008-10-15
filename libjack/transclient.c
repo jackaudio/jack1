@@ -135,9 +135,9 @@ jack_call_sync_client (jack_client_t *client)
 	if ((ectl->new_pos || control->sync_poll || control->sync_new) &&
 	    control->active_slowsync) {
 
-		if (control->sync_cb (ectl->transport_state,
+		if (client->sync_cb (ectl->transport_state,
 				      &ectl->current_time,
-				      control->sync_arg)) {
+				      client->sync_arg)) {
 
 			if (control->sync_poll) {
 				control->sync_poll = 0;
@@ -169,18 +169,19 @@ jack_call_timebase_master (jack_client_t *client)
 		if ((ectl->transport_state == JackTransportRolling) ||
 		    new_pos) {
 
-			control->timebase_cb (ectl->transport_state,
+			client->timebase_cb (ectl->transport_state,
 					      control->nframes,
 					      &ectl->pending_time,
 					      new_pos,
-					      control->timebase_arg);
+					      client->timebase_arg);
 		}
 
 	} else {
 
 		/* another master took over, so resign */
-		control->timebase_cb = NULL;
-		control->timebase_arg = NULL;
+		client->timebase_cb = NULL;
+		client->timebase_arg = NULL;
+		control->timebase_cb_cbset = FALSE;
 	}
 }
 
@@ -309,8 +310,9 @@ jack_set_sample_rate_callback (jack_client_t *client,
 		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
-	client->control->srate_arg = arg;
-	client->control->srate = callback;
+	client->srate_arg = arg;
+	client->srate = callback;
+	client->control->srate_cbset = (callback != NULL);
 
 	/* Now invoke it */
 
@@ -331,9 +333,11 @@ jack_release_timebase (jack_client_t *client)
 
 	rc = jack_client_deliver_request (client, &req);
 	if (rc == 0) {
-		ctl->timebase_cb = NULL;
-		ctl->timebase_arg = NULL;
+		client->timebase_cb = NULL;
+		client->timebase_arg = NULL;
+		ctl->timebase_cb_cbset = NULL;
 	}
+
 	return rc;
 }
 
@@ -353,8 +357,9 @@ jack_set_sync_callback (jack_client_t *client,
 
 	rc = jack_client_deliver_request (client, &req);
 	if (rc == 0) {
-		ctl->sync_cb = sync_callback;
-		ctl->sync_arg = arg;
+		client->sync_cb = sync_callback;
+		client->sync_arg = arg;
+		ctl->sync_cb_cbset = TRUE;
 	}
 	return rc;
 }
@@ -384,8 +389,9 @@ jack_set_timebase_callback (jack_client_t *client, int conditional,
 
 	rc = jack_client_deliver_request (client, &req);
 	if (rc == 0) {
-		ctl->timebase_arg = arg;
-		ctl->timebase_cb = timebase_cb;
+		client->timebase_arg = arg;
+		client->timebase_cb = timebase_cb;
+		ctl->timebase_cb_cbset = TRUE;
 	}
 	return rc;
 }

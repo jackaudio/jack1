@@ -42,6 +42,40 @@ struct _jack_client {
     char rt_thread_ok : 1;
 #endif
 
+    /* callbacks 
+     */
+    JackProcessCallback process;
+    void *process_arg;
+    JackThreadInitCallback thread_init;
+    void *thread_init_arg;
+    JackBufferSizeCallback bufsize;
+    void *bufsize_arg;
+    JackSampleRateCallback srate;
+    void *srate_arg;
+    JackPortRegistrationCallback port_register;
+    void *port_register_arg;
+    JackPortConnectCallback port_connect;
+    void *port_connect_arg;
+    JackGraphOrderCallback graph_order;
+    void *graph_order_arg;
+    JackXRunCallback xrun;
+    void *xrun_arg;
+    JackSyncCallback sync_cb;
+    void *sync_arg;
+    JackTimebaseCallback timebase_cb;
+    void *timebase_arg;
+    JackFreewheelCallback freewheel_cb;
+    void *freewheel_arg;
+    JackClientRegistrationCallback client_register;	
+    void *client_register_arg;
+	JackThreadCallback thread_cb;	
+    void *thread_cb_arg;
+
+    /* external clients: set by libjack
+     * internal clients: set by engine */
+    int (*deliver_request)(void*, jack_request_t*); /* JOQ: 64/32 bug! */
+    void *deliver_arg;
+
 };
 
 extern int jack_client_deliver_request (const jack_client_t *client,

@@ -27,6 +27,22 @@ extern "C" {
 
 #include <jack/types.h>
 
+#ifndef POST_PACKED_STRUCTURE
+#ifdef __GNUC__
+/* POST_PACKED_STRUCTURE needs to be a macro which
+   expands into a compiler directive. The directive must
+   tell the compiler to arrange the preceding structure
+   declaration so that it is packed on byte-boundaries rather 
+   than use the natural alignment of the processor and/or
+   compiler.
+*/
+#define POST_PACKED_STRUCTURE __attribute__((__packed__))
+#else
+/* Add other things here for non-gcc platforms */
+#endif
+#endif
+
+
 /**
  * Transport states.
  */
@@ -127,7 +143,7 @@ typedef struct {
     /* When (unique_1 == unique_2) the contents are consistent. */
     jack_unique_t	unique_2;	/**< unique ID */
 
-} jack_position_t;
+} POST_PACKED_STRUCTURE jack_position_t;
 
 /**
  * Called by the timebase master to release itself from that

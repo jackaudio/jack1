@@ -532,12 +532,13 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		return -1;
 	}
 	jack_info ("ALSA: use %d periods for %s", *nperiodsp, stream_name);
-	
+#if 0	
 	if (!jack_power_of_two(driver->frames_per_cycle)) {
 		jack_error("JACK: frames must be a power of two "
 			   "(64, 512, 1024, ...)\n");
 		return -1;
 	}
+#endif
 
 	if ((err = snd_pcm_hw_params_set_buffer_size (handle, hw_params,
 						      *nperiodsp *

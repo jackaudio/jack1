@@ -273,7 +273,7 @@ jack_client_deliver_request (const jack_client_t *client, jack_request_t *req)
 	 * the server.
 	 */
 
-	return client->control->deliver_request (client->control->deliver_arg,
+	return client->deliver_request (client->deliver_arg,
 						 req);
 }
 
@@ -454,10 +454,10 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 		}
 	}
 
-	if (client->control->port_connect) {
-		client->control->port_connect (event->x.self_id, event->y.other_id,
+	if (client->control->port_connect_cbset) {
+		client->port_connect (event->x.self_id, event->y.other_id,
 					       (event->type == PortConnected ? 1 : 0), 
-					       client->control->port_connect_arg);
+					       client->port_connect_arg);
 	}
 
 	return 0;
@@ -530,8 +530,8 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 	   execute it now.
 	*/
 
-	if (client->control->graph_order) {
-		client->control->graph_order (client->control->graph_order_arg);
+	if (client->control->graph_order_cbset) {
+		client->graph_order (client->graph_order_arg);
 	}
 
 	return 0;
@@ -1013,7 +1013,7 @@ jack_client_open_aux (const char *client_name,
 	}
 
 	/* attach the engine control/info block */
-	client->engine_shm = res.engine_shm;
+	client->engine_shm.index = res.engine_shm_index;
 	if (jack_attach_shm (&client->engine_shm)) {
 		jack_error ("cannot attached engine control shared memory"
 			    " segment");
@@ -1026,7 +1026,7 @@ jack_client_open_aux (const char *client_name,
 	jack_set_clock_source (client->engine->clock_source);
 
 	/* now attach the client control block */
-	client->control_shm = res.client_shm;
+	client->control_shm.index = res.client_shm_index;
 	if (jack_attach_shm (&client->control_shm)) {
 		jack_error ("cannot attached client control shared memory"
 			    " segment");
@@ -1056,8 +1056,8 @@ jack_client_open_aux (const char *client_name,
 	/* set up the client so that it does the right thing for an
 	 * external client 
 	 */
-	client->control->deliver_request = oop_client_deliver_request;
-	client->control->deliver_arg = client;
+	client->deliver_request = oop_client_deliver_request;
+	client->deliver_arg = client;
 
 	if ((ev_fd = server_event_connect (client, va.server_name)) < 0) {
 		goto fail;
@@ -1255,8 +1255,8 @@ jack_start_freewheel (jack_client_t* client)
 #endif
 	}
 
-	if (control->freewheel_cb) {
-		control->freewheel_cb (1, control->freewheel_arg);
+	if (control->freewheel_cb_cbset) {
+		client->freewheel_cb (1, client->freewheel_arg);
 	}
 }
 
@@ -1275,8 +1275,8 @@ jack_stop_freewheel (jack_client_t* client)
 #endif
 	}
 
-	if (control->freewheel_cb) {
-		control->freewheel_cb (0, control->freewheel_arg);
+	if (control->freewheel_cb_cbset) {
+		client->freewheel_cb (0, client->freewheel_arg);
 	}
 }
 
@@ -1334,34 +1334,34 @@ jack_client_process_events (jack_client_t* client)
 					port->type_info = &client->engine->port_types[port->shared->ptype_id];
 				}
 			}
-			if (control->port_register) {
-				control->port_register
+			if (control->port_register_cbset) {
+				client->port_register
 					(event.x.port_id, TRUE,
-					 control->port_register_arg);
+					 client->port_register_arg);
 			} 
 			break;
 			
 		case PortUnregistered:
-			if (control->port_register) {
-				control->port_register
+			if (control->port_register_cbset) {
+				client->port_register
 					(event.x.port_id, FALSE,
-					 control->port_register_arg);
+					 client->port_register_arg);
 			}
 			break;
 			
 		case ClientRegistered:
-			if (control->client_register) {
-				control->client_register
+			if (control->client_register_cbset) {
+				client->client_register
 					(event.x.name, TRUE,
-					 control->client_register_arg);
+					 client->client_register_arg);
 			} 
 			break;
 			
 		case ClientUnregistered:
-			if (control->client_register) {
-				control->client_register
+			if (control->client_register_cbset) {
+				client->client_register
 					(event.x.name, FALSE,
-					 control->client_register_arg);
+					 client->client_register_arg);
 			}
 			break;
 			
@@ -1377,25 +1377,25 @@ jack_client_process_events (jack_client_t* client)
 			
 		case BufferSizeChange:
 			jack_client_invalidate_port_buffers (client);
-			if (control->bufsize) {
-				status = control->bufsize
+			if (control->bufsize_cbset) {
+				status = client->bufsize
 					(control->nframes,
-					 control->bufsize_arg);
+					 client->bufsize_arg);
 			} 
 			break;
 			
 		case SampleRateChange:
-			if (control->srate) {
-				status = control->srate
+			if (control->srate_cbset) {
+				status = client->srate
 					(control->nframes,
-					 control->srate_arg);
+					 client->srate_arg);
 			}
 			break;
 			
 		case XRun:
-			if (control->xrun) {
-				status = control->xrun
-					(control->xrun_arg);
+			if (control->xrun_cbset) {
+				status = client->xrun
+					(client->xrun_arg);
 			}
 			break;
 			
@@ -1583,7 +1583,7 @@ jack_thread_wait (jack_client_t* client, int status)
 
 	/* housekeeping/cleanup after data processing */
 
-	if (status == 0 && client->control->timebase_cb) {
+	if (status == 0 && client->control->timebase_cb_cbset) {
 		jack_call_timebase_master (client);
 	}
 	
@@ -1621,7 +1621,7 @@ jack_thread_wait (jack_client_t* client, int status)
 	/* begin preemption checking */
 	CHECK_PREEMPTION (client->engine, TRUE);
 	
-	if (client->control->sync_cb)
+	if (client->control->sync_cb_cbset)
 		jack_call_sync_client (client);
 
 	return client->control->nframes;
@@ -1644,7 +1644,7 @@ jack_nframes_t jack_cycle_wait (jack_client_t* client)
 	/* begin preemption checking */
 	CHECK_PREEMPTION (client->engine, TRUE);
 	
-	if (client->control->sync_cb)
+	if (client->control->sync_cb_cbset)
 		jack_call_sync_client (client);
 
 	return client->control->nframes;
@@ -1658,7 +1658,7 @@ void jack_cycle_signal(jack_client_t* client, int status)
 
 	/* housekeeping/cleanup after data processing */
 
-	if (status == 0 && client->control->timebase_cb) {
+	if (status == 0 && client->control->timebase_cb_cbset) {
 		jack_call_timebase_master (client);
 	}
 	
@@ -1701,9 +1701,9 @@ jack_client_thread_aux (void *arg)
 
 	DEBUG ("client thread is now running");
 
-	if (control->thread_init) {
+	if (control->thread_init_cbset) {
 		DEBUG ("calling client thread init callback");
-		control->thread_init (control->thread_init_arg);
+		client->thread_init (client->thread_init_arg);
 	}
 
 	/* wait for first wakeup from server */
@@ -1712,14 +1712,14 @@ jack_client_thread_aux (void *arg)
 
 		/* now run till we're done */
 
-		if (control->process) {
+		if (control->process_cbset) {
 
 			/* run process callback, then wait... ad-infinitum */
 
 			while (1) {
 				DEBUG("client calls process()");
-				int status = (control->process (control->nframes, 
-								control->process_arg) ==
+				int status = (client->process (control->nframes, 
+								client->process_arg) ==
 					      control->nframes);
 				control->state = Finished;
 				DEBUG("client leaves process(), re-enters wait");
@@ -1745,7 +1745,7 @@ jack_client_thread (void *arg)
 	jack_client_t *client = (jack_client_t *) arg;
 	jack_client_control_t *control = client->control;
 	
-	if (client->control->thread_cb) {
+	if (client->control->thread_cb_cbset) {
 	
 		pthread_mutex_lock (&client_lock);
 		client->thread_ok = TRUE;
@@ -1756,7 +1756,7 @@ jack_client_thread (void *arg)
 		control->pid = getpid();
 		control->pgrp = getpgrp();
 
-		client->control->thread_cb(client->control->thread_cb_arg);
+		client->thread_cb(client->thread_cb_arg);
 		jack_client_thread_suicide(client);
 	} else {
 		jack_client_thread_aux(arg);
@@ -2232,8 +2232,9 @@ jack_set_graph_order_callback (jack_client_t *client,
 		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
-	client->control->graph_order = callback;
-	client->control->graph_order_arg = arg;
+	client->graph_order = callback;
+	client->graph_order_arg = arg;
+	client->control->graph_order_cbset = (callback != NULL);
 	return 0;
 }
 
@@ -2245,8 +2246,9 @@ int jack_set_xrun_callback (jack_client_t *client,
 		return -1;
 	}
 
-	client->control->xrun = callback;
-	client->control->xrun_arg = arg;
+	client->xrun = callback;
+	client->xrun_arg = arg;
+	client->control->xrun_cbset = (callback != NULL);
 	return 0;       
 }
 
@@ -2260,13 +2262,14 @@ jack_set_process_callback (jack_client_t *client,
 		return -1;
 	}
 	
-	if (client->control->thread_cb) {
+	if (client->control->thread_cb_cbset) {
 		jack_error ("A thread callback has already been setup, both models cannot be used at the same time!");
 		return -1;
 	}
 	
-	client->control->process_arg = arg;
-	client->control->process = callback;
+	client->process_arg = arg;
+	client->process = callback;
+	client->control->process_cbset = (callback != NULL);
 	return 0;
 }
 
@@ -2279,8 +2282,9 @@ jack_set_thread_init_callback (jack_client_t *client,
 		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
-	client->control->thread_init_arg = arg;
-	client->control->thread_init = callback;
+	client->thread_init_arg = arg;
+	client->thread_init = callback;
+	client->control->thread_init_cbset = (callback != NULL);
 	return 0;
 }
 
@@ -2292,8 +2296,9 @@ jack_set_freewheel_callback (jack_client_t *client,
 		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
-	client->control->freewheel_arg = arg;
-	client->control->freewheel_cb = callback;
+	client->freewheel_arg = arg;
+	client->freewheel_cb = callback;
+	client->control->freewheel_cb_cbset = (callback != NULL);
 	return 0;
 }
 
@@ -2301,8 +2306,9 @@ int
 jack_set_buffer_size_callback (jack_client_t *client,
 			       JackBufferSizeCallback callback, void *arg)
 {
-	client->control->bufsize_arg = arg;
-	client->control->bufsize = callback;
+	client->bufsize_arg = arg;
+	client->bufsize = callback;
+	client->control->bufsize_cbset = (callback != NULL);
 	return 0;
 }
 
@@ -2315,8 +2321,9 @@ jack_set_port_registration_callback(jack_client_t *client,
 		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
-	client->control->port_register_arg = arg;
-	client->control->port_register = callback;
+	client->port_register_arg = arg;
+	client->port_register = callback;
+	client->control->port_register_cbset = (callback != NULL);
 	return 0;
 }
 
@@ -2329,8 +2336,9 @@ jack_set_port_connect_callback(jack_client_t *client,
 		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
-	client->control->port_connect_arg = arg;
-	client->control->port_connect = callback;
+	client->port_connect_arg = arg;
+	client->port_connect = callback;
+	client->control->port_connect_cbset = (callback != NULL);
 	return 0;
 }
 
@@ -2343,8 +2351,9 @@ jack_set_client_registration_callback(jack_client_t *client,
 		jack_error ("You cannot set callbacks on an active client.");
 		return -1;
 	}
-	client->control->client_register_arg = arg;
-	client->control->client_register = callback;
+	client->client_register_arg = arg;
+	client->client_register = callback;
+	client->control->client_register_cbset = (callback != NULL);
 	return 0;
 }
 
@@ -2356,13 +2365,14 @@ jack_set_process_thread(jack_client_t* client, JackThreadCallback callback, void
 		return -1;
 	}
 	
-	if (client->control->process) {
+	if (client->control->process_cbset) {
 		jack_error ("A process callback has already been setup, both models cannot be used at the same time!");
 		return -1;
 	}
 
-	client->control->thread_cb_arg = arg;
-	client->control->thread_cb = callback;
+	client->thread_cb_arg = arg;
+	client->thread_cb = callback;
+	client->control->thread_cb_cbset = (callback != NULL);
 	return 0;
 }
 

@@ -61,6 +61,8 @@
 #include "clientengine.h"
 #include "transengine.h"
 
+#include "libjack/local.h"
+
 typedef struct {
 
     jack_port_internal_t *source;
@@ -581,17 +583,17 @@ jack_process_internal(jack_engine_t *engine, JSList *node,
 
 	/* XXX how to time out an internal client? */
 
-	if (ctl->sync_cb)
-		jack_call_sync_client (ctl->private_client);
+	if (ctl->sync_cb_cbset)
+		jack_call_sync_client (client->private_client);
 
-	if (ctl->process)
-		if (ctl->process (nframes, ctl->process_arg)) {
+	if (ctl->process_cbset)
+		if (client->private_client->process (nframes, client->private_client->process_arg)) {
 			jack_error ("internal client %s failed", ctl->name);
 			engine->process_errors++;
 		}
 
-	if (ctl->timebase_cb)
-		jack_call_timebase_master (ctl->private_client);
+	if (ctl->timebase_cb_cbset)
+		jack_call_timebase_master (client->private_client);
 		
 	ctl->state = Finished;
 
@@ -1071,7 +1073,7 @@ jack_engine_load_driver (jack_engine_t *engine,
 		return -1;
 	}
 
-	if ((driver = info->initialize (client->control->private_client,
+	if ((driver = info->initialize (client->private_client,
 					driver_params)) == NULL) {
 		free (info);
 		return -1;
@@ -1401,6 +1403,8 @@ handle_external_client_request (jack_engine_t *engine, int fd)
 		} else {
 			jack_error ("cannot read request from client (%d/%d/%s)",
 				    r, sizeof(req), strerror (errno));
+			// XXX: shouldnt we mark this client as error now ?
+
 			return -1;
 		}
 	}
@@ -2410,7 +2414,7 @@ jack_notify_all_port_interested_clients (jack_engine_t *engine, jack_client_id_t
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
-		if (src_client != client &&  dst_client  != client && client->control->port_connect != NULL) {
+		if (src_client != client &&  dst_client  != client && client->control->port_connect_cbset != FALSE) {
 			
 			/* one of the ports belong to this client or it has a port connect callback */
 			jack_deliver_event (engine, client, &event);
@@ -2447,39 +2451,39 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 		case PortConnected:
 		case PortDisconnected:
 			jack_client_handle_port_connection
-				(client->control->private_client, event);
+				(client->private_client, event);
 			break;
 
 		case BufferSizeChange:
 			jack_client_invalidate_port_buffers
-				(client->control->private_client);
+				(client->private_client);
 
-			if (client->control->bufsize) {
-				client->control->bufsize
+			if (client->control->bufsize_cbset) {
+				client->private_client->bufsize
 					(event->x.n,
-					 client->control->bufsize_arg);
+					 client->private_client->bufsize_arg);
 			}
 			break;
 
 		case SampleRateChange:
-			if (client->control->srate) {
-				client->control->srate
+			if (client->control->srate_cbset) {
+				client->private_client->srate
 					(event->x.n,
-					 client->control->srate_arg);
+					 client->private_client->srate_arg);
 			}
 			break;
 
 		case GraphReordered:
-			if (client->control->graph_order) {
-				client->control->graph_order
-					(client->control->graph_order_arg);
+			if (client->control->graph_order_cbset) {
+				client->private_client->graph_order
+					(client->private_client->graph_order_arg);
 			}
 			break;
 
 		case XRun:
-			if (client->control->xrun) {
-				client->control->xrun
-					(client->control->xrun_arg);
+			if (client->control->xrun_cbset) {
+				client->private_client->xrun
+					(client->private_client->xrun_arg);
 			}
 			break;
 
@@ -3134,7 +3138,7 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 			 ++n,
 			 ctl->name,
 			 ctl->type,
-			 ctl->process ? "yes" : "no",
+			 ctl->process_cbset ? "yes" : "no",
 			 client->subgraph_start_fd,
 			 client->subgraph_wait_fd);
 
@@ -3940,7 +3944,9 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req,
 				 * names. store in malloc'ed space,
 				 * client frees
 				 */
-				req->x.port_connections.ports[i] =
+			        char **ports = req->x.port_connections.ports;
+
+				ports[i] =
 					engine->control->ports[port_id].name;
 
 			} else {
@@ -3987,7 +3993,7 @@ jack_port_registration_notify (jack_engine_t *engine,
 			continue;
 		}
 
-		if (client->control->port_register) {
+		if (client->control->port_register_cbset) {
 			if (jack_deliver_event (engine, client, &event)) {
 				jack_error ("cannot send port registration"
 					    " notification to %s (%s)",
@@ -4022,7 +4028,7 @@ jack_client_registration_notify (jack_engine_t *engine,
 			continue;
 		}
 
-		if (client->control->client_register) {
+		if (client->control->client_register_cbset) {
 			if (jack_deliver_event (engine, client, &event)) {
 				jack_error ("cannot send client registration"
 					    " notification to %s (%s)",
