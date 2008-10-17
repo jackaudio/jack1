@@ -149,7 +149,7 @@ static void do_jack_output(alsa_seqmidi_t *self, port_t *port, struct process_in
 typedef struct {
 	int alsa_mask;
 	int jack_caps;
-	char name[4];
+	char name[9];
 	port_jack_func jack_func;
 } port_type_t;
 
@@ -157,13 +157,13 @@ static port_type_t port_type[2] = {
 	{
 		SND_SEQ_PORT_CAP_SUBS_READ,
 		JackPortIsOutput,
-		"in",
+		"playback",
 		do_jack_input
 	},
 	{
 		SND_SEQ_PORT_CAP_SUBS_WRITE,
 		JackPortIsInput,
-		"out",
+		"capture",
 		do_jack_output
 	}
 };
@@ -485,8 +485,8 @@ port_t* port_create(alsa_seqmidi_t *self, int type, snd_seq_addr_t addr, const s
 	snd_seq_client_info_alloca (&client_info);
 	snd_seq_get_any_client_info (self->seq, addr.client, client_info);
 
-	snprintf(port->name, sizeof(port->name), "%s(%d)/midi_%s:%d",
-		 snd_seq_client_info_get_name(client_info), addr.client, port_type[type].name, addr.port+1);
+	snprintf(port->name, sizeof(port->name), "%s/midi_%s_%d",
+		 snd_seq_client_info_get_name(client_info), port_type[type].name, addr.port+1);
 
 	// replace all offending characters by -
 	for (c = port->name; *c; ++c)
