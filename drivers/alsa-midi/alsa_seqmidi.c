@@ -156,13 +156,13 @@ typedef struct {
 static port_type_t port_type[2] = {
 	{
 		SND_SEQ_PORT_CAP_SUBS_READ,
-		JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal,
+		JackPortIsOutput,
 		"in",
 		do_jack_input
 	},
 	{
 		SND_SEQ_PORT_CAP_SUBS_WRITE,
-		JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal,
+		JackPortIsInput,
 		"out",
 		do_jack_output
 	}
@@ -470,9 +470,11 @@ void port_free(alsa_seqmidi_t *self, port_t *port)
 static
 port_t* port_create(alsa_seqmidi_t *self, int type, snd_seq_addr_t addr, const snd_seq_port_info_t *info)
 {
+	snd_seq_client_info_t* client_info;
 	port_t *port;
 	char *c;
 	int err;
+	int jack_caps;
 
 	port = calloc(1, sizeof(port_t));
 	if (!port)
@@ -480,18 +482,41 @@ port_t* port_create(alsa_seqmidi_t *self, int type, snd_seq_addr_t addr, const s
 
 	port->remote = addr;
 
-	snprintf(port->name, sizeof(port->name), "%s-%d-%d-%s",
-		port_type[type].name, addr.client, addr.port, snd_seq_port_info_get_name(info));
+	snd_seq_client_info_alloca (&client_info);
+	snd_seq_get_any_client_info (self->seq, addr.client, client_info);
+
+	snprintf(port->name, sizeof(port->name), "%s(%d)/midi_%s:%d",
+		 snd_seq_client_info_get_name(client_info), addr.client, port_type[type].name, addr.port+1);
 
 	// replace all offending characters by -
 	for (c = port->name; *c; ++c)
-		if (!isalnum(*c))
+		if (!isalnum(*c) && *c != '/' && *c != '_' && *c != ':' && *c != '(' && *c != ')')
 			*c = '-';
 
+	jack_caps = port_type[type].jack_caps;
+
+	/* mark anything that looks like a hardware port as physical&terminal */
+
+	if (snd_seq_port_info_get_type (info) & (SND_SEQ_PORT_TYPE_HARDWARE|SND_SEQ_PORT_TYPE_PORT|SND_SEQ_PORT_TYPE_SPECIFIC)) {
+		jack_caps |= (JackPortIsPhysical|JackPortIsTerminal);
+	}
+			
 	port->jack_port = jack_port_register(self->jack,
-		port->name, JACK_DEFAULT_MIDI_TYPE, port_type[type].jack_caps, 0);
+		port->name, JACK_DEFAULT_MIDI_TYPE, jack_caps, 0);
 	if (!port->jack_port)
 		goto failed;
+
+	/* generate an alias */
+
+	snprintf(port->name, sizeof(port->name), "%s:midi/%s_%d",
+		 snd_seq_client_info_get_name (client_info), port_type[type].name, addr.port+1);
+
+	// replace all offending characters by -
+	for (c = port->name; *c; ++c)
+		if (!isalnum(*c) && *c != '/' && *c != '_' && *c != ':' && *c != '(' && *c != ')')
+			*c = '-';
+
+	jack_port_set_alias (port->jack_port, port->name);
 
 	if (type == PORT_INPUT)
 		err = alsa_connect_from(self, port->remote.client, port->remote.port);
@@ -542,7 +567,7 @@ void update_port(alsa_seqmidi_t *self, snd_seq_addr_t addr, const snd_seq_port_i
 	if (port_caps & SND_SEQ_PORT_CAP_NO_EXPORT)
 		return;
 	update_port_type(self, PORT_INPUT, addr, port_caps, info);
-	update_port_type(self, PORT_OUTPUT, addr, port_caps, info);
+	update_port_type(self, PORT_OUTPUT,addr, port_caps, info);
 }
 
 static
@@ -560,13 +585,15 @@ static
 void update_ports(alsa_seqmidi_t *self)
 {
 	snd_seq_addr_t addr;
+	snd_seq_port_info_t *info;
 	int size;
 
+	snd_seq_port_info_alloca(&info);
+
 	while ((size = jack_ringbuffer_read(self->port_add, (char*)&addr, sizeof(addr)))) {
-		snd_seq_port_info_t *info;
+		
 		int err;
 
-		snd_seq_port_info_alloca(&info);
 		assert (size == sizeof(addr));
 		assert (addr.client != self->client_id);
 		if ((err=snd_seq_get_any_port_info(self->seq, addr.client, addr.port, info))>=0) {
