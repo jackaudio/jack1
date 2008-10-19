@@ -217,7 +217,7 @@ AC_DEFINE_UNQUOTED(JACK_SHM_TYPE, [$JACK_SHM_TYPE],
 AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
 
 JACK_CORE_CFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
--I\$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall -g"
+-I\$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
 JACK_OPT_CFLAGS="$JACK_CORE_CFLAGS -O3 \
 -ffast-math -funroll-loops -fprefetch-loop-arrays"
 JACK_CFLAGS="$JACK_CORE_CFLAGS $CFLAGS"
@@ -404,7 +404,8 @@ AC_ARG_ENABLE(optimize,
 	JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS"
 	AC_MSG_WARN([optimization in use.........................])
       else
-	JACK_OPT_CFLAGS=""
+        # no optimization, so lets get debugging symbols instead
+	JACK_OPT_CFLAGS="-g"
 	AC_MSG_WARN([no optimization.........................])
       fi 
     ]

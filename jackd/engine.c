@@ -3917,7 +3917,7 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req,
 			goto out;
 		}
 	} else {
-		req->x.port_connections.ports = (const char **)
+		req->x.port_connections.ports = (const char**)
 			malloc (sizeof (char *)
 				* req->x.port_connections.nports);
 	}
@@ -3944,7 +3944,7 @@ jack_do_get_port_connections (jack_engine_t *engine, jack_request_t *req,
 				 * names. store in malloc'ed space,
 				 * client frees
 				 */
-			        char **ports = req->x.port_connections.ports;
+			        char **ports = (char **) req->x.port_connections.ports;
 
 				ports[i] =
 					engine->control->ports[port_id].name;

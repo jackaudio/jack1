@@ -376,7 +376,7 @@ jack_port_get_all_connections (const jack_client_t *client,
 	}
 
 	if (client->request_fd < 0) {
-		/* internal client */
+		/* internal client, .ports is in our own address space */
 		return req.x.port_connections.ports;
 	}
 

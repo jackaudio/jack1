@@ -380,8 +380,11 @@ struct _jack_request {
 	} POST_PACKED_STRUCTURE connect;
 	struct {
 	    int32_t nports;
-	    //const char **ports;		/* JOQ: 32/64 problem? */
-	    uint64_t ports;
+	    const char **ports;	/* this is only exposed to internal clients, so there
+				   is no 64/32 issue. external clients read the ports
+				   one by one from the server, and allocate their
+				   own "ports" array in their own address space.
+				*/
 	} POST_PACKED_STRUCTURE port_connections;
 	struct {
 	    jack_client_id_t client_id;

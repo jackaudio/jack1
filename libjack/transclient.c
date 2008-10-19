@@ -335,7 +335,7 @@ jack_release_timebase (jack_client_t *client)
 	if (rc == 0) {
 		client->timebase_cb = NULL;
 		client->timebase_arg = NULL;
-		ctl->timebase_cb_cbset = NULL;
+		ctl->timebase_cb_cbset = 0;
 	}
 
 	return rc;

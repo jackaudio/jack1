@@ -72,8 +72,8 @@ jack_client_t *jack_client_open (const char *client_name,
 				 jack_status_t *status, ...);
 
 /**
- * \bold THIS FUNCTION IS DEPRECATED AND SHOULD NOT BE USED IN
- *  NEW JACK CLIENTS
+ * <b>THIS FUNCTION IS DEPRECATED AND SHOULD NOT BE USED IN
+ *  NEW JACK CLIENTS</b>
  *
  */
 jack_client_t *jack_client_new (const char *client_name);
@@ -180,8 +180,8 @@ int jack_set_process_callback (jack_client_t *client,
 			       JackProcessCallback process_callback,
 			       void *arg);
 /**
- * \bold THIS FUNCTION IS DEPRECATED AND SHOULD NOT BE USED IN
- *  NEW JACK CLIENTS.
+ * <b>THIS FUNCTION IS DEPRECATED AND SHOULD NOT BE USED IN
+ * NEW JACK CLIENTS</b>
  *
  * It should be replace by use of @ jack_cycle_wait and @ jack_cycle_signal functions.
  *

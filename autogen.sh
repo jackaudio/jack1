@@ -43,7 +43,7 @@ autoconf || {
     exit 1
 }
 
-if test x$1 != x--no-conf; then
-  echo "Running ./configure --enable-maintainer-mode $@..."
+if test x$1 = x--run-conf; then
+  echo "because of \"$1\" Running ./configure --enable-maintainer-mode $@..."
   ./configure --enable-maintainer-mode $@
 fi

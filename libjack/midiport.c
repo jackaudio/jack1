@@ -53,7 +53,7 @@ jack_midi_event_data(void* port_buffer,
                      const jack_midi_port_internal_event_t* event)
 {
 	if (event->size <= MIDI_INLINE_MAX)
-		return event->inline_data;
+		return (jack_midi_data_t*) event->inline_data;
 	else
 		return ((jack_midi_data_t *)port_buffer) + event->byte_offset;
 }

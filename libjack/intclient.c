@@ -161,13 +161,13 @@ jack_internal_client_load_aux (jack_client_t *client,
 
 jack_intclient_t
 jack_internal_client_load (jack_client_t *client,
-		  const char *client_name,
-		  jack_options_t options,
-		  jack_status_t *status, ...)
+			   const char *client_name,
+			   jack_options_t options,
+			   jack_status_t *status, ...)
 {
-	va_list ap;
+    va_list ap;
     va_start(ap, status);
-    jack_intclient_t* res = jack_internal_client_load_aux(client, client_name, options, status, ap);
+    jack_intclient_t res = jack_internal_client_load_aux(client, client_name, options, status, ap);
     va_end(ap);
     return res;
 }
