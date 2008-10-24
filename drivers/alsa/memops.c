@@ -34,19 +34,64 @@
 
 #include <jack/memops.h>
 
-#define SAMPLE_MAX_24BIT  8388608.0f
-#define SAMPLE_MAX_16BIT  32768.0f
+/* Notes about these *_SCALING values.
 
-/* define these in case we end up on a platform that is missing
+   the MAX_<N>BIT values are floating point. when multiplied by
+   a full-scale normalized floating point sample value (-1.0..+1.0)
+   they should give the maxium value representable with an integer
+   sample type of N bits. Note that this is asymmetric. Sample ranges 
+   for signed integer, 2's complement values are -(2^(N-1) to +(2^(N-1)-1)
+
+   Complications
+   -------------
+   If we use +2^(N-1) for the scaling factors, we run into a problem:
+
+   if we start with a normalized float value of -1.0, scaling
+   to 24 bits would give -8388608 (-2^23), which is ideal.
+   But with +1.0, we get +8388608, which is technically out of range.
+
+   We never multiply a full range normalized value by this constant,
+   but we could multiply it by a positive value that is close enough to +1.0
+   to produce a value > +(2^(N-1)-1.
+
+   There is no way around this paradox without wasting CPU cycles to determine
+   which scaling factor to use (i.e. determine if its negative or not,
+   use the right factor).
+
+   So, for now (October 2008) we use 2^(N-1)-1 as the scaling factor.
+*/
+
+#define SAMPLE_24BIT_SCALING  8388607.0f
+#define SAMPLE_16BIT_SCALING  32767.0f
+
+/* these are just values to use if the floating point value was out of range
+ */
+
+#define SAMPLE_24BIT_MAX  8388607  // 2^23 - 1
+#define SAMPLE_24BIT_MIN  -8388608 // - (2^23)
+
+#define SAMPLE_16BIT_MAX  32767    // 2^15-1
+#define SAMPLE_16BIT_MIN  -32768   // - (2^15)
+
+/* these mark the outer edges of the range considered "within" range
+   for a floating point sample value. values outside (and on the boundaries) 
+   of this range will be clipped before conversion; values within this 
+   range will be scaled to appropriate values for the target sample
+   type.
+*/
+
+#define NORMALIZED_FLOAT_MIN -1.0f
+#define NORMALIZED_FLOAT_MAX  1.0f
+
+/* define this in case we end up on a platform that is missing
    the real lrintf functions
 */
 
 #define f_round(f) lrintf(f)
-#define f_roundl(f) llrintf(f)
 
 /* Linear Congruential noise generator. From the music-dsp list
- * less random than rand(), but good enough and 10x faster */
-inline unsigned int fast_rand();
+ * less random than rand(), but good enough and 10x faster 
+ */
 
 inline unsigned int fast_rand() {
 	static unsigned int seed = 22222;
@@ -101,17 +146,15 @@ void sample_move_dS_floatLE (char *dst, jack_default_audio_sample_t *src, unsign
 
 void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 {
-        int64_t y;
-	int z;
+	int32_t z;
 
 	while (nsamples--) {
-		y = f_roundl(*src * SAMPLE_MAX_24BIT) << 8;
-		if (y > INT_MAX) {
-			z = INT_MAX;
-		} else if (y < INT_MIN) {
-			z = INT_MIN;
+		if (*src <= NORMALIZED_FLOAT_MIN) {
+			z = SAMPLE_24BIT_MIN;
+		} else if (*src >= NORMALIZED_FLOAT_MAX) {
+			z = SAMPLE_24BIT_MAX;
 		} else {
-			z = (int)y;
+			z = f_round (*src * SAMPLE_24BIT_SCALING) << 8;
 		}
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 		dst[0]=(char)(z>>24);
@@ -131,16 +174,13 @@ void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsign
 
 void sample_move_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 {
-    int64_t y;
-
 	while (nsamples--) {
-		y = f_roundl(*src * SAMPLE_MAX_24BIT) << 8;
-		if (y > INT_MAX) {
-			*((int *) dst) = INT_MAX;
-		} else if (y < INT_MIN) {
-			*((int *) dst) = INT_MIN;
+		if (*src <= NORMALIZED_FLOAT_MIN) {
+			*((int32_t*) dst) = SAMPLE_24BIT_MIN;
+		} else if (*src >= NORMALIZED_FLOAT_MAX) {
+			*((int32_t*) dst) = SAMPLE_24BIT_MAX;
 		} else {
-			*((int *) dst) = (int)y;
+			*((int32_t*) dst) = f_round (*src * SAMPLE_24BIT_SCALING) << 8;
 		}
 		dst += dst_skip;
 		src++;
@@ -170,7 +210,7 @@ void sample_move_dS_s32u24s (jack_default_audio_sample_t *dst, char *src, unsign
 		x <<= 8;
 		x |= (unsigned char)(src[0]);
 #endif
-		*dst = (x >> 8) / SAMPLE_MAX_24BIT;
+		*dst = (x >> 8) / SAMPLE_24BIT_SCALING;
 		dst++;
 		src += src_skip;
 	}
@@ -181,244 +221,11 @@ void sample_move_dS_s32u24 (jack_default_audio_sample_t *dst, char *src, unsigne
 	/* ALERT: signed sign-extension portability !!! */
 
 	while (nsamples--) {
-		*dst = (*((int *) src) >> 8) / SAMPLE_MAX_24BIT;
+		*dst = (*((int *) src) >> 8) / SAMPLE_24BIT_SCALING;
 		dst++;
 		src += src_skip;
 	}
 }	
-
-void sample_move_dither_rect_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-{
-	/* ALERT: signed sign-extension portability !!! */
-	jack_default_audio_sample_t  x;
-	int64_t y;
-	int z;
-
-	while (nsamples--) {
-		x = *src * SAMPLE_MAX_16BIT;
-		x -= (float)fast_rand() / (float)INT_MAX;
-		y = f_roundl(x);
-		y <<= 16;
-		if (y > INT_MAX) {
-			z = INT_MAX;
-		} else if (y < INT_MIN) {
-			z = INT_MIN;
-		} else {
-			z = (int) y;
-		}
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		dst[0]=(char)(z>>24);
-		dst[1]=(char)(z>>16);
-		dst[2]=(char)(z>>8);
-		dst[3]=(char)(z);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		dst[0]=(char)(z);
-		dst[1]=(char)(z>>8);
-		dst[2]=(char)(z>>16);
-		dst[3]=(char)(z>>24);
-#endif
-		dst += dst_skip;
-		src++;
-	}
-}	
-
-void sample_move_dither_rect_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-{
-	/* ALERT: signed sign-extension portability !!! */
-	jack_default_audio_sample_t  x;
-	int64_t y;
-
-	while (nsamples--) {
-		x = *src * SAMPLE_MAX_16BIT;
-		x -= (float)fast_rand() / (float)INT_MAX;
-		y = f_roundl(x);
-		y <<= 16;
-		if (y > INT_MAX) {
-			*((int *) dst) = INT_MAX;
-		} else if (y < INT_MIN) {
-			*((int *) dst) = INT_MIN;
-		} else {
-			*((int *) dst) = (int) y;
-		}
-		dst += dst_skip;
-		src++;
-	}
-}	
-
-void sample_move_dither_tri_d32u24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
-{
-	jack_default_audio_sample_t  x;
-	float     r;
-	float     rm1 = state->rm1;
-	int64_t y;
-	int z;
-
-	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
-		x += r - rm1;
-		rm1 = r;
-		y = f_roundl(x);
-		y <<= 16;
-
-		if (y > INT_MAX) {
-			z = INT_MAX;
-		} else if (y < INT_MIN) {
-			z = INT_MIN;
-		} else {
-			z = (int)y;
-		}
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		dst[0]=(char)(z>>24);
-		dst[1]=(char)(z>>16);
-		dst[2]=(char)(z>>8);
-		dst[3]=(char)(z);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		dst[0]=(char)(z);
-		dst[1]=(char)(z>>8);
-		dst[2]=(char)(z>>16);
-		dst[3]=(char)(z>>24);
-#endif
-		dst += dst_skip;
-		src++;
-	}
-	state->rm1 = rm1;
-}
-
-void sample_move_dither_tri_d32u24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
-{
-	jack_default_audio_sample_t  x;
-	float     r;
-	float     rm1 = state->rm1;
-	int64_t y;
-
-	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
-		x += r - rm1;
-		rm1 = r;
-		y = f_roundl(x);
-		y <<= 16;
-
-		if (y > INT_MAX) {
-			*((int *) dst) = INT_MAX;
-		} else if (y < INT_MIN) {
-			*((int *) dst) = INT_MIN;
-		} else {
-			*((int *) dst) = (int)y;
-		}
-
-		dst += dst_skip;
-		src++;
-	}
-	state->rm1 = rm1;
-}
-
-void sample_move_dither_shaped_d32u24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
-{
-	jack_default_audio_sample_t     x;
-	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
-	jack_default_audio_sample_t     xp; /* x' */
-	float        r;
-	float        rm1 = state->rm1;
-	unsigned int idx = state->idx;
-	int64_t    y;
-	int z;
-
-	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
-		/* Filter the error with Lipshitz's minimally audible FIR:
-		   [2.033 -2.165 1.959 -1.590 0.6149] */
-		xe = x
-		     - state->e[idx] * 2.033f
-		     + state->e[(idx - 1) & DITHER_BUF_MASK] * 2.165f
-		     - state->e[(idx - 2) & DITHER_BUF_MASK] * 1.959f
-		     + state->e[(idx - 3) & DITHER_BUF_MASK] * 1.590f
-		     - state->e[(idx - 4) & DITHER_BUF_MASK] * 0.6149f;
-		xp = xe + r - rm1;
-		rm1 = r;
-
-		/* This could be some inline asm on x86 */
-		y = f_roundl(xp);
-
-		/* Intrinsic z^-1 delay */
-		idx = (idx + 1) & DITHER_BUF_MASK;
-		state->e[idx] = y - xe;
-
-		y <<= 16;
-
-		if (y > INT_MAX) {
-			z = INT_MAX;
-		} else if (y < INT_MIN) {
-			z = INT_MIN;
-		} else {
-			z = (int)y;
-		}
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		dst[0]=(char)(z>>24);
-		dst[1]=(char)(z>>16);
-		dst[2]=(char)(z>>8);
-		dst[3]=(char)(z);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		dst[0]=(char)(z);
-		dst[1]=(char)(z>>8);
-		dst[2]=(char)(z>>16);
-		dst[3]=(char)(z>>24);
-#endif
-		dst += dst_skip;
-		src++;
-	}
-	state->rm1 = rm1;
-	state->idx = idx;
-}
-
-void sample_move_dither_shaped_d32u24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
-{
-	jack_default_audio_sample_t     x;
-	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
-	jack_default_audio_sample_t     xp; /* x' */
-	float        r;
-	float        rm1 = state->rm1;
-	unsigned int idx = state->idx;
-	int64_t    y;
-
-	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
-		/* Filter the error with Lipshitz's minimally audible FIR:
-		   [2.033 -2.165 1.959 -1.590 0.6149] */
-		xe = x
-		     - state->e[idx] * 2.033f
-		     + state->e[(idx - 1) & DITHER_BUF_MASK] * 2.165f
-		     - state->e[(idx - 2) & DITHER_BUF_MASK] * 1.959f
-		     + state->e[(idx - 3) & DITHER_BUF_MASK] * 1.590f
-		     - state->e[(idx - 4) & DITHER_BUF_MASK] * 0.6149f;
-		xp = xe + r - rm1;
-		rm1 = r;
-
-		/* This could be some inline asm on x86 */
-		y = f_roundl(xp);
-
-		/* Intrinsic z^-1 delay */
-		idx = (idx + 1) & DITHER_BUF_MASK;
-		state->e[idx] = y - xe;
-
-		y <<= 16;
-
-		if (y > INT_MAX) {
-			*((int *) dst) = INT_MAX;
-		} else if (y < INT_MIN) {
-			*((int *) dst) = INT_MIN;
-		} else {
-			*((int *) dst) = y;
-		}
-		dst += dst_skip;
-		src++;
-	}
-	state->rm1 = rm1;
-	state->idx = idx;
-}
 
 void sample_move_d24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 {
@@ -426,7 +233,7 @@ void sample_move_d24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned 
 	int z;
 
 	while (nsamples--) {
-		y = (int64_t)(*src * SAMPLE_MAX_24BIT);
+		y = (int64_t)(*src * SAMPLE_24BIT_SCALING);
 
 		if (y > (INT_MAX >> 8 )) {
 			z = (INT_MAX >> 8);
@@ -454,7 +261,7 @@ void sample_move_d24_sS (char *dst, jack_default_audio_sample_t *src, unsigned l
         int64_t y;
 
 	while (nsamples--) {
-		y = (int64_t)(*src * SAMPLE_MAX_24BIT);
+		y = (int64_t)(*src * SAMPLE_24BIT_SCALING);
 
 		if (y > (INT_MAX >> 8 )) {
 			y = (INT_MAX >> 8);
@@ -498,7 +305,7 @@ void sample_move_dS_s24s (jack_default_audio_sample_t *dst, char *src, unsigned 
 			x |= 0xff << 24;
 		}
 #endif
-		*dst = x / SAMPLE_MAX_24BIT;
+		*dst = x / SAMPLE_24BIT_SCALING;
 		dst++;
 		src += src_skip;
 	}
@@ -516,268 +323,26 @@ void sample_move_dS_s24 (jack_default_audio_sample_t *dst, char *src, unsigned l
 		memcpy(&x, src, 3);
 #endif
 		x >>= 8;
-		*dst = x / SAMPLE_MAX_24BIT;
+		*dst = x / SAMPLE_24BIT_SCALING;
 		dst++;
 		src += src_skip;
 	}
 }	
 
-void sample_move_dither_rect_d24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-{
-	/* ALERT: signed sign-extension portability !!! */
-	jack_default_audio_sample_t  x;
-	int64_t y;
-	int z;
-
-	while (nsamples--) {
-		x = *src * SAMPLE_MAX_16BIT;
-		x -= (float)fast_rand() / (float)INT_MAX;
-		y = f_roundl(x);
-
-		y <<= 8;
-
-		if (y > (INT_MAX >> 8)) {
-			z = (INT_MAX >> 8);
-		} else if (y < (INT_MIN >> 8)) {
-			z = (INT_MIN >> 8);
-		} else {
-			z = (int)y;
-		}
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		dst[0]=(char)(z>>16);
-		dst[1]=(char)(z>>8);
-		dst[2]=(char)(z);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		dst[0]=(char)(z);
-		dst[1]=(char)(z>>8);
-		dst[2]=(char)(z>>16);
-#endif
-		dst += dst_skip;
-		src++;
-	}
-}	
-
-void sample_move_dither_rect_d24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-{
-	/* ALERT: signed sign-extension portability !!! */
-	jack_default_audio_sample_t  x;
-	int64_t y;
-
-	while (nsamples--) {
-		x = *src * SAMPLE_MAX_16BIT;
-		x -= (float)fast_rand() / (float)INT_MAX;
-		y = f_roundl(x);
-
-		y <<= 8;
-
-		if (y > (INT_MAX >> 8)) {
-			y = (INT_MAX >> 8);
-		} else if (y < (INT_MIN >> 8)) {
-			y = (INT_MIN >> 8);
-		}
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		memcpy (dst, &y, 3);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		memcpy (dst, (char *)&y + 5, 3);
-#endif
-
-		dst += dst_skip;
-		src++;
-	}
-}	
-
-void sample_move_dither_tri_d24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
-{
-	jack_default_audio_sample_t  x;
-	float     r;
-	float     rm1 = state->rm1;
-	int64_t y;
-	int z;
-
-	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
-		x += r - rm1;
-		rm1 = r;
-		y = f_roundl(x);
-
-		y <<= 8;
-
-		if (y > (INT_MAX >> 8)) {
-			z = (INT_MAX >> 8);
-		} else if (y < (INT_MIN >> 8)) {
-			z = (INT_MIN >> 8);
-		} else {
-			z = (int)y;
-		}
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		dst[0]=(char)(z>>16);
-		dst[1]=(char)(z>>8);
-		dst[2]=(char)(z);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		dst[0]=(char)(z);
-		dst[1]=(char)(z>>8);
-		dst[2]=(char)(z>>16);
-#endif
-		dst += dst_skip;
-		src++;
-	}
-	state->rm1 = rm1;
-}
-
-void sample_move_dither_tri_d24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
-{
-	jack_default_audio_sample_t  x;
-	float     r;
-	float     rm1 = state->rm1;
-	int64_t y;
-
-	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
-		x += r - rm1;
-		rm1 = r;
-		y = f_roundl(x);
-
-		y <<= 8;
-
-		if (y > (INT_MAX >> 8)) {
-			y = (INT_MAX >> 8);
-		} else if (y < (INT_MIN >> 8)) {
-			y = (INT_MIN >> 8);
-		}
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		memcpy (dst, &y, 3);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		memcpy (dst, (char *)&y + 5, 3);
-#endif
-
-		dst += dst_skip;
-		src++;
-	}
-	state->rm1 = rm1;
-}
-
-void sample_move_dither_shaped_d24_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
-{
-	jack_default_audio_sample_t     x;
-	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
-	jack_default_audio_sample_t     xp; /* x' */
-	float        r;
-	float        rm1 = state->rm1;
-	unsigned int idx = state->idx;
-	int64_t    y;
-	int z;
-
-	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
-		/* Filter the error with Lipshitz's minimally audible FIR:
-		   [2.033 -2.165 1.959 -1.590 0.6149] */
-		xe = x
-		     - state->e[idx] * 2.033f
-		     + state->e[(idx - 1) & DITHER_BUF_MASK] * 2.165f
-		     - state->e[(idx - 2) & DITHER_BUF_MASK] * 1.959f
-		     + state->e[(idx - 3) & DITHER_BUF_MASK] * 1.590f
-		     - state->e[(idx - 4) & DITHER_BUF_MASK] * 0.6149f;
-		xp = xe + r - rm1;
-		rm1 = r;
-
-		/* This could be some inline asm on x86 */
-		y = f_roundl(xp);
-
-		/* Intrinsic z^-1 delay */
-		idx = (idx + 1) & DITHER_BUF_MASK;
-		state->e[idx] = y - xe;
-
-		y <<= 8;
-
-		if (y > (INT_MAX >> 8)) {
-			z = (INT_MAX >> 8);
-		} else if (y < (INT_MIN >> 8)) {
-			z = (INT_MIN >> 8);
-		} else {
-			z = (int)y;
-		}
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		dst[0]=(char)(z>>16);
-		dst[1]=(char)(z>>8);
-		dst[2]=(char)(z);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		dst[0]=(char)(z);
-		dst[1]=(char)(z>>8);
-		dst[2]=(char)(z>>16);
-#endif
-		dst += dst_skip;
-		src++;
-	}
-	state->rm1 = rm1;
-	state->idx = idx;
-}
-
-void sample_move_dither_shaped_d24_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
-{
-	jack_default_audio_sample_t     x;
-	jack_default_audio_sample_t     xe; /* the innput sample - filtered error */
-	jack_default_audio_sample_t     xp; /* x' */
-	float        r;
-	float        rm1 = state->rm1;
-	unsigned int idx = state->idx;
-	int64_t    y;
-
-	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
-		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
-		/* Filter the error with Lipshitz's minimally audible FIR:
-		   [2.033 -2.165 1.959 -1.590 0.6149] */
-		xe = x
-		     - state->e[idx] * 2.033f
-		     + state->e[(idx - 1) & DITHER_BUF_MASK] * 2.165f
-		     - state->e[(idx - 2) & DITHER_BUF_MASK] * 1.959f
-		     + state->e[(idx - 3) & DITHER_BUF_MASK] * 1.590f
-		     - state->e[(idx - 4) & DITHER_BUF_MASK] * 0.6149f;
-		xp = xe + r - rm1;
-		rm1 = r;
-
-		/* This could be some inline asm on x86 */
-		y = f_roundl(xp);
-
-		/* Intrinsic z^-1 delay */
-		idx = (idx + 1) & DITHER_BUF_MASK;
-		state->e[idx] = y - xe;
-
-		y <<= 8;
-
-		if (y > (INT_MAX >> 8)) {
-			y = (INT_MAX >> 8);
-		} else if (y < (INT_MIN >> 8)) {
-			y = (INT_MIN >> 8);
-		}
-#if __BYTE_ORDER == __LITTLE_ENDIAN
-		memcpy (dst, &y, 3);
-#elif __BYTE_ORDER == __BIG_ENDIAN
-		memcpy (dst, (char *)&y + 5, 3);
-#endif
-
-		dst += dst_skip;
-		src++;
-	}
-	state->rm1 = rm1;
-	state->idx = idx;
-}
 
 void sample_move_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
-	int32_t tmp;
+	int16_t tmp;
 
 	/* ALERT: signed sign-extension portability !!! */
 
 	while (nsamples--) {
-		tmp = f_round(*src * SAMPLE_MAX_16BIT);
-		if (tmp > SHRT_MAX) {
-			tmp = SHRT_MAX;
-		} else if (tmp < SHRT_MIN) {
-			tmp = SHRT_MIN;
+		if (*src <= NORMALIZED_FLOAT_MIN) {
+			tmp = SAMPLE_16BIT_MIN;
+		} else if (*src >= NORMALIZED_FLOAT_MAX) {
+			tmp = SAMPLE_16BIT_MAX;
+		} else {
+			tmp = (int16_t) f_round (*src * SAMPLE_16BIT_SCALING);
 		}
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 		dst[0]=(char)(tmp>>8);
@@ -793,18 +358,15 @@ void sample_move_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned
 
 void sample_move_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
-	int32_t tmp;
-
 	/* ALERT: signed sign-extension portability !!! */
 
 	while (nsamples--) {
-		tmp = f_round(*src * SAMPLE_MAX_16BIT);
-		if (tmp > SHRT_MAX) {
-			*((short *)dst) = SHRT_MAX;
-		} else if (tmp < SHRT_MIN) {
-			*((short *)dst) = SHRT_MIN;
+		if (*src <= NORMALIZED_FLOAT_MIN) {
+			*((int16_t*) dst) = SAMPLE_16BIT_MIN;
+		} else if (*src >= NORMALIZED_FLOAT_MAX) {
+			*((int16_t*) dst) = SAMPLE_16BIT_MAX;
 		} else {
-			*((short *) dst) = (short) tmp;
+			*((int16_t*) dst) = (int16_t) f_round (*src * SAMPLE_16BIT_SCALING);
 		}
 		dst += dst_skip;
 		src++;
@@ -814,16 +376,16 @@ void sample_move_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned 
 void sample_move_dither_rect_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t val;
-	int      tmp;
+	int16_t      tmp;
 
 	while (nsamples--) {
-		val = *src * (float)SAMPLE_MAX_16BIT;
-		val -= (float)fast_rand() / (float)INT_MAX;
-		tmp = f_round(val);
-		if (tmp > SHRT_MAX) {
-			tmp = SHRT_MAX;
-		} else if (tmp < SHRT_MIN) {
-			tmp = SHRT_MIN;
+		val = *src - (fast_rand()/((float)INT_MAX-1.0f));
+		if (val <= NORMALIZED_FLOAT_MIN) {
+			tmp = SAMPLE_16BIT_MIN;
+		} else if (val >= NORMALIZED_FLOAT_MAX) {
+			tmp = SAMPLE_16BIT_MAX;
+		} else {
+			tmp = (int16_t) f_round(*src * SAMPLE_16BIT_SCALING);
 		}
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 		dst[0]=(char)(tmp>>8);
@@ -840,18 +402,16 @@ void sample_move_dither_rect_d16_sSs (char *dst,  jack_default_audio_sample_t *s
 void sample_move_dither_rect_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
 	jack_default_audio_sample_t val;
-	int      tmp;
+	int16_t  tmp;
 
 	while (nsamples--) {
-		val = *src * (float)SAMPLE_MAX_16BIT;
-		val -= (float)fast_rand() / (float)INT_MAX;
-		tmp = f_round(val);
-		if (tmp > SHRT_MAX) {
-			*((short *)dst) = SHRT_MAX;
-		} else if (tmp < SHRT_MIN) {
-			*((short *)dst) = SHRT_MIN;
+		val = *src - (fast_rand()/((float)INT_MAX - 1.0f));
+		if (val <= NORMALIZED_FLOAT_MIN) {
+			*((int16_t*) dst) = SAMPLE_16BIT_MIN;
+		} else if (val >= NORMALIZED_FLOAT_MAX) {
+			*((int16_t*) dst) = SAMPLE_16BIT_MAX;
 		} else {
-			*((short *) dst) = (short)tmp;
+			*((int16_t*) dst) = (int16_t) f_round(*src * SAMPLE_16BIT_SCALING);
 		}
 		dst += dst_skip;
 		src++;
@@ -863,20 +423,22 @@ void sample_move_dither_tri_d16_sSs (char *dst,  jack_default_audio_sample_t *sr
 	jack_default_audio_sample_t x;
 	float    r;
 	float    rm1 = state->rm1;
-	int      y;
+	int16_t  y;
 
 	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
+		x = *src * SAMPLE_16BIT_SCALING;
 		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		x += r - rm1;
 		rm1 = r;
-		y = f_round(x);
-
-		if (y > SHRT_MAX) {
-			y = SHRT_MAX;
-		} else if (y < SHRT_MIN) {
-			y = SHRT_MIN;
+		
+		if (x <= NORMALIZED_FLOAT_MIN) {
+			y = SAMPLE_16BIT_MIN;
+		} else if (y >= NORMALIZED_FLOAT_MAX) {
+			y = SAMPLE_16BIT_MAX;
+		} else {
+			y = f_round(x);
 		}
+
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 		dst[0]=(char)(y>>8);
 		dst[1]=(char)(y);
@@ -898,7 +460,7 @@ void sample_move_dither_tri_d16_sS (char *dst,  jack_default_audio_sample_t *src
 	int      y;
 
 	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
+		x = *src * SAMPLE_16BIT_SCALING;
 		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		x += r - rm1;
 		rm1 = r;
@@ -929,7 +491,7 @@ void sample_move_dither_shaped_d16_sSs (char *dst,  jack_default_audio_sample_t 
 	int          y;
 
 	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
+		x = *src * SAMPLE_16BIT_SCALING;
 		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		/* Filter the error with Lipshitz's minimally audible FIR:
 		   [2.033 -2.165 1.959 -1.590 0.6149] */
@@ -979,7 +541,7 @@ void sample_move_dither_shaped_d16_sS (char *dst,  jack_default_audio_sample_t *
 	int          y;
 
 	while (nsamples--) {
-		x = *src * (float)SAMPLE_MAX_16BIT;
+		x = *src * SAMPLE_16BIT_SCALING;
 		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		/* Filter the error with Lipshitz's minimally audible FIR:
 		   [2.033 -2.165 1.959 -1.590 0.6149] */
@@ -1028,7 +590,7 @@ void sample_move_dS_s16s (jack_default_audio_sample_t *dst, char *src, unsigned 
 		z <<= 8;
 		z |= (unsigned char)(src[0]);
 #endif
-		*dst = z / SAMPLE_MAX_16BIT;
+		*dst = z / SAMPLE_16BIT_SCALING;
 		dst++;
 		src += src_skip;
 	}
@@ -1039,7 +601,7 @@ void sample_move_dS_s16 (jack_default_audio_sample_t *dst, char *src, unsigned l
 {
 	/* ALERT: signed sign-extension portability !!! */
 	while (nsamples--) {
-		*dst = (*((short *) src)) / SAMPLE_MAX_16BIT;
+		*dst = (*((short *) src)) / SAMPLE_16BIT_SCALING;
 		dst++;
 		src += src_skip;
 	}
@@ -1052,7 +614,7 @@ void sample_merge_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned
 	/* ALERT: signed sign-extension portability !!! */
 	
 	while (nsamples--) {
-		val = (short) (*src * SAMPLE_MAX_16BIT);
+		val = (short) (*src * SAMPLE_16BIT_SCALING);
 		
 		if (val > SHRT_MAX - *((short *) dst)) {
 			*((short *)dst) = SHRT_MAX;
@@ -1071,7 +633,7 @@ void sample_merge_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsign
 	/* ALERT: signed sign-extension portability !!! */
 
 	while (nsamples--) {
-		*((int *) dst) += (((int) (*src * SAMPLE_MAX_24BIT)) << 8);
+		*((int *) dst) += (((int) (*src * SAMPLE_24BIT_SCALING)) << 8);
 		dst += dst_skip;
 		src++;
 	}
