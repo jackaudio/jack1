@@ -51,18 +51,6 @@ void sample_move_d24_sS              (char *dst, jack_default_audio_sample_t *sr
 void sample_move_d16_sSs             (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_d16_sS              (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 
-void sample_move_dither_rect_d32u24_sSs   (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_rect_d32u24_sS    (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_tri_d32u24_sSs    (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_tri_d32u24_sS     (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_shaped_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_shaped_d32u24_sS  (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_rect_d24_sSs      (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_rect_d24_sS       (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_tri_d24_sSs       (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_tri_d24_sS        (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_shaped_d24_sSs    (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
-void sample_move_dither_shaped_d24_sS     (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_dither_rect_d16_sSs      (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_dither_rect_d16_sS       (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 void sample_move_dither_tri_d16_sSs       (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
@@ -81,9 +69,7 @@ void sample_merge_d16_sS             (char *dst,  jack_default_audio_sample_t *s
 void sample_merge_d32u24_sS          (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 
 static __inline__ void
-sample_merge (jack_default_audio_sample_t *dst, jack_default_audio_sample_t *src, unsigned long cnt)
-
-{
+sample_merge (jack_default_audio_sample_t *dst, jack_default_audio_sample_t *src, unsigned long cnt) {
 	while (cnt--) {
 		*dst += *src;
 		dst++;
@@ -92,9 +78,7 @@ sample_merge (jack_default_audio_sample_t *dst, jack_default_audio_sample_t *src
 }
 
 static __inline__ void
-sample_memcpy (jack_default_audio_sample_t *dst, jack_default_audio_sample_t *src, unsigned long cnt)
-
-{
+sample_memcpy (jack_default_audio_sample_t *dst, jack_default_audio_sample_t *src, unsigned long cnt) {
 	memcpy (dst, src, cnt * sizeof (jack_default_audio_sample_t));
 }
 
