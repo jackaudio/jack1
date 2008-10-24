@@ -28,6 +28,7 @@
 #include <math.h>
 #include <memory.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <limits.h>
 #include <endian.h>
 
@@ -100,7 +101,7 @@ void sample_move_dS_floatLE (char *dst, jack_default_audio_sample_t *src, unsign
 
 void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 {
-        long long y;
+        int64_t y;
 	int z;
 
 	while (nsamples--) {
@@ -130,7 +131,7 @@ void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsign
 
 void sample_move_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 {
-    long long y;
+    int64_t y;
 
 	while (nsamples--) {
 		y = f_roundl(*src * SAMPLE_MAX_24BIT) << 8;
@@ -190,7 +191,7 @@ void sample_move_dither_rect_d32u24_sSs (char *dst, jack_default_audio_sample_t 
 {
 	/* ALERT: signed sign-extension portability !!! */
 	jack_default_audio_sample_t  x;
-	long long y;
+	int64_t y;
 	int z;
 
 	while (nsamples--) {
@@ -225,7 +226,7 @@ void sample_move_dither_rect_d32u24_sS (char *dst, jack_default_audio_sample_t *
 {
 	/* ALERT: signed sign-extension portability !!! */
 	jack_default_audio_sample_t  x;
-	long long y;
+	int64_t y;
 
 	while (nsamples--) {
 		x = *src * SAMPLE_MAX_16BIT;
@@ -249,7 +250,7 @@ void sample_move_dither_tri_d32u24_sSs (char *dst,  jack_default_audio_sample_t 
 	jack_default_audio_sample_t  x;
 	float     r;
 	float     rm1 = state->rm1;
-	long long y;
+	int64_t y;
 	int z;
 
 	while (nsamples--) {
@@ -289,7 +290,7 @@ void sample_move_dither_tri_d32u24_sS (char *dst,  jack_default_audio_sample_t *
 	jack_default_audio_sample_t  x;
 	float     r;
 	float     rm1 = state->rm1;
-	long long y;
+	int64_t y;
 
 	while (nsamples--) {
 		x = *src * (float)SAMPLE_MAX_16BIT;
@@ -321,7 +322,7 @@ void sample_move_dither_shaped_d32u24_sSs (char *dst,  jack_default_audio_sample
 	float        r;
 	float        rm1 = state->rm1;
 	unsigned int idx = state->idx;
-	long long    y;
+	int64_t    y;
 	int z;
 
 	while (nsamples--) {
@@ -380,7 +381,7 @@ void sample_move_dither_shaped_d32u24_sS (char *dst,  jack_default_audio_sample_
 	float        r;
 	float        rm1 = state->rm1;
 	unsigned int idx = state->idx;
-	long long    y;
+	int64_t    y;
 
 	while (nsamples--) {
 		x = *src * (float)SAMPLE_MAX_16BIT;
@@ -421,11 +422,11 @@ void sample_move_dither_shaped_d32u24_sS (char *dst,  jack_default_audio_sample_
 
 void sample_move_d24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 {
-        long long y;
+        int64_t y;
 	int z;
 
 	while (nsamples--) {
-		y = (long long)(*src * SAMPLE_MAX_24BIT);
+		y = (int64_t)(*src * SAMPLE_MAX_24BIT);
 
 		if (y > (INT_MAX >> 8 )) {
 			z = (INT_MAX >> 8);
@@ -450,10 +451,10 @@ void sample_move_d24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned 
 
 void sample_move_d24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 {
-        long long y;
+        int64_t y;
 
 	while (nsamples--) {
-		y = (long long)(*src * SAMPLE_MAX_24BIT);
+		y = (int64_t)(*src * SAMPLE_MAX_24BIT);
 
 		if (y > (INT_MAX >> 8 )) {
 			y = (INT_MAX >> 8);
@@ -525,7 +526,7 @@ void sample_move_dither_rect_d24_sSs (char *dst, jack_default_audio_sample_t *sr
 {
 	/* ALERT: signed sign-extension portability !!! */
 	jack_default_audio_sample_t  x;
-	long long y;
+	int64_t y;
 	int z;
 
 	while (nsamples--) {
@@ -560,7 +561,7 @@ void sample_move_dither_rect_d24_sS (char *dst, jack_default_audio_sample_t *src
 {
 	/* ALERT: signed sign-extension portability !!! */
 	jack_default_audio_sample_t  x;
-	long long y;
+	int64_t y;
 
 	while (nsamples--) {
 		x = *src * SAMPLE_MAX_16BIT;
@@ -590,7 +591,7 @@ void sample_move_dither_tri_d24_sSs (char *dst,  jack_default_audio_sample_t *sr
 	jack_default_audio_sample_t  x;
 	float     r;
 	float     rm1 = state->rm1;
-	long long y;
+	int64_t y;
 	int z;
 
 	while (nsamples--) {
@@ -629,7 +630,7 @@ void sample_move_dither_tri_d24_sS (char *dst,  jack_default_audio_sample_t *src
 	jack_default_audio_sample_t  x;
 	float     r;
 	float     rm1 = state->rm1;
-	long long y;
+	int64_t y;
 
 	while (nsamples--) {
 		x = *src * (float)SAMPLE_MAX_16BIT;
@@ -665,7 +666,7 @@ void sample_move_dither_shaped_d24_sSs (char *dst,  jack_default_audio_sample_t 
 	float        r;
 	float        rm1 = state->rm1;
 	unsigned int idx = state->idx;
-	long long    y;
+	int64_t    y;
 	int z;
 
 	while (nsamples--) {
@@ -722,7 +723,7 @@ void sample_move_dither_shaped_d24_sS (char *dst,  jack_default_audio_sample_t *
 	float        r;
 	float        rm1 = state->rm1;
 	unsigned int idx = state->idx;
-	long long    y;
+	int64_t    y;
 
 	while (nsamples--) {
 		x = *src * (float)SAMPLE_MAX_16BIT;
@@ -739,7 +740,7 @@ void sample_move_dither_shaped_d24_sS (char *dst,  jack_default_audio_sample_t *
 		rm1 = r;
 
 		/* This could be some inline asm on x86 */
-		y = (long long)f_round(xp);
+		y = f_roundl(xp);
 
 		/* Intrinsic z^-1 delay */
 		idx = (idx + 1) & DITHER_BUF_MASK;
@@ -767,7 +768,7 @@ void sample_move_dither_shaped_d24_sS (char *dst,  jack_default_audio_sample_t *
 
 void sample_move_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
-	int tmp;
+	int32_t tmp;
 
 	/* ALERT: signed sign-extension portability !!! */
 
@@ -792,7 +793,7 @@ void sample_move_d16_sSs (char *dst,  jack_default_audio_sample_t *src, unsigned
 
 void sample_move_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)	
 {
-	int tmp;
+	int32_t tmp;
 
 	/* ALERT: signed sign-extension portability !!! */
 
