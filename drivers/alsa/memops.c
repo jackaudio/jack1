@@ -36,7 +36,12 @@
 #define SAMPLE_MAX_24BIT  8388608.0f
 #define SAMPLE_MAX_16BIT  32768.0f
 
+/* define these in case we end up on a platform that is missing
+   the real lrintf functions
+*/
+
 #define f_round(f) lrintf(f)
+#define f_roundl(f) llrintf(f)
 
 /* Linear Congruential noise generator. From the music-dsp list
  * less random than rand(), but good enough and 10x faster */
@@ -68,6 +73,29 @@ void sample_move_dS_floatLE (char *dst, jack_default_audio_sample_t *src, unsign
 	}
 }
 
+/* NOTES on function naming:
+
+   foo_bar_d<TYPE>_s<TYPE>
+
+   the "d<TYPE>" component defines the destination type for the operation
+   the "s<TYPE>" component defines the source type for the operation
+
+   TYPE can be one of:
+   
+   S      - sample is a jack_default_audio_sample_t, currently (October 2008) a 32 bit floating point value
+   Ss     - like S but reverse endian from the host CPU
+   32u24  - sample is an signed 32 bit integer value, but data is in upper 24 bits only
+   32u24s - like 32u24 but reverse endian from the host CPU
+   24     - sample is an signed 24 bit integer value
+   24s    - like 24 but reverse endian from the host CPU
+   16     - sample is an signed 16 bit integer value
+   16s    - like 16 but reverse endian from the host CPU
+
+   For obvious reasons, the reverse endian versions only show as source types.
+
+   This covers all known sample formats at 16 bits or larger.
+*/   
+
 /* functions for native integer sample data */
 
 void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
@@ -76,7 +104,7 @@ void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsign
 	int z;
 
 	while (nsamples--) {
-		y = (long long)(*src * SAMPLE_MAX_24BIT) << 8;
+		y = ((long long)f_roundl(*src * SAMPLE_MAX_24BIT)) << 8;
 		if (y > INT_MAX) {
 			z = INT_MAX;
 		} else if (y < INT_MIN) {
@@ -105,7 +133,7 @@ void sample_move_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigne
     long long y;
 
 	while (nsamples--) {
-		y = (long long)(*src * SAMPLE_MAX_24BIT) << 8;
+		y = ((long long)f_roundl(*src * SAMPLE_MAX_24BIT)) << 8;
 		if (y > INT_MAX) {
 			*((int *) dst) = INT_MAX;
 		} else if (y < INT_MIN) {
@@ -168,14 +196,14 @@ void sample_move_dither_rect_d32u24_sSs (char *dst, jack_default_audio_sample_t 
 	while (nsamples--) {
 		x = *src * SAMPLE_MAX_16BIT;
 		x -= (float)fast_rand() / (float)INT_MAX;
-		y = (long long)f_round(x);
+		y = (long long)f_roundl(x);
 		y <<= 16;
 		if (y > INT_MAX) {
 			z = INT_MAX;
 		} else if (y < INT_MIN) {
 			z = INT_MIN;
 		} else {
-			z = (int)y;
+			z = (int) y;
 		}
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 		dst[0]=(char)(z>>24);
@@ -202,14 +230,14 @@ void sample_move_dither_rect_d32u24_sS (char *dst, jack_default_audio_sample_t *
 	while (nsamples--) {
 		x = *src * SAMPLE_MAX_16BIT;
 		x -= (float)fast_rand() / (float)INT_MAX;
-		y = (long long)f_round(x);
+		y = (long long)f_roundl(x);
 		y <<= 16;
 		if (y > INT_MAX) {
 			*((int *) dst) = INT_MAX;
 		} else if (y < INT_MIN) {
 			*((int *) dst) = INT_MIN;
 		} else {
-			*((int *) dst) = (int)y;
+			*((int *) dst) = (int) y;
 		}
 		dst += dst_skip;
 		src++;
@@ -229,7 +257,7 @@ void sample_move_dither_tri_d32u24_sSs (char *dst,  jack_default_audio_sample_t 
 		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		x += r - rm1;
 		rm1 = r;
-		y = (long long)f_round(x);
+		y = (long long)f_roundl(x);
 		y <<= 16;
 
 		if (y > INT_MAX) {
@@ -268,7 +296,7 @@ void sample_move_dither_tri_d32u24_sS (char *dst,  jack_default_audio_sample_t *
 		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		x += r - rm1;
 		rm1 = r;
-		y = (long long)f_round(x);
+		y = (long long)f_roundl(x);
 		y <<= 16;
 
 		if (y > INT_MAX) {
@@ -311,7 +339,7 @@ void sample_move_dither_shaped_d32u24_sSs (char *dst,  jack_default_audio_sample
 		rm1 = r;
 
 		/* This could be some inline asm on x86 */
-		y = (long long)f_round(xp);
+		y = (long long)f_roundl(xp);
 
 		/* Intrinsic z^-1 delay */
 		idx = (idx + 1) & DITHER_BUF_MASK;
@@ -369,7 +397,7 @@ void sample_move_dither_shaped_d32u24_sS (char *dst,  jack_default_audio_sample_
 		rm1 = r;
 
 		/* This could be some inline asm on x86 */
-		y = (long long)f_round(xp);
+		y = (long long)f_roundl(xp);
 
 		/* Intrinsic z^-1 delay */
 		idx = (idx + 1) & DITHER_BUF_MASK;
@@ -503,7 +531,7 @@ void sample_move_dither_rect_d24_sSs (char *dst, jack_default_audio_sample_t *sr
 	while (nsamples--) {
 		x = *src * SAMPLE_MAX_16BIT;
 		x -= (float)fast_rand() / (float)INT_MAX;
-		y = (long long)f_round(x);
+		y = (long long)f_roundl(x);
 
 		y <<= 8;
 
@@ -537,7 +565,7 @@ void sample_move_dither_rect_d24_sS (char *dst, jack_default_audio_sample_t *src
 	while (nsamples--) {
 		x = *src * SAMPLE_MAX_16BIT;
 		x -= (float)fast_rand() / (float)INT_MAX;
-		y = (long long)f_round(x);
+		y = (long long)f_roundl(x);
 
 		y <<= 8;
 
@@ -570,7 +598,7 @@ void sample_move_dither_tri_d24_sSs (char *dst,  jack_default_audio_sample_t *sr
 		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		x += r - rm1;
 		rm1 = r;
-		y = (long long)f_round(x);
+		y = (long long)f_roundl(x);
 
 		y <<= 8;
 
@@ -608,7 +636,7 @@ void sample_move_dither_tri_d24_sS (char *dst,  jack_default_audio_sample_t *src
 		r = 2.0f * (float)fast_rand() / (float)INT_MAX - 1.0f;
 		x += r - rm1;
 		rm1 = r;
-		y = (long long)f_round(x);
+		y = (long long)f_roundl(x);
 
 		y <<= 8;
 
@@ -655,7 +683,7 @@ void sample_move_dither_shaped_d24_sSs (char *dst,  jack_default_audio_sample_t 
 		rm1 = r;
 
 		/* This could be some inline asm on x86 */
-		y = (long long)f_round(xp);
+		y = (long long)f_roundl(xp);
 
 		/* Intrinsic z^-1 delay */
 		idx = (idx + 1) & DITHER_BUF_MASK;
