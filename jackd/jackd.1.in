@@ -215,6 +215,16 @@ unsuccessful.  Default is to prefer 32\-bit samples.
 .br
 Ignore xruns reported by the ALSA driver.  This makes JACK less likely
 to disconnect unresponsive ports when running without \fB\-\-realtime\fR.
+.TP
+\fB\-X, \-\-midi \fR[\fIseq\fR|\fIraw\fR]
+.br
+Specify which ALSA MIDI system to provide access to. Using \fBraw\fR
+will provide a set of JACK MIDI ports that correspond to each raw ALSA
+device on the machine. Using \fBseq\fR will provide a set of JACK MIDI
+ports that correspond to each ALSA "sequencer" client (which includes
+each hardware MIDI port on the machine). \fBraw\fR provides slightly
+better performance but does not permit JACK MIDI communication with
+software written to use the ALSA "sequencer" API.
 .SS COREAUDIO BACKEND PARAMETERS
 .TP
 \fB\-c \-\-channel\fR
