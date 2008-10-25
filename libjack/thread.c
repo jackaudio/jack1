@@ -198,6 +198,26 @@ jack_client_create_thread (jack_client_t* client,
 	return 0;
 }
 
+int
+jack_client_real_time_priority (jack_client_t* client)
+{
+	if (!client->engine->real_time) {
+		return -1;
+	}
+	
+	return client->engine->client_priority;
+}
+
+int
+jack_client_max_real_time_priority (jack_client_t* client)
+{
+	if (!client->engine->real_time) {
+		return -1;
+	}
+
+	return client->engine->max_client_priority;
+}
+
 #if JACK_USE_MACH_THREADS 
 
 int
@@ -256,3 +276,4 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 }
 
 #endif /* JACK_USE_MACH_THREADS */
+

@@ -38,6 +38,22 @@ extern "C" {
  */
 
 /**
+ * @returns if JACK is running with realtime scheduling, this returns
+ * the priority that any JACK-created client threads will run at. 
+ * Otherwise returns -1.
+ */
+
+int jack_client_real_time_priority (jack_client_t*);
+
+/**
+ * @returns if JACK is running with realtime scheduling, this returns
+ * the maximum priority that a JACK client thread should use if the thread
+ * is subject to realtime scheduling. Otherwise returns -1.
+ */
+
+int jack_client_max_real_time_priority (jack_client_t*);
+
+/**
  * Attempt to enable realtime scheduling for a thread.  On some
  * systems that may require special privileges.
  *

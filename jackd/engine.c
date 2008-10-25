@@ -1843,9 +1843,20 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	engine->control->port_max = engine->port_max;
 	engine->control->real_time = realtime;
+	
+	/* leave some headroom for other client threads to run
+	   with priority higher than the regular client threads
+	   but less than the server. see thread.h for 
+	   jack_client_real_time_priority() and jack_client_max_real_time_priority()
+	   which are affected by this.
+	*/
+
 	engine->control->client_priority = (realtime
-					    ? engine->rtpriority - 1
+					    ? engine->rtpriority - 5
 					    : 0);
+	engine->control->max_client_priority = (realtime
+						? engine->rtpriority - 1
+						: 0);
 	engine->control->do_mlock = do_mlock;
 	engine->control->do_munlock = do_unlock;
 	engine->control->cpu_load = 0;
