@@ -602,57 +602,6 @@ void sample_move_dS_s16 (jack_default_audio_sample_t *dst, char *src, unsigned l
 	}
 }	
 
-void sample_merge_d16_sS (char *dst,  jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-{
-	int16_t val;
-	
-	/* ALERT: signed sign-extension portability !!! */
-	
-	while (nsamples--) {
-		if (*src <= NORMALIZED_FLOAT_MIN) {
-			val = SAMPLE_16BIT_MIN;
-		} else if (*src >= NORMALIZED_FLOAT_MAX) {
-			val = SAMPLE_16BIT_MAX;
-		} else {
-			val = (int16_t) f_round (*src * SAMPLE_16BIT_SCALING);
-		}
-
-		if (val > SAMPLE_16BIT_MAX - *((int16_t*)dst)) {
-			*((int16_t*) dst) = SAMPLE_16BIT_MAX;
-		} else {
-			*((int16_t*) dst) += val;
-		}
-
-		dst += dst_skip;
-		src++;
-	}
-}	
-
-void sample_merge_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
-{
-	int32_t val;
-
-	while (nsamples--) {
-
-		if (*src <= NORMALIZED_FLOAT_MIN) {
-			val = SAMPLE_16BIT_MIN;
-		} else if (*src >= NORMALIZED_FLOAT_MAX) {
-			val = SAMPLE_16BIT_MAX;
-		} else {
-			val = f_round (*src * SAMPLE_24BIT_SCALING);
-		}
-
-		if (val > SAMPLE_24BIT_MAX - *((int32_t*) dst)) {
-			*((int32_t*) dst) = SAMPLE_24BIT_MAX;
-		} else {
-			*((int32_t*) dst) += val;
-		}
-			
-		dst += dst_skip;
-		src++;
-	}
-}	
-
 void memset_interleave (char *dst, char val, unsigned long bytes, 
 			unsigned long unit_bytes, 
 			unsigned long skip_bytes) 
@@ -699,68 +648,6 @@ void
 memcpy_fake (char *dst, char *src, unsigned long src_bytes, unsigned long foo, unsigned long bar)
 {
 	memcpy (dst, src, src_bytes);
-}
-
-void 
-merge_memcpy_d16_s16 (char *dst, char *src, unsigned long src_bytes,
-		      unsigned long dst_skip_bytes, unsigned long src_skip_bytes)
-{
-	while (src_bytes) {
-		*((short *) dst) += *((short *) src);
-		dst += 2;
-		src += 2;
-		src_bytes -= 2;
-	}
-}
-
-void 
-merge_memcpy_d32_s32 (char *dst, char *src, unsigned long src_bytes,
-		      unsigned long dst_skip_bytes, unsigned long src_skip_bytes)
-
-{
-	while (src_bytes) {
-		*((int *) dst) += *((int *) src);
-		dst += 4;
-		src += 4;
-		src_bytes -= 4;
-	}
-}
-
-void 
-merge_memcpy_interleave_d16_s16 (char *dst, char *src, unsigned long src_bytes, 
-				 unsigned long dst_skip_bytes, unsigned long src_skip_bytes)
-{
-	while (src_bytes) {
-		*((short *) dst) += *((short *) src);
-		dst += dst_skip_bytes;
-		src += src_skip_bytes;
-		src_bytes -= 2;
-	}
-}
-
-void 
-merge_memcpy_interleave_d32_s32 (char *dst, char *src, unsigned long src_bytes,
-				 unsigned long dst_skip_bytes, unsigned long src_skip_bytes)
-{
-	while (src_bytes) {
-		*((int *) dst) += *((int *) src);
-		dst += dst_skip_bytes;
-		src += src_skip_bytes;
-		src_bytes -= 4;
-	}
-}
-
-void 
-merge_memcpy_interleave_d24_s24 (char *dst, char *src, unsigned long src_bytes,
-				 unsigned long dst_skip_bytes, unsigned long src_skip_bytes)
-{
-	while (src_bytes) {
-		int acc = (*(int *)dst & 0xFFFFFF) + (*(int *)src & 0xFFFFFF);
-		memcpy(dst, &acc, 3);
-		dst += dst_skip_bytes;
-		src += src_skip_bytes;
-		src_bytes -= 3;
-	}
 }
 
 void 
