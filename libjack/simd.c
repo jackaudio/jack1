@@ -329,20 +329,40 @@ sse_nonalign:
 	}
 }
 
-void x86_sse_f2i (int *dest, const float *src, int length)
+void x86_sse_f2i (int *dest, const float *src, int length, float scale)
 {
 	int i;
+	float max[4] __attribute__((aligned(16))) =
+		{ -1.0F, -1.0F, -1.0F, -1.0F };
+	float min[4] __attribute__((aligned(16))) =
+		{ 1.0F, 1.0F, 1.0F, 1.0F };
+	float s[4] __attribute__((aligned(16)));
+
+	s[0] = s[1] = s[2] = s[3] = scale;
+	asm volatile (
+		"movaps %0, %%xmm4\n\t" \
+		"movaps %1, %%xmm5\n\t" \
+		"movaps %2, %%xmm6\n\t"
+		:
+		: "m" (*max),
+		  "m" (*min),
+		  "m" (*s)
+		: "xmm4", "xmm5", "xmm6");
 
 	if (__builtin_expect((((long) dest & 0xf) || ((long) src & 0xf)), 0))
 		goto sse_nonalign;
 	for (i = 0; i < length; i += 4)
 	{
 		asm volatile (
-			"cvtps2dq %1, %%xmm0\n\t" \
+			"movaps %1, %%xmm1\n\t" \
+			"maxps %%xmm4, %%xmm1\n\t" \
+			"minps %%xmm5, %%xmm1\n\t" \
+			"mulps %%xmm6, %%xmm1\n\t" \
+			"cvtps2dq %%xmm1, %%xmm0\n\t" \
 			"movdqa %%xmm0, %0\n\t"
 			: "=m" (dest[i])
 			: "m" (src[i])
-			: "xmm0", "memory");
+			: "xmm0", "xmm1", "xmm4", "xmm5", "xmm6", "memory");
 	}
 	return;
 
@@ -350,19 +370,30 @@ sse_nonalign:
 	for (i = 0; i < length; i += 4)
 	{
 		asm volatile (
-			"movups %1, %%xmm0\n\t" \
-			"cvtps2dq %%xmm0, %%xmm1\n\t" \
-			"movdqu %%xmm1, %0\n\t"
+			"movups %1, %%xmm1\n\t" \
+			"maxps %%xmm4, %%xmm1\n\t" \
+			"minps %%xmm5, %%xmm1\n\t" \
+			"mulps %%xmm6, %%xmm1\n\t" \
+			"cvtps2dq %%xmm1, %%xmm0\n\t" \
+			"movdqu %%xmm0, %0\n\t"
 			: "=m" (dest[i])
 			: "m" (src[i])
-			: "xmm0", "xmm1", "memory");
+			: "xmm0", "xmm1", "xmm4", "xmm5", "xmm6", "memory");
 	}
 }
 
 
-void x86_sse_i2f (float *dest, const int *src, int length)
+void x86_sse_i2f (float *dest, const int *src, int length, float scale)
 {
 	int i;
+	float s[4] __attribute__((aligned(16)));
+
+	s[0] = s[1] = s[2] = s[3] = scale;
+	asm volatile (
+		"movaps %0, %%xmm4\n\t"
+		:
+		: "m" (*s)
+		: "xmm4" );
 
 	if (__builtin_expect((((long) dest & 0xf) || ((long) src & 0xf)), 0))
 		goto sse_nonalign; 
@@ -370,10 +401,11 @@ void x86_sse_i2f (float *dest, const int *src, int length)
 	{
 		asm volatile (
 			"cvtdq2ps %1, %%xmm0\n\t" \
+			"mulps %%xmm4, %%xmm0\n\t" \
 			"movaps %%xmm0, %0\n\t"
 			: "=m" (dest[i])
 			: "m" (src[i])
-			: "xmm0", "memory");
+			: "xmm0", "xmm4", "memory");
 	}
 	return;
 
@@ -381,12 +413,13 @@ sse_nonalign:
 	for (i = 0; i < length; i += 4)
 	{
 		asm volatile (
-			"movdqu %1, %%xmm0\n\t" \
-			"cvtdq2ps %%xmm0, %%xmm1\n\t" \
-			"movups %%xmm1, %0\n\t"
+			"movdqu %1, %%xmm1\n\t" \
+			"cvtdq2ps %%xmm1, %%xmm0\n\t" \
+			"mulps %%xmm4, %%xmm0\n\t" \
+			"movups %%xmm0, %0\n\t"
 			: "=m" (dest[i])
 			: "m" (src[i])
-			: "xmm0", "xmm1", "memory");
+			: "xmm0", "xmm1", "xmm4", "memory");
 	}
 }
 

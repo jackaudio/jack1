@@ -45,8 +45,8 @@ void x86_3dnow_copyf (float *, const float *, int);
 void x86_3dnow_add2f (float *, const float *, int);
 void x86_sse_copyf (float *, const float *, int);
 void x86_sse_add2f (float *, const float *, int);
-void x86_sse_f2i (int *, const float *, int);
-void x86_sse_i2f (float *, const int *, int);
+void x86_sse_f2i (int *, const float *, int, float);
+void x86_sse_i2f (float *, const int *, int, float);
 
 #endif /* ARCH_X86 */
 
