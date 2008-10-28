@@ -116,7 +116,7 @@
 	        (d) = f_round ((s));\
 	}
 
-#define float_24(s, d) \
+#define float_24u32(s, d) \
 	if ((s) <= NORMALIZED_FLOAT_MIN) {\
 		(d) = SAMPLE_24BIT_MIN;\
 	} else if ((s) >= NORMALIZED_FLOAT_MAX) {\
@@ -128,13 +128,34 @@
 /* call this when "s" has already been scaled (e.g. when dithering)
  */
 
-#define float_24_scaled(s, d)\
+#define float_24u32_scaled(s, d)\
         if ((s) <= SAMPLE_24BIT_MIN_F) {\
 		(d) = SAMPLE_24BIT_MIN;\
 	} else if ((s) >= SAMPLE_24BIT_MAX_F) {	\
 		(d) = SAMPLE_24BIT_MAX;		\
 	} else {\
 		(d) = f_round ((s)) << 8; \
+	}
+
+#define float_24(s, d) \
+	if ((s) <= NORMALIZED_FLOAT_MIN) {\
+		(d) = SAMPLE_24BIT_MIN;\
+	} else if ((s) >= NORMALIZED_FLOAT_MAX) {\
+		(d) = SAMPLE_24BIT_MAX;\
+	} else {\
+		(d) = f_round ((s) * SAMPLE_24BIT_SCALING);\
+	}
+
+/* call this when "s" has already been scaled (e.g. when dithering)
+ */
+
+#define float_24_scaled(s, d)\
+        if ((s) <= SAMPLE_24BIT_MIN_F) {\
+		(d) = SAMPLE_24BIT_MIN;\
+	} else if ((s) >= SAMPLE_24BIT_MAX_F) {	\
+		(d) = SAMPLE_24BIT_MAX;		\
+	} else {\
+		(d) = f_round ((s)); \
 	}
 
 
@@ -199,7 +220,7 @@ void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsign
 
 	while (nsamples--) {
 
-		float_24 (*src, z);
+		float_24u32 (*src, z);
 
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -221,7 +242,7 @@ void sample_move_d32u24_sSs (char *dst, jack_default_audio_sample_t *src, unsign
 void sample_move_d32u24_sS (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state)
 {
 	while (nsamples--) {
-		float_24 (*src, *((int32_t*) dst));
+		float_24u32 (*src, *((int32_t*) dst));
 		dst += dst_skip;
 		src++;
 	}
