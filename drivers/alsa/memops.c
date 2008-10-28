@@ -118,9 +118,9 @@
 
 #define float_24u32(s, d) \
 	if ((s) <= NORMALIZED_FLOAT_MIN) {\
-		(d) = SAMPLE_24BIT_MIN;\
+		(d) = SAMPLE_24BIT_MIN << 8;\
 	} else if ((s) >= NORMALIZED_FLOAT_MAX) {\
-		(d) = SAMPLE_24BIT_MAX;\
+		(d) = SAMPLE_24BIT_MAX << 8;\
 	} else {\
 		(d) = f_round ((s) * SAMPLE_24BIT_SCALING) << 8;\
 	}
@@ -130,9 +130,9 @@
 
 #define float_24u32_scaled(s, d)\
         if ((s) <= SAMPLE_24BIT_MIN_F) {\
-		(d) = SAMPLE_24BIT_MIN;\
+		(d) = SAMPLE_24BIT_MIN << 8;\
 	} else if ((s) >= SAMPLE_24BIT_MAX_F) {	\
-		(d) = SAMPLE_24BIT_MAX;		\
+		(d) = SAMPLE_24BIT_MAX << 8;		\
 	} else {\
 		(d) = f_round ((s)) << 8; \
 	}
