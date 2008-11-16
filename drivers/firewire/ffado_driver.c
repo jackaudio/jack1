@@ -91,10 +91,12 @@ ffado_driver_attach (ffado_driver_t *driver)
 	/* packetizer thread options */
 	driver->device_options.realtime=(driver->engine->control->real_time? 1 : 0);
 	
-	driver->device_options.packetizer_priority=driver->engine->control->client_priority +
-		FFADO_RT_PRIORITY_PACKETIZER_RELATIVE;
-	if (driver->device_options.packetizer_priority>98) {
-		driver->device_options.packetizer_priority=98;
+	driver->device_options.packetizer_priority = driver->engine->rtpriority;
+	if (driver->device_options.packetizer_priority > 98) {
+		driver->device_options.packetizer_priority = 98;
+	}
+	if (driver->device_options.packetizer_priority < 1) {
+		driver->device_options.packetizer_priority = 1;
 	}
 
 	driver->dev = ffado_streaming_init(driver->device_info, driver->device_options);

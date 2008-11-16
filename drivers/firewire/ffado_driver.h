@@ -108,9 +108,6 @@
 	#define debugPrintWithTimeStamp(Level, format, args...)
 #endif
 
-// thread priority setup
-#define FFADO_RT_PRIORITY_PACKETIZER_RELATIVE	5
-
 typedef struct _ffado_driver ffado_driver_t;
 
 /*
