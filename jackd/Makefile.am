@@ -46,10 +46,12 @@ libjackserver_la_CFLAGS = $(AM_CFLAGS)
 
 libjackserver_la_SOURCES = engine.c clientengine.c transengine.c ../libjack/client.c ../libjack/driver.c ../libjack/intclient.c \
 			../libjack/messagebuffer.c ../libjack/pool.c ../libjack/port.c ../libjack/midiport.c ../libjack/ringbuffer.c ../libjack/shm.c \
-			../libjack/thread.c ../libjack/time.c  ../libjack/transclient.c  ../libjack/unlock.c  ../libjack/simd.c
-libjackserver_la_LIBADD  = @OS_LDFLAGS@
+			../libjack/thread.c ../libjack/time.c  ../libjack/transclient.c  ../libjack/unlock.c
+libjackserver_la_LIBADD  = simd.lo @OS_LDFLAGS@
 libjackserver_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@
 
+simd.lo: $(srcdir)/../libjack/simd.c
+	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/../libjack/simd.c
 
 man_MANS = jackd.1 jackstart.1
 EXTRA_DIST = $(man_MANS)
