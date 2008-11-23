@@ -64,46 +64,46 @@ AM_CXXFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
 
 jack_connect_SOURCES = connect.c
 jack_connect_LDFLAGS = @OS_LDFLAGS@
-jack_connect_LDADD = ../libjack/libjack.la
+jack_connect_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_disconnect_SOURCES = connect.c
 jack_disconnect_LDFLAGS = @OS_LDFLAGS@
-jack_disconnect_LDADD = ../libjack/libjack.la
+jack_disconnect_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_monitor_client_SOURCES = monitor_client.c
 jack_monitor_client_LDFLAGS = @OS_LDFLAGS@
-jack_monitor_client_LDADD = ../libjack/libjack.la
+jack_monitor_client_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_thread_wait_SOURCES = tw.c
 jack_thread_wait_LDFLAGS = @OS_LDFLAGS@
-jack_thread_wait_LDADD = ../libjack/libjack.la
+jack_thread_wait_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_evmon_SOURCES = evmon.c
 jack_evmon_LDFLAGS = @OS_LDFLAGS@
-jack_evmon_LDADD = ../libjack/libjack.la
+jack_evmon_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_alias_SOURCES = alias.c
 jack_alias_LDFLAGS = @OS_LDFLAGS@
-jack_alias_LDADD = ../libjack/libjack.la
+jack_alias_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_lsp_SOURCES = lsp.c
 jack_lsp_LDFLAGS = @OS_LDFLAGS@
-jack_lsp_LDADD = ../libjack/libjack.la
+jack_lsp_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_freewheel_SOURCES = freewheel.c
 jack_freewheel_LDFLAGS = @OS_LDFLAGS@
-jack_freewheel_LDADD = ../libjack/libjack.la
+jack_freewheel_LDADD = $(top_builddir)/libjack/libjack.la
 
 if HAVE_SNDFILE
 jackrec_SOURCES = capture_client.c
 jackrec_LDFLAGS = @SNDFILE_LIBS@ @OS_LDFLAGS@
-jackrec_LDADD = ../libjack/libjack.la
+jackrec_LDADD = $(top_builddir)/libjack/libjack.la
 endif
 
 if HAVE_READLINE
 jack_transport_SOURCES = transport.c
 jack_transport_LDFLAGS = -lreadline @READLINE_DEPS@ @OS_LDFLAGS@
-jack_transport_LDADD = ../libjack/libjack.la
+jack_transport_LDADD = $(top_builddir)/libjack/libjack.la
 endif
 
 #
@@ -112,29 +112,29 @@ endif
 
 jack_load_SOURCES = ipload.c
 jack_load_LDFLAGS = @OS_LDFLAGS@
-jack_load_LDADD = ../libjack/libjack.la
+jack_load_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_unload_SOURCES = ipunload.c
 jack_unload_LDFLAGS = @OS_LDFLAGS@
-jack_unload_LDADD = ../libjack/libjack.la
+jack_unload_LDADD = $(top_builddir)/libjack/libjack.la
 
 #
 # Netjack slave tools
 #
 if HAVE_SAMPLERATE
-jack_netsource_SOURCES = netsource.c ../drivers/netjack/netjack_packet.c
-jack_netsource_CFLAGS = -I../drivers/netjack
+jack_netsource_SOURCES = netsource.c $(top_builddir)/drivers/netjack/netjack_packet.c
+jack_netsource_CFLAGS = -I$(top_srcdir)/drivers/netjack
 jack_netsource_LDFLAGS = -lsamplerate @OS_LDFLAGS@
-jack_netsource_LDADD = ../libjack/libjack.la
+jack_netsource_LDADD = $(top_builddir)/libjack/libjack.la
 
 if HAVE_ALSA
 alsa_in_SOURCES = alsa_in.c
 alsa_in_LDFLAGS = -lasound -lsamplerate @OS_LDFLAGS@
-alsa_in_LDADD = ../libjack/libjack.la
+alsa_in_LDADD = $(top_builddir)/libjack/libjack.la
 
 alsa_out_SOURCES = alsa_out.c
 alsa_out_LDFLAGS = -lasound -lsamplerate @OS_LDFLAGS@
-alsa_out_LDADD = ../libjack/libjack.la
+alsa_out_LDADD = $(top_builddir)/libjack/libjack.la
 endif #HAVE_ALSA
 endif #HAVE_SAMPLERATE
 

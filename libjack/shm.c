@@ -653,7 +653,9 @@ static void
 jack_remove_shm (jack_shm_id_t *id)
 {
 	/* registry may or may not be locked */
-	shm_unlink ((char *) id);
+	if (shm_unlink ((char *) id) != 0) {
+		jack_error ("could not remove SHM ID %s", id);
+	}
 }
 
 void
@@ -844,7 +846,9 @@ static void
 jack_remove_shm (jack_shm_id_t *id)
 {
 	/* registry may or may not be locked */
-	shmctl (*id, IPC_RMID, NULL);
+	if (shmctl (*id, IPC_RMID, NULL) != 0) {
+		jack_error ("failed to remove SHM segment\n");
+	}
 }
 
 void
