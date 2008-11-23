@@ -145,7 +145,7 @@ x86_3dnow_copyf (float *dest, const float *src, int length)
 		asm volatile ("movq %0, %%mm6\n\t"
 			: : "m" (*m64p_src++) : "mm6", "memory");
 		asm volatile ("movq %0, %%mm7\n\t"
-			: : "m" (*m64p_src++) : "xmm7", "memory");
+			: : "m" (*m64p_src++) : "mm7", "memory");
 
 		asm volatile ("movq %%mm0, %0\n\t"
 			: "=m" (*m64p_dest++) : : "mm0", "memory");
