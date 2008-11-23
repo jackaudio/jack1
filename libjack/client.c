@@ -474,8 +474,8 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 	   execute it now.
 	*/
 
-	if (client->control->graph_order) {
-		client->control->graph_order (client->control->graph_order_arg);
+	if (client->control->graph_order_cbset) {
+		client->graph_order (client->graph_order_arg);
 	}
 
 	return 0;
@@ -1429,8 +1429,6 @@ jack_client_process_events (jack_client_t* client)
 static int
 jack_client_core_wait (jack_client_t* client)
 {
-	jack_client_control_t *control = client->control;
-	
 	DEBUG ("client polling on %s", client->pollmax == 2 ? 
 	       "event_fd and graph_wait_fd..." :
 	       "event_fd only");
@@ -1777,10 +1775,10 @@ jack_client_process_thread (void *arg)
 	jack_client_control_t *control = client->control;
 	int err = 0;
       
-	if (client->control->thread_init) {
+	if (client->control->thread_init_cbset) {
 	/* this means that the init callback will be called twice -taybin*/
 		DEBUG ("calling client thread init callback");
-		client->control->thread_init (client->control->thread_init_arg);
+		client->thread_init (client->thread_init_arg);
 	}
 
 	client->control->pid = getpid();
@@ -1801,19 +1799,19 @@ jack_client_process_thread (void *arg)
 		 
 		control->state = Running;
 
-		if (control->sync_cb)
+		if (control->sync_cb_cbset)
 			jack_call_sync_client (client);
 
-		if (control->process) {
-			if (control->process (control->nframes,
-				control->process_arg) == 0) {
-					control->state = Finished;
+		if (control->process_cbset) {
+			if (client->process (control->nframes,
+					     client->process_arg) == 0) {
+				control->state = Finished;
 			}
 		} else {
 			control->state = Finished;
 		}
 
-		if (control->timebase_cb)
+		if (control->timebase_cb_cbset)
 			jack_call_timebase_master (client);
                 
 		control->finished_at = jack_get_microseconds();
