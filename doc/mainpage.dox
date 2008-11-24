@@ -36,9 +36,9 @@ JACK changes all this by providing an API that does several things:
        their software.
 
     2. allows applications to send and receive audio data to/from
-       each other as well as the audio interface. There is
+       each other as well as the audio interface. There is no
        difference in how an application sends or receives
-       data regardless of whether it comes from another application 
+       data regardless of whether it comes from/goes to another application 
        or an audio interface.
 
 For programmers with experience of several other audio APIs such as
