@@ -588,10 +588,10 @@ void jack_port_set_latency (jack_port_t *, jack_nframes_t);
 /**
  * Request a complete recomputation of a port's total latency. This
  * can be called by a client that has just changed the internal
- * latency of its port using @function jack_port_set_latency
+ * latency of its port using jack_port_set_latency()
  * and wants to ensure that all signal pathways in the graph
  * are updated with respect to the values that will be returned
- * by @function jack_port_get_total_latency. 
+ * by jack_port_get_total_latency(). 
  * 
  * @return zero for successful execution of the request. non-zero
  *         otherwise.
@@ -601,10 +601,10 @@ int jack_recompute_total_latency (jack_client_t*, jack_port_t* port);
 /**
  * Request a complete recomputation of all port latencies. This
  * can be called by a client that has just changed the internal
- * latency of its port using @function jack_port_set_latency
+ * latency of its port using jack_port_set_latency()
  * and wants to ensure that all signal pathways in the graph
  * are updated with respect to the values that will be returned
- * by @function jack_port_get_total_latency. It allows a client 
+ * by jack_port_get_total_latency(). It allows a client 
  * to change multiple port latencies without triggering a 
  * recompute for each change.
  * 
@@ -627,7 +627,7 @@ int jack_port_set_name (jack_port_t *port, const char *port_name);
  * If the alias is longer than jack_port_name_size(), it will be truncated.
  * 
  * After a successful call, and until JACK exits or
- * @function jack_port_unset_alias() is called, @alias may be
+ * jack_port_unset_alias() is called, @a alias may be
  * used as a alternate name for the port.
  *
  * Ports can have up to two aliases - if both are already 
@@ -851,7 +851,7 @@ jack_nframes_t jack_time_to_frames(const jack_client_t *client, jack_time_t);
  * 
  * The value returned is guaranteed to be monotonic, but not linear.
  *
- * This function is a client version of @function jack_get_microseconds().
+ * This function is a client version of jack_get_microseconds().
  */
 jack_time_t jack_get_time();
 
