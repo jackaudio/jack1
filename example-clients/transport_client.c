@@ -1,7 +1,10 @@
-/** @file simple_client.c
+/** @file transport_client.c
  *
- * @brief This simple client demonstrates the most basic features of JACK
- * as they would be used by many applications.
+ * @brief This client demonstrates very simple use of the JACK
+ * transport API. Compare it with the simple_client example,
+ * which is even simpler. It also demonstrates taking a client
+ * name and optionally server name from the command line, rather 
+ * than hard-coding either of these names.
  */
 
 #include <stdio.h>
@@ -16,23 +19,41 @@ jack_port_t *input_port;
 jack_port_t *output_port;
 jack_client_t *client;
 
+/* a simple state machine for this client */
+volatile enum {
+	Init,
+	Run,
+	Exit
+} client_state = Init;
+
 /**
  * The process callback for this JACK application is called in a
  * special realtime thread once for each audio cycle.
  *
- * This client does nothing more than copy data from its input
- * port to its output port. It will exit when stopped by 
- * the user (e.g. using Ctrl-C on a unix-ish operating system)
+ * This client follows a simple rule: when the JACK transport is
+ * running, copy the input port to the output.  When it stops, exit.
  */
 int
 process (jack_nframes_t nframes, void *arg)
 {
 	jack_default_audio_sample_t *in, *out;
-	
-	in = jack_port_get_buffer (input_port, nframes);
-	out = jack_port_get_buffer (output_port, nframes);
-	memcpy (out, in,
-		sizeof (jack_default_audio_sample_t) * nframes);
+	jack_transport_state_t ts = jack_transport_query(client, NULL);
+
+	if (ts == JackTransportRolling) {
+
+		if (client_state == Init)
+			client_state = Run;
+
+		in = jack_port_get_buffer (input_port, nframes);
+		out = jack_port_get_buffer (output_port, nframes);
+		memcpy (out, in,
+			sizeof (jack_default_audio_sample_t) * nframes);
+
+	} else if (ts == JackTransportStopped) {
+
+		if (client_state == Run)
+			client_state = Exit;
+	}
 
 	return 0;      
 }
@@ -51,11 +72,26 @@ int
 main (int argc, char *argv[])
 {
 	const char **ports;
-	const char *client_name = "simple";
+	const char *client_name;
 	const char *server_name = NULL;
 	jack_options_t options = JackNullOption;
 	jack_status_t status;
-	
+
+	if (argc >= 2) {		/* client name specified? */
+		client_name = argv[1];
+		if (argc >= 3) {	/* server name specified? */
+			server_name = argv[2];
+			options |= JackServerName;
+		}
+	} else {			/* use basename of argv[0] */
+		client_name = strrchr(argv[0], '/');
+		if (client_name == 0) {
+			client_name = argv[0];
+		} else {
+			client_name++;
+		}
+	}
+
 	/* open a client connection to the JACK server */
 
 	client = jack_client_open (client_name, options, &status, server_name);
@@ -150,14 +186,11 @@ main (int argc, char *argv[])
 
 	free (ports);
 
-	/* keep running until stopped by the user */
+	/* keep running until the transport stops */
 
-	sleep (-1);
-
-	/* this is never reached but if the program
-	   had some other way to exit besides being killed,
-	   they would be important to call.
-	*/
+	while (client_state != Exit) {
+		sleep (1);
+	}
 
 	jack_client_close (client);
 	exit (0);
