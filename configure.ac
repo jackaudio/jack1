@@ -193,7 +193,7 @@ fi
 
 # look for system support for POSIX shm API
 AC_ARG_ENABLE(posix-shm,
-	AC_HELP_STRING([--enable-posix-shm], [use POSIX shm API]),
+	AC_HELP_STRING([--enable-posix-shm], [use POSIX shm API (default=auto)]),
 	[TRY_POSIX_SHM=$enableval])
 if test "x$TRY_POSIX_SHM" = "xyes"
 then
@@ -297,21 +297,21 @@ elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
     fi
     
     AC_ARG_ENABLE(optimization-by-compiler,
-	[  --enable-optimization-by-compiler  use compiler (NOT processor) capabilities to determine optimization flags],,
+	AC_HELP_STRING([--enable-optimization-by-compiler],[use compiler (NOT processor) capabilities to determine optimization flags (default=no)]),,
 	optimization_by_compiler=no
     )
     
     AC_ARG_ENABLE(optimization-by-cpu,
-	[  --enable-optimization-by-cpu  use processor capabilities to determine optimization flags],,
+	AC_HELP_STRING([--enable-optimization-by-cpu],[use processor capabilities to determine optimization flags (default=yes)]),,
 	optimization_by_cpu=yes
     )
     
     AC_ARG_ENABLE(mmx,
-	[  --enable-mmx            enable MMX support (default=auto)],,
+	AC_HELP_STRING([--enable-mmx],[enable MMX support (default=auto)]),,
 	enable_mmx=yes)
     
     AC_ARG_ENABLE(sse,
-	[  --enable-sse            enable SSE support (default=auto)],,
+	AC_HELP_STRING([--enable-sse],[enable SSE support (default=auto)]),,
 	enable_sse=$enable_mmx)
     
     if test "x$enable_mmx" = xyes; then
@@ -387,7 +387,7 @@ elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 fi
 
 AC_ARG_ENABLE(dynsimd,
-    [  --enable-dynsimd        enable dynamic SIMD selection (default=no)],,
+	AC_HELP_STRING([--enable-dynsimd],[enable dynamic SIMD selection (default=no)]),,
     enable_dynsimd=no)
 
 if test "x$enable_dynsimd" = xyes; then
@@ -399,7 +399,7 @@ fi
 
 AC_ARG_ENABLE(optimize,
     AC_HELP_STRING([--enable-optimize],
-	[ask the compiler for its best optimizations]),
+	[optimize code, based on CPU or compiler, as separately selected (default=no)]),
     [ if test x$enable_optimize != xno ; then
 	JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS"
 	AC_MSG_WARN([optimization in use.........................])
@@ -422,21 +422,21 @@ CFLAGS=$JACK_CFLAGS
 # allow buffer resizing unless --disable-resize specified
 buffer_resizing=yes
 AC_ARG_ENABLE(resize,
-	AC_HELP_STRING([--enable-resize], [enable buffer resizing feature]),
+	AC_HELP_STRING([--enable-resize], [enable buffer resizing feature (default=yes)]),
         [ 
 	  if test x$enable_resize = xno ; then
 	  	buffer_resizing=no
 	  fi
-
-	  if test x$buffer_resizing != xno; then 
-	  	AC_DEFINE(DO_BUFFER_RESIZE,,[Enable buffer resizing])
-          fi
-         ]
+	 ]
 )
 
+if test x$buffer_resizing != xno; then 
+   AC_DEFINE(DO_BUFFER_RESIZE,,[Enable buffer resizing])
+fi
+
+
 AC_ARG_ENABLE(ensure-mlock,
-	AC_HELP_STRING([--enable-ensure-mlock],
-		[fail if unable to lock memory]),
+	AC_HELP_STRING([--enable-ensure-mlock], [server should fail if unable to lock memory (default=no)]),
         [ 
 	  if test x$enable_ensure_mlock != xno ; then
 	  	AC_DEFINE(ENSURE_MLOCK,,[Ensure that memory locking succeeds])
@@ -446,7 +446,7 @@ AC_ARG_ENABLE(ensure-mlock,
 
 AC_ARG_ENABLE(debug,
 	AC_HELP_STRING([--enable-debug],
-		[enable debugging messages in jackd and libjack]),
+		[enable debugging messages in jackd and libjack (default=no)]),
         [ 
 	  if test x$enable_debug != xno ; then
 	     AC_DEFINE(DEBUG_ENABLED,,[Enable debugging messages])
@@ -456,7 +456,7 @@ AC_ARG_ENABLE(debug,
 
 AC_ARG_ENABLE(timestamps,
 	AC_HELP_STRING([--enable-timestamps],
-		[allow clients to use the JACK timestamp API]),
+		[allow clients to use the JACK timestamp API (JACK developers only) (default=no)]),
         [ 
 	  if test x$enable_timestamps != xno ; then
 	  	AC_DEFINE(WITH_TIMESTAMPS,,[Enable JACK timestamp API])
@@ -466,7 +466,7 @@ AC_ARG_ENABLE(timestamps,
 
 AC_ARG_ENABLE(preemption-check,
 	AC_HELP_STRING([--enable-preemption-check],
-		[check for inappropriate realtime preemption]),
+		[check for inappropriate realtime preemption (requires a specially built Linux kernel) (default=no)]),
 		[
 		  if test x$enable_preemption_check != xno ; then
 			echo checking for realtime preemption bugs
@@ -478,7 +478,7 @@ AC_ARG_ENABLE(preemption-check,
 USE_CAPABILITIES=false
 
 AC_ARG_ENABLE(capabilities,
-              [  --enable-capabilities   !!! LINUX 2.4 KERNELS ONLY !!! use libcap to gain realtime scheduling priviledges],
+	AC_HELP_STRING([--enable-capabilities],[!!! LINUX 2.4 KERNELS ONLY !!! use libcap to gain realtime scheduling priviledges]),
               [ if test "x$enable_capabilities" != "xno" ; then
                     AC_CHECK_LIB(cap, capgetp,
                                  [AC_CHECK_HEADER(sys/capability.h,
@@ -506,7 +506,7 @@ AC_ARG_ENABLE(capabilities,
 
 with_oldtrans=yes
 AC_ARG_ENABLE(oldtrans,
-              [  --disable-oldtrans      remove old transport interfaces],
+	AC_HELP_STRING([--disable-oldtrans],[remove old transport interfaces (default=yes)]),
               [ if test "x$enable_oldtrans" = "xno" ; then
 		    with_oldtrans=no
 		fi 
@@ -518,13 +518,13 @@ fi
 
 STRIPPED_JACKD=false
 AC_ARG_ENABLE(stripped-jackd,
-              [  --enable-stripped-jackd strip jack before computing its md5 sum ],
-              [ if test "x$USE_CAPABILITIES" != "xtrue" ; then
+	AC_HELP_STRING([--enable-stripped-jackd],[strip jack before computing its md5 sum (useful only with Linux 2.4 kernel)]),
+              [ if test "x$USE_CAPABILITIES" != "xtrue" ; then	    
                     AC_MSG_WARN([*** capabilities not enabled, stripped jackd has no effect])
                 elif test "x$enable_stripped_jackd" != "xno"; then
-                    STRIPPED_JACKD=true
-                fi
-              ]
+                    STRIPPED_JACKD=true		    
+                fi  
+              ]	
 )
 
 # plugins go in the addon dir.
@@ -535,7 +535,7 @@ AS_AC_EXPAND(ADDON_DIR_EXPANDED,${libdir}/jack)
 AC_DEFINE_UNQUOTED(ADDON_DIR,"$ADDON_DIR_EXPANDED",[Directory for plugins])
 
 AC_ARG_WITH(html-dir,
-            [  --with-html-dir=PATH    where to install the html documentation])
+		AC_HELP_STRING([--with-html-dir=PATH],[where to install the html documentation]))
 
 if test "x$with_html_dir" = "x" ; then
     HTML_DIR='${pkgdatadir}'
@@ -548,7 +548,7 @@ AC_SUBST(HTML_DIR)
 
 # allow specifying default tmpdir
 AC_ARG_WITH(default-tmpdir,
-            [  --with-default-tmpdir=PATH    where jackd and clients will put tmp files (/dev/shm)])
+            AC_HELP_STRING([--with-default-tmpdir],[where jackd and clients will put tmp files (default=/dev/shm)]))
 
 if test "x$with_default_tmpdir" = "x" ; then
 	DEFAULT_TMP_DIR=$HOST_DEFAULT_TMP_DIR
@@ -564,7 +564,7 @@ AC_DEFINE_UNQUOTED(DEFAULT_TMP_DIR,"$DEFAULT_TMP_DIR",[Default tmp directory])
 test "x$USE_BARRIER" = "x" && USE_BARRIER="yes"
 AC_ARG_WITH(barrier,
 	AC_HELP_STRING([--without-barrier],
-		       [avoid using pthread barrier functions]),
+		       [avoid using pthread barrier functions (only used by OSS driver)]),
 	[ USE_BARRIER=$withval ])
 if test "x$USE_BARRIER" = "xyes"; then
 	AC_CHECK_LIB([pthread], [pthread_barrier_init],
@@ -599,8 +599,10 @@ fi
 
 JACK_DEFAULT_DRIVER=\"dummy\"
 
-AC_ARG_ENABLE(portaudio, [  --disable-portaudio     ignore PortAudio driver ],
-			TRY_PORTAUDIO=$enableval , TRY_PORTAUDIO=no ) 
+AC_ARG_ENABLE(portaudio,
+	AC_HELP_STRING([--enable-portaudio],[build PortAudio driver]),
+   TRY_PORTAUDIO=$enableval , TRY_PORTAUDIO=no)
+
 HAVE_PA="false"
 if test "x$TRY_PORTAUDIO" = "xyes"
 then
@@ -616,8 +618,8 @@ then
 fi
 AM_CONDITIONAL(HAVE_PA, $HAVE_PA)
 
-AC_ARG_ENABLE(coreaudio, [  --disable-coreaudio     ignore CoreAudio driver ],
-			TRY_COREAUDIO=$enableval , TRY_COREAUDIO=yes ) 
+AC_ARG_ENABLE(coreaudio, AC_HELP_STRING([--disable-coreaudio], [ignore CoreAudio driver]),
+			TRY_COREAUDIO=$enableval , TRY_COREAUDIO=yes )
 HAVE_COREAUDIO="false"
 if test "x$TRY_COREAUDIO" = "xyes"
 then
@@ -629,7 +631,7 @@ then
 fi
 AM_CONDITIONAL(HAVE_COREAUDIO, $HAVE_COREAUDIO)
 
-AC_ARG_ENABLE(oss, [  --disable-oss           ignore OSS driver ],
+AC_ARG_ENABLE(oss, AC_HELP_STRING([--disable-oss],[ignore OSS driver ]),
 			TRY_OSS=$enableval , TRY_OSS=yes ) 
 HAVE_OSS="false"
 if test "x$TRY_OSS" = "xyes"
@@ -641,7 +643,7 @@ then
 fi
 AM_CONDITIONAL(HAVE_OSS, $HAVE_OSS)
 
-AC_ARG_ENABLE(sun, [  --disable-sun           ignore Sun driver ],
+AC_ARG_ENABLE(sun, AC_HELP_STRING([--disable-sun],[ignore Sun driver ]),
 			TRY_SUN=$enableval , TRY_SUN=yes ) 
 HAVE_SUN="false"
 if test "x$TRY_SUN" = "xyes"
@@ -653,7 +655,7 @@ then
 fi
 AM_CONDITIONAL(HAVE_SUN, $HAVE_SUN)
 
-AC_ARG_ENABLE(freebob, [  --disable-freebob          ignore FreeBob driver ],
+AC_ARG_ENABLE(freebob, AC_HELP_STRING([--disable-freebob],[ignore FreeBob driver ]),
 			TRY_FREEBOB=$enableval , TRY_FREEBOB=yes ) 
 HAVE_FREEBOB="false"
 if test "x$TRY_FREEBOB" = "xyes"
@@ -670,7 +672,7 @@ then
 fi
 AM_CONDITIONAL(HAVE_FREEBOB,$HAVE_FREEBOB)
 
-AC_ARG_ENABLE(firewire, [  --disable-firewire          ignore FireWire driver (FFADO) ],
+AC_ARG_ENABLE(firewire, AC_HELP_STRING([--disable-firewire],[ignore FireWire driver (FFADO)]),
 			TRY_FIREWIRE=$enableval , TRY_FIREWIRE=yes ) 
 HAVE_FIREWIRE="false"
 if test "x$TRY_FIREWIRE" = "xyes"
@@ -687,7 +689,7 @@ then
 fi
 AM_CONDITIONAL(HAVE_FIREWIRE,$HAVE_FIREWIRE)
 
-AC_ARG_ENABLE(alsa, [  --disable-alsa          ignore ALSA driver ],
+AC_ARG_ENABLE(alsa, AC_HELP_STRING([--disable-alsa],[ignore ALSA driver ]),
 			TRY_ALSA=$enableval , TRY_ALSA=yes ) 
 HAVE_ALSA="false"
 if test "x$TRY_ALSA" = "xyes"
@@ -807,6 +809,7 @@ echo \| Build with Sun audio support.......................... : $HAVE_SUN
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
 echo \| Build with NetJack support............................ : $HAVE_SAMPLERATE
+echo \| Build with dynamic buffer size support................ : $buffer_resizing
 echo \| Compiler optimization flags........................... : $JACK_OPT_CFLAGS
 echo \| Compiler full flags................................... : $CFLAGS
 echo \| Install dir for libjack + backends.................... : $libdir/jack

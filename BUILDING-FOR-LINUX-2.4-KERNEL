@@ -1,6 +1,9 @@
+Specific Instructions for a 2.4 Linux kernel
+--------------------------------------------
 
- Quick Install Guide
----------------------
+Before using JACK in realtime mode with a 2.4 kernel, you may
+need or want to take the following steps. A better choice is
+to use a 2.6 kernel.
 
 1) in /usr/src/linux/include/linux/capability.h find these lines
 
@@ -25,13 +28,8 @@
    ftp://ftp.kernel.org/pub/linux/libs/security/linux-privs/kernel-2.4/
 
 3) if you're using a journalling filesystem, mount some directory with
-   -t tmpfs and tell configure about it with --with-default-tmpdir
+   -t tmpfs and use this with JACK's configure step as the
+   argument to --with-default-tmpdir.
 
-4) configure with --enable-optimize --enable-capabilities and
-   --with-default-tmpdir=/where/ever
+4) use --enable-capabilities with JACK's configure step
 
-5) make
-
-6) as root, do 
-
-       make install

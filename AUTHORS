@@ -10,7 +10,7 @@ contributions to those discussions came from (in alphabetical order):
 Many other members of LAD contributed ideas to JACK, particularly
 Richard Guenther.
 
-CONTRIBUTORS
+CONTRIBUTORS (in rough chronological order)
 
 Paul Davis 
 	the principal author of the JACK API and of the
@@ -41,7 +41,9 @@ Melanie Thielker
 	aspects of both POSIX and System V APIs.  
 
 Stephane Letz 
-	ported JACK to Mac OS X.  
+	ported JACK to Mac OS X and Windows, reimplemented
+	JACK in C++ to give Jackdmp/JACK 2, lots of design
+	work, bug fixes and testing.
 
 Jussi Laako 
 	wrote the OSS driver interface.  
@@ -58,7 +60,7 @@ Rui Nuno Capela
 
 Karsten Wiese 
 	(with Rui) added US-X2Y USB device support to the
-	ALSA backend.  
+	ALSA backend, added read/write lock support.
 
 Lee Revell 
 	contributed statistical interfaces and much low-latency realtime testing.
@@ -86,6 +88,9 @@ Jacob Meuser
 
 Marc-Olivier Barre
 	help with netjack integration and cleanup
+
+Torben Hohn
+       wrote netjack, implemented mixed 64/32 bit support and bug fixes.
 
 Many others have contributed patches and/or test results, and we thank
 them all.

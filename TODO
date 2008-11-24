@@ -34,7 +34,6 @@ TODO before-1.0
 TODO post-1.0
 
 - jack session handling (taybin)
-- handle mixed-mode 64bit and 32bit clients (joq)
 - first client run without jackd becomes jackd (joq)
 - TBD
 
@@ -60,6 +59,7 @@ TO THINK ABOUT - no agreed timeline
 
 CLOSED (date,who,comment)
 
+- handle mixed-mode 64bit and 32bit clients (2008/10, done by torben)
 - don't build static libraries of drivers and ip-clients (2003/10/07,paul)
 - API to change buffer size (joq) (2003/10/07)
 - added code to enforce the 'bufsize==2^x' rule (taybin) (2003/8/28)
