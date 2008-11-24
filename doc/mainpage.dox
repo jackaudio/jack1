@@ -8,18 +8,18 @@
 
 @section intro Introduction
 
-JACK is a low-latency audio server, written for POSIX conformant
-operating systems such as GNU/Linux and Apple's OS X.  It can connect
-several client applications to an audio device, and allow them to
-share audio with each other.  Clients can run as separate processes
-like normal applications, or within the JACK server as "plugins".
+JACK is a low-latency audio server, written for any operating system
+that is reasonably POSIX compliant. It currently exists for Linux, OS
+X, Solaris, FreeBSD and Windows. It can connect several client
+applications to an audio device, and allow them to share audio with
+each other.  Clients can run as separate processes like normal
+applications, or within the JACK server as "plugins".
 
 JACK was designed from the ground up for professional audio work, and
 its design focuses on two key areas: synchronous execution of all
 clients, and low latency operation.
 
-@see <http://jackit.sourceforge.net>
-
+@see <http://jackaudio.org>
 
 @section jack_overview JACK Overview
 
@@ -80,7 +80,23 @@ internal client "plugin" that runs within the JACK server process.
 
 @section reference Reference
 
-The JACK programming interfaces are described in several header files:
+The JACK programming interfaces are described in several header files.
+We present them here broken into useful categories to make the API a
+little clearer:
+
+    - @ref ClientFunctions
+    - @ref ClientCallbacks
+    - @ref ClientThreads
+    - @ref ServerControl
+    - @ref PortFunctions
+    - @ref PortSearching
+    - @ref TimeFunctions
+    - @ref TransportControl
+    - @ref ErrorOutput
+    - @ref NonCallbackAPI
+    - @ref MIDIAPI
+
+The full API is described in:
 
   - @ref jack.h "<jack/jack.h>" is the main JACK interface.
   - @ref statistics.h "<jack/statistics.h>" provides interfaces for
@@ -100,7 +116,7 @@ The JACK programming interfaces are described in several header files:
   - @ref midiport.h "<jack/midiport.h>" functions to handle reading
   and writing of MIDI data to a port
 
-In addition, the example-clients directory provides numerous examples
+In addition, the tools directory provides numerous examples
 of simple JACK clients that nevertheless use the API to do something
 useful.  It includes
 
@@ -111,6 +127,8 @@ useful.  It includes
        change the buffer size and more.      
   - commands to load and unload JACK internal clients.
   - tools for checking the status of a running JACK system.
+
+and many more.
 
 @section porting Porting
 

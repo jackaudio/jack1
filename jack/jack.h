@@ -35,6 +35,11 @@ extern "C" {
  */
 
 /**
+ * @defgroup ClientFunctions Creating & manipulating clients
+ * @{
+ */
+
+/**
  * Open an external client session with a JACK server.  This interface
  * is more complex but more powerful than jack_client_new().  With it,
  * clients may choose which of several servers to connect, and control
@@ -132,6 +137,31 @@ int jack_internal_client_new (const char *client_name,
 void jack_internal_client_close (const char *client_name);
 
 /**
+ * Tell the Jack server that the program is ready to start processing
+ * audio.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+int jack_activate (jack_client_t *client);
+
+/**
+ * Tell the Jack server to remove this @a client from the process
+ * graph.  Also, disconnect all ports belonging to it, since inactive
+ * clients have no port connections.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+int jack_deactivate (jack_client_t *client);
+
+/**
+ * @return the pthread ID of the thread running the JACK client side
+ * code.
+ */
+pthread_t jack_client_thread_id (jack_client_t *);
+
+/*@}*/
+
+/**
  * @param client pointer to JACK client structure.
  *
  * Check if the JACK subsystem is running with -R (--realtime).
@@ -140,45 +170,11 @@ void jack_internal_client_close (const char *client_name);
  */
 int jack_is_realtime (jack_client_t *client);
 
-/** 
- * @param client pointer to JACK client structure.
- * @param function The jack_shutdown function pointer.
- * @param arg The arguments for the jack_shutdown function.
- *
- * Register a function (and argument) to be called if and when the
- * JACK server shuts down the client thread.  The function must
- * be written as if it were an asynchonrous POSIX signal
- * handler --- use only async-safe functions, and remember that it
- * is executed from another thread.  A typical function might
- * set a flag or write to a pipe so that the rest of the
- * application knows that the JACK client thread has shut
- * down.
- *
- * NOTE: clients do not need to call this.  It exists only
- * to help more complex clients understand what is going
- * on.  It should be called before jack_client_activate().
- */
-void jack_on_shutdown (jack_client_t *client,
-		       void (*function)(void *arg), void *arg);
-
 /**
- * Tell the Jack server to call @a process_callback whenever there is
- * work be done, passing @a arg as the second argument.
- *
- * The code in the supplied function must be suitable for real-time
- * execution. That means that it cannot call functions that might
- * block for a long time. This includes malloc, free, printf,
- * pthread_mutex_lock, sleep, wait, poll, select, pthread_join,
- * pthread_cond_wait, etc, etc. See
- * http://jackit.sourceforge.net/docs/design/design.html#SECTION00411000000000000000
- * for more information.
- *
- * @return 0 on success, otherwise a non-zero error code, causing JACK
- * to remove that client from the process() graph.
+ * @defgroup NonCallbackAPI The non-callback API
+ * @{
  */
-int jack_set_process_callback (jack_client_t *client,
-			       JackProcessCallback process_callback,
-			       void *arg);
+
 /**
  * <b>THIS FUNCTION IS DEPRECATED AND SHOULD NOT BE USED IN
  * NEW JACK CLIENTS</b>
@@ -220,6 +216,13 @@ void jack_cycle_signal (jack_client_t* client, int status);
 */    
 int jack_set_process_thread(jack_client_t* client, JackThreadCallback fun, void *arg);
 
+/*@}*/
+
+/**
+ * @defgroup ClientCallbacks Setting Client Callbacks
+ * @{
+ */
+
 /**
  * Tell JACK to call @a thread_init_callback once just after
  * the creation of the thread in which all other callbacks 
@@ -235,6 +238,46 @@ int jack_set_thread_init_callback (jack_client_t *client,
 				   JackThreadInitCallback thread_init_callback,
 				   void *arg);
 
+/** 
+ * @param client pointer to JACK client structure.
+ * @param function The jack_shutdown function pointer.
+ * @param arg The arguments for the jack_shutdown function.
+ *
+ * Register a function (and argument) to be called if and when the
+ * JACK server shuts down the client thread.  The function must
+ * be written as if it were an asynchonrous POSIX signal
+ * handler --- use only async-safe functions, and remember that it
+ * is executed from another thread.  A typical function might
+ * set a flag or write to a pipe so that the rest of the
+ * application knows that the JACK client thread has shut
+ * down.
+ *
+ * NOTE: clients do not need to call this.  It exists only
+ * to help more complex clients understand what is going
+ * on.  It should be called before jack_client_activate().
+ */
+void jack_on_shutdown (jack_client_t *client,
+		       void (*function)(void *arg), void *arg);
+
+/**
+ * Tell the Jack server to call @a process_callback whenever there is
+ * work be done, passing @a arg as the second argument.
+ *
+ * The code in the supplied function must be suitable for real-time
+ * execution. That means that it cannot call functions that might
+ * block for a long time. This includes malloc, free, printf,
+ * pthread_mutex_lock, sleep, wait, poll, select, pthread_join,
+ * pthread_cond_wait, etc, etc. See
+ * http://jackit.sourceforge.net/docs/design/design.html#SECTION00411000000000000000
+ * for more information.
+ *
+ * @return 0 on success, otherwise a non-zero error code, causing JACK
+ * to remove that client from the process() graph.
+ */
+int jack_set_process_callback (jack_client_t *client,
+			       JackProcessCallback process_callback,
+			       void *arg);
+
 /**
  * Tell the Jack server to call @a freewheel_callback
  * whenever we enter or leave "freewheel" mode, passing @a
@@ -247,49 +290,6 @@ int jack_set_thread_init_callback (jack_client_t *client,
 int jack_set_freewheel_callback (jack_client_t *client,
 				 JackFreewheelCallback freewheel_callback,
 				 void *arg);
-
-/**
- * Start/Stop JACK's "freewheel" mode.
- *
- * When in "freewheel" mode, JACK no longer waits for
- * any external event to begin the start of the next process
- * cycle. 
- *
- * As a result, freewheel mode causes "faster than realtime"
- * execution of a JACK graph. If possessed, real-time
- * scheduling is dropped when entering freewheel mode, and
- * if appropriate it is reacquired when stopping.
- * 
- * IMPORTANT: on systems using capabilities to provide real-time
- * scheduling (i.e. Linux kernel 2.4), if onoff is zero, this function
- * must be called from the thread that originally called jack_activate(). 
- * This restriction does not apply to other systems (e.g. Linux kernel 2.6 
- * or OS X).
- * 
- * @param client pointer to JACK client structure
- * @param onoff  if non-zero, freewheel mode starts. Otherwise
- *                  freewheel mode ends.
- *
- * @return 0 on success, otherwise a non-zero error code.
- */
-int jack_set_freewheel(jack_client_t* client, int onoff);
-
-/**
- * Change the buffer size passed to the @a process_callback.
- *
- * This operation stops the JACK engine process cycle, then calls all
- * registered @a bufsize_callback functions before restarting the
- * process cycle.  This will cause a gap in the audio flow, so it
- * should only be done at appropriate stopping points.
- *
- * @see jack_set_buffer_size_callback()
- *
- * @param client pointer to JACK client structure.
- * @param nframes new buffer size.  Must be a power of two.
- *
- * @return 0 on success, otherwise a non-zero error code
- */
-int jack_set_buffer_size (jack_client_t *client, jack_nframes_t nframes);
 
 /**
  * Tell JACK to call @a bufsize_callback whenever the size of the the
@@ -365,22 +365,100 @@ int jack_set_graph_order_callback (jack_client_t *,
 int jack_set_xrun_callback (jack_client_t *,
 			    JackXRunCallback xrun_callback, void *arg);
 
-/**
- * Tell the Jack server that the program is ready to start processing
- * audio.
- *
- * @return 0 on success, otherwise a non-zero error code
- */
-int jack_activate (jack_client_t *client);
+/*@}*/
 
 /**
- * Tell the Jack server to remove this @a client from the process
- * graph.  Also, disconnect all ports belonging to it, since inactive
- * clients have no port connections.
+ * @defgroup ServerControl Controlling & querying JACK server operation
+ * @{
+ */
+
+/**
+ * Start/Stop JACK's "freewheel" mode.
+ *
+ * When in "freewheel" mode, JACK no longer waits for
+ * any external event to begin the start of the next process
+ * cycle. 
+ *
+ * As a result, freewheel mode causes "faster than realtime"
+ * execution of a JACK graph. If possessed, real-time
+ * scheduling is dropped when entering freewheel mode, and
+ * if appropriate it is reacquired when stopping.
+ * 
+ * IMPORTANT: on systems using capabilities to provide real-time
+ * scheduling (i.e. Linux kernel 2.4), if onoff is zero, this function
+ * must be called from the thread that originally called jack_activate(). 
+ * This restriction does not apply to other systems (e.g. Linux kernel 2.6 
+ * or OS X).
+ * 
+ * @param client pointer to JACK client structure
+ * @param onoff  if non-zero, freewheel mode starts. Otherwise
+ *                  freewheel mode ends.
+ *
+ * @return 0 on success, otherwise a non-zero error code.
+ */
+int jack_set_freewheel(jack_client_t* client, int onoff);
+
+/**
+ * Change the buffer size passed to the @a process_callback.
+ *
+ * This operation stops the JACK engine process cycle, then calls all
+ * registered @a bufsize_callback functions before restarting the
+ * process cycle.  This will cause a gap in the audio flow, so it
+ * should only be done at appropriate stopping points.
+ *
+ * @see jack_set_buffer_size_callback()
+ *
+ * @param client pointer to JACK client structure.
+ * @param nframes new buffer size.  Must be a power of two.
  *
  * @return 0 on success, otherwise a non-zero error code
  */
-int jack_deactivate (jack_client_t *client);
+int jack_set_buffer_size (jack_client_t *client, jack_nframes_t nframes);
+
+/**
+ * @return the sample rate of the jack system, as set by the user when
+ * jackd was started.
+ */
+jack_nframes_t jack_get_sample_rate (jack_client_t *);
+
+/**
+ * @return the current maximum size that will ever be passed to the @a
+ * process_callback.  It should only be used *before* the client has
+ * been activated.  This size may change, clients that depend on it
+ * must register a @a bufsize_callback so they will be notified if it
+ * does.
+ *
+ * @see jack_set_buffer_size_callback()
+ */
+jack_nframes_t jack_get_buffer_size (jack_client_t *);
+
+/**
+ * Old-style interface to become the timebase for the entire JACK
+ * subsystem.
+ *
+ * @deprecated This function still exists for compatibility with the
+ * earlier transport interface, but it does nothing.  Instead, see
+ * transport.h and use jack_set_timebase_callback().
+ *
+ * @return ENOSYS, function not implemented.
+ */
+int  jack_engine_takeover_timebase (jack_client_t *);
+
+/**
+ * @return the current CPU load estimated by JACK.  This is a running
+ * average of the time it takes to execute a full process cycle for
+ * all clients as a percentage of the real time available per cycle
+ * determined by the buffer size and sample rate.
+ */
+float jack_cpu_load (jack_client_t *client);
+	
+
+/*@}*/
+
+/**
+ * @defgroup PortFunctions Creating & manipulating ports
+ * @{
+ */
 
 /**
  * Create a new port for the client. This is an object used for moving
@@ -588,10 +666,10 @@ void jack_port_set_latency (jack_port_t *, jack_nframes_t);
 /**
  * Request a complete recomputation of a port's total latency. This
  * can be called by a client that has just changed the internal
- * latency of its port using jack_port_set_latency()
+ * latency of its port using  jack_port_set_latency
  * and wants to ensure that all signal pathways in the graph
  * are updated with respect to the values that will be returned
- * by jack_port_get_total_latency(). 
+ * by  jack_port_get_total_latency. 
  * 
  * @return zero for successful execution of the request. non-zero
  *         otherwise.
@@ -601,10 +679,10 @@ int jack_recompute_total_latency (jack_client_t*, jack_port_t* port);
 /**
  * Request a complete recomputation of all port latencies. This
  * can be called by a client that has just changed the internal
- * latency of its port using jack_port_set_latency()
+ * latency of its port using  jack_port_set_latency
  * and wants to ensure that all signal pathways in the graph
  * are updated with respect to the values that will be returned
- * by jack_port_get_total_latency(). It allows a client 
+ * by  jack_port_get_total_latency. It allows a client 
  * to change multiple port latencies without triggering a 
  * recompute for each change.
  * 
@@ -627,7 +705,7 @@ int jack_port_set_name (jack_port_t *port, const char *port_name);
  * If the alias is longer than jack_port_name_size(), it will be truncated.
  * 
  * After a successful call, and until JACK exits or
- * jack_port_unset_alias() is called, @a alias may be
+ * jack_port_unset_alias() is called, may be
  * used as a alternate name for the port.
  *
  * Ports can have up to two aliases - if both are already 
@@ -749,23 +827,12 @@ int jack_port_name_size(void);
  * including the final NULL character.  This value is a constant.
  */
 int jack_port_type_size(void);
+/*@}*/
 
 /**
- * @return the sample rate of the jack system, as set by the user when
- * jackd was started.
+ * @defgroup PortSearching Looking up ports
+ * @{
  */
-jack_nframes_t jack_get_sample_rate (jack_client_t *);
-
-/**
- * @return the current maximum size that will ever be passed to the @a
- * process_callback.  It should only be used *before* the client has
- * been activated.  This size may change, clients that depend on it
- * must register a @a bufsize_callback so they will be notified if it
- * does.
- *
- * @see jack_set_buffer_size_callback()
- */
-jack_nframes_t jack_get_buffer_size (jack_client_t *);
 
 /**
  * @param port_name_pattern A regular expression used to select 
@@ -801,17 +868,13 @@ jack_port_t *jack_port_by_name (jack_client_t *, const char *port_name);
 jack_port_t *jack_port_by_id (jack_client_t *client,
 			      jack_port_id_t port_id);
 
+/*@}*/
+
+
 /**
- * Old-style interface to become the timebase for the entire JACK
- * subsystem.
- *
- * @deprecated This function still exists for compatibility with the
- * earlier transport interface, but it does nothing.  Instead, see
- * transport.h and use jack_set_timebase_callback().
- *
- * @return ENOSYS, function not implemented.
+ * @defgroup TimeFunctions Handling time
+ * @{
  */
-int  jack_engine_takeover_timebase (jack_client_t *);
 
 /**
  * @return the time in frames that has passed since the JACK server
@@ -855,19 +918,12 @@ jack_nframes_t jack_time_to_frames(const jack_client_t *client, jack_time_t);
  */
 jack_time_t jack_get_time();
 
+/*@}*/
+
 /**
- * @return the current CPU load estimated by JACK.  This is a running
- * average of the time it takes to execute a full process cycle for
- * all clients as a percentage of the real time available per cycle
- * determined by the buffer size and sample rate.
+ * @defgroup ErrorOutput Controlling error/information output
  */
-float jack_cpu_load (jack_client_t *client);
-	
-/**
- * @return the pthread ID of the thread running the JACK client side
- * code.
- */
-pthread_t jack_client_thread_id (jack_client_t *);
+/*@{*/
 
 /**
  * Display JACK error message.
@@ -901,6 +957,7 @@ extern void (*jack_info_callback)(const char *msg);
  * Set the @ref jack_info_callback for info message display.
  */
 void jack_set_info_function (void (*func)(const char *));
+/*@}*/
 
 #ifdef __cplusplus
 }

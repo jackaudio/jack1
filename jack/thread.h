@@ -38,6 +38,11 @@ extern "C" {
  */
 
 /**
+ * @defgroup ClientThreads Creating and managing client threads
+ * @{
+ */
+
+/**
  * @returns if JACK is running with realtime scheduling, this returns
  * the priority that any JACK-created client threads will run at. 
  * Otherwise returns -1.
@@ -96,6 +101,8 @@ int jack_client_create_thread (jack_client_t* client,
  * @returns 0, if successful; otherwise an error number.
  */
 int jack_drop_real_time_scheduling (pthread_t thread);
+
+/* @} */
 
 #ifdef __cplusplus
 }

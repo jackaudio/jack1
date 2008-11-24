@@ -146,6 +146,11 @@ typedef struct {
 } POST_PACKED_STRUCTURE jack_position_t;
 
 /**
+ * @defgroup TransportControl Transport and Timebase control
+ * @{
+ */
+
+/**
  * Called by the timebase master to release itself from that
  * responsibility.
  *
@@ -385,6 +390,7 @@ void jack_transport_start (jack_client_t *client);
  */
 void jack_transport_stop (jack_client_t *client);
 
+/*@}*/
 
 /*********************************************************************
  * The following interfaces are DEPRECATED.  They are only provided
