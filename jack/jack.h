@@ -605,29 +605,20 @@ const char **jack_port_get_all_connections (const jack_client_t *client,
 					    const jack_port_t *port);
 
 /**
- * A client may call this on a pair of its own ports to 
- * semi-permanently wire them together. This means that
- * a client that wants to direct-wire an input port to
- * an output port can call this and then no longer
- * have to worry about moving data between them. Any data
- * arriving at the input port will appear automatically
- * at the output port.
  *
- * The 'destination' port must be an output port. The 'source'
- * port must be an input port. Both ports must belong to
- * the same client. You cannot use this to tie ports between
- * clients. That is what a connection is for.
- *
- * @return 0 on success, otherwise a non-zero error code
+ * @deprecated This function will be removed from a future version 
+ * of JACK. Do not use it. There is no replacement. It has 
+ * turned out to serve essentially no purpose in real-life
+ * JACK clients.
  */
 int  jack_port_tie (jack_port_t *src, jack_port_t *dst);
 
 /**
- * This undoes the effect of jack_port_tie(). The port
- * should be same as the 'destination' port passed to
- * jack_port_tie().
  *
- * @return 0 on success, otherwise a non-zero error code
+ * @deprecated This function will be removed from a future version 
+ * of JACK. Do not use it. There is no replacement. It has 
+ * turned out to serve essentially no purpose in real-life
+ * JACK clients.
  */
 int  jack_port_untie (jack_port_t *port);
 
