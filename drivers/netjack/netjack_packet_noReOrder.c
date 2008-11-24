@@ -461,12 +461,12 @@ void render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playbac
             src_process(src_state, &src);
 
             for (i = 0; i < net_period_up; i++) {
-                packet_bufX[i] = htons((floatbuf[i] + 1.0) * 32767.0);
+                packet_bufX[i] = htons(((uint16_t)((floatbuf[i] + 1.0) * 32767.0)));
             }
             src_node = jack_slist_next (src_node);
         } else {
             for (i = 0; i < net_period_up; i++) {
-                packet_bufX[i] = htons((buf[i] + 1.0) * 32767.0);
+                packet_bufX[i] = htons(((uint16_t)((buf[i] + 1.0) * 32767.0)));
             }
         }
 
