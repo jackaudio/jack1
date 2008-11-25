@@ -43,6 +43,10 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 
 #include <samplerate.h>
 
+#ifdef HAVE_CELT
+#include <celt/celt.h>
+#endif
+
 #include "net_driver.h"
 #include "netjack_packet.h"
 
@@ -327,7 +331,16 @@ net_driver_attach (net_driver_t *driver)
 
         driver->capture_ports =
             jack_slist_append (driver->capture_ports, port);
-        driver->capture_srcs = jack_slist_append(driver->capture_srcs, src_new(SRC_LINEAR, 1, NULL));
+
+	if( driver->bitdepth == 1000 ) {
+#ifdef HAVE_CELT
+	    // XXX: memory leak
+	    CELTMode *celt_mode = celt_mode_create( driver->sample_rate, 1, driver->period_size, NULL );
+	    driver->capture_srcs = jack_slist_append(driver->capture_srcs, celt_decoder_create( celt_mode ) );
+#endif
+	} else {
+	    driver->capture_srcs = jack_slist_append(driver->capture_srcs, src_new(SRC_LINEAR, 1, NULL));
+	}
     }
     for (chn = driver->capture_channels_audio; chn < driver->capture_channels; chn++) {
         snprintf (buf, sizeof(buf) - 1, "capture_%u", chn + 1);
@@ -361,7 +374,15 @@ net_driver_attach (net_driver_t *driver)
 
         driver->playback_ports =
             jack_slist_append (driver->playback_ports, port);
-        driver->playback_srcs = jack_slist_append(driver->playback_srcs, src_new(SRC_LINEAR, 1, NULL));
+	if( driver->bitdepth == 1000 ) {
+#ifdef HAVE_CELT
+	    // XXX: memory leak
+	    CELTMode *celt_mode = celt_mode_create( driver->sample_rate, 1, driver->period_size, NULL );
+	    driver->playback_srcs = jack_slist_append(driver->playback_srcs, celt_encoder_create( celt_mode ) );
+#endif
+	} else {
+	    driver->playback_srcs = jack_slist_append(driver->playback_srcs, src_new(SRC_LINEAR, 1, NULL));
+	}
     }
     for (chn = driver->playback_channels_audio; chn < driver->playback_channels; chn++) {
         snprintf (buf, sizeof(buf) - 1, "playback_%u", chn + 1);
@@ -475,7 +496,7 @@ net_driver_new (jack_client_t * client,
     driver->client = client;
     driver->engine = NULL;
 
-    if ((bitdepth != 0) && (bitdepth != 8) && (bitdepth != 16))
+    if ((bitdepth != 0) && (bitdepth != 8) && (bitdepth != 16) && (bitdepth != 1000))
     {
         jack_info ("Invalid bitdepth: %d (8, 16 or 0 for float) !!!", bitdepth);
         return NULL;
@@ -574,8 +595,15 @@ net_driver_new (jack_client_t * client,
         (jack_time_t) floor ((((float) driver->period_size) / driver->sample_rate)
                              * 1000000.0f);
 
-    driver->net_period_down = (float) driver->period_size / (float) resample_factor;
-    driver->net_period_up = (float) driver->period_size / (float) resample_factor_up;
+    if( driver->bitdepth == 1000 ) {
+	// celt mode. 
+	// TODO: this is a hack. But i dont want to change the packet header.
+	driver->net_period_down = resample_factor;
+	driver->net_period_up = resample_factor_up;
+    } else {
+	driver->net_period_down = (float) driver->period_size / (float) resample_factor;
+	driver->net_period_up = (float) driver->period_size / (float) resample_factor_up;
+    }
 
     /* TODO: this seems... useles */
     rx_bufsize = sizeof (jacknet_packet_header) + driver->net_period_down * driver->capture_channels * get_sample_size (driver->bitdepth);
@@ -602,7 +630,7 @@ driver_get_descriptor ()
 
     desc = calloc (1, sizeof (jack_driver_desc_t));
     strcpy (desc->name, "net");
-    desc->nparams = 11;
+    desc->nparams = 12;
 
     params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
@@ -679,6 +707,15 @@ driver_get_descriptor ()
     params[i].value.ui   = 0U;
     strcpy (params[i].short_desc,
             "Factor for sample rate reduction on the upstream");
+    strcpy (params[i].long_desc, params[i].short_desc);
+
+    i++;
+    strcpy (params[i].name, "celt");
+    params[i].character  = 'c';
+    params[i].type       = JackDriverParamUInt;
+    params[i].value.ui   = 0U;
+    strcpy (params[i].short_desc,
+            "sets celt encoding and number of bytes per channel");
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
@@ -767,6 +804,16 @@ driver_initialize (jack_client_t *client, const JSList * params)
             case 'b':
                 bitdepth = param->value.ui;
                 break;
+
+	    case 'c':
+#ifdef HAVE_CELT
+		bitdepth = 1000;
+		resample_factor = param->value.ui;
+#else
+		printf( "not built with celt support\n" );
+		exit(10);
+#endif
+		break;
 
             case 't':
                 handle_transport_sync = param->value.ui;

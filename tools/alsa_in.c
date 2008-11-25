@@ -56,6 +56,11 @@ int catch_factor = 1000;
 
 int print_counter = 10;
 
+volatile float output_resampling_factor = 0.0;
+volatile int output_new_delay = 0;
+volatile float output_offset = 0.0;
+volatile float output_diff = 0.0;
+
 // Alsa stuff... i dont want to touch this bullshit in the next years.... please...
 
 static int xrun_recovery(snd_pcm_t *handle, int err) {
@@ -239,14 +244,14 @@ int process (jack_nframes_t nframes, void *arg) {
     if( delay > (target_delay+max_diff) ) {
 	ALSASAMPLE *tmp = alloca( (delay-target_delay) * sizeof( ALSASAMPLE ) * num_channels ); 
 	snd_pcm_readi( alsa_handle, tmp, delay-target_delay );
-	printf( "delay = %d\n", (int) delay );
+	output_new_delay = (int) delay;
 	delay = target_delay;
 	// XXX: at least set it to that value.
 	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
     }
     if( delay < (target_delay-max_diff) ) {
 	snd_pcm_rewind( alsa_handle, target_delay - delay );
-	printf( "delay = %d\n", (int) delay );
+	output_new_delay = (int) delay;
 	delay = target_delay;
 	// XXX: at least set it to that value.
 	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
@@ -269,6 +274,7 @@ int process (jack_nframes_t nframes, void *arg) {
 
     double resamp_rate = (double)jack_sample_rate / (double)sample_rate;  // == nframes / alsa_samples.
     double request_samples = nframes / resamp_rate;  //== alsa_samples;
+    //double request_samples = nframes / current_resample_factor;  //== alsa_samples;
 
     double offset = delay - target_delay;
 
@@ -279,11 +285,15 @@ int process (jack_nframes_t nframes, void *arg) {
 
     double diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
     current_resample_factor -= diff_value;
+    current_resample_factor = current_resample_factor < 0.25 ? 0.25 : current_resample_factor;
     rlen = ceil( ((double)nframes) / current_resample_factor )+2;
 
     if( (print_counter--) == 0 ) {
 	print_counter = 10;
-	printf( "res: %f, \tdiff = %f, \toffset = %f \n", (float)current_resample_factor, (float)diff_value, (float) offset );
+	//printf( "res: %f, \tdiff = %f, \toffset = %f \n", (float)current_resample_factor, (float)diff_value, (float) offset );
+	output_resampling_factor = (float) current_resample_factor;
+	output_diff = (float) diff_value;
+	output_offset = (float) offset;
     }
 
     /*
@@ -299,7 +309,7 @@ int process (jack_nframes_t nframes, void *arg) {
 again:
     err = snd_pcm_readi(alsa_handle, outbuf, rlen);
     if( err < 0 ) {
-	printf( "err = %d\n", err );
+	//printf( "err = %d\n", err );
 	if (xrun_recovery(alsa_handle, err) < 0) {
 	    //printf("Write error: %s\n", snd_strerror(err));
 	    //exit(EXIT_FAILURE);
@@ -307,7 +317,7 @@ again:
 	goto again;
     }
     if( err != rlen ) {
-	printf( "read = %d\n", rlen );
+	//printf( "read = %d\n", rlen );
     }
 
     /*
@@ -346,7 +356,7 @@ again:
 	put_back_samples = rlen-src.input_frames_used;
 
 	if( src.output_frames_gen != nframes )
-	    printf( "did not fill jack_buffer...\n" );
+	    //printf( "did not fill jack_buffer...\n" );
 
 	src_node = jack_slist_next (src_node);
 	node = jack_slist_next (node);
@@ -558,7 +568,16 @@ int main (int argc, char *argv[]) {
 	return 1;
     }
 
-    while(1) sleep(1);
+    while(1) {
+	sleep(1);
+	if( output_new_delay ) {
+	    printf( "delay = %d\n", output_new_delay );
+	    output_new_delay = 0;
+	}
+	printf( "res: %f, \tdiff = %f, \toffset = %f \n", output_resampling_factor, output_diff, output_offset );
+	
+    }
+
     jack_client_close (client);
     exit (0);
 }

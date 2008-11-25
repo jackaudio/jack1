@@ -588,6 +588,16 @@ else
 	LIBS="$LIBS $SAMPLERATE_LIBS"
 fi
 
+# Celt low-latency audio codec. netjack transmission via internet.
+HAVE_CELT=false
+PKG_CHECK_MODULES(CELT, celt >= 0.5.0,[HAVE_CELT=true], [true])
+if test x$HAVE_CELT = xfalse; then
+             AC_MSG_WARN([*** NetJack will not be built with celt support])
+else
+	CFLAGS="$CFLAGS $CELT_CFLAGS"
+	LIBS="$LIBS $CELT_LIBS"
+fi
+
 # Note: A bug in pkg-config causes problems if the first occurence of
 # PKG_CHECK_MODULES can be disabled. So, if you're going to use
 # PKG_CHECK_MODULES inside a --disable-whatever check, you need to
@@ -745,6 +755,7 @@ if test $HAVE_DOXYGEN = "false"; then
 fi
 
 AM_CONDITIONAL(HAVE_SNDFILE, $HAVE_SNDFILE)
+AM_CONDITIONAL(HAVE_CELT, $HAVE_CELT)
 AM_CONDITIONAL(HAVE_SAMPLERATE, $HAVE_SAMPLERATE)
 AM_CONDITIONAL(HAVE_READLINE, $HAVE_READLINE)
 AM_CONDITIONAL(HAVE_DOXYGEN, $HAVE_DOXYGEN)
@@ -809,6 +820,7 @@ echo \| Build with Sun audio support.......................... : $HAVE_SUN
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
 echo \| Build with NetJack support............................ : $HAVE_SAMPLERATE
+echo \| Build with Celt support............................... : $HAVE_CELT
 echo \| Build with dynamic buffer size support................ : $buffer_resizing
 echo \| Compiler optimization flags........................... : $JACK_OPT_CFLAGS
 echo \| Compiler full flags................................... : $CFLAGS

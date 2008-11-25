@@ -124,6 +124,9 @@ jack_unload_LDADD = $(top_builddir)/libjack/libjack.la
 if HAVE_SAMPLERATE
 jack_netsource_SOURCES = netsource.c $(top_builddir)/drivers/netjack/netjack_packet.c
 jack_netsource_CFLAGS = -I$(top_srcdir)/drivers/netjack
+if HAVE_CELT
+jack_netsource_CFLAGS += -DHAVE_CELT
+endif
 jack_netsource_LDFLAGS = -lsamplerate @OS_LDFLAGS@
 jack_netsource_LDADD = $(top_builddir)/libjack/libjack.la
 

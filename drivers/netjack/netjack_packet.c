@@ -47,6 +47,10 @@
 
 #include <samplerate.h>
 
+#ifdef HAVE_CELT
+#include <celt/celt.h>
+#endif
+
 #include "net_driver.h"
 #include "netjack_packet.h"
 
@@ -98,6 +102,8 @@ int get_sample_size (int bitdepth)
         return sizeof (int8_t);
     if (bitdepth == 16)
         return sizeof (int16_t);
+    if( bitdepth == 1000 )
+	return sizeof( unsigned char );
     return sizeof (int32_t);
 }
 
@@ -905,6 +911,96 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
     }
 }
 
+#ifdef HAVE_CELT
+// render functions for celt.
+void
+render_payload_to_jack_ports_celt (void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
+{
+    channel_t chn = 0;
+    JSList *node = capture_ports;
+    JSList *src_node = capture_srcs;
+
+    unsigned char *packet_bufX = (unsigned char *)packet_payload;
+
+    while (node != NULL)
+    {
+        int i;
+        //uint32_t val;
+        SRC_DATA src;
+
+        jack_port_t *port = (jack_port_t *) node->data;
+        jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+
+        float *floatbuf = alloca (sizeof(float) * net_period_down);
+        const char *portname = jack_port_type (port);
+
+        if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
+        {
+            // audio port, decode celt data.
+	    
+	    CELTDecoder *decoder = src_node->data;
+	    celt_decode_float( decoder, packet_bufX, net_period_down, buf );
+	    src_node = jack_slist_next (src_node);
+        }
+        else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
+        {
+            // midi port, decode midi events
+            // convert the data buffer to a standard format (uint32_t based)
+            unsigned int buffer_size_uint32 = net_period_down / 2;
+            uint32_t * buffer_uint32 = (uint32_t*) packet_bufX;
+            decode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
+        }
+        packet_bufX = (packet_bufX + net_period_down);
+        node = jack_slist_next (node);
+        chn++;
+    }
+}
+
+void
+render_jack_ports_to_payload_celt (JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
+{
+    channel_t chn = 0;
+    JSList *node = playback_ports;
+    JSList *src_node = playback_srcs;
+
+    unsigned char *packet_bufX = (uint16_t *)packet_payload;
+
+    while (node != NULL)
+    {
+        SRC_DATA src;
+        int i;
+        jack_port_t *port = (jack_port_t *) node->data;
+        jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        const char *portname = jack_port_type (port);
+
+        if (strncmp (portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
+        {
+            // audio port, encode celt data.
+    
+	    int encoded_bytes;
+	    float *floatbuf = alloca (sizeof(float) * nframes );
+	    memcpy( floatbuf, buf, nframes*sizeof(float) );
+	    CELTEncoder *encoder = src_node->data;
+	    encoded_bytes = celt_encode_float( encoder, floatbuf, NULL, packet_bufX, net_period_up );
+	    if( encoded_bytes != net_period_up )
+		printf( "bah... they are not the same\n" );
+	    src_node = jack_slist_next( src_node );
+        }
+        else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
+        {
+            // encode midi events from port to packet
+            // convert the data buffer to a standard format (uint32_t based)
+            unsigned int buffer_size_uint32 = net_period_up / 2;
+            uint32_t * buffer_uint32 = (uint32_t*) packet_bufX;
+            encode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
+        }
+        packet_bufX = (packet_bufX + net_period_up);
+        node = jack_slist_next (node);
+        chn++;
+    }
+}
+
+#endif
 /* Wrapper functions with bitdepth argument... */
 void
 render_payload_to_jack_ports (int bitdepth, void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
@@ -913,6 +1009,10 @@ render_payload_to_jack_ports (int bitdepth, void *packet_payload, jack_nframes_t
         render_payload_to_jack_ports_8bit (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
     else if (bitdepth == 16)
         render_payload_to_jack_ports_16bit (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
+#ifdef HAVE_CELT
+    else if (bitdepth == 1000)
+        render_payload_to_jack_ports_celt (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
+#endif
     else
         render_payload_to_jack_ports_float (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
 }
@@ -924,6 +1024,10 @@ render_jack_ports_to_payload (int bitdepth, JSList *playback_ports, JSList *play
         render_jack_ports_to_payload_8bit (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
     else if (bitdepth == 16)
         render_jack_ports_to_payload_16bit (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
+#ifdef HAVE_CELT
+    else if (bitdepth == 1000)
+        render_jack_ports_to_payload_celt (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
+#endif
     else
         render_jack_ports_to_payload_float (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
 }

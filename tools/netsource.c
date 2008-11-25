@@ -51,6 +51,10 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #include <netjack_packet.h>
 #include <samplerate.h>
 
+#ifdef HAVE_CELT
+#include <celt/celt.h>
+#endif
+
 JSList *capture_ports = NULL;
 JSList *capture_srcs = NULL;
 int capture_channels = 0;
@@ -110,7 +114,15 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
             printf( "jack_netsource: cannot register %s port\n", buf);
             break;
         }
-        capture_srcs = jack_slist_append (capture_srcs, src_new (SRC_LINEAR, 1, NULL));
+	if( bitdepth == 1000 ) {
+#ifdef HAVE_CELT
+	    // XXX: memory leak
+	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate( client ), 1, jack_get_buffer_size(client), NULL );
+	    capture_srcs = jack_slist_append(capture_srcs, celt_decoder_create( celt_mode ) );
+#endif
+	} else {
+	    capture_srcs = jack_slist_append (capture_srcs, src_new (SRC_LINEAR, 1, NULL));
+	}
         capture_ports = jack_slist_append (capture_ports, port);
     }
 
@@ -139,8 +151,16 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
             printf ("jack_netsource: cannot register %s port\n", buf);
             break;
         }
+	if( bitdepth == 1000 ) {
+#ifdef HAVE_CELT
+	    // XXX: memory leak
+	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate (client), 1, jack_get_buffer_size(client), NULL );
+	    playback_srcs = jack_slist_append(playback_srcs, celt_encoder_create( celt_mode ) );
+#endif
+	} else {
 	    playback_srcs = jack_slist_append (playback_srcs, src_new (SRC_LINEAR, 1, NULL));
-	    playback_ports = jack_slist_append (playback_ports, port);
+	}
+	playback_ports = jack_slist_append (playback_ports, port);
     }
 
     /* Allocate midi playback channels */
@@ -190,7 +210,12 @@ sync_cb (jack_transport_state_t state, jack_position_t *pos, void *arg)
 int
 process (jack_nframes_t nframes, void *arg)
 {
-    jack_nframes_t net_period = (float) nframes / (float) factor;
+    jack_nframes_t net_period;
+
+    if( bitdepth == 1000 )
+	net_period = factor;
+    else
+	net_period = (float) nframes / (float) factor;
 
     int rx_bufsize =  get_sample_size (bitdepth) * capture_channels * net_period + sizeof (jacknet_packet_header);
     int tx_bufsize =  get_sample_size (bitdepth) * playback_channels * net_period + sizeof (jacknet_packet_header);
@@ -365,6 +390,7 @@ fprintf (stderr, "usage: jack_netsource -h <host peer> [options]\n"
         "  -f <downsample ratio> - Downsample data in the wire by this factor\n"
         "  -b <bitdepth> - Set transport to use 16bit or 8bit\n"
         "  -m <mtu> - Assume this mtu for the link\n"
+	"  -c <bytes> - Use Celt and encode <bytes> per channel and packet.\n"
         "\n");
 }
 
@@ -396,7 +422,7 @@ main (int argc, char *argv[])
     sprintf(client_name, "netsource");
     sprintf(peer_ip, "localhost");
 
-    while ((c = getopt (argc, argv, ":n:s:h:p:C:P:i:o:l:r:f:b:m:")) != -1)
+    while ((c = getopt (argc, argv, ":n:s:h:p:C:P:i:o:l:r:f:b:m:c:")) != -1)
     {
         switch (c)
         {
@@ -442,6 +468,15 @@ main (int argc, char *argv[])
             case 'b':
             bitdepth = atoi (optarg);
             break;
+	    case 'c':
+#ifdef HAVE_CELT
+	    bitdepth = 1000;
+	    factor = atoi (optarg);
+#else
+	    printf( "not built with celt supprt\n" );
+	    exit(10);
+#endif
+	    break;
             case 'm':
             mtu = atoi (optarg);
             break;
