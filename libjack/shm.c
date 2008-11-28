@@ -846,9 +846,12 @@ static void
 jack_remove_shm (jack_shm_id_t *id)
 {
 	/* registry may or may not be locked */
-	if (shmctl (*id, IPC_RMID, NULL) != 0) {
-		jack_error ("failed to remove SHM segment\n");
-	}
+	/* this call can fail if we are attempting to 
+	   remove a segment that was already deleted
+	   by the client. XXX i suppose the 
+	   function should take a "canfail" argument.
+	*/
+	shmctl (*id, IPC_RMID, NULL);
 }
 
 void

@@ -406,6 +406,7 @@ AC_ARG_ENABLE(optimize,
       else
         # no optimization, so lets get debugging symbols instead
 	JACK_OPT_CFLAGS="-g"
+	JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS"
 	AC_MSG_WARN([no optimization.........................])
       fi 
     ]
