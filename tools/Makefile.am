@@ -141,4 +141,6 @@ alsa_out_LDADD = $(top_builddir)/libjack/libjack.la
 endif #HAVE_ALSA
 endif #HAVE_SAMPLERATE
 
+EXTRA_DIST = time_smoother.h
+
 dist-hook: dist-check-sndfile
