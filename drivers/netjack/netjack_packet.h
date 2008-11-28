@@ -90,11 +90,13 @@ struct _packet_cache
 {
     int size;
     cache_packet *packets;
+    int mtu;
 };
 
 extern packet_cache *global_packcache;
 
 // fragment cache function prototypes
+// XXX: Some of these are private.
 packet_cache *packet_cache_new(int num_packets, int pkt_size, int mtu);
 void	      packet_cache_free(packet_cache *pkt_cache);
 
@@ -105,13 +107,18 @@ cache_packet *packet_cache_get_free_packet(packet_cache *pkt_cache);
 void	cache_packet_reset(cache_packet *pack);
 void	cache_packet_set_framecnt(cache_packet *pack, jack_nframes_t framecnt);
 void	cache_packet_add_fragment(cache_packet *pack, char *packet_buf, int rcv_len);
-int		cache_packet_is_complete(cache_packet *pack);
+int	cache_packet_is_complete(cache_packet *pack);
 
+void packet_cache_drain_socket( packet_cache *pcache, int sockfd );
+int packet_cache_retreive_packet( packet_cache *pcache, jack_nframes_t framecnt, char *packet_buf, int pkt_size );
+int packet_cache_get_next_available_framecnt( packet_cache *pcache, jack_nframes_t expected_framecnt, jack_nframes_t *framecnt );
+int packet_cache_find_latency( packet_cache *pcache, jack_nframes_t expected_framecnt, jack_nframes_t *framecnt );
 // Function Prototypes
-int netjack_poll(int sockfd, int timeout);
+
+int netjack_poll_deadline (int sockfd, jack_time_t deadline);
+
 void netjack_sendto(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, int addr_size, int mtu);
-int netjack_recvfrom(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu);
-int netjack_recv(int sockfd, char *packet_buf, int pkt_size, int flags, int mtu);
+
 
 int get_sample_size(int bitdepth);
 void packet_header_hton(jacknet_packet_header *pkthdr);
@@ -121,6 +128,15 @@ void packet_header_ntoh(jacknet_packet_header *pkthdr);
 void render_payload_to_jack_ports(int bitdepth, void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes);
 
 void render_jack_ports_to_payload(int bitdepth, JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up);
+
+
+// XXX: This is sort of deprecated:
+//      This one waits forever. an is not using ppoll
+int netjack_poll(int sockfd, int timeout);
+
+// TODO: these are deprecated.
+int netjack_recvfrom(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu);
+int netjack_recv(int sockfd, char *packet_buf, int pkt_size, int flags, int mtu);
 
 #endif
 

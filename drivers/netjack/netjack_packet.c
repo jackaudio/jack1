@@ -41,7 +41,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+
+// for ppoll
+#define __USE_GNU
 #include <poll.h>
+
 #include <errno.h>
 #include <signal.h>
 
@@ -115,7 +119,7 @@ packet_cache
     int fragment_payload_size = mtu - sizeof (jacknet_packet_header);
     int fragment_number = (pkt_size - sizeof (jacknet_packet_header) - 1) / fragment_payload_size + 1;
     int i;
-
+    
     packet_cache *pcache = malloc (sizeof (packet_cache));
     if (pcache == NULL)
     {
@@ -146,6 +150,7 @@ packet_cache
             return NULL;
         }
     }
+    pcache->mtu = mtu;
 
     return pcache;
 }
@@ -197,10 +202,15 @@ cache_packet
     return retval;
 }
 
+// TODO: fix wrapping case... need to pass
+//       current expected frame here.
+//
+//       or just save framecount into packet_cache.
+
 cache_packet
 *packet_cache_get_oldest_packet (packet_cache *pcache)
 {
-    jack_nframes_t minimal_frame = 0;
+    jack_nframes_t minimal_frame = JACK_MAX_FRAMES;
     cache_packet *retval = &(pcache->packets[0]);
     int i;
 
@@ -215,7 +225,6 @@ cache_packet
 
     return retval;
 }
-
 
 cache_packet
 *packet_cache_get_free_packet (packet_cache *pcache)
@@ -274,9 +283,10 @@ cache_packet_add_fragment (cache_packet *pack, char *packet_buf, int rcv_len)
         return;
     }
 
+
     if (fragment_nr == 0)
     {
-        memcpy (pack->packet_buf, packet_buf, pack->mtu);
+        memcpy (pack->packet_buf, packet_buf, rcv_len);
         pack->fragment_array[0] = 1;
 
         return;
@@ -303,6 +313,70 @@ cache_packet_is_complete (cache_packet *pack)
             return FALSE;
 
     return TRUE;
+}
+
+
+// new poll using nanoseconds resolution and
+// not waiting forever.
+int
+netjack_poll_deadline (int sockfd, jack_time_t deadline)
+{
+    struct pollfd fds;
+    int i, poll_err = 0;
+    sigset_t sigmask;
+    struct sigaction action;
+    struct timespec timeout_spec = { 0, 0 }; 
+
+    jack_time_t now = jack_get_microseconds();
+    if( now >= deadline )
+	return 0;
+
+    timeout_spec.tv_nsec = (deadline - now) * 1000;
+
+    sigemptyset(&sigmask);
+	sigaddset(&sigmask, SIGHUP);
+	sigaddset(&sigmask, SIGINT);
+	sigaddset(&sigmask, SIGQUIT);
+	sigaddset(&sigmask, SIGPIPE);
+	sigaddset(&sigmask, SIGTERM);
+	sigaddset(&sigmask, SIGUSR1);
+	sigaddset(&sigmask, SIGUSR2);
+	
+	action.sa_handler = SIG_DFL;
+	action.sa_mask = sigmask;
+	action.sa_flags = SA_RESTART;
+
+    for (i = 1; i < NSIG; i++)
+        if (sigismember (&sigmask, i))
+            sigaction (i, &action, 0);
+
+    fds.fd = sockfd;
+    fds.events = POLLIN;
+
+    poll_err = ppoll (&fds, 1, &timeout_spec, &sigmask);
+
+    if (poll_err == -1)
+    {
+        switch (errno)
+        {
+            case EBADF:
+            jack_error ("Error %d: An invalid file descriptor was given in one of the sets", errno);
+            break;
+            case EFAULT:
+            jack_error ("Error %d: The array given as argument was not contained in the calling program's address space", errno);
+            break;
+            case EINTR:
+            jack_error ("Error %d: A signal occurred before any requested event", errno);
+            break;
+            case EINVAL:
+            jack_error ("Error %d: The nfds value exceeds the RLIMIT_NOFILE value", errno);
+            break;
+            case ENOMEM:
+            jack_error ("Error %d: There was no space to allocate file descriptor tables", errno);
+            break;
+        }
+    }
+    return poll_err;
 }
 
 int
@@ -365,6 +439,122 @@ netjack_poll (int sockfd, int timeout)
     return TRUE;
 }
 
+// This now reads all a socket has into the cache.
+// replacing netjack_recv functions.
+
+void
+packet_cache_drain_socket( packet_cache *pcache, int sockfd )
+{
+    char *rx_packet = alloca (pcache->mtu);
+    jacknet_packet_header *pkthdr = (jacknet_packet_header *) rx_packet;
+    int rcv_len;
+    jack_nframes_t framecnt;
+    cache_packet *cpack;
+
+    while (1)
+    {
+        rcv_len = recv (sockfd, rx_packet, pcache->mtu, MSG_DONTWAIT);
+        if (rcv_len < 0)
+            return;
+        framecnt = ntohl (pkthdr->framecnt);
+	//printf( "Got Packet %d\n", framecnt );
+        cpack = packet_cache_get_packet (global_packcache, framecnt);
+        cache_packet_add_fragment (cpack, rx_packet, rcv_len);
+    }
+}
+
+int
+packet_cache_retreive_packet( packet_cache *pcache, jack_nframes_t framecnt, char *packet_buf, int pkt_size )
+{
+    int i;
+    cache_packet *cpack = NULL;
+
+    for (i = 0; i < pcache->size; i++) {
+        if (pcache->packets[i].valid && (pcache->packets[i].framecnt == framecnt)) {
+	    cpack = &(pcache->packets[i]);
+            break;
+	}
+    }
+
+    if( cpack == NULL )
+	return -1;
+
+    if( !cache_packet_is_complete( cpack ) )
+	return -1;
+
+    // ok. cpack is the one we want and its complete.
+    memcpy (packet_buf, cpack->packet_buf, pkt_size);
+    cache_packet_reset (cpack);
+    return pkt_size;
+}
+
+// Returns 0 when no valid packet is inside the cache.
+int
+packet_cache_get_next_available_framecnt( packet_cache *pcache, jack_nframes_t expected_framecnt, jack_nframes_t *framecnt )
+{
+    int i;
+    jack_nframes_t best_offset = JACK_MAX_FRAMES/2-1;
+    int retval = 0;
+
+    for (i = 0; i < pcache->size; i++)
+    {
+	cache_packet *cpack = &(pcache->packets[i]);
+	//printf( "p%d: valid=%d, frame %d\n", i, cpack->valid, cpack->framecnt );
+
+        if (!cpack->valid || !cache_packet_is_complete( cpack )) {
+	    //printf( "invalid\n" );
+	    continue;
+	}
+
+	if( (cpack->framecnt - expected_framecnt) > best_offset ) {
+	    continue;
+	}
+
+	best_offset = cpack->framecnt - expected_framecnt;	
+	retval = 1;
+
+	if( best_offset == 0 )
+	    break;
+    }
+    if( retval && framecnt )
+	*framecnt = expected_framecnt + best_offset;
+
+    return retval;
+}
+
+// Returns 0 when no valid packet is inside the cache.
+int
+packet_cache_find_latency( packet_cache *pcache, jack_nframes_t expected_framecnt, jack_nframes_t *framecnt )
+{
+    int i;
+    jack_nframes_t best_offset = 0;
+    int retval = 0;
+
+    for (i = 0; i < pcache->size; i++)
+    {
+	cache_packet *cpack = &(pcache->packets[i]);
+	//printf( "p%d: valid=%d, frame %d\n", i, cpack->valid, cpack->framecnt );
+
+        if (!cpack->valid || !cache_packet_is_complete( cpack )) {
+	    //printf( "invalid\n" );
+	    continue;
+	}
+
+	if( (cpack->framecnt - expected_framecnt) < best_offset ) {
+	    continue;
+	}
+
+	best_offset = cpack->framecnt - expected_framecnt;	
+	retval = 1;
+
+	if( best_offset == 0 )
+	    break;
+    }
+    if( retval && framecnt )
+	*framecnt = JACK_MAX_FRAMES - best_offset;
+
+    return retval;
+}
 // fragmented packet IO
 int
 netjack_recvfrom (int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu)
@@ -427,8 +617,11 @@ netjack_sendto (int sockfd, char *packet_buf, int pkt_size, int flags, struct so
 
     int fragment_payload_size = mtu - sizeof (jacknet_packet_header);
 
-    if (pkt_size <= mtu)
+    if (pkt_size <= mtu) {
+	pkthdr = (jacknet_packet_header *) packet_buf;
+        pkthdr->fragment_nr = htonl (0);
         sendto(sockfd, packet_buf, pkt_size, flags, addr, addr_size);
+    }
     else
     {
         // Copy the packet header to the tx pack first.
@@ -532,6 +725,9 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
     JSList *src_node = capture_srcs;
 
     uint32_t *packet_bufX = (uint32_t *)packet_payload;
+
+    if( !packet_payload )
+	return;
 
     while (node != NULL)
     {
@@ -669,6 +865,9 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
 
     uint16_t *packet_bufX = (uint16_t *)packet_payload;
 
+    if( !packet_payload )
+	return;
+
     while (node != NULL)
     {
         int i;
@@ -797,6 +996,9 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
 
     int8_t *packet_bufX = (int8_t *)packet_payload;
 
+    if( !packet_payload )
+	return;
+
     while (node != NULL)
     {
         int i;
@@ -924,14 +1126,9 @@ render_payload_to_jack_ports_celt (void *packet_payload, jack_nframes_t net_peri
 
     while (node != NULL)
     {
-        int i;
-        //uint32_t val;
-        SRC_DATA src;
-
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
-        float *floatbuf = alloca (sizeof(float) * net_period_down);
         const char *portname = jack_port_type (port);
 
         if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
@@ -939,7 +1136,11 @@ render_payload_to_jack_ports_celt (void *packet_payload, jack_nframes_t net_peri
             // audio port, decode celt data.
 	    
 	    CELTDecoder *decoder = src_node->data;
-	    celt_decode_float( decoder, packet_bufX, net_period_down, buf );
+	    if( !packet_payload )
+		celt_decode_float( decoder, NULL, net_period_down, buf );
+	    else
+		celt_decode_float( decoder, packet_bufX, net_period_down, buf );
+
 	    src_node = jack_slist_next (src_node);
         }
         else if (strncmp(portname, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
@@ -948,7 +1149,8 @@ render_payload_to_jack_ports_celt (void *packet_payload, jack_nframes_t net_peri
             // convert the data buffer to a standard format (uint32_t based)
             unsigned int buffer_size_uint32 = net_period_down / 2;
             uint32_t * buffer_uint32 = (uint32_t*) packet_bufX;
-            decode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
+	    if( packet_payload )
+		decode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
         }
         packet_bufX = (packet_bufX + net_period_down);
         node = jack_slist_next (node);
@@ -963,12 +1165,10 @@ render_jack_ports_to_payload_celt (JSList *playback_ports, JSList *playback_srcs
     JSList *node = playback_ports;
     JSList *src_node = playback_srcs;
 
-    unsigned char *packet_bufX = (uint16_t *)packet_payload;
+    unsigned char *packet_bufX = (unsigned char *)packet_payload;
 
     while (node != NULL)
     {
-        SRC_DATA src;
-        int i;
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
         const char *portname = jack_port_type (port);

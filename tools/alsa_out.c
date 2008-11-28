@@ -21,6 +21,7 @@
 #include "alsa/asoundlib.h"
 
 #include <samplerate.h>
+#include "time_smoother.h"
 
 typedef signed short ALSASAMPLE;
 
@@ -40,6 +41,9 @@ snd_pcm_t *alsa_handle;
 int jack_sample_rate;
 
 double current_resample_factor = 1.0;
+int periods_until_stability = 10;
+
+time_smoother *smoother;
 
 // ------------------------------------------------------ commandline parameters
 
@@ -60,6 +64,7 @@ volatile float output_resampling_factor = 0.0;
 volatile int output_new_delay = 0;
 volatile float output_offset = 0.0;
 volatile float output_diff = 0.0;
+
 
 // Alsa stuff... i dont want to touch this bullshit in the next years.... please...
 
@@ -225,6 +230,7 @@ static snd_pcm_t *open_audiofd( char *device_name, int capture, int rate, int ch
   return handle;
 }
 
+jack_nframes_t soundcard_frames = 0;
 
 /**
  * The process callback for this JACK application.
@@ -237,61 +243,97 @@ int process (jack_nframes_t nframes, void *arg) {
     int rlen;
     int err;
     snd_pcm_sframes_t delay;
+    jack_nframes_t this_frame_time;
+    jack_nframes_t this_soundcard_time;
+    int dont_adjust_resampling_factor = 0;
+    double a, b;
 
+    double offset;
+    double diff_value;
 
     snd_pcm_delay( alsa_handle, &delay );
+    this_frame_time = jack_frame_time(client);
+    this_soundcard_time = soundcard_frames + delay;
+
+    time_smoother_put( smoother, this_frame_time, this_soundcard_time );
 
     // Do it the hard way.
     // this is for compensating xruns etc...
 
-
     if( delay > (target_delay+max_diff) ) {
 	snd_pcm_rewind( alsa_handle, delay - target_delay );
+	soundcard_frames -= (delay-target_delay);
 	output_new_delay = (int) delay;
-	snd_pcm_delay( alsa_handle, &delay );
-	//delay = target_delay;
+	dont_adjust_resampling_factor = 1;
+	//snd_pcm_delay( alsa_handle, &delay );
+	delay = target_delay;
 	// XXX: at least set it to that value.
-	current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
+	periods_until_stability = 10;
     }
     if( delay < (target_delay-max_diff) ) {
 	ALSASAMPLE *tmp = alloca( (target_delay-delay) * sizeof( ALSASAMPLE ) * num_channels ); 
 	memset( tmp, 0, sizeof( ALSASAMPLE ) * num_channels * (target_delay-delay) );
 	snd_pcm_writei( alsa_handle, tmp, target_delay-delay );
+	soundcard_frames += (target_delay-delay);
 	output_new_delay = (int) delay;
-	snd_pcm_delay( alsa_handle, &delay );
-	//delay = target_delay;
+	dont_adjust_resampling_factor = 1;
+	//snd_pcm_delay( alsa_handle, &delay );
+	delay = target_delay;
 	// XXX: at least set it to that value.
-	current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
+	periods_until_stability = 10;
     }
     /* ok... now we should have target_delay +- max_diff on the alsa side.
      *
      * calculate the number of frames, we want to get.
      */
 
-    double resamp_rate = (double)jack_sample_rate / (double)sample_rate;  // == nframes / alsa_samples.
-    double request_samples = nframes / resamp_rate;  //== alsa_samples;
-    //double request_samples = nframes * current_resample_factor;  //== alsa_samples;
+    //if( periods_until_stability ) {
+    if( 1 ) {
+	double resamp_rate = (double)jack_sample_rate / (double)sample_rate;  // == nframes / alsa_samples.
+	double request_samples = nframes / resamp_rate;  //== alsa_samples;
+	//double request_samples = nframes * current_resample_factor;  //== alsa_samples;
 
-    double offset = delay - target_delay;
+	offset = delay - target_delay;
 
-    //double frlen = request_samples - offset / catch_factor;
-    double frlen = request_samples - offset;
+	//double frlen = request_samples - offset / catch_factor;
+	double frlen = request_samples - offset;
 
-    double compute_factor = frlen / (double) nframes;
+	double compute_factor = frlen / (double) nframes;
+	//double compute_factor = (double) nframes / frlen;
 
-    double diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
-    current_resample_factor -= diff_value;
-    current_resample_factor = current_resample_factor < 0.25 ? 0.25 : current_resample_factor;
-    rlen = ceil( ((double)nframes) * current_resample_factor ) + 2;
+	diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
+	current_resample_factor -= diff_value;
+	periods_until_stability -= 1;
+    }
+    else
+    {
+	time_smoother_get_linear_params( smoother, this_frame_time, this_soundcard_time, jack_get_sample_rate(client)/4,
+		&a, &b );
 
-    if( (print_counter--) == 0 ) {
-	print_counter = 10;
-	//printf( "res: %f, \tdiff = %f, \toffset = %f \n", (float)current_resample_factor, (float)diff_value, (float) offset );
-	output_resampling_factor = (float) current_resample_factor;
-	output_diff = (float) diff_value;
-	output_offset = (float) offset;
+	if( dont_adjust_resampling_factor ) {
+	    current_resample_factor = 1.0/( b - a/(double)nframes/(double)catch_factor );
+	    //double delay_diff = (double)delay - (double)target_delay;
+	    //current_resample_factor = 1.0/( b + a/(double)nframes - delay_diff/(double)nframes/(double)catch_factor );
+	} else
+	    current_resample_factor = 1.0/b;
+
+	offset = delay - target_delay;
+	diff_value = b;
     }
 
+
+    output_resampling_factor = (float) current_resample_factor;
+    output_diff = (float) diff_value;
+    output_offset = (float) offset;
+
+    if( current_resample_factor < 0.25 ) current_resample_factor = 0.25;
+    if( current_resample_factor > 4 ) current_resample_factor = 4;
+    rlen = ceil( ((double)nframes) * current_resample_factor )+2;
+    assert( rlen > 10 );
     /*
      * now this should do it...
      */
@@ -323,10 +365,8 @@ int process (jack_nframes_t nframes, void *arg) {
 	src.output_frames = rlen;
 	src.end_of_input = 0;
 
-	//src.src_ratio = (float) frlen / (float) nframes;
 	src.src_ratio = current_resample_factor;
 
-	//src_set_ratio( src_state, src.src_ratio );
 	src_process( src_state, &src );
 
 	for (i=0; i < rlen; i++) {
@@ -343,13 +383,15 @@ int process (jack_nframes_t nframes, void *arg) {
 again:
   err = snd_pcm_writei(alsa_handle, outbuf, src.output_frames_gen);
   if( err < 0 ) {
-      //printf( "err = %d\n", err );
+      printf( "err = %d\n", err );
       if (xrun_recovery(alsa_handle, err) < 0) {
 	  //printf("Write error: %s\n", snd_strerror(err));
 	  //exit(EXIT_FAILURE);
       }
       goto again;
   }
+  soundcard_frames += err;
+
 //  if( err != rlen ) {
 //      printf( "write = %d\n", rlen );
 //  }
@@ -513,6 +555,11 @@ int main (int argc, char *argv[]) {
     if( !max_diff )
 	max_diff = period_size / 2;	
 
+    smoother = time_smoother_new( 100 );
+    if( !smoother ) {
+	fprintf (stderr, "no memory\n");
+	return 10;
+    }
 
 
     if ((client = jack_client_new (jack_name)) == 0) {
@@ -560,7 +607,7 @@ int main (int argc, char *argv[]) {
     }
 
     while(1) {
-	sleep(1);
+	usleep(500000);
 	if( output_new_delay ) {
 	    printf( "delay = %d\n", output_new_delay );
 	    output_new_delay = 0;

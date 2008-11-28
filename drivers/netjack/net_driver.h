@@ -72,8 +72,20 @@ struct _net_driver
 
     unsigned int *rx_buf;
     unsigned int *pkt_buf;
+    unsigned int rx_bufsize;
+    //unsigned int tx_bufsize;
     unsigned int mtu;
     unsigned int latency;
+
+    jack_nframes_t expected_framecnt;
+    int		   expected_framecnt_valid;
+    unsigned int   num_lost_packets;
+    jack_time_t	   next_deadline;
+    int		   next_deadline_valid;
+    int		   packet_data_valid;
+    int		   resync_threshold;
+    int		   running_free;
+
 };
 
 #endif /* __JACK_NET_DRIVER_H__ */

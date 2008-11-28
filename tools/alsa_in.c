@@ -21,6 +21,7 @@
 #include "alsa/asoundlib.h"
 
 #include <samplerate.h>
+#include "time_smoother.h"
 
 typedef signed short ALSASAMPLE;
 
@@ -40,6 +41,8 @@ snd_pcm_t *alsa_handle;
 int jack_sample_rate;
 
 double current_resample_factor = 1.0;
+
+time_smoother *smoother;
 
 // ------------------------------------------------------ commandline parameters
 
@@ -169,7 +172,7 @@ static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams, int pe
 		return err;
 	}
 	/* allow the transfer when at least period_size samples can be processed */
-	err = snd_pcm_sw_params_set_avail_min(handle, swparams, period );
+	err = snd_pcm_sw_params_set_avail_min(handle, swparams, 2*period );
 	if (err < 0) {
 		printf("Unable to set avail min for capture: %s\n", snd_strerror(err));
 		return err;
@@ -220,6 +223,7 @@ static snd_pcm_t *open_audiofd( char *device_name, int capture, int rate, int ch
   return handle;
 }
 
+jack_nframes_t soundcard_frames = 0;
 
 /**
  * The process callback for this JACK application.
@@ -231,32 +235,51 @@ int process (jack_nframes_t nframes, void *arg) {
     float *floatbuf, *resampbuf;
     int rlen;
     int err;
-    snd_pcm_sframes_t delay;
+    snd_pcm_sframes_t delay, absolute_delay;
+    jack_nframes_t this_frame_time;
+    jack_nframes_t this_soundcard_time;
     int put_back_samples=0;
+    int dont_adjust_resampling_factor = 0;
+    double a, b;
 
-
+    {
     snd_pcm_delay( alsa_handle, &delay );
+    this_frame_time = jack_frame_time(client);
+    this_soundcard_time = soundcard_frames + delay;
+    }
 
-    delay = delay;
+    time_smoother_put( smoother, this_frame_time, this_soundcard_time );
+
+    // subtract jack_frames_since_cycle_start, to compensate for
+    // cpu jitter.
+    //absolute_delay = delay;
+    //delay = delay - jack_frames_since_cycle_start( client );
+
+
     // Do it the hard way.
     // this is for compensating xruns etc...
 
     if( delay > (target_delay+max_diff) ) {
 	ALSASAMPLE *tmp = alloca( (delay-target_delay) * sizeof( ALSASAMPLE ) * num_channels ); 
 	snd_pcm_readi( alsa_handle, tmp, delay-target_delay );
+	soundcard_frames += (delay-target_delay);
 	output_new_delay = (int) delay;
-	delay = target_delay;
+	dont_adjust_resampling_factor = 1;
+	//delay = target_delay;
 	// XXX: at least set it to that value.
-	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
+	//current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
     }
     if( delay < (target_delay-max_diff) ) {
 	snd_pcm_rewind( alsa_handle, target_delay - delay );
+	soundcard_frames -= (target_delay-delay);
 	output_new_delay = (int) delay;
-	delay = target_delay;
+	dont_adjust_resampling_factor = 1;
+	//delay = target_delay;
 	// XXX: at least set it to that value.
-	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
+	//current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
     }
 
+    if( 0 ) {
     /* ok... now we should have target_delay +- max_diff on the alsa side.
      *
      * calculate the number of frames, we want to get.
@@ -284,17 +307,34 @@ int process (jack_nframes_t nframes, void *arg) {
     double compute_factor = (double) nframes / frlen;
 
     double diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
-    current_resample_factor -= diff_value;
-    current_resample_factor = current_resample_factor < 0.25 ? 0.25 : current_resample_factor;
-    rlen = ceil( ((double)nframes) / current_resample_factor )+2;
 
-    if( (print_counter--) == 0 ) {
-	print_counter = 10;
-	//printf( "res: %f, \tdiff = %f, \toffset = %f \n", (float)current_resample_factor, (float)diff_value, (float) offset );
-	output_resampling_factor = (float) current_resample_factor;
+    current_resample_factor -= diff_value;
+
+    current_resample_factor = current_resample_factor < 0.25 ? 0.25 : current_resample_factor;
+    }
+
+    time_smoother_get_linear_params( smoother, this_frame_time, this_soundcard_time, jack_get_sample_rate(client)/4,
+				     &a, &b );
+
+    if( !dont_adjust_resampling_factor )
+	current_resample_factor = b - a/(double)nframes/(double)catch_factor;
+    else
+	current_resample_factor = b;
+
+    double offset = a;
+    double diff_value = b;
+
+
+    output_resampling_factor = (float) current_resample_factor;
+    //if( fabs( offset ) > fabs( output_offset ) ) {
 	output_diff = (float) diff_value;
 	output_offset = (float) offset;
-    }
+    //}
+
+    if( current_resample_factor < 0.25 ) current_resample_factor = 0.25;
+    if( current_resample_factor > 4 ) current_resample_factor = 4;
+    rlen = ceil( ((double)nframes) * current_resample_factor )+2;
+    assert( rlen > 10 );
 
     /*
      * now this should do it...
@@ -309,13 +349,14 @@ int process (jack_nframes_t nframes, void *arg) {
 again:
     err = snd_pcm_readi(alsa_handle, outbuf, rlen);
     if( err < 0 ) {
-	//printf( "err = %d\n", err );
+	printf( "err = %d\n", err );
 	if (xrun_recovery(alsa_handle, err) < 0) {
 	    //printf("Write error: %s\n", snd_strerror(err));
 	    //exit(EXIT_FAILURE);
 	}
 	goto again;
     }
+    soundcard_frames += err;
     if( err != rlen ) {
 	//printf( "read = %d\n", rlen );
     }
@@ -365,6 +406,7 @@ again:
 
     //printf( "putback = %d\n", put_back_samples );
     snd_pcm_rewind( alsa_handle, put_back_samples );
+    soundcard_frames -= put_back_samples;
 
     return 0;      
 }
@@ -522,6 +564,11 @@ int main (int argc, char *argv[]) {
     if( !max_diff )
 	max_diff = period_size / 2;	
 
+    smoother = time_smoother_new( 100 );
+    if( !smoother ) {
+	fprintf (stderr, "no memory\n");
+	return 10;
+    }
 
 
     if ((client = jack_client_new (jack_name)) == 0) {
@@ -569,12 +616,13 @@ int main (int argc, char *argv[]) {
     }
 
     while(1) {
-	sleep(1);
+	usleep(500000);
 	if( output_new_delay ) {
 	    printf( "delay = %d\n", output_new_delay );
 	    output_new_delay = 0;
 	}
 	printf( "res: %f, \tdiff = %f, \toffset = %f \n", output_resampling_factor, output_diff, output_offset );
+	output_offset = 0.0;
 	
     }
 

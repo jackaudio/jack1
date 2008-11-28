@@ -238,24 +238,13 @@ process (jack_nframes_t nframes, void *arg)
 
     packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (uint32_t);
 
-    /* ---------- Receive ---------- */
+    // New Receive Code:
     if (reply_port)
-        size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, mtu);
+        packet_cache_drain_socket(global_packcache, insockfd);
     else
-        size = netjack_recv (outsockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, mtu);
-    packet_header_ntoh (pkthdr);
-    /* Loop till we get the right packet at the right momment */
-    while (size == rx_bufsize && (framecnt - pkthdr->framecnt) > latency)
-    {
-        //printf ("Frame %d  \tLate packet received with a latency of %d frames (expected frame %d, got frame %d)\n", framecnt, framecnt - pkthdr->framecnt, framecnt - latency, pkthdr->framecnt);
-        //printf ("Frame %d  \tLate packet received with a latency of %d frames\n", framecnt, framecnt - pkthdr->framecnt);
+        packet_cache_drain_socket(global_packcache, outsockfd);
 
-        if (reply_port)
-            size = netjack_recv (insockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, mtu);
-        else
-            size = netjack_recv (outsockfd, (char *) packet_buf, rx_bufsize, MSG_DONTWAIT, mtu);
-        packet_header_ntoh (pkthdr);
-    }
+    size = packet_cache_retreive_packet( global_packcache, framecnt - latency, (char *)packet_buf, rx_bufsize ); 
 
     /* First alternative : we received what we expected. Render the data
      * to the JACK ports so it can be played. */
@@ -273,7 +262,7 @@ process (jack_nframes_t nframes, void *arg)
         //    printf ("Frame %d  \tSync has been set\n", framecnt);
 
 	state_currentframe = framecnt;
-	state_latency = framecnt - pkthdr->framecnt;
+	//state_latency = framecnt - pkthdr->framecnt;
 	state_connected = 1;
         sync_state = pkthdr->sync_state;
     }
@@ -282,9 +271,13 @@ process (jack_nframes_t nframes, void *arg)
      * to the ouput ports */
     else
     {
+	jack_nframes_t latency_estimate;
+	if( packet_cache_find_latency( global_packcache, framecnt, &latency_estimate ) )
+		state_latency = latency_estimate;
+
 	// Set the counters up.
 	state_currentframe = framecnt;
-	state_latency = framecnt - pkthdr->framecnt;
+	//state_latency = framecnt - pkthdr->framecnt;
 	state_netxruns += 1;
 
         //printf ("Frame %d  \tPacket missed or incomplete (expected: %d bytes, got: %d bytes)\n", framecnt, rx_bufsize, size);
@@ -329,11 +322,11 @@ process (jack_nframes_t nframes, void *arg)
     pkthdr->mtu = mtu;
     
     packet_header_hton (pkthdr);
-    if (cont_miss < 10)
+    if (cont_miss < 2*latency+5)
         netjack_sendto (outsockfd, (char *) packet_buf, tx_bufsize, 0, &destaddr, sizeof (destaddr), mtu);
 //    else if (cont_miss >= 10 && cont_miss <= 50)
 //        printf ("Frame %d  \tToo many packets missed (%d). We have stopped sending data\n", framecnt, cont_miss);
-    else if (cont_miss > 50)
+    else if (cont_miss > 50+5*latency)
     {
 	state_connected = 0;
         //printf ("Frame %d  \tRealy too many packets missed (%d). Let's reset the counter\n", framecnt, cont_miss);
