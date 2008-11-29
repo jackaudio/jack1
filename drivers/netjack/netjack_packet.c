@@ -46,9 +46,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-
-// for ppoll
-#define __USE_GNU
 #include <poll.h>
 
 #include <errno.h>
@@ -328,11 +325,12 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
 {
     struct pollfd fds;
     int i, poll_err = 0;
-    sigset_t sigmask, rsigmask;
+    sigset_t sigmask;
     struct sigaction action;
 #if HAVE_PPOLL
     struct timespec timeout_spec = { 0, 0 }; 
 #else
+    sigset_t rsigmask;
     int timeout;
 #endif
 
