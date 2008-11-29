@@ -51,7 +51,7 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #include <netjack_packet.h>
 #include <samplerate.h>
 
-#ifdef HAVE_CELT
+#if HAVE_CELT
 #include <celt/celt.h>
 #endif
 
@@ -115,7 +115,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
             break;
         }
 	if( bitdepth == 1000 ) {
-#ifdef HAVE_CELT
+#if HAVE_CELT
 	    // XXX: memory leak
 	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate( client ), 1, jack_get_buffer_size(client), NULL );
 	    capture_srcs = jack_slist_append(capture_srcs, celt_decoder_create( celt_mode ) );
@@ -152,7 +152,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
             break;
         }
 	if( bitdepth == 1000 ) {
-#ifdef HAVE_CELT
+#if HAVE_CELT
 	    // XXX: memory leak
 	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate (client), 1, jack_get_buffer_size(client), NULL );
 	    playback_srcs = jack_slist_append(playback_srcs, celt_encoder_create( celt_mode ) );
@@ -462,7 +462,7 @@ main (int argc, char *argv[])
             bitdepth = atoi (optarg);
             break;
 	    case 'c':
-#ifdef HAVE_CELT
+#if HAVE_CELT
 	    bitdepth = 1000;
 	    factor = atoi (optarg);
 #else

@@ -26,7 +26,9 @@
  *
  */
 
-#ifdef HAVE_PPOLL
+#include "config.h"
+
+#if HAVE_PPOLL
 #define _GNU_SOURCE
 #endif
 
@@ -54,7 +56,7 @@
 
 #include <samplerate.h>
 
-#ifdef HAVE_CELT
+#if HAVE_CELT
 #include <celt/celt.h>
 #endif
 
@@ -328,7 +330,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
     int i, poll_err = 0;
     sigset_t sigmask, rsigmask;
     struct sigaction action;
-#ifdef HAVE_PPOLL
+#if HAVE_PPOLL
     struct timespec timeout_spec = { 0, 0 }; 
 #else
     int timeout;
@@ -339,7 +341,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
     if( now >= deadline )
 	return 0;
 
-#ifdef HAVE_PPOLL
+#if HAVE_PPOLL
     timeout_spec.tv_nsec = (deadline - now) * 1000;
 #else
     timeout = lrintf( (float)(deadline - now) / 1000.0 );
@@ -365,7 +367,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
     fds.fd = sockfd;
     fds.events = POLLIN;
 
-#ifdef HAVE_PPOLL
+#if HAVE_PPOLL
     poll_err = ppoll (&fds, 1, &timeout_spec, &sigmask);
 #else
     sigprocmask (SIG_UNBLOCK, &sigmask, &rsigmask);
@@ -1131,7 +1133,7 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
     }
 }
 
-#ifdef HAVE_CELT
+#if HAVE_CELT
 // render functions for celt.
 void
 render_payload_to_jack_ports_celt (void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
@@ -1227,7 +1229,7 @@ render_payload_to_jack_ports (int bitdepth, void *packet_payload, jack_nframes_t
         render_payload_to_jack_ports_8bit (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
     else if (bitdepth == 16)
         render_payload_to_jack_ports_16bit (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
-#ifdef HAVE_CELT
+#if HAVE_CELT
     else if (bitdepth == 1000)
         render_payload_to_jack_ports_celt (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
 #endif
@@ -1242,7 +1244,7 @@ render_jack_ports_to_payload (int bitdepth, JSList *playback_ports, JSList *play
         render_jack_ports_to_payload_8bit (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
     else if (bitdepth == 16)
         render_jack_ports_to_payload_16bit (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
-#ifdef HAVE_CELT
+#if HAVE_CELT
     else if (bitdepth == 1000)
         render_jack_ports_to_payload_celt (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
 #endif

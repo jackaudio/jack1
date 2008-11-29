@@ -43,7 +43,7 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 
 #include <samplerate.h>
 
-#ifdef HAVE_CELT
+#if HAVE_CELT
 #include <celt/celt.h>
 #endif
 
@@ -423,7 +423,7 @@ net_driver_attach (net_driver_t *driver)
             jack_slist_append (driver->capture_ports, port);
 
 	if( driver->bitdepth == 1000 ) {
-#ifdef HAVE_CELT
+#if HAVE_CELT
 	    // XXX: memory leak
 	    CELTMode *celt_mode = celt_mode_create( driver->sample_rate, 1, driver->period_size, NULL );
 	    driver->capture_srcs = jack_slist_append(driver->capture_srcs, celt_decoder_create( celt_mode ) );
@@ -465,7 +465,7 @@ net_driver_attach (net_driver_t *driver)
         driver->playback_ports =
             jack_slist_append (driver->playback_ports, port);
 	if( driver->bitdepth == 1000 ) {
-#ifdef HAVE_CELT
+#if HAVE_CELT
 	    // XXX: memory leak
 	    CELTMode *celt_mode = celt_mode_create( driver->sample_rate, 1, driver->period_size, NULL );
 	    driver->playback_srcs = jack_slist_append(driver->playback_srcs, celt_encoder_create( celt_mode ) );
@@ -904,7 +904,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
                 break;
 
 	    case 'c':
-#ifdef HAVE_CELT
+#if HAVE_CELT
 		bitdepth = 1000;
 		resample_factor = param->value.ui;
 #else

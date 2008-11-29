@@ -4,13 +4,6 @@ AM_CFLAGS = $(JACK_CFLAGS)
 
 if HAVE_SAMPLERATE
 
-if HAVE_CELT
-AM_CFLAGS += -DHAVE_CELT
-endif
-if HAVE_PPOLL
-AM_CFLAGS += -DHAVE_PPOLL
-endif
-
 plugindir = $(ADDON_DIR)
 
 plugin_LTLIBRARIES = jack_net.la

@@ -234,9 +234,6 @@ AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
 
 JACK_CORE_CFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
 -I\$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
-JACK_OPT_CFLAGS="$JACK_CORE_CFLAGS -O3 \
--ffast-math -funroll-loops -fprefetch-loop-arrays"
-JACK_CFLAGS="$JACK_CORE_CFLAGS $CFLAGS"
 
 AC_ARG_WITH(cpu-target,
             [  --with-cpu-target=cpu-type    explicit, overriding argument for gcc -march= flag])
@@ -292,10 +289,10 @@ if test "$target_cpu" = "powerpc" -o "$target_cpu" = "powerpc64" ; then
 
     dnl -mcpu=7450 does not reliably work with gcc 3.*
     
-    JACK_OPT_CFLAGS="-D_REENTRANT -O2 -mcpu=7400 $ALTIVEC_OPT_FLAGS -mhard-float -mpowerpc-gfxopt"
+    JACK_OPT_CFLAGS="-O2 -mcpu=7400 $ALTIVEC_OPT_FLAGS -mhard-float -mpowerpc-gfxopt"
 
     if test "$target_cpu" = "powerpc64"; then
-	JACK_OPT_CFLAGS="-D_REENTRANT -O2 -mcpu=powerpc64 $ALTIVEC_OPT_FLAGS -mhard-float" 
+	JACK_OPT_CFLAGS="-O2 -mcpu=powerpc64 $ALTIVEC_OPT_FLAGS -mhard-float" 
     fi
 
 elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
@@ -310,6 +307,13 @@ elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 	if echo $procflags | grep -s sse ; then
 	    cpu_supports_sse=yes
 	fi
+    else
+	# this is not linux, but assume that if the processor
+	# is x86 then is supports SSE and not MMX
+        cpu_supports_sse=yes
+	AC_MSG_WARN([Assuming your x86/x86_64 system can support SSE. Use --disable-sse if this is not the case])
+        cpu_supports_mmx=no
+	AC_MSG_WARN([Assuming your x86/x86_64 system does not need to use MMX. Use --enable-mmx if this is not the case])
     fi
     
     AC_ARG_ENABLE(optimization-by-compiler,
@@ -354,35 +358,32 @@ elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 	    AC_MSG_WARN([The assembler does not support the MMX command set.])
 	)
     fi
-        
+
     if test "x$enable_sse" = xyes; then
 	
 	AC_MSG_CHECKING(whether we can compile SSE code)
 	
 	AC_COMPILE_IFELSE([asm ("movntps %xmm0, 0");],
-	    AC_DEFINE(USE_SSE, 1,
-		[Define to 1 if SSE assembly is available.])
-	    
-	    if test x$optimization_by_cpu = xyes ; then
-		if test x$cpu_supports_sse = xyes ; then
+	    [
+		if test x$optimization_by_cpu = xyes ; then
+		    if test x$cpu_supports_sse = xyes ; then
+			SSE_FLAGS="-msse -mfpmath=sse"
+		    fi
+		else 
 		    SSE_FLAGS="-msse -mfpmath=sse"
 		fi
-	    else 
-		SSE_FLAGS="-msse -mfpmath=sse"
-	    fi
-	    
-	    AC_MSG_RESULT(yes)
-	    ,
-	    enable_sse=no
-	    AC_MSG_RESULT(no)
-	    AC_MSG_WARN(
-		[The assembler does not support the SSE command set.]
-	    )
-	)
+		
+		AC_MSG_RESULT(yes)
+		],
+	    [
+		enable_sse=no
+		AC_MSG_RESULT(no)
+		AC_MSG_WARN([The assembler does not support the SSE command set.]) 
+		])
     fi
-
+    
     AC_DEFINE(x86, 1, "Nope it's intel")
-    COMMON_X86_OPT_FLAGS="-DREENTRANT -O3 -fomit-frame-pointer -ffast-math -funroll-loops"
+    COMMON_X86_OPT_FLAGS="-O3 -fomit-frame-pointer -ffast-math -funroll-loops"
     
     if test x$with_cpu_target != x ; then
         JACK_OPT_CFLAGS="-march=$with_cpu_target"
@@ -417,16 +418,21 @@ AC_ARG_ENABLE(optimize,
     AC_HELP_STRING([--enable-optimize],
 	[optimize code, based on CPU or compiler, as separately selected (default=no)]),
     [ if test x$enable_optimize != xno ; then
-	JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS"
 	AC_MSG_WARN([optimization in use.........................])
       else
         # no optimization, so lets get debugging symbols instead
 	JACK_OPT_CFLAGS="-g"
-	JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS"
 	AC_MSG_WARN([no optimization.........................])
       fi 
+    ],
+    [
+        # no optimization, so lets get debugging symbols instead
+	JACK_OPT_CFLAGS="-g"
+	AC_MSG_WARN([no optimization.........................])
     ]
 )
+
+JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS"
 
 AC_SUBST(JACK_CFLAGS)
 
@@ -599,7 +605,7 @@ fi
 HAVE_SAMPLERATE=false
 PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 0.1.2,[HAVE_SAMPLERATE=true], [true])
 if test x$HAVE_SAMPLERATE = xfalse; then
-             AC_MSG_WARN([*** the NetJack backend and internal client will not be built])
+        AC_MSG_WARN([*** the NetJack backend and internal client will not be built])
 else
 	CFLAGS="$CFLAGS $SAMPLERATE_CFLAGS"
 	LIBS="$LIBS $SAMPLERATE_LIBS"
@@ -609,9 +615,12 @@ fi
 HAVE_CELT=false
 PKG_CHECK_MODULES(CELT, celt >= 0.5.0,[HAVE_CELT=true], [true])
 if test x$HAVE_CELT = xfalse; then
-             AC_MSG_WARN([*** NetJack will not be built with celt support])
+    	AC_DEFINE(HAVE_CELT,0,"Whether CELT is available")
+	AC_MSG_RESULT(no)
+        AC_MSG_WARN([*** NetJack will not be built with celt support])
 else
-	CFLAGS="$CFLAGS $CELT_CFLAGS"
+    	AC_DEFINE(HAVE_CELT,1,"Whether CELT is available")
+	AC_MSG_RESULT(yes)
 	LIBS="$LIBS $CELT_LIBS"
 fi
 
