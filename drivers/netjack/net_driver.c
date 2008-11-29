@@ -52,6 +52,8 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 
 #undef DEBUG_WAKEUP
 
+#define MIN(x,y) ((x)<(y) ? (x) : (y))
+
 static int sync_state = TRUE;
 static jack_transport_state_t last_transport_state;
 
@@ -300,7 +302,7 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
     framecnt = pkthdr->framecnt;
     driver->reply_port = pkthdr->reply_port;
     driver->latency = pkthdr->latency;
-    driver->resync_threshold = pkthdr->latency-1;
+    driver->resync_threshold = MIN( 15, pkthdr->latency-1 );
 
     // check whether, we should handle the transport sync stuff, or leave trnasports untouched.
     if (driver->handle_transport_sync) {
@@ -704,7 +706,7 @@ net_driver_new (jack_client_t * client,
     driver->num_lost_packets = 0;
     driver->next_deadline_valid = 0;
 
-    driver->resync_threshold = driver->latency - 1;
+    driver->resync_threshold = MIN( 15, driver->latency-1 );
     driver->running_free = 0;
 
     jack_info ("netjack: period   : up: %d / dn: %d", driver->net_period_up, driver->net_period_down);

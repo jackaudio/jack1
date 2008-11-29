@@ -26,6 +26,9 @@
  *
  */
 
+#ifdef HAVE_PPOLL
+#define _GNU_SOURCE
+#endif
 
 #include <math.h>
 #include <stdio.h>
@@ -323,15 +326,24 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
 {
     struct pollfd fds;
     int i, poll_err = 0;
-    sigset_t sigmask;
+    sigset_t sigmask, rsigmask;
     struct sigaction action;
+#ifdef HAVE_PPOLL
     struct timespec timeout_spec = { 0, 0 }; 
+#else
+    int timeout;
+#endif
+
 
     jack_time_t now = jack_get_microseconds();
     if( now >= deadline )
 	return 0;
 
+#ifdef HAVE_PPOLL
     timeout_spec.tv_nsec = (deadline - now) * 1000;
+#else
+    timeout = lrintf( (float)(deadline - now) / 1000.0 );
+#endif
 
     sigemptyset(&sigmask);
 	sigaddset(&sigmask, SIGHUP);
@@ -353,7 +365,13 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
     fds.fd = sockfd;
     fds.events = POLLIN;
 
+#ifdef HAVE_PPOLL
     poll_err = ppoll (&fds, 1, &timeout_spec, &sigmask);
+#else
+    sigprocmask (SIG_UNBLOCK, &sigmask, &rsigmask);
+    poll_err = poll (&fds, 1, timeout);
+    sigprocmask (SIG_SETMASK, &rsigmask, NULL);
+#endif
 
     if (poll_err == -1)
     {

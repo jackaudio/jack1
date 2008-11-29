@@ -19,7 +19,7 @@ DIST_SUBDIRS = config jack libjack jackd drivers example-clients tools doc
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = jack.pc
 
-EXTRA_DIST = COPYING COPYING.GPL COPYING.LGPL libjack/simd.c
+EXTRA_DIST = COPYING COPYING.GPL COPYING.LGPL libjack/simd.c jack.spec
 
 AUTOMAKE_OPTIONS = foreign
 

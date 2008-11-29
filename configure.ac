@@ -78,6 +78,7 @@ AC_PROG_CXX
 AC_PROG_LD
 AM_PROG_LIBTOOL
 AC_PROG_LN_S
+AM_PROG_CC_C_O
 AC_C_BIGENDIAN
 
 AC_MSG_CHECKING([platform dependencies])
@@ -169,6 +170,21 @@ AC_CHECK_FUNC(pthread_create, [],
 AC_CHECK_FUNCS(on_exit atexit)
 AC_CHECK_FUNCS(posix_memalign)
 AC_CHECK_LIB(m, sin)
+
+echo -n "Checking for ppoll()... "
+AC_EGREP_CPP( ppoll,
+[
+#define _GNU_SOURCE
+#include <poll.h>
+], [
+    	AC_DEFINE(HAVE_PPOLL,1,"Whether ppoll is available")
+	echo "yes"
+   ],[
+    	AC_DEFINE(HAVE_PPOLL,0,"Whether ppoll is available")
+	echo "no"
+   ] )
+
+	 
 
 AC_CHECK_FUNC(clock_gettime, 
        [
@@ -762,6 +778,7 @@ AM_CONDITIONAL(HAVE_READLINE, $HAVE_READLINE)
 AM_CONDITIONAL(HAVE_DOXYGEN, $HAVE_DOXYGEN)
 AM_CONDITIONAL(USE_CAPABILITIES, $USE_CAPABILITIES)
 AM_CONDITIONAL(STRIPPED_JACKD, $STRIPPED_JACKD)
+AM_CONDITIONAL(HAVE_PPOLL, $HAVE_PPOLL)
 
 AC_OUTPUT(
 Makefile

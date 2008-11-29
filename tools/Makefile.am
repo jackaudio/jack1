@@ -127,6 +127,9 @@ jack_netsource_CFLAGS = -I$(top_srcdir)/drivers/netjack
 if HAVE_CELT
 jack_netsource_CFLAGS += -DHAVE_CELT
 endif
+if HAVE_PPOLL
+jack_netsource_CFLAGS += -DHAVE_PPOLL
+endif
 jack_netsource_LDFLAGS = -lsamplerate @OS_LDFLAGS@
 jack_netsource_LDADD = $(top_builddir)/libjack/libjack.la
 
