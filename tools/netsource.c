@@ -226,6 +226,7 @@ process (jack_nframes_t nframes, void *arg)
     channel_t chn;
     int size, i;
     const char *porttype;
+    int input_fd;
 
     jack_position_t local_trans_pos;
 
@@ -236,69 +237,13 @@ process (jack_nframes_t nframes, void *arg)
 
     jacknet_packet_header *pkthdr = (jacknet_packet_header *) packet_buf;
 
-    packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (uint32_t);
+    /*
+     * ok... SEND code first.
+     * needed some time to find out why latency=0 
+     * did not work ;S
+     *
+     */
 
-    // New Receive Code:
-    if (reply_port)
-        packet_cache_drain_socket(global_packcache, insockfd);
-    else
-        packet_cache_drain_socket(global_packcache, outsockfd);
-
-    size = packet_cache_retreive_packet( global_packcache, framecnt - latency, (char *)packet_buf, rx_bufsize ); 
-
-    /* First alternative : we received what we expected. Render the data
-     * to the JACK ports so it can be played. */
-    if (size == rx_bufsize)
-    {
-        if (cont_miss)
-        {
-            //printf("Frame %d  \tRecovered from dropouts\n", framecnt);
-            cont_miss = 0;
-        }
-        render_payload_to_jack_ports (bitdepth, packet_bufX, net_period, capture_ports, capture_srcs, nframes);
-
-        /* Now evaluate packet header */
-        //if (sync_state != pkthdr->sync_state)
-        //    printf ("Frame %d  \tSync has been set\n", framecnt);
-
-	state_currentframe = framecnt;
-	//state_latency = framecnt - pkthdr->framecnt;
-	state_connected = 1;
-        sync_state = pkthdr->sync_state;
-    }
-    /* Second alternative : we've received something that's not
-     * as big as expected or we missed a packet. We render silence
-     * to the ouput ports */
-    else
-    {
-	jack_nframes_t latency_estimate;
-	if( packet_cache_find_latency( global_packcache, framecnt, &latency_estimate ) )
-		state_latency = latency_estimate;
-
-	// Set the counters up.
-	state_currentframe = framecnt;
-	//state_latency = framecnt - pkthdr->framecnt;
-	state_netxruns += 1;
-
-        //printf ("Frame %d  \tPacket missed or incomplete (expected: %d bytes, got: %d bytes)\n", framecnt, rx_bufsize, size);
-        //printf ("Frame %d  \tPacket missed or incomplete\n", framecnt);
-        cont_miss += 1;
-        chn = 0;
-        node = capture_ports;
-        while (node != NULL)
-        {
-            port = (jack_port_t *) node->data;
-            buf = jack_port_get_buffer (port, nframes);
-            porttype = jack_port_type (port);
-            if (strncmp (porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size ()) == 0)
-                for (i = 0; i < nframes; i++)
-                    buf[i] = 0.0;
-            else if (strncmp (porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size ()) == 0)
-                jack_midi_clear_buffer (buf);
-            node = jack_slist_next (node);
-            chn++;
-        }
-    }
     /* reset packet_bufX... */
     packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (jack_default_audio_sample_t);
 
@@ -324,13 +269,95 @@ process (jack_nframes_t nframes, void *arg)
     packet_header_hton (pkthdr);
     if (cont_miss < 2*latency+5)
         netjack_sendto (outsockfd, (char *) packet_buf, tx_bufsize, 0, &destaddr, sizeof (destaddr), mtu);
-//    else if (cont_miss >= 10 && cont_miss <= 50)
-//        printf ("Frame %d  \tToo many packets missed (%d). We have stopped sending data\n", framecnt, cont_miss);
     else if (cont_miss > 50+5*latency)
     {
 	state_connected = 0;
         //printf ("Frame %d  \tRealy too many packets missed (%d). Let's reset the counter\n", framecnt, cont_miss);
         cont_miss = 5;
+    }
+
+    /*
+     * ok... now the RECEIVE code.
+     *
+     */
+
+    /* reset packet_bufX... */
+    packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (jack_default_audio_sample_t);
+
+    if( reply_port )
+	input_fd = insockfd;
+    else
+	input_fd = outsockfd;
+
+    // for latency == 0 we can poll.
+    if( latency == 0 ) {
+	jack_time_t deadline = jack_get_microseconds() + 1000000 * jack_get_buffer_size(client)/jack_get_sample_rate(client);
+	// Now loop until we get the right packet.
+	while(1) {
+	    if ( ! netjack_poll_deadline( input_fd, deadline ) )
+		break;
+
+	    packet_cache_drain_socket(global_packcache, input_fd);
+
+	    if (packet_cache_get_next_available_framecnt( global_packcache, framecnt, NULL ))
+		break;
+	}
+    } else {
+	// normally:
+	// only drain socket.
+	packet_cache_drain_socket(global_packcache, input_fd);
+    }
+
+    size = packet_cache_retreive_packet( global_packcache, framecnt - latency, (char *)packet_buf, rx_bufsize ); 
+
+    /* First alternative : we received what we expected. Render the data
+     * to the JACK ports so it can be played. */
+    if (size == rx_bufsize)
+    {
+        if (cont_miss)
+        {
+            //printf("Frame %d  \tRecovered from dropouts\n", framecnt);
+            cont_miss = 0;
+        }
+        render_payload_to_jack_ports (bitdepth, packet_bufX, net_period, capture_ports, capture_srcs, nframes);
+
+	state_currentframe = framecnt;
+	state_connected = 1;
+        sync_state = pkthdr->sync_state;
+    }
+    /* Second alternative : we've received something that's not
+     * as big as expected or we missed a packet. We render silence
+     * to the ouput ports */
+    else
+    {
+	jack_nframes_t latency_estimate;
+	if( packet_cache_find_latency( global_packcache, framecnt, &latency_estimate ) )
+	    if( (state_latency == 0) || (latency_estimate < state_latency) )
+		state_latency = latency_estimate;
+
+	// Set the counters up.
+	state_currentframe = framecnt;
+	//state_latency = framecnt - pkthdr->framecnt;
+	state_netxruns += 1;
+
+        //printf ("Frame %d  \tPacket missed or incomplete (expected: %d bytes, got: %d bytes)\n", framecnt, rx_bufsize, size);
+        //printf ("Frame %d  \tPacket missed or incomplete\n", framecnt);
+        cont_miss += 1;
+        chn = 0;
+        node = capture_ports;
+        while (node != NULL)
+        {
+            port = (jack_port_t *) node->data;
+            buf = jack_port_get_buffer (port, nframes);
+            porttype = jack_port_type (port);
+            if (strncmp (porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size ()) == 0)
+                for (i = 0; i < nframes; i++)
+                    buf[i] = 0.0;
+            else if (strncmp (porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size ()) == 0)
+                jack_midi_clear_buffer (buf);
+            node = jack_slist_next (node);
+            chn++;
+        }
     }
 
     framecnt++;
@@ -397,6 +424,7 @@ main (int argc, char *argv[])
     jack_status_t status;
 
     /* Torben's famous state variables, aka "the reporting API" ! */
+    /* heh ? these are only the copies of them ;)                 */
     int statecopy_connected, statecopy_latency, statecopy_netxruns;
 
     /* Argument parsing stuff */    

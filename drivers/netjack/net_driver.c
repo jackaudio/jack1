@@ -94,7 +94,15 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
     jacknet_packet_header *pkthdr = (jacknet_packet_header *) driver->rx_buf;
     
     if( !driver->next_deadline_valid ) {
-	    driver->next_deadline = jack_get_microseconds() + 2*driver->period_usecs;
+	    if( driver->latency == 0 )
+		// for full sync mode... always wait for packet.
+		driver->next_deadline = jack_get_microseconds() + 500*driver->period_usecs;
+	    else if( driver->latency == 1 )
+		// for normal 1 period latency mode, only 1 period for dealine.
+		driver->next_deadline = jack_get_microseconds() + 1*driver->period_usecs;
+	    else
+		driver->next_deadline = jack_get_microseconds() + 2*driver->period_usecs;
+
 	    driver->next_deadline_valid = 1;
     } else {
 	    driver->next_deadline += driver->period_usecs;
@@ -302,7 +310,12 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
     framecnt = pkthdr->framecnt;
     driver->reply_port = pkthdr->reply_port;
     driver->latency = pkthdr->latency;
-    driver->resync_threshold = MIN( 15, pkthdr->latency-1 );
+
+    // Special handling for latency=0
+    if( driver->latency == 0 )
+	driver->resync_threshold = 0;
+    else
+	driver->resync_threshold = MIN( 15, pkthdr->latency-1 );
 
     // check whether, we should handle the transport sync stuff, or leave trnasports untouched.
     if (driver->handle_transport_sync) {
@@ -706,7 +719,12 @@ net_driver_new (jack_client_t * client,
     driver->num_lost_packets = 0;
     driver->next_deadline_valid = 0;
 
-    driver->resync_threshold = MIN( 15, driver->latency-1 );
+    // Special handling for latency=0
+    if( driver->latency == 0 )
+	driver->resync_threshold = 0;
+    else
+	driver->resync_threshold = MIN( 15, driver->latency-1 );
+
     driver->running_free = 0;
 
     jack_info ("netjack: period   : up: %d / dn: %d", driver->net_period_up, driver->net_period_down);
