@@ -51,6 +51,14 @@
 
 #include "alsa_midi.h"
 
+#ifndef SND_SEQ_PORT_TYPE_PORT
+#define SND_SEQ_PORT_TYPE_PORT (1<<19)  /* Appears in version 1.0.12rc1 */
+#endif
+
+#ifndef SND_SEQ_PORT_TYPE_HARDWARE
+#define SND_SEQ_PORT_TYPE_HARDWARE (1<<16)  /* Appears in version 1.0.12rc1 */
+#endif
+
 #ifdef STANDALONE
 #define MESSAGE(...) fprintf(stderr, __VA_ARGS__)
 #else
