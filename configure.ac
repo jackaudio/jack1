@@ -410,7 +410,7 @@ AC_ARG_ENABLE(dynsimd,
 if test "x$enable_dynsimd" = xyes; then
 	AC_DEFINE(USE_DYNSIMD, 1, [Define to 1 to use dynamic SIMD selection.])
 	dnl This needs update once there's more than x86/x86-64 supported
-	SIMD_CFLAGS="-msse -msse2 -m3dnow"
+	SIMD_CFLAGS="-O -msse -msse2 -m3dnow"
 	AC_SUBST(SIMD_CFLAGS)
 fi
 
