@@ -23,7 +23,7 @@
 Summary:	The Jack Audio Connection Kit
 Name:		@PACKAGE@
 Version:	@VERSION@
-Release:	7
+Release:	8
 License:	GPL
 Group:		System Environment/Daemons
 Source0:	%{name}-%{version}.tar.gz
@@ -112,9 +112,10 @@ Small example clients that use JACK (Jack Audio Connection Kit).
 	--enable-preemption-check \
 %endif
 %if %{dynsimd}
-	--enable-dynsimd \
-%endif
+	--enable-dynsimd
+%else
 	--enable-optimize
+%endif
 make
 
 
@@ -189,12 +190,16 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 %{_bindir}/jack_showtime
 %{_bindir}/jack_simple_client
 #{_bindir}/jack_transport
+%{_bindir}/jack_transport_client
 #{_bindir}/jack_unload
 #{_bindir}/alsa_in
 #{_bindir}/alsa_out
 
 
 %changelog
+
+* Mon Dec  1 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.116.0-8
+- added jack_transport_client to example-clients package
 
 * Tue Jul  8 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.112.0-7
 - refactored packaging to accomodate libjack0 and libjack-devel
