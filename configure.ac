@@ -70,6 +70,13 @@ AC_SUBST(JACK_RELEASE)
 AM_INIT_AUTOMAKE(jack-audio-connection-kit,${JACK_VERSION})
 AM_MAINTAINER_MODE
 
+dnl
+dnl save any user-provided CFLAGS so we can forget
+dnl about any nonsense that configure generates
+dnl 
+
+ORIGINAL_CFLAGS="$CFLAGS"
+
 AM_CONFIG_HEADER(config.h)
 AC_ENABLE_STATIC(no)
 AC_ENABLE_SHARED(yes)
@@ -80,6 +87,14 @@ AM_PROG_LIBTOOL
 AC_PROG_LN_S
 AM_PROG_CC_C_O
 AC_C_BIGENDIAN
+
+dnl
+dnl now use those user-provided CFLAGS
+dnl and dump whatever nonsense configure generated
+dnl while looking for a compiler
+dnl
+
+CFLAGS="$ORIGINAL_CFLAGS"
 
 AC_MSG_CHECKING([platform dependencies])
 
@@ -317,7 +332,8 @@ elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
     fi
     
     AC_ARG_ENABLE(optimization-by-compiler,
-	AC_HELP_STRING([--enable-optimization-by-compiler],[use compiler (NOT processor) capabilities to determine optimization flags (default=no)]),,
+	AC_HELP_STRING([--enable-optimization-by-compiler],[use compiler (NOT processor) capabilities to determine optimization flags (default=no)]),
+	optimization_by_compiler=yes,
 	optimization_by_compiler=no
     )
     
@@ -401,7 +417,16 @@ elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 	fi
     fi
 
-    JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS $JACK_OPT_CFLAGS $MMX_FLAGS $SSE_FLAGS"
+dnl
+dnl do not add h/w specific flags if asked to let compiler
+dnl to the optimization
+dnl    
+
+    if test x$optimization_by_compiler != xyes ; then
+        JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS $JACK_OPT_CFLAGS $MMX_FLAGS $SSE_FLAGS"
+    else
+       JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS"
+    fi
 
 fi
 
