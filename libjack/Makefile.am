@@ -25,7 +25,7 @@ SOURCE_FILES = \
 	     unlock.c
 
 simd.lo: $(srcdir)/simd.c
-	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/simd.c
+	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/simd.c
 
 lib_LTLIBRARIES	= libjack.la
 

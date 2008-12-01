@@ -311,14 +311,14 @@ typedef struct {
 
     char name[JACK_CLIENT_NAME_SIZE];	/* unique name, if assigned */
 
-    /* these two are valid only for internal clients, and thus
-       are exempt from the requirement that we not export
-       pointers back to clients. an internal client must
-       necessarily match the host, so 32/64 bit issues
-       do not apply to these pointers.
+    /* these are actually pointers, but they must
+       be the same size regardless of whether the
+       server and/or client are 64 bit or 32 bit.
+       force them to be 64 bit.
     */
-    jack_client_control_t* client_control;
-    jack_control_t* engine_control;
+
+    uint64_t client_control;
+    uint64_t engine_control;
 
 #ifdef JACK_USE_MACH_THREADS
     /* specific resources for server/client real-time thread communication */
@@ -385,6 +385,11 @@ struct _jack_request {
 				   is no 64/32 issue. external clients read the ports
 				   one by one from the server, and allocate their
 				   own "ports" array in their own address space.
+
+				   we are lucky, because this is part of a union
+				   whose other components are bigger than this one.
+				   otherwise it would change structure size when
+				   comparing the 64 and 32 bit versions.
 				*/
 	} POST_PACKED_STRUCTURE port_connections;
 	struct {
@@ -440,36 +445,6 @@ typedef struct _jack_client_internal {
     int portnum;
 #endif /* JACK_USE_MACH_THREADS */
    
-#if 0
-    /* callbacks 
-     */
-    JackProcessCallback process;
-    void *process_arg;
-    JackThreadInitCallback thread_init;
-    void *thread_init_arg;
-    JackBufferSizeCallback bufsize;
-    void *bufsize_arg;
-    JackSampleRateCallback srate;
-    void *srate_arg;
-    JackPortRegistrationCallback port_register;
-    void *port_register_arg;
-    JackPortConnectCallback port_connect;
-    void *port_connect_arg;
-    JackGraphOrderCallback graph_order;
-    void *graph_order_arg;
-    JackXRunCallback xrun;
-    void *xrun_arg;
-    JackSyncCallback sync_cb;
-    void *sync_arg;
-    JackTimebaseCallback timebase_cb;
-    void *timebase_arg;
-    JackFreewheelCallback freewheel_cb;
-    void *freewheel_arg;
-    JackClientRegistrationCallback client_register;	
-    void *client_register_arg;
-	JackThreadCallback thread_cb;	
-    void *thread_cb_arg;
-#endif
     /* external clients: set by libjack
      * internal clients: set by engine */
     //int (*deliver_request)(void*, jack_request_t*); /* JOQ: 64/32 bug! */

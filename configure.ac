@@ -16,8 +16,8 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=115
-JACK_MICRO_VERSION=7
+JACK_MINOR_VERSION=116
+JACK_MICRO_VERSION=0
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -368,9 +368,11 @@ elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 		if test x$optimization_by_cpu = xyes ; then
 		    if test x$cpu_supports_sse = xyes ; then
 			SSE_FLAGS="-msse -mfpmath=sse"
+			MMX_FLAGS=""
 		    fi
 		else 
 		    SSE_FLAGS="-msse -mfpmath=sse"
+		    MMX_FLAGS=""
 		fi
 		
 		AC_MSG_RESULT(yes)
@@ -434,13 +436,18 @@ AC_ARG_ENABLE(optimize,
 
 JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS"
 
+dnl
+dnl most makefiles use JACK_CFLAGS, but simd code needs JACK_CORE_CFLAGS
+dnl
+
 AC_SUBST(JACK_CFLAGS)
+AC_SUBST(JACK_CORE_CFLAGS)
 
 dnl
 dnl use JACK_CFLAGS for jackd compilation
 dnl 
 
-CFLAGS=$JACK_CFLAGS
+CFLAGS="$CFLAGS $JACK_CFLAGS"
 
 # allow buffer resizing unless --disable-resize specified
 buffer_resizing=yes

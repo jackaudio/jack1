@@ -574,13 +574,16 @@ main (int argc, char *argv[])
             }
             else
                 printf ("Not Connected\n");
+
+	    fflush(stdout);
         }
 
 	    if (statecopy_connected)
 	    {
             if (statecopy_netxruns != state_netxruns) {
-            statecopy_netxruns = state_netxruns;
-            printf ("at frame %06d -> total netxruns %d\n", state_currentframe, statecopy_netxruns);
+		statecopy_netxruns = state_netxruns;
+		printf ("at frame %06d -> total netxruns %d\n", state_currentframe, statecopy_netxruns);
+		fflush(stdout);
             }
         }
         else
@@ -590,6 +593,7 @@ main (int argc, char *argv[])
                 statecopy_latency = state_latency;
                 if (statecopy_latency > 1)
                 printf ("current latency %d\n", statecopy_latency);
+		fflush(stdout);
             }
         }
     }

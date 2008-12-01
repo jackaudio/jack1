@@ -4,6 +4,9 @@
  * as they would be used by many applications.
  */
 
+#define _ISOC99_SOURCE  1
+#define _XOPEN_SOURCE   600
+
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -22,6 +25,22 @@
 
 #include <samplerate.h>
 #include "time_smoother.h"
+
+#define SAMPLE_16BIT_SCALING  32767.0f
+#define SAMPLE_16BIT_MAX  32767
+#define SAMPLE_16BIT_MIN  -32767
+#define NORMALIZED_FLOAT_MIN -1.0f
+#define NORMALIZED_FLOAT_MAX  1.0f
+#define f_round(f) lrintf(f)
+
+#define float_16(s, d)\
+	if ((s) <= NORMALIZED_FLOAT_MIN) {\
+		(d) = SAMPLE_16BIT_MIN;\
+	} else if ((s) >= NORMALIZED_FLOAT_MAX) {\
+		(d) = SAMPLE_16BIT_MAX;\
+	} else {\
+		(d) = f_round ((s) * SAMPLE_16BIT_SCALING);\
+	}
 
 typedef signed short ALSASAMPLE;
 
@@ -370,7 +389,7 @@ int process (jack_nframes_t nframes, void *arg) {
 	src_process( src_state, &src );
 
 	for (i=0; i < rlen; i++) {
-	    outbuf[chn+ i*num_channels]= resampbuf[i] * 32767;
+	    float_16( resampbuf[i], outbuf[chn+ i*num_channels] );
 	}
 
 	src_node = jack_slist_next (src_node);

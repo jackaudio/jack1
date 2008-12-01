@@ -766,8 +766,16 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 #endif
 	
 	if (jack_client_is_internal(client)) {
-		res.client_control = client->control;
-		res.engine_control = engine->control;
+		/* the ->control pointers are for an internal client
+		   so we know they are the right sized pointers
+		   for this server. however, to keep the result
+		   structure the same size for both 32 and 64 bit
+		   clients/servers, the result structure stores
+		   them as 64 bit integer, so we have to do a slightly
+		   forced cast here.
+		*/
+		res.client_control = (uint64_t) ((intptr_t) client->control);
+		res.engine_control = (uint64_t) ((intptr_t) engine->control);
 	} else {
 		strcpy (res.fifo_prefix, engine->fifo_prefix);
 	}
