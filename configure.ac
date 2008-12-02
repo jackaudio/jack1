@@ -24,10 +24,11 @@ dnl HOWTO: updating the jack protocol version
 dnl
 dnl increment the protocol version whenever a change is
 dnl made to the way libjack communicates with jackd
-dnl that would break applications linked with an older
-dnl version of libjack.
+dnl that would break applications statically linked with an older
+dnl version of libjack. NOTE: statically linking to libjack
+dnl is a huge mistake.
 dnl ---
-JACK_PROTOCOL_VERSION=23
+JACK_PROTOCOL_VERSION=24
 
 dnl ---
 dnl HOWTO: updating the libjack interface version
