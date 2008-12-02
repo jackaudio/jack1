@@ -132,7 +132,7 @@ static int jack_client_sort (jack_client_internal_t *a,
 static void jack_check_acyclic (jack_engine_t* engine);
 static void jack_compute_all_port_total_latencies (jack_engine_t *engine);
 static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_shared_t*);
-
+static void jack_engine_signal_problems (jack_engine_t* engine);
 
 static inline int 
 jack_rolling_interval (jack_time_t period_usecs)
@@ -696,9 +696,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 		jack_error ("cannot initiate graph processing (%s)",
 			    strerror (errno));
 		engine->process_errors++;
-		jack_lock_problems (engine);
-		engine->problems++;
-		jack_unlock_problems (engine);
+		jack_engine_signal_problems (engine);
 		return NULL; /* will stop the loop */
 	} 
 
@@ -1558,18 +1556,14 @@ jack_server_thread (void *arg)
 			if (engine->pfd[i].revents & ~POLLIN) {
 
 				jack_mark_client_socket_error (engine, engine->pfd[i].fd);
-				jack_lock_problems (engine);
-				engine->problems++;	
-				jack_unlock_problems (engine);
+				jack_engine_signal_problems (engine);
 
 			} else if (engine->pfd[i].revents & POLLIN) {
 
 				if (handle_external_client_request (engine, engine->pfd[i].fd)) {
 					jack_error ("could not handle external"
 						    " client request");
-					jack_lock_problems (engine);
-					engine->problems++;	
-					jack_unlock_problems (engine);
+					jack_engine_signal_problems (engine);
 				}
 			}
 		}
@@ -1582,14 +1576,20 @@ jack_server_thread (void *arg)
 		   and reset engine->problems
 		 */
 
-		if (problemsProblemsPROBLEMS) {
+		while (problemsProblemsPROBLEMS) {
+			
+			VERBOSE (engine, "trying to lock graph to remove %d problems", problemsProblemsPROBLEMS);
 			jack_lock_graph (engine);
-			jack_lock_problems (engine);
-			VERBOSE (engine, "we have problem clients");
+			VERBOSE (engine, "we have problem clients (problems = %d", problemsProblemsPROBLEMS);
 			jack_remove_clients (engine);
-			engine->problems = 0;
-			jack_unlock_problems (engine);
 			jack_unlock_graph (engine);
+
+			jack_lock_problems (engine);
+			engine->problems -= problemsProblemsPROBLEMS;
+			problemsProblemsPROBLEMS = engine->problems;
+			jack_unlock_problems (engine);
+
+			VERBOSE (engine, "after removing clients, problems = %d", problemsProblemsPROBLEMS);
 		}
 		
 			
@@ -2121,20 +2121,28 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 
 	DEBUG ("trying to acquire read lock");
 	if (jack_try_rdlock_graph (engine)) {
-		/* engine can't run. just throw away an entire cycle */
-		VERBOSE (engine, "null cycle");
+		VERBOSE (engine, "lock-driven null cycle");
 		driver->null_cycle (driver, nframes);
 		return 0;
 	}
 
-	if (engine->problems) {
-		/* engine can't run. just throw away an entire cycle */
-		VERBOSE (engine, "problem-driven null cycle");
+	if (jack_trylock_problems (engine)) {
+		VERBOSE (engine, "problem-lock-driven null cycle");
 		jack_unlock_graph (engine);
 		driver->null_cycle (driver, nframes);
 		return 0;
 	}
 
+	if (engine->problems) {
+		VERBOSE (engine, "problem-driven null cycle problems=%d", engine->problems);
+		jack_unlock_problems (engine);
+		jack_unlock_graph (engine);
+		driver->null_cycle (driver, nframes);
+		return 0;
+	}
+
+	jack_unlock_problems (engine);
+		
 	if (!engine->freewheeling) {
 		DEBUG("waiting for driver read\n");
 		if (driver->read (driver, nframes)) {
@@ -2520,9 +2528,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 					    " (%s)", client->control->name,
 					    strerror (errno));
 				client->error += JACK_ERROR_WITH_SOCKETS;
-				jack_lock_problems (engine);
-				engine->problems++;
-				jack_unlock_problems (engine);
+				jack_engine_signal_problems (engine);
 			}
 
  			if (client->error) {
@@ -2598,29 +2604,28 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
  					}
  				}
   			}
- 
+
  			if (status == 0) {
  				if (read (client->event_fd, &status, sizeof (status)) != sizeof (status)) {
  					jack_error ("cannot read event response from "
  							"client [%s] (%s)",
  							client->control->name,
  							strerror (errno));
-					client->error += JACK_ERROR_WITH_SOCKETS;
-					jack_lock_problems (engine);
-					engine->problems++;
-					jack_unlock_problems (engine);
- 				}
+					status = -1;
+ 				} 
+
  			} else {
  				jack_error ("bad status (%d) for client %s "
 					    "handling event (type = %d)",
  					    status,
 					    client->control->name,
 					    event->type);
-				client->error += JACK_ERROR_WITH_SOCKETS;
-				jack_lock_problems (engine);
-				engine->problems++;
-				jack_unlock_problems (engine);
   			}
+
+			if (status) {
+				client->error += JACK_ERROR_WITH_SOCKETS;
+				jack_engine_signal_problems (engine);
+			}
 		}
 	}
 	DEBUG ("event delivered");
@@ -4138,4 +4143,12 @@ jack_send_connection_notification (jack_engine_t *engine,
 	}
 
 	return 0;
+}
+
+void
+jack_engine_signal_problems (jack_engine_t* engine)
+{
+	jack_lock_problems (engine);
+	engine->problems++;
+	jack_unlock_problems (engine);
 }
