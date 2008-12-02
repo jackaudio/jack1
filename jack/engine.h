@@ -192,7 +192,7 @@ jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
 #define jack_try_rdlock_graph(e) pthread_rwlock_tryrdlock (&e->client_lock)
 #define jack_unlock_graph(e) { DEBUG ("release graph lock"); if (pthread_rwlock_unlock (&e->client_lock)) abort(); }
 
-#define jack_lock_problems(e) { DEBUG ("release problem lock"); if (pthread_mutex_lock (&e->problem_lock)) abort(); }
+#define jack_lock_problems(e) { DEBUG ("acquiring problem lock"); if (pthread_mutex_lock (&e->problem_lock)) abort(); }
 #define jack_unlock_problems(e) { DEBUG ("release problem lock"); if (pthread_mutex_unlock (&e->problem_lock)) abort(); }
 
 #if 0
