@@ -15,10 +15,8 @@
 %define portaudio 0
 # use freebob
 %define freebob 1
-# use preemption check
-%define preemption_check 0
 # use dynamic SIMD (ix86)
-%define dynsimd 0
+%define dynsimd 1
 
 Summary:	The Jack Audio Connection Kit
 Name:		@PACKAGE@
@@ -108,14 +106,10 @@ Small example clients that use JACK (Jack Audio Connection Kit).
 %if ! %{freebob}
 	--disable-freebob \
 %endif
-%if %{preemption_check}
-	--enable-preemption-check \
-%endif
 %if %{dynsimd}
-	--enable-dynsimd
-%else
-	--enable-optimize
+	--enable-dynsimd \
 %endif
+	--enable-optimize
 make
 
 
@@ -198,7 +192,9 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 
 %changelog
 
-* Mon Dec  1 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.116.0-8
+* Wed Dec  3 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.116.0-8
+- enable dynamic SIMD optimizations by default
+- dropped preemption check option
 - added jack_transport_client to example-clients package
 
 * Tue Jul  8 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.112.0-7
