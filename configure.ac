@@ -791,6 +791,12 @@ AC_DEFINE_UNQUOTED(JACK_DEFAULT_DRIVER,
 	[$JACK_DEFAULT_DRIVER],
 	[Default JACK driver])
 
+JACK_SEMAPHORE_KEY=0x282929
+AC_DEFINE_UNQUOTED(JACK_SEMAPHORE_KEY,
+	  [$JACK_SEMAPHORE_KEY],
+	  [ an integer constant used as the semaphore and SysV SHM key. see libjack/shm.c for usage])
+AC_SUBST(JACK_SEMAPHORE_KEY)
+
 # On some systems, readline depends on termcap or ncurses.  But, the
 # MacOSX linker complains bitterly if these libraries are explicitly
 # referenced.  

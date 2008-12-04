@@ -100,7 +100,6 @@ static char jack_shm_server_prefix[JACK_SERVER_NAME_SIZE] = "";
  * again on that machine until after a reboot.
  */
 
-#define JACK_SEMAPHORE_KEY 0x282929
 #ifndef USE_POSIX_SHM
 #define JACK_SHM_REGISTRY_KEY JACK_SEMAPHORE_KEY
 #endif

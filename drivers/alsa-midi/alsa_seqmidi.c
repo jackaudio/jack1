@@ -470,7 +470,7 @@ void port_free(alsa_seqmidi_t *self, port_t *port)
 		jack_ringbuffer_free(port->early_events);
 	if (port->jack_port)
 		jack_port_unregister(self->jack, port->jack_port);
-	info_log("port deleted: %s\n", port->name);
+	// info_log("port deleted: %s\n", port->name);
 
 	free(port);
 }
@@ -535,7 +535,7 @@ port_t* port_create(alsa_seqmidi_t *self, int type, snd_seq_addr_t addr, const s
 
 	port->early_events = jack_ringbuffer_create(MAX_EVENT_SIZE*16);
 
-	info_log("port created: %s\n", port->name);
+	// info_log("port created: %s\n", port->name);
 	return port;
 
  failed:
