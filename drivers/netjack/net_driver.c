@@ -41,6 +41,8 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+#include "config.h"
+
 #include <samplerate.h>
 
 #if HAVE_CELT

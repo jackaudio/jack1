@@ -302,6 +302,11 @@ jack_client_alloc ()
 	client->on_shutdown = NULL;
 	client->n_port_types = 0;
 	client->port_segment = NULL;
+
+#ifdef USE_DYNSIMD
+	init_cpu();
+#endif /* USE_DYNSIMD */
+
 	return client;
 }
 
@@ -1508,7 +1513,7 @@ jack_client_core_wait (jack_client_t* client)
 		}
 	}
 
-	if (client->control->dead || client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
+	if (control->dead || client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
 		DEBUG ("client appears dead or event pollfd has error status\n");
 		return -1;
 	}

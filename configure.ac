@@ -403,6 +403,13 @@ elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
     
     AC_DEFINE(x86, 1, "Nope it's intel")
     COMMON_X86_OPT_FLAGS="-O3 -fomit-frame-pointer -ffast-math -funroll-loops"
+
+dnl
+dnl its a little sad that OS X doesn't make it possible to identify 
+dnl the target_cpu a little more precisely. on os x we always get "i386"
+dnl as the CPU type. we miss out on some possible optimizations as 
+dnl a result. oh well.
+dnl     
     
     if test x$with_cpu_target != x ; then
         JACK_OPT_CFLAGS="-march=$with_cpu_target"

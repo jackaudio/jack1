@@ -653,9 +653,12 @@ static void
 jack_remove_shm (jack_shm_id_t *id)
 {
 	/* registry may or may not be locked */
-	if (shm_unlink ((char *) id) != 0) {
-		jack_error ("could not remove SHM ID %s", id);
-	}
+	/* note that in many cases the client has already removed
+	   the shm segment, so this failing is not an error.
+	   XXX it would be good to differentiate between these
+	   two conditions.
+	*/
+	shm_unlink ((char *) id);
 }
 
 void
