@@ -59,10 +59,6 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 static int sync_state = TRUE;
 static jack_transport_state_t last_transport_state;
 
-/* This is set upon reading a packetand will be
- * written into the pkthdr of an outgoing packet */
-static int framecnt; 
-
 static int
 net_driver_sync_cb(jack_transport_state_t state, jack_position_t *pos, net_driver_t *driver)
 {
@@ -71,8 +67,8 @@ net_driver_sync_cb(jack_transport_state_t state, jack_position_t *pos, net_drive
     if (state == JackTransportStarting && last_transport_state != JackTransportStarting) {
         retval = 0;
     }
-    if (state == JackTransportStarting) 
-		jack_info("Starting sync_state = %d", sync_state);
+//    if (state == JackTransportStarting) 
+//		jack_info("Starting sync_state = %d", sync_state);
     last_transport_state = state;
     return retval;
 }
@@ -93,6 +89,7 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
     //int len;
     int we_have_the_expected_frame = 0;
     jack_nframes_t next_frame_avail;
+    jack_time_t packet_recv_time_stamp;
     jacknet_packet_header *pkthdr = (jacknet_packet_header *) driver->rx_buf;
     
     if( !driver->next_deadline_valid ) {
@@ -101,8 +98,12 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 		driver->next_deadline = jack_get_microseconds() + 500*driver->period_usecs;
 	    else if( driver->latency == 1 )
 		// for normal 1 period latency mode, only 1 period for dealine.
-		driver->next_deadline = jack_get_microseconds() + 1*driver->period_usecs;
+		driver->next_deadline = jack_get_microseconds() + driver->period_usecs;
 	    else
+		// looks like waiting 1 period always is correct.
+		// not 100% sure yet. with the improved resync, it might be better,
+		// to have more than one period headroom for high latency.
+		//driver->next_deadline = jack_get_microseconds() + 5*driver->latency*driver->period_usecs/4;
 		driver->next_deadline = jack_get_microseconds() + 2*driver->period_usecs;
 
 	    driver->next_deadline_valid = 1;
@@ -110,28 +111,71 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	    driver->next_deadline += driver->period_usecs;
     }
 
+    // Increment expected frame here.
+    driver->expected_framecnt += 1;
+
+    // Now check if required packet is already in the cache.
+    // then poll (have deadline calculated)
+    // then drain socket, rinse and repeat.
     while(1) {
-	if( ! netjack_poll_deadline( driver->sockfd, driver->next_deadline ) )
-	    break;
-
-	packet_cache_drain_socket( global_packcache, driver->sockfd );
-
 	if( packet_cache_get_next_available_framecnt( global_packcache, driver->expected_framecnt, &next_frame_avail) ) {
 	    if( next_frame_avail == driver->expected_framecnt ) {
 		we_have_the_expected_frame = 1;
 		break;
 	    }
-	    //printf( "next frame = %d  (exp: %d) \n", next_frame_avail, driver->expected_framecnt );
 	}
+	if( ! netjack_poll_deadline( driver->sockfd, driver->next_deadline ) )
+	    break;
+
+	packet_cache_drain_socket( global_packcache, driver->sockfd );
     }
 
+    // check if we know who to send our packets too.
+    // TODO: there is still something wrong when trying
+    // to send back to another port on localhost.
+    // need to use -r on netsource for that.
+    if (!driver->srcaddress_valid)
+	if( global_packcache->master_address_valid ) {
+	    memcpy (&(driver->syncsource_address), &(global_packcache->master_address), sizeof( struct sockaddr_in ) );
+	    driver->srcaddress_valid = 1;
+	}
+
+    // XXX: switching mode unconditionally is stupid.
+    //      if we were running free perhaps we like to behave differently
+    //      ie. fastforward one packet etc.
+    //      well... this is the first packet we see. hmm.... dunno ;S
+    //      it works... so...
     driver->running_free = 0;
 
     if( we_have_the_expected_frame ) {
-	packet_cache_retreive_packet( global_packcache, driver->expected_framecnt, (char *) driver->rx_buf, driver->rx_bufsize );
+	driver->time_to_deadline = driver->next_deadline - jack_get_microseconds() - driver->period_usecs;
+	packet_cache_retreive_packet( global_packcache, driver->expected_framecnt, (char *) driver->rx_buf, driver->rx_bufsize , &packet_recv_time_stamp);
+	//int recv_time_offset = (int) (jack_get_microseconds() - packet_recv_time_stamp);
+	packet_header_ntoh(pkthdr);
+	driver->deadline_goodness = (int)pkthdr->sync_state;
 	driver->packet_data_valid = 1;
-	//printf( "ok... %d\n", driver->expected_framecnt );
+	
+	// TODO: Queue state could be taken into account.
+	//       But needs more processing, cause, when we are running as
+	//       fast as we can, recv_time_offset can be zero, which is
+	//       good.
+	//       need to add (now-deadline) and check that.
+	/*
+	if( recv_time_offset < driver->period_usecs )
+	    //driver->next_deadline -= driver->period_usecs*driver->latency/100;
+	    driver->next_deadline += driver->period_usecs/1000;
+	    */
+
+	if( driver->deadline_goodness < 1*(int)driver->period_usecs/8*driver->latency ) {
+	    driver->next_deadline -= driver->period_usecs/1000;
+	    //printf( "goodness: %d, Adjust deadline: --- %d\n", driver->deadline_goodness, (int) driver->period_usecs*driver->latency/100 );
+	}
+	if( driver->deadline_goodness > 1*(int)driver->period_usecs/8*driver->latency ) {
+	    driver->next_deadline += driver->period_usecs/1000;
+	    //printf( "goodness: %d, Adjust deadline: +++ %d\n", driver->deadline_goodness, (int) driver->period_usecs*driver->latency/100 );
+	}
     } else {
+	driver->time_to_deadline = 0;
 	// bah... the packet is not there.
 	// either 
 	// - it got lost.
@@ -145,49 +189,76 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	{
 	    jack_nframes_t offset = next_frame_avail - driver->expected_framecnt;
 
-	    if( offset < driver->resync_threshold ) {
+	    //if( offset < driver->resync_threshold )
+	    if( offset < 10 ) {
 		// ok. dont do nothing. we will run without data. 
 		// this seems to be one or 2 lost packets.
+		//
+		// this can also be reordered packet jitter.
+		// (maybe this is not happening in real live)
+		//  but it happens in netem.
+
 		driver->packet_data_valid = 0;
-		//printf( "lost packet... %d\n", driver->expected_framecnt );
+
+		// I also found this happening, when the packet queue, is too full.
+		// but wtf ? use a smaller latency. this link can handle that ;S
+		if( packet_cache_get_fill( global_packcache, driver->expected_framecnt ) > 80.0 )
+		    driver->next_deadline -= driver->period_usecs/2;
+
 		
 	    } else {
-		// the diff is too high. but we have a packet.
+		// the diff is too high. but we have a packet in the future.
 		// lets resync.
 		driver->expected_framecnt = next_frame_avail;
-		packet_cache_retreive_packet( global_packcache, driver->expected_framecnt, (char *) driver->rx_buf, driver->rx_bufsize );
+		packet_cache_retreive_packet( global_packcache, driver->expected_framecnt, (char *) driver->rx_buf, driver->rx_bufsize, NULL );
+		packet_header_ntoh(pkthdr);
+		//driver->deadline_goodness = 0;
+		driver->deadline_goodness = (int)pkthdr->sync_state - (int)driver->period_usecs * offset;
 		driver->next_deadline_valid = 0;
 		driver->packet_data_valid = 1;
-		//printf( "resync... expected: %d, offset=%d\n", driver->expected_framecnt, offset );
 	    }
 	    
 	} else {
 	    // no packets in buffer.
 	    driver->packet_data_valid = 0;
-
-	    if( driver->num_lost_packets < 3 ) {
-		// increase deadline.
-		driver->next_deadline += driver->period_usecs/4;
-		// might be lost packets.
-		// continue
+	    
+	    //printf( "frame %d No Packet in queue. num_lost_packets = %d \n", driver->expected_framecnt, driver->num_lost_packets ); 
+	    if( driver->num_lost_packets < 5 ) {
+		// adjust deadline.
+		driver->next_deadline += driver->period_usecs/8;
 	    } else if( (driver->num_lost_packets <= 10) ) { 
-		// lets try adjusting the deadline, for some packets, we might have just ran 2 fast.
+		// lets try adjusting the deadline harder, for some packets, we might have just ran 2 fast.
+		driver->next_deadline += driver->period_usecs*driver->latency/8;
 	    } else {
-		// give up. lets run freely.
-		driver->running_free = 1;
 		
 		// But now we can check for any new frame available.
-		if( packet_cache_get_next_available_framecnt( global_packcache, 0, &next_frame_avail) ) {
+		// now with redundancy we would move back in most cases.
+		// we dont want that.
+		if( packet_cache_get_highest_available_framecnt( global_packcache, &next_frame_avail) ) {
 		    driver->expected_framecnt = next_frame_avail;
-		    packet_cache_retreive_packet( global_packcache, driver->expected_framecnt, (char *) driver->rx_buf, driver->rx_bufsize );
+		    packet_cache_retreive_packet( global_packcache, driver->expected_framecnt, (char *) driver->rx_buf, driver->rx_bufsize, NULL );
+		    packet_header_ntoh(pkthdr);
+		    driver->deadline_goodness = pkthdr->sync_state;
 		    driver->next_deadline_valid = 0;
 		    driver->packet_data_valid = 1;
+		    driver->running_free = 0;
+		    printf( "resync after freerun... %d\n", driver->expected_framecnt );
+		} else {
+		    // give up. lets run freely.
+		    // XXX: hmm... 
+
 		    driver->running_free = 1;
-		    //printf( "resync after freerun... %d\n", driver->expected_framecnt );
+
+		    // when we really dont see packets.
+		    // reset source address. and open possibility for new master.
+		    // maybe dsl reconnect. Also restart of netsource without fix
+		    // reply address changes port.
+		    if (driver->num_lost_packets > 200 ) {
+			driver->srcaddress_valid = 0;
+			packet_cache_reset_master_address( global_packcache );
+		    }
 		}
 	    }
-
-	    //printf( "free... %d\n", driver->expected_framecnt );
 	}
     }
 
@@ -195,11 +266,9 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	driver->num_lost_packets += 1;
     else {
 	driver->num_lost_packets = 0;
-	packet_header_ntoh (pkthdr);
+	//packet_header_ntoh (pkthdr);
     }
 
-    framecnt = driver->expected_framecnt;
-    driver->expected_framecnt += 1;
 
     
     driver->last_wait_ust = jack_get_microseconds ();
@@ -207,6 +276,7 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 
     /* this driver doesn't work so well if we report a delay */
     /* XXX: this might not be the case anymore */
+    /*      the delayed _usecs is a resync or something. */
     *delayed_usecs = 0;		/* lie about it */
     *status = 0;
     return driver->period_size;
@@ -259,7 +329,7 @@ net_driver_null_cycle (net_driver_t* driver, jack_nframes_t nframes)
 
     tx_pkthdr->sync_state = (driver->engine->control->sync_remain <= 1);
 
-    tx_pkthdr->framecnt = framecnt;
+    tx_pkthdr->framecnt = driver->expected_framecnt;
 
     // memset 0 the payload.
     int payload_size = get_sample_size(driver->bitdepth) * driver->playback_channels * driver->net_period_up;
@@ -267,11 +337,15 @@ net_driver_null_cycle (net_driver_t* driver, jack_nframes_t nframes)
 
     packet_header_hton(tx_pkthdr);
     if (driver->srcaddress_valid)
-        if (driver->reply_port)
-            driver->syncsource_address.sin_port = htons(driver->reply_port);
+    {
+	int r;
+	if (driver->reply_port)
+	    driver->syncsource_address.sin_port = htons(driver->reply_port);
 
-    netjack_sendto(driver->outsockfd, (char *)packet_buf, tx_size,
-                    0, (struct sockaddr*)&driver->syncsource_address, sizeof(struct sockaddr_in), driver->mtu);
+	for( r=0; r<driver->redundancy; r++ )
+	    netjack_sendto(driver->outsockfd, (char *)packet_buf, tx_size,
+		    0, (struct sockaddr*)&(driver->syncsource_address), sizeof(struct sockaddr_in), driver->mtu);
+    }
 
     return 0;
 }
@@ -303,13 +377,6 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
 
     packet_bufX = packet_buf + sizeof(jacknet_packet_header) / sizeof(jack_default_audio_sample_t);
 
-    //packet_header_ntoh(pkthdr);
-    // fill framecnt from pkthdr.
-
-    //if (pkthdr->framecnt != framecnt + 1)
-    //    jack_info("bogus framecount %d", pkthdr->framecnt);
-
-    framecnt = pkthdr->framecnt;
     driver->reply_port = pkthdr->reply_port;
     driver->latency = pkthdr->latency;
 
@@ -383,24 +450,32 @@ net_driver_write (net_driver_t* driver, jack_nframes_t nframes)
     packet_buf = alloca(packet_size);
     pkthdr = (jacknet_packet_header *)packet_buf;
 
-    if( driver->running_free )
+    if( driver->running_free ) {
 	return 0;
+    }
 
     // offset packet_bufX by the packetheader.
     packet_bufX = packet_buf + sizeof(jacknet_packet_header) / sizeof(jack_default_audio_sample_t);
 
     pkthdr->sync_state = (driver->engine->control->sync_remain <= 1);
-    pkthdr->framecnt = framecnt;
+    pkthdr->latency = driver->time_to_deadline;
+    //printf( "time to deadline = %d  goodness=%d\n", (int)driver->time_to_deadline, driver->deadline_goodness );
+    pkthdr->framecnt = driver->expected_framecnt;
+
 
     render_jack_ports_to_payload(driver->bitdepth, driver->playback_ports, driver->playback_srcs, nframes, packet_bufX, driver->net_period_up);
 
     packet_header_hton(pkthdr);
     if (driver->srcaddress_valid)
+    {
+	int r;
         if (driver->reply_port)
             driver->syncsource_address.sin_port = htons(driver->reply_port);
 
-    netjack_sendto(driver->outsockfd, (char *)packet_buf, packet_size,
-                    0, (struct sockaddr*)&driver->syncsource_address, sizeof(struct sockaddr_in), driver->mtu);
+	for( r=0; r<driver->redundancy; r++ )
+	    netjack_sendto(driver->outsockfd, (char *)packet_buf, packet_size,
+		    MSG_CONFIRM, (struct sockaddr*)&(driver->syncsource_address), sizeof(struct sockaddr_in), driver->mtu);
+    }
 
     return 0;
 }
@@ -556,7 +631,10 @@ net_driver_new (jack_client_t * client,
                 unsigned int transport_sync,
                 unsigned int resample_factor,
                 unsigned int resample_factor_up,
-                unsigned int bitdepth)
+                unsigned int bitdepth,
+		unsigned int use_autoconfig,
+		unsigned int latency,
+		unsigned int redundancy)
 {
     net_driver_t * driver;
     int first_pack_len;
@@ -598,8 +676,14 @@ net_driver_new (jack_client_t * client,
     driver->playback_ports    = NULL;
 
     driver->handle_transport_sync = transport_sync;
+    driver->mtu = 1400;
+    driver->latency = latency;
+    driver->redundancy = redundancy;
+
+
     driver->client = client;
     driver->engine = NULL;
+
 
     if ((bitdepth != 0) && (bitdepth != 8) && (bitdepth != 16) && (bitdepth != 1000))
     {
@@ -629,73 +713,74 @@ net_driver_new (jack_client_t * client,
     }
 
     driver->outsockfd = socket (PF_INET, SOCK_DGRAM, 0);
-    if (driver->sockfd == -1)
+    if (driver->outsockfd == -1)
     {
         jack_info ("socket error");
         return NULL;
     }
     driver->srcaddress_valid = 0;
 
-    jacknet_packet_header *first_packet = alloca (sizeof (jacknet_packet_header));
-    socklen_t address_size = sizeof (struct sockaddr_in);
-
-    jack_info ("Waiting for an incoming packet !!!");
-    jack_info ("*** IMPORTANT *** Dont connect a client to jackd until the driver is attached to a clock source !!!");
-
-    // XXX: netjack_poll polls forever.
-    //      thats ok here.
-    if (netjack_poll (driver->sockfd, 500))
-        first_pack_len = recvfrom (driver->sockfd, first_packet, sizeof (jacknet_packet_header), 0, (struct sockaddr*) & driver->syncsource_address, &address_size);
-    else
-        first_pack_len = 0;
-
-    driver->srcaddress_valid = 1;
-
-    driver->mtu = 0;
-
-    if (first_pack_len == sizeof (jacknet_packet_header))
+    if (use_autoconfig)
     {
-        packet_header_ntoh (first_packet);
+	jacknet_packet_header *first_packet = alloca (sizeof (jacknet_packet_header));
+	socklen_t address_size = sizeof (struct sockaddr_in);
 
-        jack_info ("AutoConfig Override !!!");
-        if (driver->sample_rate != first_packet->sample_rate)
-        {
-            jack_info ("AutoConfig Override: Master JACK sample rate = %d", first_packet->sample_rate);
-            driver->sample_rate = first_packet->sample_rate;
-        }
+	jack_info ("Waiting for an incoming packet !!!");
+	jack_info ("*** IMPORTANT *** Dont connect a client to jackd until the driver is attached to a clock source !!!");
 
-        if (driver->period_size != first_packet->period_size)
-        {
-            jack_info ("AutoConfig Override: Master JACK period size is %d", first_packet->period_size);
-            driver->period_size = first_packet->period_size;
-        }
-        if (driver->capture_channels_audio != first_packet->capture_channels_audio)
-        {
-            jack_info ("AutoConfig Override: capture_channels_audio = %d", first_packet->capture_channels_audio);
-            driver->capture_channels_audio = first_packet->capture_channels_audio;
-        }
-        if (driver->capture_channels_midi != first_packet->capture_channels_midi)
-        {
-            jack_info ("AutoConfig Override: capture_channels_midi = %d", first_packet->capture_channels_midi);
-            driver->capture_channels_midi = first_packet->capture_channels_midi;
-        }
-        if (driver->playback_channels_audio != first_packet->playback_channels_audio)
-        {
-            jack_info ("AutoConfig Override: playback_channels_audio = %d", first_packet->playback_channels_audio);
-            driver->playback_channels_audio = first_packet->playback_channels_audio;
-        }
-        if (driver->playback_channels_midi != first_packet->playback_channels_midi)
-        {
-            jack_info ("AutoConfig Override: playback_channels_midi = %d", first_packet->playback_channels_midi);
-            driver->playback_channels_midi = first_packet->playback_channels_midi;
-        }
-        driver->capture_channels  = driver->capture_channels_audio + driver->capture_channels_midi;
-        driver->playback_channels = driver->playback_channels_audio + driver->playback_channels_midi;
+	// XXX: netjack_poll polls forever.
+	//      thats ok here.
+	if (netjack_poll (driver->sockfd, 500))
+	    first_pack_len = recvfrom (driver->sockfd, first_packet, sizeof (jacknet_packet_header), 0, (struct sockaddr*) & driver->syncsource_address, &address_size);
+	else
+	    first_pack_len = 0;
 
-        driver->mtu = first_packet->mtu;
-        jack_info ("MTU is set to %d bytes", first_packet->mtu);
-        driver->latency = first_packet->latency;
+	driver->srcaddress_valid = 1;
+
+	if (first_pack_len == sizeof (jacknet_packet_header))
+	{
+	    packet_header_ntoh (first_packet);
+
+	    jack_info ("AutoConfig Override !!!");
+	    if (driver->sample_rate != first_packet->sample_rate)
+	    {
+		jack_info ("AutoConfig Override: Master JACK sample rate = %d", first_packet->sample_rate);
+		driver->sample_rate = first_packet->sample_rate;
+	    }
+
+	    if (driver->period_size != first_packet->period_size)
+	    {
+		jack_info ("AutoConfig Override: Master JACK period size is %d", first_packet->period_size);
+		driver->period_size = first_packet->period_size;
+	    }
+	    if (driver->capture_channels_audio != first_packet->capture_channels_audio)
+	    {
+		jack_info ("AutoConfig Override: capture_channels_audio = %d", first_packet->capture_channels_audio);
+		driver->capture_channels_audio = first_packet->capture_channels_audio;
+	    }
+	    if (driver->capture_channels_midi != first_packet->capture_channels_midi)
+	    {
+		jack_info ("AutoConfig Override: capture_channels_midi = %d", first_packet->capture_channels_midi);
+		driver->capture_channels_midi = first_packet->capture_channels_midi;
+	    }
+	    if (driver->playback_channels_audio != first_packet->playback_channels_audio)
+	    {
+		jack_info ("AutoConfig Override: playback_channels_audio = %d", first_packet->playback_channels_audio);
+		driver->playback_channels_audio = first_packet->playback_channels_audio;
+	    }
+	    if (driver->playback_channels_midi != first_packet->playback_channels_midi)
+	    {
+		jack_info ("AutoConfig Override: playback_channels_midi = %d", first_packet->playback_channels_midi);
+		driver->playback_channels_midi = first_packet->playback_channels_midi;
+	    }
+
+	    driver->mtu = first_packet->mtu;
+	    jack_info ("MTU is set to %d bytes", first_packet->mtu);
+	    driver->latency = first_packet->latency;
+	}
     }
+    driver->capture_channels  = driver->capture_channels_audio + driver->capture_channels_midi;
+    driver->playback_channels = driver->playback_channels_audio + driver->playback_channels_midi;
 
     // After possible Autoconfig: do all calculations...
     driver->period_usecs =
@@ -720,6 +805,8 @@ net_driver_new (jack_client_t * client,
     driver->expected_framecnt_valid = 0;
     driver->num_lost_packets = 0;
     driver->next_deadline_valid = 0;
+    driver->deadline_goodness = 0;
+    driver->time_to_deadline = 0;
 
     // Special handling for latency=0
     if( driver->latency == 0 )
@@ -748,7 +835,7 @@ driver_get_descriptor ()
 
     desc = calloc (1, sizeof (jack_driver_desc_t));
     strcpy (desc->name, "net");
-    desc->nparams = 12;
+    desc->nparams = 15;
 
     params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
@@ -844,14 +931,41 @@ driver_get_descriptor ()
     strcpy (params[i].short_desc,
             "Sample bit-depth (0 for float, 8 for 8bit and 16 for 16bit)");
     strcpy (params[i].long_desc, params[i].short_desc);
-    i++;
 
+    i++;
     strcpy (params[i].name, "transport-sync");
     params[i].character  = 't';
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 1U;
     strcpy (params[i].short_desc,
             "Whether to slave the transport to the master transport");
+    strcpy (params[i].long_desc, params[i].short_desc);
+
+    i++;
+    strcpy (params[i].name, "autoconf");
+    params[i].character  = 'a';
+    params[i].type       = JackDriverParamUInt;
+    params[i].value.ui   = 1U;
+    strcpy (params[i].short_desc,
+            "Whether to use Autoconfig, or just start.");
+    strcpy (params[i].long_desc, params[i].short_desc);
+
+    i++;
+    strcpy (params[i].name, "latency");
+    params[i].character  = 'L';
+    params[i].type       = JackDriverParamUInt;
+    params[i].value.ui   = 5U;
+    strcpy (params[i].short_desc,
+            "Latency setting");
+    strcpy (params[i].long_desc, params[i].short_desc);
+
+    i++;
+    strcpy (params[i].name, "redundancy");
+    params[i].character  = 'R';
+    params[i].type       = JackDriverParamUInt;
+    params[i].value.ui   = 1U;
+    strcpy (params[i].short_desc,
+            "Send packets N times");
     strcpy (params[i].long_desc, params[i].short_desc);
 
     desc->params = params;
@@ -875,6 +989,9 @@ driver_initialize (jack_client_t *client, const JSList * params)
     unsigned int resample_factor_up = 0;
     unsigned int bitdepth = 0;
     unsigned int handle_transport_sync = 1;
+    unsigned int use_autoconfig = 1;
+    unsigned int latency = 5;
+    unsigned int redundancy = 1;
     const JSList * node;
     const jack_driver_param_t * param;
 
@@ -936,6 +1053,18 @@ driver_initialize (jack_client_t *client, const JSList * params)
             case 't':
                 handle_transport_sync = param->value.ui;
                 break;
+
+            case 'a':
+                use_autoconfig = param->value.ui;
+                break;
+
+            case 'L':
+                latency = param->value.ui;
+                break;
+
+            case 'R':
+                redundancy = param->value.ui;
+                break;
         }
     }
 
@@ -943,7 +1072,8 @@ driver_initialize (jack_client_t *client, const JSList * params)
                            capture_ports_midi, playback_ports_midi,
                            sample_rate, period_size,
                            listen_port, handle_transport_sync,
-                           resample_factor, resample_factor_up, bitdepth);
+                           resample_factor, resample_factor_up, bitdepth,
+			   use_autoconfig, latency, redundancy);
 }
 
 void

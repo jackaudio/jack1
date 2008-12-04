@@ -56,8 +56,8 @@ struct _jacknet_packet_header
     // Packet loss Detection, and latency reduction
     jack_nframes_t framecnt;
     jack_nframes_t latency;
-    jack_nframes_t reply_port;
 
+    jack_nframes_t reply_port;
     jack_nframes_t mtu;
     jack_nframes_t fragment_nr;
 };
@@ -79,6 +79,7 @@ struct _cache_packet
     int		    num_fragments;
     int		    packet_size;
     int		    mtu;
+    jack_time_t	    recv_timestamp;
     jack_nframes_t  framecnt;
     char *	    fragment_array;
     char *	    packet_buf;
@@ -91,6 +92,8 @@ struct _packet_cache
     int size;
     cache_packet *packets;
     int mtu;
+    struct sockaddr_in master_address;
+    int master_address_valid;
 };
 
 extern packet_cache *global_packcache;
@@ -110,8 +113,11 @@ void	cache_packet_add_fragment(cache_packet *pack, char *packet_buf, int rcv_len
 int	cache_packet_is_complete(cache_packet *pack);
 
 void packet_cache_drain_socket( packet_cache *pcache, int sockfd );
-int packet_cache_retreive_packet( packet_cache *pcache, jack_nframes_t framecnt, char *packet_buf, int pkt_size );
+void packet_cache_reset_master_address( packet_cache *pcache );
+float packet_cache_get_fill( packet_cache *pcache, jack_nframes_t expected_framecnt );
+int packet_cache_retreive_packet( packet_cache *pcache, jack_nframes_t framecnt, char *packet_buf, int pkt_size, jack_time_t *timestamp );
 int packet_cache_get_next_available_framecnt( packet_cache *pcache, jack_nframes_t expected_framecnt, jack_nframes_t *framecnt );
+int packet_cache_get_highest_available_framecnt( packet_cache *pcache, jack_nframes_t *framecnt );
 int packet_cache_find_latency( packet_cache *pcache, jack_nframes_t expected_framecnt, jack_nframes_t *framecnt );
 // Function Prototypes
 
