@@ -251,6 +251,15 @@ AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
 JACK_CORE_CFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
 -I\$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
 
+JACK_LIBC_HELPER_FLAGS=
+AC_ARG_ENABLE(ancient_libc,
+	AC_HELP_STRING([--enable-ancient-libc],[Add required CFLAGS for libc versions too old to expose PThread R/W Lock and other modern code]),
+	JACK_LIBC_HELPER_FLAGS="-D_XOPEN_SOURCE=600 -D_BSD_SOURCE",
+	JACK_LIBC_HELPER_FLAGS=""
+	)
+	 
+JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS $JACK_LIBC_HELPER_FLAGS"   
+
 AC_ARG_WITH(cpu-target,
             [  --with-cpu-target=cpu-type    explicit, overriding argument for gcc -march= flag])
 
@@ -265,7 +274,7 @@ dnl ----------------------------------------------------------------------
 if test "$target_cpu" = "powerpc64" ; then
 
     AC_ARG_ENABLE(cell,
-	[  --enable-cell           enable Cell BE support (default=no)],,
+	AC_HELP_STRING([--enable-cell],[enable Cell BE support (default=no)]),,
 	[ enable_cell=no ])
 
     if test "x$enable_cell" = xyes; then
@@ -283,7 +292,7 @@ if test "$target_cpu" = "powerpc" -o "$target_cpu" = "powerpc64" ; then
 ############################
 
     AC_ARG_ENABLE(altivec,
-	[  --enable-altivec        enable Altivec support (default=auto)],,
+	AC_HELP_STRING([--enable-altivec],[enable Altivec support (default=auto)]),,
 	[ enable_altivec=yes ])
     
     if test "x$enable_altivec" = xyes; then
