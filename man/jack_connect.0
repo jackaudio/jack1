@@ -1,0 +1,12 @@
+.TH JACK_CONNECT "!DATE!" "!VERSION!"
+.SH NAME
+jack_connect \- A JACK Audio Connection Kit toolkit client
+.SH SYNOPSYS
+.B jack_connect
+[ -s | --server servername ] [ -h | --help ] port1 port2
+.SH DESCRIPTION
+.B jack_connect
+connects the two named ports.
+.SH RETURNS
+The exit status is zero if successful, 1 otherwise
+

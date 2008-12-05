@@ -1,4 +1,4 @@
-.TH JACK_CONNECT "1" "August 2003" "0.91.1"
+.TH JACK_CONNECT "!DATE!" "!VERSION!"
 .SH NAME
 jack_monitor_client \- The JACK Audio Connection Kit example client
 .SH SYNOPSYS

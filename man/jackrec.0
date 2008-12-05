@@ -1,0 +1,10 @@
+.TH JACKREC "!DATE!" "!VERSION!"
+.SH NAME
+jackrec \- The JACK Audio Connection Kit example client
+.SH SYNOPSYS
+.B jackrec
+-f filename [ -d second ] [ -b bitdepth ] port1 [ port2 ... ]
+.SH DESCRIPTION
+.B jackrec
+
+

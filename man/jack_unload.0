@@ -1,4 +1,4 @@
-.TH JACK_UNLOAD "1" "August 2003" "0.91.1"
+.TH JACK_UNLOAD "!DATE!" "!VERSION!"
 .SH NAME
 jack_unload \- The JACK Audio Connection Kit example client
 .SH SYNOPSYS

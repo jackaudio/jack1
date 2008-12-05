@@ -878,6 +878,7 @@ drivers/firewire/Makefile
 drivers/netjack/Makefile
 example-clients/Makefile
 tools/Makefile
+man/Makefile
 jack.pc
 jack.spec
 jack/Makefile

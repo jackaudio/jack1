@@ -1,4 +1,4 @@
-.TH JACK_IMPULSE_GRABBER "1" "June 2002" "0.91.1"
+.TH JACK_IMPULSE_GRABBER "!DATE!" "!VERSION!"
 .SH NAME
 jack_impulse_grabber \- The JACK Audio Connection Kit example client
 .SH SYNOPSYS
