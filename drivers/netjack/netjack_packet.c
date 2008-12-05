@@ -471,7 +471,7 @@ packet_cache_drain_socket( packet_cache *pcache, int sockfd )
     jack_nframes_t framecnt;
     cache_packet *cpack;
     struct sockaddr_in sender_address;
-    socklen_t senderlen;
+    socklen_t senderlen = sizeof( struct sockaddr_in );
 
     while (1)
     {
