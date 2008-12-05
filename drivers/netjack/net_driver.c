@@ -167,11 +167,11 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	    */
 
 	if( driver->deadline_goodness < 1*(int)driver->period_usecs/8*driver->latency ) {
-	    driver->next_deadline -= driver->period_usecs/1000;
+	    driver->next_deadline -= driver->period_usecs/100;
 	    //printf( "goodness: %d, Adjust deadline: --- %d\n", driver->deadline_goodness, (int) driver->period_usecs*driver->latency/100 );
 	}
 	if( driver->deadline_goodness > 1*(int)driver->period_usecs/8*driver->latency ) {
-	    driver->next_deadline += driver->period_usecs/1000;
+	    driver->next_deadline += driver->period_usecs/100;
 	    //printf( "goodness: %d, Adjust deadline: +++ %d\n", driver->deadline_goodness, (int) driver->period_usecs*driver->latency/100 );
 	}
     } else {
