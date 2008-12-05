@@ -28,9 +28,6 @@
 
 #include <jack/jack.h>
 
-jack_port_t *input_port;
-jack_port_t *output_port;
-int connecting, disconnecting;
 #define TRUE 1
 #define FALSE 0
 
@@ -44,10 +41,8 @@ void
 show_usage (char *my_name)
 {
 	show_version (my_name);
-	fprintf (stderr, "\nusage: %s [options] <src_port> <dst_port>\n", my_name);
+	fprintf (stderr, "\nusage: %s [options] port1 port2\n", my_name);
 	fprintf (stderr, "Connects two JACK ports together.\n\n");
-	fprintf (stderr, "        The source port must be an output port of the source client.\n");
-	fprintf (stderr, "        The destination port must be an input port of the destination client.\n");
 	fprintf (stderr, "        -s, --server <name>   Connect to the jack server named <name>\n");
 	fprintf (stderr, "        -v, --version         Output version information and exit\n");
 	fprintf (stderr, "        -h, --help            Display this help message\n\n");
@@ -60,25 +55,31 @@ main (int argc, char *argv[])
 	jack_client_t *client;
 	jack_status_t status;
 	char *server_name = NULL;
-    int c;
-    int option_index;
-    jack_options_t options = JackNoStartServer;
+	int c;
+	int option_index;
+	jack_options_t options = JackNoStartServer;
 	char *my_name = strrchr(argv[0], '/');
+	jack_port_t *src_port = 0;
+	jack_port_t *dst_port = 0;
+	jack_port_t *port1 = 0;
+	jack_port_t *port2 = 0;
+	int connecting, disconnecting;
+	int port1_flags, port2_flags;
 
 	struct option long_options[] = {
 	    { "server", 1, 0, 's' },
-		{ "help", 0, 0, 'h' },
-		{ "version", 0, 0, 'v' },
-		{ 0, 0, 0, 0 }
+	    { "help", 0, 0, 'h' },
+	    { "version", 0, 0, 'v' },
+	    { 0, 0, 0, 0 }
 	};
 
-	while ((c = getopt_long (argc, argv, "s:AclLphvt", long_options, &option_index)) >= 0) {
+	while ((c = getopt_long (argc, argv, "s:hv", long_options, &option_index)) >= 0) {
 		switch (c) {
 		case 's':
-            server_name = (char *) malloc (sizeof (char) * strlen(optarg));
-            strcpy (server_name, optarg);
-            options |= JackServerName;
-            break;
+			server_name = (char *) malloc (sizeof (char) * strlen(optarg));
+			strcpy (server_name, optarg);
+			options |= JackServerName;
+			break;
 		case 'h':
 			show_usage (my_name);
 			return 1;
@@ -98,19 +99,18 @@ main (int argc, char *argv[])
 	if (my_name == 0) {
 		my_name = argv[0];
 	} else {
-	my_name ++;
+		my_name ++;
 	}
 
 	if (strstr(my_name, "disconnect")) {
-		disconnecting = TRUE;
-	} else
-	if (strstr(my_name, "connect")) {
-		connecting = TRUE;
+		disconnecting = 1;
+	} else if (strstr(my_name, "connect")) {
+		connecting = 1;
 	} else {
 		fprintf(stderr, "ERROR! client should be called jack_connect or jack_disconnect. client is called %s\n", my_name);
 		return 1;
 	}
-
+	
 	if (argc < 3) show_usage(my_name);
 
 	/* try to become a client of the JACK server */
@@ -120,29 +120,34 @@ main (int argc, char *argv[])
 		return 1;
 	}
 
-	/* display the current sample rate. once the client is activated 
-	   (see below), you should rely on your own sample rate
-	   callback (see above) for this value.
-	*/
-
-	printf ("engine sample rate: %" PRIu32 "\n",
-		jack_get_sample_rate (client));
-
 	/* find the two ports */
 
-	if ((input_port = jack_port_by_name(client, argv[argc-1])) == 0) {
+	if ((port1 = jack_port_by_name(client, argv[argc-1])) == 0) {
 		fprintf (stderr, "ERROR %s not a valid port\n", argv[argc-1]);
 		return 1;
 		}
-	if ((output_port = jack_port_by_name(client, argv[argc-2])) == 0) {
+	if ((port2 = jack_port_by_name(client, argv[argc-2])) == 0) {
 		fprintf (stderr, "ERROR %s not a valid port\n", argv[argc-2]);
 		return 1;
 		}
 
-	/* tell the JACK server that we are ready to roll */
+	port1_flags = jack_port_flags (port1);
+	port2_flags = jack_port_flags (port2);
 
-	if (jack_activate (client)) {
-		fprintf (stderr, "cannot activate client");
+	if (port1_flags & JackPortIsInput) {
+		if (port2_flags & JackPortIsOutput) {
+			src_port = port2;
+			dst_port = port1;
+		}
+	} else {
+		if (port2_flags & JackPortIsInput) {
+			src_port = port1;
+			dst_port = port2;
+		}
+	}
+
+	if (!src_port || !dst_port) {
+		fprintf (stderr, "arguments must include 1 input port and 1 output port\n");
 		return 1;
 	}
 
@@ -150,19 +155,14 @@ main (int argc, char *argv[])
 	   the client is activated (this may change in the future).
 	*/
 
-/* jack_port_connect not implemented
-	if (jack_port_connect(client, input_port, output_port)) {
-		fprintf (stderr, "cannot connect ports\n");
-	}
-*/
 	if (connecting) {
-		if (jack_connect(client, jack_port_name(input_port), jack_port_name(output_port))) {
+		if (jack_connect(client, jack_port_name(src_port), jack_port_name(dst_port))) {
 			fprintf (stderr, "cannot connect ports\n");
 			return 1;
 	}
 	}
 	if (disconnecting) {
-		if (jack_disconnect(client, jack_port_name(input_port), jack_port_name(output_port))) {
+		if (jack_disconnect(client, jack_port_name(src_port), jack_port_name(dst_port))) {
 			fprintf (stderr, "cannot disconnect ports\n");
 			return 1;
 	}
