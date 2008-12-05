@@ -1,17 +1,22 @@
-.TH ALSA_IO "1" "December 2008" "0.116.0"
+.TH ALSA_IO "1" "!DATE!" "!VERSION!"
 .SH NAME
-\fBalsa_in\fR, \fBalsa_out\fR \- Jack Clients, that bind to an unsynchronised Soundcard.
+\fBalsa_in\fR, \fBalsa_out\fR \- Jack clients that perform I/O with an alternate audio interface
 .SH SYNOPSYS
 \fBalsa_in\fR [\fIoptions\fR]
 .br
 \fBalsa_out\fR [\fIoptions\fR]
 
 .SH DESCRIPTION
-A Jack Client, that opens a specified soundcard, and plays the audio
-data from its input Port to the Soundcard. This Soundcard does not
-need to be synchronized with the jackd Clocksource.
+A JACK client that opens a specified audio interface (different to the
+one used by the JACK server, if any) and moves audio data between its
+JACK ports and the interface. alsa_in will provide data from the
+interface (potentially for capture); alsa_out will deliver data to it
+(for playback).
 
-alsa_in/alsa_out tries to resample the output stream, to reduce clicks.
+The audio interface used by alsa_in/alsa_out does not need to be
+synchronized with JACK backend (or the hardware it might be using).
+alsa_in/alsa_out tries to resample the output stream in an attempt to
+compensate for drift between the two clocks.
 
 .SH OPTIONS
 .TP
@@ -65,6 +70,4 @@ Set number of periods. See note for period_size.
 
 .SH AUTHOR
 Torben Hohn
-.PP
-This manpage was written by Torben Hohn <torbenh@gmx.de> 
 
