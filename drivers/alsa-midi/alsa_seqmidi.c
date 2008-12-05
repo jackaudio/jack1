@@ -165,13 +165,13 @@ static port_type_t port_type[2] = {
 	{
 		SND_SEQ_PORT_CAP_SUBS_READ,
 		JackPortIsOutput,
-		"playback",
+		"capture",
 		do_jack_input
 	},
 	{
 		SND_SEQ_PORT_CAP_SUBS_WRITE,
 		JackPortIsInput,
-		"capture",
+		"playback",
 		do_jack_output
 	}
 };
