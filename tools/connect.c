@@ -157,15 +157,13 @@ main (int argc, char *argv[])
 
 	if (connecting) {
 		if (jack_connect(client, jack_port_name(src_port), jack_port_name(dst_port))) {
-			fprintf (stderr, "cannot connect ports\n");
 			return 1;
-	}
+		}
 	}
 	if (disconnecting) {
 		if (jack_disconnect(client, jack_port_name(src_port), jack_port_name(dst_port))) {
-			fprintf (stderr, "cannot disconnect ports\n");
 			return 1;
-	}
+		}
 	}
 
 	jack_client_close (client);
