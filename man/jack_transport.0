@@ -1,4 +1,4 @@
-.TH JACK_TRANSPORT "!DATE!" "!VERSION!"
+.TH JACK_TRANSPORT "1" "!DATE!" "!VERSION!"
 .SH NAME
 jack_transport \- The JACK Audio Connection Kit example client
 .SH SYNOPSYS

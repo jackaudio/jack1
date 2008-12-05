@@ -1,4 +1,4 @@
-.TH JACKREC "!DATE!" "!VERSION!"
+.TH JACKREC "1" "!DATE!" "!VERSION!"
 .SH NAME
 jackrec \- The JACK Audio Connection Kit example client
 .SH SYNOPSYS

@@ -1,4 +1,4 @@
-.TH JACK_FREEWHEEL "!DATE!" "!VERSION!"
+.TH JACK_FREEWHEEL "1" "!DATE!" "!VERSION!"
 .SH NAME
 jack_freewheel \- The JACK Audio Connection Kit example client
 .SH SYNOPSYS

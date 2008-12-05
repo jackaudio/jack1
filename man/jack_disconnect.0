@@ -1,13 +1,1 @@
-.TH JACK_DISCONNECT "!DATE!" "!VERSION!"
-.SH NAME
-jack_disconnect \- A JACK Audio Connection Kit toolkit client
-.SH SYNOPSYS
-.B jack_disconnect
-port1 port2
-.SH DESCRIPTION
-.B jack_disconnect
-disconnects the two named ports.
-.SH RETURNS
-The exit status is zero if successful, 1 otherwise.
-
-
+.so jack_connect.1

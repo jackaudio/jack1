@@ -1,4 +1,4 @@
-.TH JACK_BUFSIZE "!DATE!" "!VERSION!"
+.TH JACK_BUFSIZE "1" "!DATE!" "!VERSION!"
 .SH NAME
 jack_bufsize \- The JACK Audio Connection Kit example client
 .SH SYNOPSYS
