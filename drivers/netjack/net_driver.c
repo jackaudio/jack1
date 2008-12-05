@@ -469,12 +469,19 @@ net_driver_write (net_driver_t* driver, jack_nframes_t nframes)
     if (driver->srcaddress_valid)
     {
 	int r;
+
+#ifdef __APPLE__
+	static const int flag = 0;
+#else
+	static const int flag = MSG_CONFIRM;
+#endif
+
         if (driver->reply_port)
             driver->syncsource_address.sin_port = htons(driver->reply_port);
 
 	for( r=0; r<driver->redundancy; r++ )
 	    netjack_sendto(driver->outsockfd, (char *)packet_buf, packet_size,
-		    MSG_CONFIRM, (struct sockaddr*)&(driver->syncsource_address), sizeof(struct sockaddr_in), driver->mtu);
+			   flag, (struct sockaddr*)&(driver->syncsource_address), sizeof(struct sockaddr_in), driver->mtu);
     }
 
     return 0;

@@ -476,7 +476,7 @@ packet_cache_drain_socket( packet_cache *pcache, int sockfd )
     while (1)
     {
         rcv_len = recvfrom (sockfd, rx_packet, pcache->mtu, MSG_DONTWAIT,
-			    &sender_address, &senderlen);
+			    (struct sockaddr*) &sender_address, &senderlen);
         if (rcv_len < 0)
             return;
 
@@ -763,7 +763,7 @@ netjack_sendto (int sockfd, char *packet_buf, int pkt_size, int flags, struct so
         //jack_error("last fragment_count = %d, payload_size = %d\n", fragment_count, last_payload_size);
 
         // sendto(last_pack_size);
-        sendto(sockfd, tx_packet, last_payload_size + sizeof(jacknet_packet_header), flags, addr, addr_size);
+        err = sendto(sockfd, tx_packet, last_payload_size + sizeof(jacknet_packet_header), flags, addr, addr_size);
 	if( err<0 ) {
 	    printf( "error in send\n" );
 	    perror( "send" );
