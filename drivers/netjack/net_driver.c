@@ -167,11 +167,11 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	    */
 
 	if( driver->deadline_goodness < 1*(int)driver->period_usecs/8*driver->latency ) {
-	    driver->next_deadline -= driver->period_usecs/100;
+	    driver->next_deadline -= driver->period_usecs/1000;
 	    //printf( "goodness: %d, Adjust deadline: --- %d\n", driver->deadline_goodness, (int) driver->period_usecs*driver->latency/100 );
 	}
 	if( driver->deadline_goodness > 1*(int)driver->period_usecs/8*driver->latency ) {
-	    driver->next_deadline += driver->period_usecs/100;
+	    driver->next_deadline += driver->period_usecs/1000;
 	    //printf( "goodness: %d, Adjust deadline: +++ %d\n", driver->deadline_goodness, (int) driver->period_usecs*driver->latency/100 );
 	}
     } else {
@@ -225,10 +225,10 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	    //printf( "frame %d No Packet in queue. num_lost_packets = %d \n", driver->expected_framecnt, driver->num_lost_packets ); 
 	    if( driver->num_lost_packets < 5 ) {
 		// adjust deadline.
-		driver->next_deadline += driver->period_usecs/8;
+		//driver->next_deadline += driver->period_usecs/8;
 	    } else if( (driver->num_lost_packets <= 10) ) { 
 		// lets try adjusting the deadline harder, for some packets, we might have just ran 2 fast.
-		driver->next_deadline += driver->period_usecs*driver->latency/8;
+		//driver->next_deadline += driver->period_usecs*driver->latency/8;
 	    } else {
 		
 		// But now we can check for any new frame available.
