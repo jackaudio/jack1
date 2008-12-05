@@ -187,7 +187,12 @@ setup_disk_thread (jack_thread_info_t *info)
 		exit (1);
 	}
 
-	info->duration *= sf_info.samplerate;
+	if (info->duration == 0) {
+		info->duration = JACK_MAX_FRAMES;
+	} else {
+		info->duration *= sf_info.samplerate;
+	}
+
 	info->can_capture = 0;
 
 	pthread_create (&info->thread_id, NULL, disk_thread, info);
