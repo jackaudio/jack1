@@ -1,14 +1,11 @@
 .TH JACK_IMPULSE_GRABBER "1" "!DATE!" "!VERSION!"
 .SH NAME
-jack_impulse_grabber \- The JACK Audio Connection Kit example client
+jack_impulse_grabber \- JACK toolkit client to grab an impulse (response)
 .SH SYNOPSYS
-.B jack_impulse_grabber
--d duration [-f (C|gnuplot)]
+\fBjack_impulse_grabber\fR \fB-d\fR \fIduration\fR [\fI-f\fR (C|gnuplot)]
 .SH DESCRIPTION
-.B jack_impulse_grabber
-is an example client for the JACK Audio Connection Kit.
-.SH AUTHORS
-Paul Davis and others.
-.PP
-This manpage was written by Stefan Schwandter <e9925373@student.tuwien.ac.at>
+\fBjack_impulse_grabber\fR is a JACK example client for collecting
+impulses recordings from JACK ports.
+
+
 

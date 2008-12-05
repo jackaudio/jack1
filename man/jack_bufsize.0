@@ -1,15 +1,12 @@
 .TH JACK_BUFSIZE "1" "!DATE!" "!VERSION!"
 .SH NAME
-jack_bufsize \- The JACK Audio Connection Kit example client
+jack_bufsize \- JACK toolkit client to change the JACK buffer size
 .SH SYNOPSYS
 .B jack_bufsize bufsize
 .SH DESCRIPTION
 .B jack_bufsize
 jack_bufsize sets the size of the buffer (frames per period) used in JACK. 
-This change happens on-line (jackd and its clients do not need to be 
+This change happens on-line (the JACK server and its clients do not need to be 
 restarted).
-.SH AUTHOR
-Paul Davis
-.PP
-This manpage was written by Robert Jordens <jordens@debian.org> for Debian.
+
 

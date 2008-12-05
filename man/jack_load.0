@@ -1,20 +1,28 @@
 .TH JACK_LOAD "1" "!DATE!" "!VERSION!"
 .SH NAME
-jack_load \- The JACK Audio Connection Kit example client
+jack_load \- JACK toolkit client for loading in-process clients
 .SH SYNOPSYS
-.B jack_load
-client-name so-name [so-data]
-.PP
-The client-name must be a yet unused client name.
-The so-name is the name of a plugin under /usr/lib/libjack*.
+\fBjack_load\fR [ \fI-i\fR initstring ] [ \fI-s\fR servername ] [\fI-w\fR ] client-name so-name [ initstring ]
 .SH DESCRIPTION
-.B jack_load
-is an example client for the JACK Audio Connection Kit. It loads the
-specified plugin and creates a client.
-.SH EXAMPLE
-.B jack_load in_process_test inprocess
+\fBjack_load\fR is a JACK toolkit client. It loads the specified plugin and creates an in-process client.
+.ARGUMENTS
+.PP
+The client-name must be a currently unused client name.
+.PP
+The so-name is the name of file that client code is stored in (typically, \fIclientname.so\fR)
+.SH OPTIONS
+.TP
+\fB-i\fR, \fB--init\fR init-string
+.br
+initialization string passed to the in-process client. Note that this can also be specified as the last argument on the command line.
+.TP
+\fB-s\fR, \fB--server\fR servername
+.br
+Name of JACK server to connect to
+.TP
+\fB-w\fR, \fB--wait\fR
+Wait for a signal (eg. from Ctrl-c) and then unload the client.
 .SH AUTHOR
 Jeremy Hall
-.PP
-This manpage was written by Robert Jordens <rjo@gmx.de> for Debian.
+
 
