@@ -1,0 +1,70 @@
+.TH ALSA_IO "1" "December 2008" "0.116.0"
+.SH NAME
+\fBalsa_in\fR, \fBalsa_out\fR \- Jack Clients, that bind to an unsynchronised Soundcard.
+.SH SYNOPSYS
+\fBalsa_in\fR [\fIoptions\fR]
+.br
+\fBalsa_out\fR [\fIoptions\fR]
+
+.SH DESCRIPTION
+A Jack Client, that opens a specified soundcard, and plays the audio
+data from its input Port to the Soundcard. This Soundcard does not
+need to be synchronized with the jackd Clocksource.
+
+alsa_in/alsa_out tries to resample the output stream, to reduce clicks.
+
+.SH OPTIONS
+.TP
+\fB\-j \fI jack_client_name\fR
+.br
+Set Client Name.
+.TP
+\fB\-d \fI alsa_device\fR  
+.br
+Use this Soundcard.
+.TP
+\fB\-c \fI channels\fR  
+.br
+Set Number of channels.
+.TP
+\fB\-r \fI sample_rate\fR  
+.br
+Set sample_rate. The program resamples as necessary.
+So you can connect a 44k1 jackd to a soundcard only supporting
+48k.
+.TP
+\fB\-m \fI max_diff\fR  
+.br
+The value when a soft xrun occurs. Basically the window, in which
+the dma pointer may jitter. If you see "delay=" in the output of alsa_out
+this is too small.
+.br
+Make sure target_delay is bigger than this.
+.TP
+\fB\-t \fI target_delay\fR  
+.br
+The delay alsa_io should try to approach. Tune this to get lower latency.
+Must be bigger than max_diff for alsa_out, and should be bigger than max_diff+jackd_period
+for alsa_in. 
+.TP
+\fB\-f \fI catch_factor\fR  
+.br
+This value sets how fast the samplerate will change.
+default is 1000. Try 10000 when you have good relation between
+your clocksources. This will make resampling inaudible for example.
+.TP
+\fB\-p \fI period_size\fR  
+.br
+Set the period size. It is not related to the jackd period_size.
+Sometimes it affects the quality of the delay measurements.
+Thats why its configurable.
+.TP
+\fB\-n \fI num_period\fR  
+.br
+Set number of periods. See note for period_size.
+
+.SH AUTHOR
+Torben Hohn
+.PP
+This manpage was written by Torben Hohn <torbenh@gmx.de> 
+
