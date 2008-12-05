@@ -255,6 +255,7 @@ int process (jack_nframes_t nframes, void *arg) {
     //absolute_delay = delay;
     //delay = delay - jack_frames_since_cycle_start( client );
 
+	//output_new_delay = (int) delay;
 
     // Do it the hard way.
     // this is for compensating xruns etc...
@@ -265,75 +266,62 @@ int process (jack_nframes_t nframes, void *arg) {
 	soundcard_frames += (delay-target_delay);
 	output_new_delay = (int) delay;
 	dont_adjust_resampling_factor = 1;
-	//delay = target_delay;
+	delay = target_delay;
 	// XXX: at least set it to that value.
-	//current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
+	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
     }
     if( delay < (target_delay-max_diff) ) {
 	snd_pcm_rewind( alsa_handle, target_delay - delay );
 	soundcard_frames -= (target_delay-delay);
 	output_new_delay = (int) delay;
 	dont_adjust_resampling_factor = 1;
-	//delay = target_delay;
+	delay = target_delay;
 	// XXX: at least set it to that value.
-	//current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
+	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
     }
 
-    if( 0 ) {
-    /* ok... now we should have target_delay +- max_diff on the alsa side.
-     *
-     * calculate the number of frames, we want to get.
-     */
+    if( 1 ) {
+	    double resamp_rate = (double)jack_sample_rate / (double)sample_rate;  // == nframes / alsa_samples.
+	    double request_samples = nframes / resamp_rate;  //== alsa_samples;
 
-    // float resamp_rate = (float)jack_sample_rate / (float)sample_rate;  // == nframes / alsa_samples.
-    // float request_samples = nframes / resamp_rate;  //== alsa_samples;
+	    double offset = delay - target_delay;
 
-    //float offset = delay - target_delay;
+	    double frlen = request_samples + offset;
+	    double compute_factor = (double) nframes / frlen;
 
-    //float frlen = request_samples + offset / catch_factor;
-    //rlen = ceil( frlen );
+	    double diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
 
-    // This is the code from the alsa_out...
+	    current_resample_factor -= diff_value;
 
-    double resamp_rate = (double)jack_sample_rate / (double)sample_rate;  // == nframes / alsa_samples.
-    double request_samples = nframes / resamp_rate;  //== alsa_samples;
-    //double request_samples = nframes / current_resample_factor;  //== alsa_samples;
+	    // clamp...
+	    current_resample_factor = current_resample_factor < 0.25 ? 0.25 : current_resample_factor;
 
-    double offset = delay - target_delay;
-
-    //double frlen = request_samples - offset / catch_factor;
-    double frlen = request_samples + offset;
-    //alsa_out.c: double compute_factor = frlen / (double) nframes;
-    double compute_factor = (double) nframes / frlen;
-
-    double diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
-
-    current_resample_factor -= diff_value;
-
-    current_resample_factor = current_resample_factor < 0.25 ? 0.25 : current_resample_factor;
+	    output_resampling_factor = (float) current_resample_factor;
+	    output_offset = offset;
+	    output_diff = diff_value;
     }
-
-    time_smoother_get_linear_params( smoother, this_frame_time, this_soundcard_time, jack_get_sample_rate(client)/4,
-				     &a, &b );
-
-    if( !dont_adjust_resampling_factor )
-	current_resample_factor = b - a/(double)nframes/(double)catch_factor;
     else
-	current_resample_factor = b;
+    {
+	    time_smoother_get_linear_params( smoother, this_frame_time, this_soundcard_time, jack_get_sample_rate(client)/4,
+			    &a, &b );
 
-    double offset = a;
-    double diff_value = b;
+	    if( !dont_adjust_resampling_factor )
+		    current_resample_factor = b - a/(double)nframes/(double)catch_factor;
+	    else
+		    current_resample_factor = b;
+
+	    double offset = a;
+	    double diff_value = b;
 
 
-    output_resampling_factor = (float) current_resample_factor;
-    //if( fabs( offset ) > fabs( output_offset ) ) {
-	output_diff = (float) diff_value;
-	output_offset = (float) offset;
-    //}
+	    output_resampling_factor = (float) current_resample_factor;
+	    output_diff = (float) diff_value;
+	    output_offset = (float) offset;
+    }
 
     if( current_resample_factor < 0.25 ) current_resample_factor = 0.25;
     if( current_resample_factor > 4 ) current_resample_factor = 4;
-    rlen = ceil( ((double)nframes) * current_resample_factor )+2;
+    rlen = ceil( ((double)nframes) / current_resample_factor )+20;
     assert( rlen > 10 );
 
     /*
@@ -396,8 +384,13 @@ again:
 
 	put_back_samples = rlen-src.input_frames_used;
 
-	if( src.output_frames_gen != nframes )
-	    //printf( "did not fill jack_buffer...\n" );
+	/*
+	if( src.output_frames_gen != nframes ) {
+	    printf( "did not fill jack_buffer... %ld\n", nframes-src.output_frames_gen );
+	    printf( "rlen=%d ratio=%f... nframes=%d\ninputused=%d\n", rlen, current_resample_factor, nframes, src.input_frames_used );
+	}
+	*/
+
 
 	src_node = jack_slist_next (src_node);
 	node = jack_slist_next (node);
