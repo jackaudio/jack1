@@ -2,9 +2,13 @@
 	@sed -e "s/!VERSION!/@JACK_RELEASE@/g" -e "s/!DATE!/`date '+%B %Y'`/g" < $*.0 > $@
 	@echo Built $*.1 from template
 
-manpages := $(patsubst %.0,%.1,$(wildcard *.0))
+manpages = $(patsubst %.0,%.1,$(wildcard *.0))
 
-all: $(manpages)
+clean-local:
+	-rm -rf $(manpages)
 
-clean: 
-	-rm $(manpages)	
+man1_MANS = $(manpages)
+
+BUILT_SOURCES = $(manpages)
+
+dist_man_MANS = $(manpages)
