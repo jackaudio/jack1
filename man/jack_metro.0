@@ -1,20 +1,40 @@
 .TH JACK_METRO "1" "!DATE!" "!VERSION!"
 .SH NAME
-jack_metro \- The JACK Audio Connection Kit example client
-.SH SYNOPSYS
-.B jack_metro
-[ --frequency OR -f frequency (in Hz) ]
-[ --amplitude OR -A maximum amplitude (between 0 and 1) ]
-[ --duration OR -D duration (in ms) ]
-[ --attack OR -a attack (in percent of duration) ]
-[ --decay OR -d decay (in percent of duration) ]
-[ --name OR -n jack name for metronome client ] 
---bpm OR -b beats per minute
+jack_metro \- JACK toolkit metronome
+.SH SYNOPSIS
+\fBjack_metro\fR [ \fI-n\fR name ] [ \fI-f\R hz ] [ \fI-D\fR msecs ] [\fI-a\fR % ] [ \fI-d\fR % ] \fI-b\fR bpm 
 .SH DESCRIPTION
-.B jack_metro
-is a simple metronome for JACK.
+\fBjack_metro\fR is a simple metronome for JACK. It generates a
+synthetic "tick" sound for every beat. Note that is does \fBnot\fR
+connect its output port by default - to hear the sound it makes you must
+connect them using some other tool.
+.SH OPTIONS
+.TP
+\fB-n\fR, \fB--name\fR
+.br
+Specify a name for this instance of the metronome.
+.TP
+\fB-f\fR, \fB--frequency\fR Hz
+.br
+Define the frequency of the "tick" in Hz.
+.TP
+\fB-D\fR, \fB--duration\fR msecs
+.br
+Define the duration of the "tick" in milliseconds.
+.TP
+\fB-a\fR, \fB--attack\fR %-age
+.br
+Define the duration of the attack phase of the "tick" as a percentage
+of the duration.
+.TP
+\fB-d\fR, \fB--decay\fR %-age
+.br
+Define the duration of the decay phase of the "tick" as a percentage
+of the duration.
+.TP
+\fB--b\fR, \fB--bpm\fR bpm
+.br
+Define the number of beats per minute.
 .SH AUTHOR
 Anthony Van Groningen
-.PP
-This manpage was written by Stefan Schwandter <swan@debian.org>
 

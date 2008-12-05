@@ -1,7 +1,7 @@
 .TH ALSA_IO "1" "!DATE!" "!VERSION!"
 .SH NAME
 \fBalsa_in\fR, \fBalsa_out\fR \- Jack clients that perform I/O with an alternate audio interface
-.SH SYNOPSYS
+.SH SYNOPSIS
 \fBalsa_in\fR [\fIoptions\fR]
 .br
 \fBalsa_out\fR [\fIoptions\fR]
