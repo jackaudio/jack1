@@ -166,11 +166,11 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	    driver->next_deadline += driver->period_usecs/1000;
 	    */
 
-	if( driver->deadline_goodness < 1*(int)driver->period_usecs/8*driver->latency ) {
+	if( driver->deadline_goodness < 10*(int)driver->period_usecs/100*driver->latency ) {
 	    driver->next_deadline -= driver->period_usecs/1000;
 	    //printf( "goodness: %d, Adjust deadline: --- %d\n", driver->deadline_goodness, (int) driver->period_usecs*driver->latency/100 );
 	}
-	if( driver->deadline_goodness > 1*(int)driver->period_usecs/8*driver->latency ) {
+	if( driver->deadline_goodness > 10*(int)driver->period_usecs/100*driver->latency ) {
 	    driver->next_deadline += driver->period_usecs/1000;
 	    //printf( "goodness: %d, Adjust deadline: +++ %d\n", driver->deadline_goodness, (int) driver->period_usecs*driver->latency/100 );
 	}
@@ -224,16 +224,39 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	    
 	    //printf( "frame %d No Packet in queue. num_lost_packets = %d \n", driver->expected_framecnt, driver->num_lost_packets ); 
 	    if( driver->num_lost_packets < 5 ) {
-		// adjust deadline.
-		//driver->next_deadline += driver->period_usecs/8;
+		// ok. No Packet in queue. The packet was either lost,
+		// or we are running too fast.
+		//
+		// Adjusting the deadline unconditionally resulted in
+		// too many xruns on master.
+		// But we need to adjust for the case we are running too fast.
+		// So lets check if the last packet is there now.
+		//
+		// It would not be in the queue anymore, if it had been
+		// retrieved. This might break for redundancy, but
+		// i will make the packet cache drop redundant packets,
+		// that have already been retreived.
+		//
+		if( packet_cache_get_highest_available_framecnt( global_packcache, &next_frame_avail) ) {
+		    if( next_frame_avail == (driver->expected_framecnt - 1) ) {
+			// Ok. the last packet is there now.
+			// and it had not been retrieved.
+			// 
+			// TODO: We are still dropping 2 packets.
+			//       perhaps we can adjust the deadline
+			//       when (num_packets lost == 0)
+			
+			// This might still be too much.
+			driver->next_deadline += driver->period_usecs/8;
+		    }
+		}
 	    } else if( (driver->num_lost_packets <= 10) ) { 
 		// lets try adjusting the deadline harder, for some packets, we might have just ran 2 fast.
 		//driver->next_deadline += driver->period_usecs*driver->latency/8;
 	    } else {
 		
 		// But now we can check for any new frame available.
-		// now with redundancy we would move back in most cases.
-		// we dont want that.
+		//
 		if( packet_cache_get_highest_available_framecnt( global_packcache, &next_frame_avail) ) {
 		    driver->expected_framecnt = next_frame_avail;
 		    packet_cache_retreive_packet( global_packcache, driver->expected_framecnt, (char *) driver->rx_buf, driver->rx_bufsize, NULL );

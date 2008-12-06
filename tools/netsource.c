@@ -287,7 +287,7 @@ process (jack_nframes_t nframes, void *arg)
 	state_connected = 0;
 	packet_cache_reset_master_address( global_packcache );
         //printf ("Frame %d  \tRealy too many packets missed (%d). Let's reset the counter\n", framecnt, cont_miss);
-        cont_miss = 5;
+        cont_miss = 0;
     }
 
     /*
