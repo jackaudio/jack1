@@ -27,10 +27,10 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 
 #include <jack/internal.h>
 #include <jack/engine.h>
-#include <jack/driver.h>
 #include <jack/messagebuffer.h>
 #include <jack/version.h>
 #include <sysdeps/poll.h>
@@ -143,12 +143,17 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	/* ignore the driver, which counts as a client. */
 
 	if (engine->temporary && (jack_slist_length(engine->clients) <= 1)) {
-		if (engine->driver) {
-			// engine->driver->stop (engine->driver);
-			// engine->driver->detach (engine->driver, engine);
-			// engine->driver = 0;
+		if (engine->wait_pid >= 0) {
+			/* tell the waiter we're done
+			   to initiate a normal shutdown.
+			*/
+			VERBOSE (engine, "Kill wait pid to stop");
+			kill (engine->wait_pid, SIGUSR2);
+			sleep (-1);
+		} else {
+			exit (0);
 		}
-		exit (0);
+
 	}
 }
 
