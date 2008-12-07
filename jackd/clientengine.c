@@ -144,9 +144,9 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	if (engine->temporary && (jack_slist_length(engine->clients) <= 1)) {
 		if (engine->driver) {
-			engine->driver->stop (engine->driver);
-			engine->driver->detach (engine->driver, engine);
-			engine->driver = 0;
+			// engine->driver->stop (engine->driver);
+			// engine->driver->detach (engine->driver, engine);
+			// engine->driver = 0;
 		}
 		exit (0);
 	}
