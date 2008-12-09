@@ -94,6 +94,8 @@ struct _packet_cache
     int mtu;
     struct sockaddr_in master_address;
     int master_address_valid;
+    jack_nframes_t last_framecnt_retreived;
+    int last_framecnt_retreived_valid;
 };
 
 extern packet_cache *global_packcache;

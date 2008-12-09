@@ -134,6 +134,9 @@ packet_cache
     pcache->size = num_packets;
     pcache->packets = malloc (sizeof (cache_packet) * num_packets);
     pcache->master_address_valid = 0;
+    pcache->last_framecnt_retreived = 0;
+    pcache->last_framecnt_retreived_valid = 0;
+
     if (pcache->packets == NULL)
     {
         jack_error ("could not allocate packet cache (2)\n");
@@ -494,6 +497,9 @@ packet_cache_drain_socket( packet_cache *pcache, int sockfd )
 	}
 
         framecnt = ntohl (pkthdr->framecnt);
+	if( pcache->last_framecnt_retreived_valid && (framecnt <= pcache->last_framecnt_retreived ))
+	    continue;
+
 	//printf( "Got Packet %d\n", framecnt );
         cpack = packet_cache_get_packet (global_packcache, framecnt);
         cache_packet_add_fragment (cpack, rx_packet, rcv_len);
@@ -505,6 +511,8 @@ void
 packet_cache_reset_master_address( packet_cache *pcache )
 {
     pcache->master_address_valid = 0;
+    pcache->last_framecnt_retreived = 0;
+    pcache->last_framecnt_retreived_valid = 0;
 }
 
 void
@@ -548,6 +556,9 @@ packet_cache_retreive_packet( packet_cache *pcache, jack_nframes_t framecnt, cha
     memcpy (packet_buf, cpack->packet_buf, pkt_size);
     if( timestamp )
 	*timestamp = cpack->recv_timestamp;
+
+    pcache->last_framecnt_retreived_valid = 1;
+    pcache->last_framecnt_retreived = framecnt;
 
     cache_packet_reset (cpack);
     packet_cache_clear_old_packets( pcache, framecnt );
