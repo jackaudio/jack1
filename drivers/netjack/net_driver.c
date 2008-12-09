@@ -43,7 +43,9 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 
 #include "config.h"
 
+#if HAVE_SAMPLERATE
 #include <samplerate.h>
+#endif
 
 #if HAVE_CELT
 #include <celt/celt.h>
@@ -549,7 +551,9 @@ net_driver_attach (net_driver_t *driver)
 	    driver->capture_srcs = jack_slist_append(driver->capture_srcs, celt_decoder_create( celt_mode ) );
 #endif
 	} else {
+#if HAVE_SAMPLERATE 
 	    driver->capture_srcs = jack_slist_append(driver->capture_srcs, src_new(SRC_LINEAR, 1, NULL));
+#endif
 	}
     }
     for (chn = driver->capture_channels_audio; chn < driver->capture_channels; chn++) {
@@ -565,7 +569,6 @@ net_driver_attach (net_driver_t *driver)
 
         driver->capture_ports =
             jack_slist_append (driver->capture_ports, port);
-        //driver->capture_srcs = jack_slist_append(driver->capture_srcs, src_new(SRC_LINEAR, 1, NULL));
     }
 
     port_flags = JackPortIsInput | JackPortIsPhysical | JackPortIsTerminal;
@@ -591,7 +594,9 @@ net_driver_attach (net_driver_t *driver)
 	    driver->playback_srcs = jack_slist_append(driver->playback_srcs, celt_encoder_create( celt_mode ) );
 #endif
 	} else {
+#if HAVE_SAMPLERATE
 	    driver->playback_srcs = jack_slist_append(driver->playback_srcs, src_new(SRC_LINEAR, 1, NULL));
+#endif
 	}
     }
     for (chn = driver->playback_channels_audio; chn < driver->playback_channels; chn++) {
@@ -608,7 +613,6 @@ net_driver_attach (net_driver_t *driver)
 
         driver->playback_ports =
             jack_slist_append (driver->playback_ports, port);
-        //driver->playback_srcs = jack_slist_append(driver->playback_srcs, src_new(SRC_LINEAR, 1, NULL));
     }
 
     jack_activate (driver->client);
@@ -1059,11 +1063,21 @@ driver_initialize (jack_client_t *client, const JSList * params)
                 break;
 
             case 'f':
+#if HAVE_SAMPLERATE
                 resample_factor = param->value.ui;
+#else
+		printf( "not built with libsamplerate support\n" );
+		exit(10);
+#endif
                 break;
 
             case 'u':
+#if HAVE_SAMPLERATE
                 resample_factor_up = param->value.ui;
+#else
+		printf( "not built with libsamplerate support\n" );
+		exit(10);
+#endif
                 break;
 
             case 'b':

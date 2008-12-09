@@ -655,9 +655,11 @@ HAVE_SAMPLERATE=false
 PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 0.1.2,[HAVE_SAMPLERATE=true], [true])
 if test x$HAVE_SAMPLERATE = xfalse; then
         AC_MSG_WARN([*** the NetJack backend and internal client will not be built])
+    	AC_DEFINE(HAVE_SAMPLERATE,0,"Whether libsamplerate is available")
 else
 	CFLAGS="$CFLAGS $SAMPLERATE_CFLAGS"
 	LIBS="$LIBS $SAMPLERATE_LIBS"
+    	AC_DEFINE(HAVE_SAMPLERATE,1,"Whether libsamplerate is available")
 fi
 
 # Celt low-latency audio codec. netjack transmission via internet.

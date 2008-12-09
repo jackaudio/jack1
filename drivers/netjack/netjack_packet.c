@@ -51,7 +51,9 @@
 #include <errno.h>
 #include <signal.h>
 
+#if HAVE_SAMPLERATE
 #include <samplerate.h>
+#endif
 
 #if HAVE_CELT
 #include <celt/celt.h>
@@ -856,7 +858,9 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
     {
         int i;
         int_float_t val;
+#if HAVE_SAMPLERATE 
         SRC_DATA src;
+#endif
 
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
@@ -865,6 +869,7 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
 
         if (strncmp (porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
         {
+#if HAVE_SAMPLERATE 
             // audio port, resample if necessary
             if (net_period_down != nframes)
             {
@@ -888,6 +893,7 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
                 src_node = jack_slist_next (src_node);
             }
             else
+#endif
             {
                 for (i = 0; i < net_period_down; i++)
                 {
@@ -922,7 +928,9 @@ render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_src
 
     while (node != NULL)
     {
+#if HAVE_SAMPLERATE 
         SRC_DATA src;
+#endif
         int i;
         int_float_t val;
         jack_port_t *port = (jack_port_t *) node->data;
@@ -934,6 +942,7 @@ render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_src
         {
             // audio port, resample if necessary
     
+#if HAVE_SAMPLERATE 
             if (net_period_up != nframes) {
                 SRC_STATE *src_state = src_node->data;
                 src.data_in = buf;
@@ -955,6 +964,7 @@ render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_src
                 src_node = jack_slist_next (src_node);
             }
             else
+#endif
             {
                 for (i = 0; i < net_period_up; i++)
                 {
@@ -995,7 +1005,9 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
     {
         int i;
         //uint32_t val;
+#if HAVE_SAMPLERATE 
         SRC_DATA src;
+#endif
 
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
@@ -1007,6 +1019,7 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
         {
             // audio port, resample if necessary
     
+#if HAVE_SAMPLERATE 
             if (net_period_down != nframes)
             {
                 SRC_STATE *src_state = src_node->data;
@@ -1029,6 +1042,7 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
                 src_node = jack_slist_next (src_node);
             }
             else
+#endif
                 for (i = 0; i < net_period_down; i++)
                     buf[i] = ((float) ntohs (packet_bufX[i])) / 32768.0 - 1.0;
         }
@@ -1057,7 +1071,9 @@ render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_src
 
     while (node != NULL)
     {
+#if HAVE_SAMPLERATE 
         SRC_DATA src;
+#endif
         int i;
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
@@ -1067,6 +1083,7 @@ render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_src
         {
             // audio port, resample if necessary
     
+#if HAVE_SAMPLERATE 
             if (net_period_up != nframes)
             {
                 SRC_STATE *src_state = src_node->data;
@@ -1092,6 +1109,7 @@ render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_src
                 src_node = jack_slist_next (src_node);
             }
             else
+#endif
                 for (i = 0; i < net_period_up; i++)
                     packet_bufX[i] = htons(((uint16_t)((buf[i] + 1.0) * 32767.0)));
         }
@@ -1126,7 +1144,9 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
     {
         int i;
         //uint32_t val;
+#if HAVE_SAMPLERATE 
         SRC_DATA src;
+#endif
 
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
@@ -1136,8 +1156,8 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
 
         if (strncmp (portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
         {
+#if HAVE_SAMPLERATE
             // audio port, resample if necessary
-    
             if (net_period_down != nframes)
             {
                 SRC_STATE *src_state = src_node->data;
@@ -1158,6 +1178,7 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
                 src_node = jack_slist_next (src_node);
             }
             else
+#endif
                 for (i = 0; i < net_period_down; i++)
                     buf[i] = ((float) packet_bufX[i]) / 127.0;
         }
@@ -1186,7 +1207,9 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
 
     while (node != NULL)
     {
+#if HAVE_SAMPLERATE 
         SRC_DATA src;
+#endif
         int i;
         jack_port_t *port = (jack_port_t *) node->data;
 
@@ -1195,9 +1218,11 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
 
         if (strncmp (portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
         {
+#if HAVE_SAMPLERATE 
             // audio port, resample if necessary
             if (net_period_up != nframes)
             {
+
                 SRC_STATE *src_state = src_node->data;
     
                 float *floatbuf = alloca (sizeof (float) * net_period_up);
@@ -1219,6 +1244,7 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
                 src_node = jack_slist_next (src_node);
             }
             else
+#endif
                 for (i = 0; i < net_period_up; i++)
                     packet_bufX[i] = buf[i] * 127.0;
         }

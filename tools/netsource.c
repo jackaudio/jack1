@@ -49,7 +49,9 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 #include <net_driver.h>
 #include <netjack_packet.h>
+#if HAVE_SAMPLERATE
 #include <samplerate.h>
+#endif
 
 #if HAVE_CELT
 #include <celt/celt.h>
@@ -125,7 +127,9 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
 	    capture_srcs = jack_slist_append(capture_srcs, celt_decoder_create( celt_mode ) );
 #endif
 	} else {
+#if HAVE_SAMPLERATE
 	    capture_srcs = jack_slist_append (capture_srcs, src_new (SRC_LINEAR, 1, NULL));
+#endif
 	}
         capture_ports = jack_slist_append (capture_ports, port);
     }
@@ -162,7 +166,9 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
 	    playback_srcs = jack_slist_append(playback_srcs, celt_encoder_create( celt_mode ) );
 #endif
 	} else {
+#if HAVE_SAMPLERATE
 	    playback_srcs = jack_slist_append (playback_srcs, src_new (SRC_LINEAR, 1, NULL));
+#endif
 	}
 	playback_ports = jack_slist_append (playback_ports, port);
     }

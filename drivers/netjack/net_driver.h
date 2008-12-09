@@ -28,7 +28,6 @@
 #include <jack/transport.h>
 
 #include <netinet/in.h>
-#include <samplerate.h>
 
 typedef struct _net_driver net_driver_t;
 
