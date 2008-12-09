@@ -843,7 +843,7 @@ encode_midi_buffer (uint32_t *buffer_uint32, unsigned int buffer_size_uint32, ja
 
 // render functions for float
 void
-render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
+render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes, int dont_htonl_floats)
 {
     channel_t chn = 0;
     JSList *node = capture_ports;
@@ -895,12 +895,19 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
             else
 #endif
             {
-                for (i = 0; i < net_period_down; i++)
-                {
-                    val.i = packet_bufX[i];
-                    val.i = ntohl (val.i);
-                    buf[i] = val.f;
-                }
+		if( dont_htonl_floats ) 
+		{
+		    memcpy( buf, packet_bufX, net_period_down*sizeof(jack_default_audio_sample_t));
+		}
+		else
+		{
+		    for (i = 0; i < net_period_down; i++)
+		    {
+			val.i = packet_bufX[i];
+			val.i = ntohl (val.i);
+			buf[i] = val.f;
+		    }
+		}
             }
         }
         else if (strncmp (porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
@@ -918,7 +925,7 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
 }
 
 void
-render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
+render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up, int dont_htonl_floats )
 {
     channel_t chn = 0;
     JSList *node = playback_ports;
@@ -966,12 +973,19 @@ render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_src
             else
 #endif
             {
-                for (i = 0; i < net_period_up; i++)
-                {
-                    val.f = buf[i];
-                    val.i = htonl (val.i);
-                    packet_bufX[i] = val.i;
-                }
+		if( dont_htonl_floats )
+		{
+		    memcpy( packet_bufX, buf, net_period_up*sizeof(jack_default_audio_sample_t) );
+		}
+		else
+		{
+		    for (i = 0; i < net_period_up; i++)
+		    {
+			val.f = buf[i];
+			val.i = htonl (val.i);
+			packet_bufX[i] = val.i;
+		    }
+		}
             }
         }
         else if (strncmp(porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0)
@@ -1352,7 +1366,7 @@ render_jack_ports_to_payload_celt (JSList *playback_ports, JSList *playback_srcs
 #endif
 /* Wrapper functions with bitdepth argument... */
 void
-render_payload_to_jack_ports (int bitdepth, void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
+render_payload_to_jack_ports (int bitdepth, void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes, int dont_htonl_floats)
 {
     if (bitdepth == 8)
         render_payload_to_jack_ports_8bit (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
@@ -1363,11 +1377,11 @@ render_payload_to_jack_ports (int bitdepth, void *packet_payload, jack_nframes_t
         render_payload_to_jack_ports_celt (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
 #endif
     else
-        render_payload_to_jack_ports_float (packet_payload, net_period_down, capture_ports, capture_srcs, nframes);
+        render_payload_to_jack_ports_float (packet_payload, net_period_down, capture_ports, capture_srcs, nframes, dont_htonl_floats);
 }
 
 void
-render_jack_ports_to_payload (int bitdepth, JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
+render_jack_ports_to_payload (int bitdepth, JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up, int dont_htonl_floats)
 {
     if (bitdepth == 8)
         render_jack_ports_to_payload_8bit (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
@@ -1378,5 +1392,5 @@ render_jack_ports_to_payload (int bitdepth, JSList *playback_ports, JSList *play
         render_jack_ports_to_payload_celt (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
 #endif
     else
-        render_jack_ports_to_payload_float (playback_ports, playback_srcs, nframes, packet_payload, net_period_up);
+        render_jack_ports_to_payload_float (playback_ports, playback_srcs, nframes, packet_payload, net_period_up, dont_htonl_floats);
 }

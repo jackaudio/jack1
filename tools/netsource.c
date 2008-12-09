@@ -69,6 +69,7 @@ JSList *playback_srcs = NULL;
 int playback_channels = 0;
 int playback_channels_audio = 2;
 int playback_channels_midi = 1;
+int dont_htonl_floats = 0;
 
 int latency = 5;
 jack_nframes_t factor = 1;
@@ -262,7 +263,8 @@ process (jack_nframes_t nframes, void *arg)
     packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (jack_default_audio_sample_t);
 
     /* ---------- Send ---------- */
-    render_jack_ports_to_payload (bitdepth, playback_ports, playback_srcs, nframes, packet_bufX, net_period);
+    render_jack_ports_to_payload (bitdepth, playback_ports, playback_srcs, nframes, 
+	    packet_bufX, net_period, dont_htonl_floats);
 
     /* fill in packet hdr */
     pkthdr->transport_state = jack_transport_query (client, &local_trans_pos);
@@ -345,7 +347,8 @@ process (jack_nframes_t nframes, void *arg)
             //printf("Frame %d  \tRecovered from dropouts\n", framecnt);
             cont_miss = 0;
         }
-        render_payload_to_jack_ports (bitdepth, packet_bufX, net_period, capture_ports, capture_srcs, nframes);
+        render_payload_to_jack_ports (bitdepth, packet_bufX, net_period, 
+		capture_ports, capture_srcs, nframes, dont_htonl_floats);
 
 	state_currentframe = framecnt;
 	state_recv_packet_queue_time = recv_time_offset;
@@ -471,7 +474,7 @@ main (int argc, char *argv[])
     sprintf(client_name, "netsource");
     sprintf(peer_ip, "localhost");
 
-    while ((c = getopt (argc, argv, ":R:n:s:h:p:C:P:i:o:l:r:f:b:m:c:")) != -1)
+    while ((c = getopt (argc, argv, ":H:R:n:s:h:p:C:P:i:o:l:r:f:b:m:c:")) != -1)
     {
         switch (c)
         {
@@ -531,6 +534,9 @@ main (int argc, char *argv[])
             break;
             case 'R':
             redundancy = atoi (optarg);
+            break;
+            case 'H':
+            dont_htonl_floats = atoi (optarg);
             break;
             case ':':
             fprintf (stderr, "Option -%c requires an operand\n", optopt);
