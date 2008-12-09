@@ -413,6 +413,7 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
 
     // check whether, we should handle the transport sync stuff, or leave trnasports untouched.
     if (driver->handle_transport_sync) {
+	int compensated_tranport_pos = (pkthdr->transport_frame + (pkthdr->latency * nframes) + driver->codec_latency);
 
         // read local transport info....
         local_trans_state = jack_transport_query(driver->client, &local_trans_pos);
@@ -428,11 +429,12 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
                     jack_info("locally stopped... starting...");
                 }
 
-                if (local_trans_pos.frame != (pkthdr->transport_frame + (pkthdr->latency) * nframes)) {
-                    jack_transport_locate(driver->client, (pkthdr->transport_frame + (pkthdr->latency) * nframes));
+                if (local_trans_pos.frame != compensated_tranport_pos)
+		{
+                    jack_transport_locate(driver->client, compensated_tranport_pos);
                     last_transport_state = JackTransportRolling;
                     sync_state = FALSE;
-                    jack_info("starting locate to %d", pkthdr->transport_frame + (pkthdr->latency)*nframes);
+                    jack_info("starting locate to %d", compensated_tranport_pos );
                 }
                 break;
             case JackTransportStopped:
@@ -546,8 +548,12 @@ net_driver_attach (net_driver_t *driver)
 
 	if( driver->bitdepth == 1000 ) {
 #if HAVE_CELT
+	    celt_int32_t lookahead;
 	    // XXX: memory leak
 	    CELTMode *celt_mode = celt_mode_create( driver->sample_rate, 1, driver->period_size, NULL );
+	    celt_mode_info( celt_mode, CELT_GET_LOOKAHEAD, &lookahead );
+	    driver->codec_latency = 2*lookahead;
+
 	    driver->capture_srcs = jack_slist_append(driver->capture_srcs, celt_decoder_create( celt_mode ) );
 #endif
 	} else {
@@ -708,6 +714,7 @@ net_driver_new (jack_client_t * client,
     driver->playback_channels_audio = playback_ports;
     driver->playback_channels_midi = playback_ports_midi;
     driver->playback_ports    = NULL;
+    driver->codec_latency = 0;
 
     driver->handle_transport_sync = transport_sync;
     driver->mtu = 1400;

@@ -42,6 +42,8 @@ struct _net_driver
     jack_nframes_t  bitdepth;
     jack_nframes_t  period_size;
 
+    jack_nframes_t  codec_latency;
+
     unsigned int    listen_port;
 
     unsigned int    capture_channels;
