@@ -974,10 +974,7 @@ jack_client_open_aux (const char *client_name,
 	}
 
 	/* parse variable arguments */
-	if (ap)
         jack_varargs_parse(options, ap, &va);
-    else
-        jack_varargs_init(&va);
 
 	/* External clients need to know where the tmpdir used for
 	   communication with the server lives
@@ -1122,7 +1119,7 @@ jack_client_new (const char *client_name)
 	jack_options_t options = JackUseExactName;
 	if (getenv("JACK_START_SERVER") == NULL)
 		options |= JackNoStartServer;
-	return jack_client_open_aux (client_name, options, NULL, NULL);
+	return jack_client_open (client_name, options, NULL);
 }
 
 char *
