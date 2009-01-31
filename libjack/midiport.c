@@ -32,11 +32,11 @@ enum { MIDI_INLINE_MAX = sizeof(jack_shmsize_t) };
 
 typedef struct _jack_midi_port_info_private {
 	jack_nframes_t        nframes; /**< Number of frames in buffer */
- 	size_t                buffer_size; /**< Size of buffer in bytes */
+ 	uint32_t                buffer_size; /**< Size of buffer in bytes */
 	jack_nframes_t        event_count; /**< Number of events stored in this buffer */
 	jack_nframes_t        last_write_loc; /**< Used for both writing and mixdown */
 	jack_nframes_t        events_lost;	  /**< Number of events lost in this buffer */
-} jack_midi_port_info_private_t;
+} POST_PACKED_STRUCTURE jack_midi_port_info_private_t;
 
 typedef struct _jack_midi_port_internal_event {
 	int32_t        time;
@@ -44,8 +44,8 @@ typedef struct _jack_midi_port_internal_event {
 	union {
 		jack_shmsize_t byte_offset;
 		jack_midi_data_t inline_data[MIDI_INLINE_MAX];
-	};
-} jack_midi_port_internal_event_t;
+	} POST_PACKED_STRUCTURE;
+} POST_PACKED_STRUCTURE jack_midi_port_internal_event_t;
 
 
 static inline jack_midi_data_t*

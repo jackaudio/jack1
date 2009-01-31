@@ -55,6 +55,21 @@ typedef int32_t jack_port_type_id_t;
 
 #define JACK_BACKEND_ALIAS "system"
 
+#ifndef POST_PACKED_STRUCTURE
+#ifdef __GNUC__
+/* POST_PACKED_STRUCTURE needs to be a macro which
+   expands into a compiler directive. The directive must
+   tell the compiler to arrange the preceding structure
+   declaration so that it is packed on byte-boundaries rather 
+   than use the natural alignment of the processor and/or
+   compiler.
+*/
+#define POST_PACKED_STRUCTURE __attribute__((__packed__))
+#else
+/* Add other things here for non-gcc platforms */
+#endif
+#endif
+
 /* Port type structure.  
  *
  *  (1) One for each port type is part of the engine's jack_control_t
@@ -90,7 +105,7 @@ typedef struct _jack_port_type_info {
 
     jack_shmsize_t zero_buffer_offset;
 
-} jack_port_type_info_t;
+} POST_PACKED_STRUCTURE jack_port_type_info_t;
 
 /* Allocated by the engine in shared memory. */
 typedef struct _jack_port_shared {
@@ -98,7 +113,7 @@ typedef struct _jack_port_shared {
     jack_port_type_id_t      ptype_id;	/* index into port type array */
     jack_shmsize_t           offset;	/* buffer offset in shm segment */
     jack_port_id_t           id;	/* index into engine port array */
-    enum JackPortFlags	     flags;    
+    uint32_t			     flags;    
     char                     name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
     char                     alias1[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
     char                     alias2[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
@@ -112,7 +127,7 @@ typedef struct _jack_port_shared {
     char                     in_use;
     char                     unused; /* legacy locked field */
 
-} jack_port_shared_t;
+} POST_PACKED_STRUCTURE jack_port_shared_t;
 
 typedef struct _jack_port_functions {
 
