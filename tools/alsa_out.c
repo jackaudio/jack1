@@ -287,8 +287,8 @@ int process (jack_nframes_t nframes, void *arg) {
 	//snd_pcm_delay( alsa_handle, &delay );
 	delay = target_delay;
 	// XXX: at least set it to that value.
-	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
-	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
+	current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+	//current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
 	periods_until_stability = 10;
     }
     if( delay < (target_delay-max_diff) ) {
@@ -301,8 +301,8 @@ int process (jack_nframes_t nframes, void *arg) {
 	//snd_pcm_delay( alsa_handle, &delay );
 	delay = target_delay;
 	// XXX: at least set it to that value.
-	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
-	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
+	current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+	//current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
 	periods_until_stability = 10;
     }
     /* ok... now we should have target_delay +- max_diff on the alsa side.
