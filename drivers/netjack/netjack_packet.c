@@ -121,8 +121,12 @@ packet_cache
 *packet_cache_new (int num_packets, int pkt_size, int mtu)
 {
     int fragment_payload_size = mtu - sizeof (jacknet_packet_header);
-    int fragment_number = (pkt_size - sizeof (jacknet_packet_header) - 1) / fragment_payload_size + 1;
-    int i;
+    int i, fragment_number;
+
+    if( pkt_size == sizeof(jacknet_packet_header) )
+	    fragment_number = 1;
+    else
+	    fragment_number = (pkt_size - sizeof (jacknet_packet_header) - 1) / fragment_payload_size + 1;
     
     packet_cache *pcache = malloc (sizeof (packet_cache));
     if (pcache == NULL)
