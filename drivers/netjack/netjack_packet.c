@@ -862,7 +862,9 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
 {
     channel_t chn = 0;
     JSList *node = capture_ports;
+#if HAVE_SAMPLERATE 
     JSList *src_node = capture_srcs;
+#endif
 
     uint32_t *packet_bufX = (uint32_t *)packet_payload;
 
@@ -944,7 +946,9 @@ render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_src
 {
     channel_t chn = 0;
     JSList *node = playback_ports;
+#if HAVE_SAMPLERATE
     JSList *src_node = playback_srcs;
+#endif
 
     uint32_t *packet_bufX = (uint32_t *) packet_payload;
 
@@ -1023,7 +1027,9 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
 {
     channel_t chn = 0;
     JSList *node = capture_ports;
+#if HAVE_SAMPLERATE
     JSList *src_node = capture_srcs;
+#endif
 
     uint16_t *packet_bufX = (uint16_t *)packet_payload;
 
@@ -1041,7 +1047,9 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
+#if HAVE_SAMPLERATE
         float *floatbuf = alloca (sizeof(float) * net_period_down);
+#endif
         const char *portname = jack_port_type (port);
 
         if (strncmp(portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
@@ -1094,7 +1102,9 @@ render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_src
 {
     channel_t chn = 0;
     JSList *node = playback_ports;
+#if HAVE_SAMPLERATE 
     JSList *src_node = playback_srcs;
+#endif
 
     uint16_t *packet_bufX = (uint16_t *)packet_payload;
 
@@ -1162,7 +1172,10 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
 {
     channel_t chn = 0;
     JSList *node = capture_ports;
+
+#if HAVE_SAMPLERATE 
     JSList *src_node = capture_srcs;
+#endif
 
     int8_t *packet_bufX = (int8_t *)packet_payload;
 
@@ -1180,7 +1193,9 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
+#if HAVE_SAMPLERATE 
         float *floatbuf = alloca (sizeof (float) * net_period_down);
+#endif
         const char *portname = jack_port_type (port);
 
         if (strncmp (portname, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0)
@@ -1230,7 +1245,9 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
 {
     channel_t chn = 0;
     JSList *node = playback_ports;
+#if HAVE_SAMPLERATE 
     JSList *src_node = playback_srcs;
+#endif
 
     int8_t *packet_bufX = (int8_t *)packet_payload;
 
