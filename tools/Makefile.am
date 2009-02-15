@@ -24,15 +24,15 @@ dist-check-readline:
 	@false
 endif
 
-if HAVE_SAMPLERATE
 NETJACK_TOOLS = jack_netsource
+
+if HAVE_SAMPLERATE
 if HAVE_ALSA
 NETJACK_TOOLS += alsa_in alsa_out
 endif
-dist-check-readline:
+dist-check-samplerate:
 else
-NETJACK_TOOLS =
-dist-check-readline:
+dist-check-samplerate:
 	@echo
 	@echo ' ******' You need libsamplerate installed to make dist.' ******'
 	@echo
@@ -140,4 +140,4 @@ endif #HAVE_SAMPLERATE
 
 EXTRA_DIST = time_smoother.h
 
-dist-hook: dist-check-sndfile
+dist-hook: dist-check-sndfile dist-check-samplerate
