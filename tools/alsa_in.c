@@ -16,8 +16,6 @@
 #include <jack/jack.h>
 #include <jack/jslist.h>
 
-#define ALSA_PCM_OLD_HW_PARAMS_API
-#define ALSA_PCM_OLD_SW_PARAMS_API
 #include "alsa/asoundlib.h"
 
 #include <samplerate.h>
@@ -64,6 +62,9 @@ volatile int output_new_delay = 0;
 volatile float output_offset = 0.0;
 volatile float output_diff = 0.0;
 
+snd_pcm_uframes_t real_buffer_size;
+snd_pcm_uframes_t real_period_size;
+
 // Alsa stuff... i dont want to touch this bullshit in the next years.... please...
 
 static int xrun_recovery(snd_pcm_t *handle, int err) {
@@ -88,6 +89,9 @@ static int xrun_recovery(snd_pcm_t *handle, int err) {
 
 static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_access_t access, int rate, int channels, int period, int nperiods ) {
 	int err, dir=0;
+	unsigned int buffer_time;
+	unsigned int period_time;
+	unsigned int rrate;
 
 	/* choose all parameters */
 	err = snd_pcm_hw_params_any(handle, params);
@@ -114,9 +118,10 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
 		return err;
 	}
 	/* set the stream rate */
-	err = snd_pcm_hw_params_set_rate_near(handle, params, rate, 0);
+	rrate = rate;
+	err = snd_pcm_hw_params_set_rate_near(handle, params, &rrate, 0);
 	if (err < 0) {
-		printf("Rate %iHz not available for capture: %s\n", rate, snd_strerror(err));
+		printf("Rate %iHz not available for playback: %s\n", rate, snd_strerror(err));
 		return err;
 	}
 	if (err != rate) {
@@ -124,23 +129,35 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
 		return -EINVAL;
 	}
 	/* set the buffer time */
-	err = snd_pcm_hw_params_set_buffer_time_near(handle, params, 1000000*period*nperiods/rate, &dir);
+
+	buffer_time = 1000000*period*nperiods/rate;
+	err = snd_pcm_hw_params_set_buffer_time_near(handle, params, &buffer_time, &dir);
 	if (err < 0) {
 		printf("Unable to set buffer time %i for playback: %s\n",  1000000*period*nperiods/rate, snd_strerror(err));
 		return err;
 	}
-	if( snd_pcm_hw_params_get_buffer_size(params) != nperiods * period ) {
-	    printf( "WARNING: buffer size does not match: (requested %d, got %d)\n", nperiods * period, (int) snd_pcm_hw_params_get_buffer_size(params) );
+	err = snd_pcm_hw_params_get_buffer_size( params, &real_buffer_size );
+	if (err < 0) {
+		printf("Unable to get buffer size back: %s\n", snd_strerror(err));
+		return err;
+	}
+	if( real_buffer_size != nperiods * period ) {
+	    printf( "WARNING: buffer size does not match: (requested %d, got %d)\n", nperiods * period, (int) real_buffer_size );
 	}
 	/* set the period time */
-	err = snd_pcm_hw_params_set_period_time_near(handle, params, 1000000*period/rate, &dir);
+	period_time = 1000000*period/rate;
+	err = snd_pcm_hw_params_set_period_time_near(handle, params, &period_time, &dir);
 	if (err < 0) {
 		printf("Unable to set period time %i for playback: %s\n", 1000000*period/rate, snd_strerror(err));
 		return err;
 	}
-	int ps = snd_pcm_hw_params_get_period_size(params, NULL );
-	if( ps != period ) {
-	    printf( "WARNING: period size does not match: (requested %i, got %i)\n", period, ps );
+	err = snd_pcm_hw_params_get_period_size(params, &real_period_size, NULL );
+	if (err < 0) {
+		printf("Unable to get period size back: %s\n", snd_strerror(err));
+		return err;
+	}
+	if( real_period_size != period ) {
+	    printf( "WARNING: period size does not match: (requested %i, got %i)\n", period, (int)real_period_size );
 	}
 	/* write the parameters to device */
 	err = snd_pcm_hw_params(handle, params);
