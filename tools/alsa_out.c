@@ -312,9 +312,9 @@ int process (jack_nframes_t nframes, void *arg) {
 
     //if( periods_until_stability ) {
     if( 1 ) {
-	double resamp_rate = (double)jack_sample_rate / (double)sample_rate;  // == nframes / alsa_samples.
-	double request_samples = nframes / resamp_rate;  //== alsa_samples;
-	//double request_samples = nframes * current_resample_factor;  //== alsa_samples;
+	//double resamp_rate = (double)sample_rate / (double)jack_sample_rate;  // == nframes / alsa_samples.
+	//double request_samples = nframes / resamp_rate;  //== alsa_samples;
+	double request_samples = nframes * current_resample_factor;  //== alsa_samples;
 
 	offset = delay - target_delay;
 
