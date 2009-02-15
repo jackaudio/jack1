@@ -904,7 +904,6 @@ echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with Sun audio support.......................... : $HAVE_SUN
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
-echo \| Build with NetJack support............................ : $HAVE_SAMPLERATE
 echo \| Build with Celt support............................... : $HAVE_CELT
 echo \| Build with dynamic buffer size support................ : $buffer_resizing
 echo \| Compiler optimization flags........................... : $JACK_OPT_CFLAGS
