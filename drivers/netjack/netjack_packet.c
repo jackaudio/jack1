@@ -346,7 +346,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
 #endif
 
 
-    jack_time_t now = jack_get_microseconds();
+    jack_time_t now = jack_get_time();
     if( now >= deadline )
 	return 0;
 
@@ -507,7 +507,7 @@ packet_cache_drain_socket( packet_cache *pcache, int sockfd )
 	//printf( "Got Packet %d\n", framecnt );
         cpack = packet_cache_get_packet (global_packcache, framecnt);
         cache_packet_add_fragment (cpack, rx_packet, rcv_len);
-	cpack->recv_timestamp = jack_get_microseconds();
+	cpack->recv_timestamp = jack_get_time();
     }
 }
 

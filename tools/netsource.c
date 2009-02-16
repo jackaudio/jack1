@@ -313,7 +313,7 @@ process (jack_nframes_t nframes, void *arg)
 
     // for latency == 0 we can poll.
     if( latency == 0 ) {
-	jack_time_t deadline = jack_get_microseconds() + 1000000 * jack_get_buffer_size(client)/jack_get_sample_rate(client);
+	jack_time_t deadline = jack_get_time() + 1000000 * jack_get_buffer_size(client)/jack_get_sample_rate(client);
 	// Now loop until we get the right packet.
 	while(1) {
 	    if ( ! netjack_poll_deadline( input_fd, deadline ) )
@@ -337,7 +337,7 @@ process (jack_nframes_t nframes, void *arg)
     {
 	// calculate how much time there would have been, if this packet was sent at the deadline.
 
-	int recv_time_offset = (int) (jack_get_microseconds() - packet_recv_timestamp);
+	int recv_time_offset = (int) (jack_get_time() - packet_recv_timestamp);
 	packet_header_ntoh (pkthdr);
 	deadline_goodness = recv_time_offset - (int)pkthdr->latency;
 	//printf( "deadline goodness = %d ---> off: %d\n", deadline_goodness, recv_time_offset );
