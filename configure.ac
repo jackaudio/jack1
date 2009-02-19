@@ -3,6 +3,51 @@ dnl $Id$
 
 AC_INIT(jackd/jackd.c)
 
+
+dnl
+dnl Check for existing JACK installs
+dnl 
+
+AC_MSG_CHECKING([existing, conflicting JACK installs])
+not_overwriting=0
+installs=
+for dir in /usr/lib /usr/local/lib /opt/lib ; do
+    if test -d $dir ; then
+	if test $(find $dir -name 'libjack.*' 2>/dev/null | wc -l) -gt 0 ; then
+	    if echo $prefix/lib | grep -vs $dir >/dev/null 2>&1 ; then
+		not_overwriting=$(expr $not_overwriting + 1)
+	    fi
+	    installs="$installs $dir"
+	fi	    
+    fi
+done
+
+if test $not_overwriting -gt 0 ; then
+    echo 
+    echo
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "You appear to have at least one existing installation of JACK."
+    echo
+    echo "Complete or partial JACK installs exist in:$installs"
+    echo 
+    echo "Installing this version will leave at least one of these"
+    echo "existing installations installed and this will probably break"
+    echo "JACK on your machine. "
+    echo
+    echo "Before building, you should first remove the existing JACK"
+    echo "installation(s). "
+    echo
+    echo "Alternatively use ./configure --prefix=... to force overwriting"
+    echo "the existing install."
+    echo
+    echo "WARNING: ON ANY DEBIAN-DERIVED DISTRIBUTION (Debian, Ubuntu etc)"
+    echo "CHANGING THE INSTALLATION PREFIX WILL NOT PRODUCE A WORKING JACK"
+    echo "INSTALL. Please contact the distribution packager for JACK and"
+    echo "ask them to fix their packaging."
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    exit 1
+fi
+
 AC_CONFIG_AUX_DIR(config)
 AC_CANONICAL_TARGET
 
@@ -657,8 +702,8 @@ if test x$HAVE_SAMPLERATE = xfalse; then
         AC_MSG_WARN([*** the NetJack backend and internal client will not be built])
     	AC_DEFINE(HAVE_SAMPLERATE,0,"Whether libsamplerate is available")
 else
-	CFLAGS="$CFLAGS $SAMPLERATE_CFLAGS"
-	LIBS="$LIBS $SAMPLERATE_LIBS"
+	NETJACK_CFLAGS="$NETJACK_CFLAGS $SAMPLERATE_CFLAGS"
+	NETJACK_LIBS="$NETJACK_LIBS $SAMPLERATE_LIBS"
     	AC_DEFINE(HAVE_SAMPLERATE,1,"Whether libsamplerate is available")
 fi
 
@@ -672,8 +717,11 @@ if test x$HAVE_CELT = xfalse; then
 else
     	AC_DEFINE(HAVE_CELT,1,"Whether CELT is available")
 	AC_MSG_RESULT(yes)
-	LIBS="$LIBS $CELT_LIBS"
+	NETJACK_LIBS="$NETJACK_LIBS $CELT_LIBS"
 fi
+
+AC_SUBST(NETJACK_LIBS)
+AC_SUBST(NETJACK_CFLAGS)
 
 # Note: A bug in pkg-config causes problems if the first occurence of
 # PKG_CHECK_MODULES can be disabled. So, if you're going to use
@@ -917,3 +965,5 @@ echo \| Install prefix........................................ : $prefix
 echo \| Default tmp dir....................................... : $DEFAULT_TMP_DIR
 echo
 
+
+ 

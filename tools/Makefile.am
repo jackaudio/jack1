@@ -122,17 +122,19 @@ jack_unload_LDADD = $(top_builddir)/libjack/libjack.la
 # Netjack slave tools
 #
 jack_netsource_SOURCES = netsource.c $(top_builddir)/drivers/netjack/netjack_packet.c
-jack_netsource_CFLAGS = -I$(top_srcdir)/drivers/netjack
-jack_netsource_LDFLAGS = @OS_LDFLAGS@
+jack_netsource_CFLAGS = @NETJACK_CFLAGS@ -I$(top_srcdir)/drivers/netjack
+jack_netsource_LDFLAGS = @NETJACK_LIBS@ @OS_LDFLAGS@ 
 jack_netsource_LDADD = $(top_builddir)/libjack/libjack.la
 
 if HAVE_SAMPLERATE
 if HAVE_ALSA
 alsa_in_SOURCES = alsa_in.c time_smoother.c
+alsa_in_CFLAGS = @NETJACK_CFLAGS@
 alsa_in_LDFLAGS = -lasound -lsamplerate @OS_LDFLAGS@
 alsa_in_LDADD = $(top_builddir)/libjack/libjack.la
 
 alsa_out_SOURCES = alsa_out.c time_smoother.c
+alsa_out_CFLAGS = @NETJACK_CFLAGS@
 alsa_out_LDFLAGS = -lasound -lsamplerate @OS_LDFLAGS@
 alsa_out_LDADD = $(top_builddir)/libjack/libjack.la
 endif #HAVE_ALSA
