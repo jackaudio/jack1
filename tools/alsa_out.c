@@ -72,6 +72,7 @@ int num_periods = 2;
 int target_delay = 0;	    /* the delay which the program should try to approach. */
 int max_diff = 0;	    /* the diff value, when a hard readpointer skip should occur */
 int catch_factor = 1000;
+int catch_factor2 = 1000000;
 
 // Debug stuff:
 
@@ -341,6 +342,7 @@ int process (jack_nframes_t nframes, void *arg) {
 	//double compute_factor = (double) nframes / frlen;
 
 	diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
+	diff_value +=  pow(current_resample_factor - compute_factor, 1) / (double) catch_factor2;
 	current_resample_factor -= diff_value;
 	periods_until_stability -= 1;
     }
