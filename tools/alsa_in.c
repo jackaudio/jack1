@@ -124,8 +124,8 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
 		printf("Rate %iHz not available for playback: %s\n", rate, snd_strerror(err));
 		return err;
 	}
-	if (err != rate) {
-		printf("Rate doesn't match (requested %iHz, get %iHz)\n", rate, err);
+	if (rrate != rate) {
+		printf("Rate doesn't match (requested %iHz, get %iHz)\n", rate, rrate);
 		return -EINVAL;
 	}
 	/* set the buffer time */
