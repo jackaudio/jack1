@@ -73,6 +73,7 @@ int target_delay = 0;	    /* the delay which the program should try to approach.
 int max_diff = 0;	    /* the diff value, when a hard readpointer skip should occur */
 int catch_factor = 1000;
 int catch_factor2 = 1000000;
+int good_window=0;
 
 // Debug stuff:
 
@@ -344,6 +345,19 @@ int process (jack_nframes_t nframes, void *arg) {
 	diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
 	diff_value +=  pow(current_resample_factor - compute_factor, 1) / (double) catch_factor2;
 	current_resample_factor -= diff_value;
+
+	if( good_window ) { 
+		if( (offset > 150) || (offset < -150) ) {
+			good_window = 0;
+		}
+	} else {
+		if( (offset < 50) && (offset > -50) ) {
+			if( 0.0001 < fabs( current_resample_factor - ((double) sample_rate / (double) jack_sample_rate) ) )
+				current_resample_factor = ((double) sample_rate / (double) jack_sample_rate);
+			good_window = 1;
+		}
+	}
+
 	periods_until_stability -= 1;
     }
     else
