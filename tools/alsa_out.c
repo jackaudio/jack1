@@ -87,15 +87,15 @@ snd_pcm_uframes_t real_period_size;
 // Alsa stuff... i dont want to touch this bullshit in the next years.... please...
 
 static int xrun_recovery(snd_pcm_t *handle, int err) {
-    //printf( "xrun !!!....\n" );
+    printf( "xrun !!!.... %d\n", err );
 	if (err == -EPIPE) {	/* under-run */
 		err = snd_pcm_prepare(handle);
 		if (err < 0)
 			printf("Can't recovery from underrun, prepare failed: %s\n", snd_strerror(err));
 		return 0;
-	} else if (err == -ESTRPIPE) {
+	} else if (err == -EAGAIN) {
 		while ((err = snd_pcm_resume(handle)) == -EAGAIN)
-			sleep(1);	/* wait until the suspend flag is released */
+			usleep(100);	/* wait until the suspend flag is released */
 		if (err < 0) {
 			err = snd_pcm_prepare(handle);
 			if (err < 0)
@@ -396,15 +396,14 @@ int process (jack_nframes_t nframes, void *arg) {
 
     // now write the output...
 
-again:
   err = snd_pcm_writei(alsa_handle, outbuf, src.output_frames_gen);
+  //err = snd_pcm_writei(alsa_handle, outbuf, src.output_frames_gen);
   if( err < 0 ) {
       printf( "err = %d\n", err );
       if (xrun_recovery(alsa_handle, err) < 0) {
-	  //printf("Write error: %s\n", snd_strerror(err));
-	  //exit(EXIT_FAILURE);
+	  printf("Write error: %s\n", snd_strerror(err));
+	  exit(EXIT_FAILURE);
       }
-      goto again;
   }
 
     return 0;      
