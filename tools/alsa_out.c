@@ -39,7 +39,7 @@
 		(d) = f_round ((s) * SAMPLE_16BIT_SCALING);\
 	}
 
-#define OFF_D_SIZE 128
+#define OFF_D_SIZE 256
 
 typedef signed short ALSASAMPLE;
 
@@ -70,6 +70,8 @@ int offset_differential_index = 0;
 double old_resample_factor = 1.0;
 double old_old_resample_factor = 1.0;
 double dd_resample_factor = 0.0;
+
+double offset_integral = 0;
 // ------------------------------------------------------ commandline parameters
 
 int sample_rate = 0;				 /* stream rate */
@@ -281,6 +283,7 @@ double hann( double x )
 }
 
     int jumped = 0;
+    int delay_offset = 0;
 /**
  * The process callback for this JACK application.
  * It is called by JACK at the appropriate times.
@@ -368,22 +371,26 @@ int process (jack_nframes_t nframes, void *arg) {
     smooth_offset /= (double) OFF_D_SIZE;
 
     ////////////////////////
-    dd_resample_factor = 0.999 * dd_resample_factor + 0.001 * smooth_offset_differential;
+    dd_resample_factor = 0.99 * dd_resample_factor + 0.01 * smooth_offset_differential;
     smooth_offset_differential = dd_resample_factor;
     ///////////////////////////////////
     old_offset = offset;
 
+    offset_integral += offset;
+
     current_resample_factor -= pow(offset/ (double) nframes, 3) / (double) catch_factor;
+    current_resample_factor -= smooth_offset_differential / (double) nframes / (double)catch_factor2;
+    //current_resample_factor -= offset_integral / (double) nframes / (double)10000000 / (double) catch_factor;
+
     //current_resample_factor -= pow(smooth_offset/ (double) nframes, 3) / (double) catch_factor;
     //current_resample_factor -= dd_resample_factor/(double)nframes * 5.0;
-    current_resample_factor -= smooth_offset_differential / (double) nframes / (double)catch_factor2;
 
     // Dampening:
     // use hysteresis, only do it once offset was more than 150 off,
     // and now came into 50samples window.
     // Also only damp when current_resample_factor is more than 0.01% off.
     if( good_window ) { 
-	    if( (offset > max_diff*3/4) || (offset < max_diff*3/4) ) {
+	    if( (offset > max_diff*2/4) || (offset < -max_diff*2/4) ) {
 		    good_window = 0;
 	    }
     } else {
@@ -456,6 +463,7 @@ int process (jack_nframes_t nframes, void *arg) {
     }
 
     // now write the output...
+    delay_offset += (nframes-src.output_frames_gen);
 again:
   err = snd_pcm_writei(alsa_handle, outbuf, src.output_frames_gen);
   //err = snd_pcm_writei(alsa_handle, outbuf, src.output_frames_gen);
