@@ -19,7 +19,6 @@
 #include "alsa/asoundlib.h"
 
 #include <samplerate.h>
-#include "time_smoother.h"
 
 typedef signed short ALSASAMPLE;
 
@@ -40,7 +39,6 @@ int jack_sample_rate;
 
 double current_resample_factor = 1.0;
 
-time_smoother *smoother;
 
 // ------------------------------------------------------ commandline parameters
 
@@ -537,13 +535,6 @@ int main (int argc, char *argv[]) {
 
     if( !max_diff )
 	max_diff = period_size / 2;	
-
-    smoother = time_smoother_new( 100 );
-    if( !smoother ) {
-	fprintf (stderr, "no memory\n");
-	return 10;
-    }
-
 
     if ((client = jack_client_new (jack_name)) == 0) {
 	fprintf (stderr, "jack server not running?\n");

@@ -128,12 +128,12 @@ jack_netsource_LDADD = $(top_builddir)/libjack/libjack.la
 
 if HAVE_SAMPLERATE
 if HAVE_ALSA
-alsa_in_SOURCES = alsa_in.c time_smoother.c
+alsa_in_SOURCES = alsa_in.c
 alsa_in_CFLAGS = @NETJACK_CFLAGS@
 alsa_in_LDFLAGS = -lasound -lsamplerate @OS_LDFLAGS@
 alsa_in_LDADD = $(top_builddir)/libjack/libjack.la
 
-alsa_out_SOURCES = alsa_out.c time_smoother.c
+alsa_out_SOURCES = alsa_out.c
 alsa_out_CFLAGS = @NETJACK_CFLAGS@
 alsa_out_LDFLAGS = -lasound -lsamplerate @OS_LDFLAGS@
 alsa_out_LDADD = $(top_builddir)/libjack/libjack.la
