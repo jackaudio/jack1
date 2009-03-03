@@ -42,6 +42,7 @@ struct _net_driver
     jack_nframes_t  bitdepth;
     jack_nframes_t  period_size;
     int		    dont_htonl_floats;
+    int		    always_wait_dedline;
 
     jack_nframes_t  codec_latency;
 

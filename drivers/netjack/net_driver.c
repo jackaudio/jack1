@@ -106,7 +106,7 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 		// not 100% sure yet. with the improved resync, it might be better,
 		// to have more than one period headroom for high latency.
 		//driver->next_deadline = jack_get_microseconds() + 5*driver->latency*driver->period_usecs/4;
-		driver->next_deadline = jack_get_microseconds() + 2*driver->period_usecs;
+		driver->next_deadline = jack_get_microseconds() + 1*driver->period_usecs;
 
 	    driver->next_deadline_valid = 1;
     } else {
@@ -123,7 +123,8 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	if( packet_cache_get_next_available_framecnt( global_packcache, driver->expected_framecnt, &next_frame_avail) ) {
 	    if( next_frame_avail == driver->expected_framecnt ) {
 		we_have_the_expected_frame = 1;
-		break;
+		if( ! driver->always_wait_dedline )
+			break;
 	    }
 	}
 	if( ! netjack_poll_deadline( driver->sockfd, driver->next_deadline ) )
@@ -675,6 +676,7 @@ net_driver_new (jack_client_t * client,
 		unsigned int use_autoconfig,
 		unsigned int latency,
 		unsigned int redundancy,
+		int always_wait_dedline,
 		int dont_htonl_floats)
 {
     net_driver_t * driver;
@@ -722,6 +724,7 @@ net_driver_new (jack_client_t * client,
     driver->mtu = 1400;
     driver->latency = latency;
     driver->redundancy = redundancy;
+    driver->always_wait_dedline = always_wait_dedline;
 
 
     driver->client = client;
@@ -878,7 +881,7 @@ driver_get_descriptor ()
 
     desc = calloc (1, sizeof (jack_driver_desc_t));
     strcpy (desc->name, "net");
-    desc->nparams = 16;
+    desc->nparams = 17;
 
     params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
@@ -1020,6 +1023,15 @@ driver_get_descriptor ()
             "Dont convert samples to network byte order.");
     strcpy (params[i].long_desc, params[i].short_desc);
 
+    i++;
+    strcpy (params[i].name, "deadline");
+    params[i].character  = 'D';
+    params[i].type       = JackDriverParamBool;
+    params[i].value.ui  = 0U;
+    strcpy (params[i].short_desc,
+            "always wait for the deadline, more friendly to alsa_io");
+    strcpy (params[i].long_desc, params[i].short_desc);
+
     desc->params = params;
 
     return desc;
@@ -1045,6 +1057,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
     unsigned int latency = 5;
     unsigned int redundancy = 1;
     int dont_htonl_floats = 0;
+    int always_wait_dedline = 0;
     const JSList * node;
     const jack_driver_param_t * param;
 
@@ -1132,6 +1145,10 @@ driver_initialize (jack_client_t *client, const JSList * params)
             case 'H':
                 dont_htonl_floats = param->value.ui;
                 break;
+
+            case 'D':
+                always_wait_dedline = param->value.ui;
+                break;
         }
     }
 
@@ -1141,7 +1158,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
                            listen_port, handle_transport_sync,
                            resample_factor, resample_factor_up, bitdepth,
 			   use_autoconfig, latency, redundancy,
-			   dont_htonl_floats);
+			   always_wait_dedline, dont_htonl_floats);
 }
 
 void
