@@ -616,10 +616,10 @@ int main (int argc, char *argv[]) {
     jack_buffer_size = jack_get_buffer_size( client );
     // Setup target delay and max_diff for the normal user, who does not play with them...
     if( !target_delay ) 
-	target_delay = (num_periods*period_size / 2) + jack_buffer_size;
+	target_delay = (num_periods*period_size / 2) - jack_buffer_size/2;
 
     if( !max_diff )
-	max_diff = period_size / 2;	
+	max_diff = target_delay;	
 
     if( max_diff > target_delay ) {
 	    fprintf( stderr, "target_delay (%d) cant be smaller than max_diff(%d)\n", target_delay, max_diff );
