@@ -39,6 +39,8 @@
 		(d) = f_round ((s) * SAMPLE_16BIT_SCALING);\
 	}
 
+#define OFF_D_SIZE 256
+
 typedef signed short ALSASAMPLE;
 
 // Here are the lists of the jack ports...
@@ -59,6 +61,13 @@ int jack_buffer_size;
 
 double current_resample_factor = 1.0;
 
+double resample_mean = 1.0;
+double old_offset = 0.0;
+double offset_differential_array[OFF_D_SIZE];
+int offset_differential_index = 0;
+double old_resample_factor = 1.0;
+double old_old_resample_factor = 1.0;
+double dd_resample_factor = 0.0;
 // ------------------------------------------------------ commandline parameters
 
 int sample_rate = 0;				 /* stream rate */
@@ -69,7 +78,7 @@ int num_periods = 2;
 int target_delay = 0;	    /* the delay which the program should try to approach. */
 int max_diff = 0;	    /* the diff value, when a hard readpointer skip should occur */
 int catch_factor = 1000;
-int catch_factor2 = 1000000;
+int catch_factor2 = 10000;
 int good_window=0;
 int verbose = 0;
 int instrument = 0;
@@ -264,6 +273,12 @@ static snd_pcm_t *open_audiofd( char *device_name, int capture, int rate, int ch
   return handle;
 }
 
+double hann( double x )
+{
+	return 0.5 * (1.0 - cos( M_PI * x ) );
+}
+
+    int jumped = 0;
 /**
  * The process callback for this JACK application.
  * It is called by JACK at the appropriate times.
@@ -274,11 +289,12 @@ int process (jack_nframes_t nframes, void *arg) {
     float *floatbuf, *resampbuf;
     int rlen;
     int err;
-    snd_pcm_sframes_t delay;
+    snd_pcm_sframes_t delay = target_delay;
 
 
     snd_pcm_delay( alsa_handle, &delay );
 
+    //delay -= jack_frames_since_cycle_start( client );
     // Do it the hard way.
     // this is for compensating xruns etc...
 
@@ -287,7 +303,9 @@ int process (jack_nframes_t nframes, void *arg) {
 	output_new_delay = (int) delay;
 
 	delay = target_delay;
-	current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+	current_resample_factor = resample_mean;
+	jumped = 10;
     }
     if( delay < (target_delay-max_diff) ) {
 	ALSASAMPLE *tmp = alloca( (target_delay-delay) * sizeof( ALSASAMPLE ) * num_channels ); 
@@ -297,16 +315,19 @@ int process (jack_nframes_t nframes, void *arg) {
 	output_new_delay = (int) delay;
 
 	delay = target_delay;
-	current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+	current_resample_factor = resample_mean;
+	jumped = 10;
     }
     /* ok... now we should have target_delay +- max_diff on the alsa side.
      *
      * calculate the number of frames, we want to get.
      */
 
+    double offset = delay - target_delay;
+#if 0
     double request_samples = nframes * current_resample_factor;  //== alsa_samples;
 
-    double offset = delay - target_delay;
 
     double frlen = request_samples - offset;
 
@@ -317,28 +338,50 @@ int process (jack_nframes_t nframes, void *arg) {
     // here are the coefficients of the dll.
     double diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
     diff_value +=  pow(current_resample_factor - compute_factor, 1) / (double) catch_factor2;
+#endif
 
-    current_resample_factor -= diff_value;
+    //smooth_offset_differential = 0.999 * smooth_offset_differential + 0.001 * (offset - old_offset);
+    if( jumped==0 ) //fabs(offset-old_offset) < 10.0 )
+	    offset_differential_array[(offset_differential_index++) % OFF_D_SIZE ] = offset-old_offset;
+    else
+    {
+	    jumped--;
+	    offset_differential_array[(offset_differential_index++) % OFF_D_SIZE ] = 0.0;
+    }
+
+    int i;
+    double smooth_offset_differential = 0.0;
+    for( i=0; i<OFF_D_SIZE; i++ )
+	    smooth_offset_differential +=
+		    offset_differential_array[ (i + offset_differential_index-1) % OFF_D_SIZE] * hann( (double) i / ((double) OFF_D_SIZE - 1.0) );
+    smooth_offset_differential /= (double) OFF_D_SIZE;
+
+    old_offset = offset;
+
+    current_resample_factor -= pow(offset/ (double) nframes, 3) / (double) catch_factor;
+    //current_resample_factor -= dd_resample_factor/(double)nframes * 5.0;
+    current_resample_factor -= smooth_offset_differential / (double) nframes / 999.0;
 
     // Dampening:
     // use hysteresis, only do it once offset was more than 150 off,
     // and now came into 50samples window.
     // Also only damp when current_resample_factor is more than 0.01% off.
     if( good_window ) { 
-	    if( (offset > 150) || (offset < -150) ) {
+	    if( (offset > 75) || (offset < -75) ) {
 		    good_window = 0;
 	    }
     } else {
-	    if( (offset < 50) && (offset > -50) ) {
-		    if( 0.0001 < fabs( current_resample_factor - ((double) sample_rate / (double) jack_sample_rate) ) )
-			    current_resample_factor = ((double) sample_rate / (double) jack_sample_rate);
+	    if( (offset < 20) && (offset > -20) ) {
+		    if( 0.0001 < fabs( current_resample_factor - resample_mean ) )
+			    //current_resample_factor = ((double) sample_rate / (double) jack_sample_rate);
+			    current_resample_factor = resample_mean;
 		    good_window = 1;
 	    }
     }
 
     // Output "instrumentatio" gonna change that to real instrumentation in a few.
     output_resampling_factor = (float) current_resample_factor;
-    output_diff = (float) diff_value;
+    output_diff = (float) smooth_offset_differential;
     output_offset = (float) offset;
 
     // Clamp a bit.
@@ -349,6 +392,8 @@ int process (jack_nframes_t nframes, void *arg) {
     rlen = ceil( ((double)nframes) * current_resample_factor )+2;
     assert( rlen > 10 );
 
+    // Calculate resample_mean so we can init ourselves to saner values.
+    resample_mean = 0.9999 * resample_mean + 0.0001 * current_resample_factor;
     /*
      * now this should do it...
      */
@@ -592,6 +637,11 @@ int main (int argc, char *argv[]) {
 	sample_rate = jack_sample_rate;
 
     current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
+    resample_mean = current_resample_factor;
+
+    int i;
+    for( i=0; i<OFF_D_SIZE; i++ )
+	    offset_differential_array[i] = 0.0;
     
     jack_buffer_size = jack_get_buffer_size( client );
     // Setup target delay and max_diff for the normal user, who does not play with them...
