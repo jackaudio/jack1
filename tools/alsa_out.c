@@ -66,6 +66,7 @@ double offset_array[OFF_D_SIZE];
 int offset_differential_index = 0;
 
 double offset_integral = 0;
+
 // ------------------------------------------------------ commandline parameters
 
 int sample_rate = 0;				 /* stream rate */
@@ -77,6 +78,8 @@ int target_delay = 0;	    /* the delay which the program should try to approach.
 int max_diff = 0;	    /* the diff value, when a hard readpointer skip should occur */
 int catch_factor = 100000;
 int catch_factor2 = 10000;
+double pclamp = 15.0;
+double controlquant = 10000.0;
 int good_window=0;
 int verbose = 0;
 int instrument = 0;
@@ -350,7 +353,7 @@ int process (jack_nframes_t nframes, void *arg) {
     // the smooth offset still contains unwanted noise
     // which would go straigth onto the resample coeff.
     // it only used in the P component and the I component is used for the fine tuning anyways.
-    if( fabs( smooth_offset ) < 15.0 )
+    if( fabs( smooth_offset ) < pclamp )
 	    smooth_offset = 0.0;
 
     // ok. now this is the PI controller. 
@@ -359,7 +362,7 @@ int process (jack_nframes_t nframes, void *arg) {
     double current_resample_factor = static_resample_factor - smooth_offset / (double) catch_factor - offset_integral / (double) catch_factor / (double)catch_factor2;
 
     // now quantize this value around resample_mean, so that the noise which is in the integral component doesnt hurt.
-    current_resample_factor = floor( (current_resample_factor - resample_mean) * 10000.0 + 0.5 ) / 10000.0 + resample_mean;
+    current_resample_factor = floor( (current_resample_factor - resample_mean) * controlquant + 0.5 ) / controlquant + resample_mean;
 
     // Output "instrumentatio" gonna change that to real instrumentation in a few.
     output_resampling_factor = (float) current_resample_factor;
@@ -373,7 +376,7 @@ int process (jack_nframes_t nframes, void *arg) {
 
     // Now Calculate how many samples we need.
     rlen = ceil( ((double)nframes) * current_resample_factor )+2;
-    assert( rlen > 10 );
+    assert( rlen > 2 );
 
     // Calculate resample_mean so we can init ourselves to saner values.
     resample_mean = 0.9999 * resample_mean + 0.0001 * current_resample_factor;
@@ -539,7 +542,7 @@ int main (int argc, char *argv[]) {
     int errflg=0;
     int c;
 
-    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:m:t:f:F:")) != -1) {
+    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:m:t:f:F:C:Q:")) != -1) {
 	switch(c) {
 	    case 'j':
 		strcpy(jack_name,optarg);
@@ -570,6 +573,12 @@ int main (int argc, char *argv[]) {
 		break;
 	    case 'F':
 		catch_factor2 = atoi(optarg);
+		break;
+	    case 'C':
+		pclamp = (double) atoi(optarg);
+		break;
+	    case 'Q':
+		controlquant = (double) atoi(optarg);
 		break;
 	    case 'v':
 		verbose = 1;
