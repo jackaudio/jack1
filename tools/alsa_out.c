@@ -347,6 +347,7 @@ int process (jack_nframes_t nframes, void *arg) {
     if( current_resample_factor > 4 ) current_resample_factor = 4;
     rlen = ceil( ((double)nframes) * current_resample_factor )+2;
     assert( rlen > 10 );
+
     /*
      * now this should do it...
      */
@@ -363,6 +364,7 @@ int process (jack_nframes_t nframes, void *arg) {
     JSList *node = playback_ports;
     JSList *src_node = playback_srcs;
     SRC_DATA src;
+
     while ( node != NULL)
     {
 	int i;

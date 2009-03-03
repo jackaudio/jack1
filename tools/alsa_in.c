@@ -271,6 +271,10 @@ int process (jack_nframes_t nframes, void *arg) {
 	delay = target_delay;
 	current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
     }
+    /* ok... now we should have target_delay +- max_diff on the alsa side.
+     *
+     * calculate the number of frames, we want to get.
+     */
 
     double resamp_rate = (double)jack_sample_rate / (double)sample_rate;  // == nframes / alsa_samples.
     double request_samples = nframes / resamp_rate;  //== alsa_samples;
@@ -307,9 +311,10 @@ int process (jack_nframes_t nframes, void *arg) {
 
     // Output "instrumentatio" gonna change that to real instrumentation in a few.
     output_resampling_factor = (float) current_resample_factor;
-    output_offset = offset;
-    output_diff = diff_value;
+    output_diff = (float) diff_value;
+    output_offset = (float) offset;
 
+    // Clamp a bit.
     if( current_resample_factor < 0.25 ) current_resample_factor = 0.25;
     if( current_resample_factor > 4 ) current_resample_factor = 4;
     rlen = ceil( ((double)nframes) / current_resample_factor )+20;
@@ -346,6 +351,8 @@ again:
     int chn = 0;
     JSList *node = capture_ports;
     JSList *src_node = capture_srcs;
+    SRC_DATA src;
+
     while ( node != NULL)
     {
 	int i;
@@ -353,7 +360,6 @@ again:
 	float *buf = jack_port_get_buffer (port, nframes);
 
 	SRC_STATE *src_state = src_node->data;
-	SRC_DATA src;
 
 	for (i=0; i < rlen; i++) {
 	    resampbuf[i] = (float) outbuf[chn+ i*num_channels] / 32767;
