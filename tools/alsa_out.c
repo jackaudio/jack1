@@ -58,7 +58,6 @@ snd_pcm_t *alsa_handle;
 int jack_sample_rate;
 
 double current_resample_factor = 1.0;
-int periods_until_stability = 10;
 
 time_smoother *smoother;
 
@@ -267,8 +266,6 @@ static snd_pcm_t *open_audiofd( char *device_name, int capture, int rate, int ch
   return handle;
 }
 
-jack_nframes_t soundcard_frames = 0;
-
 /**
  * The process callback for this JACK application.
  * It is called by JACK at the appropriate times.
@@ -280,107 +277,75 @@ int process (jack_nframes_t nframes, void *arg) {
     int rlen;
     int err;
     snd_pcm_sframes_t delay;
-    jack_nframes_t this_frame_time;
-    jack_nframes_t this_soundcard_time;
-    int dont_adjust_resampling_factor = 0;
-    double a, b;
 
     double offset;
     double diff_value;
 
     snd_pcm_delay( alsa_handle, &delay );
-    this_frame_time = jack_frame_time(client);
-    this_soundcard_time = soundcard_frames + delay;
 
-    time_smoother_put( smoother, this_frame_time, this_soundcard_time );
 
     // Do it the hard way.
     // this is for compensating xruns etc...
 
     if( delay > (target_delay+max_diff) ) {
 	snd_pcm_rewind( alsa_handle, delay - target_delay );
-	soundcard_frames -= (delay-target_delay);
 	output_new_delay = (int) delay;
-	dont_adjust_resampling_factor = 1;
-	//snd_pcm_delay( alsa_handle, &delay );
+
 	delay = target_delay;
-	// XXX: at least set it to that value.
 	current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
-	//current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
-	periods_until_stability = 10;
     }
     if( delay < (target_delay-max_diff) ) {
 	ALSASAMPLE *tmp = alloca( (target_delay-delay) * sizeof( ALSASAMPLE ) * num_channels ); 
 	memset( tmp, 0, sizeof( ALSASAMPLE ) * num_channels * (target_delay-delay) );
 	snd_pcm_writei( alsa_handle, tmp, target_delay-delay );
-	soundcard_frames += (target_delay-delay);
+
 	output_new_delay = (int) delay;
-	dont_adjust_resampling_factor = 1;
-	//snd_pcm_delay( alsa_handle, &delay );
+
 	delay = target_delay;
-	// XXX: at least set it to that value.
 	current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
-	//current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
-	periods_until_stability = 10;
     }
     /* ok... now we should have target_delay +- max_diff on the alsa side.
      *
      * calculate the number of frames, we want to get.
      */
 
-    //if( periods_until_stability ) {
-    if( 1 ) {
-	//double resamp_rate = (double)sample_rate / (double)jack_sample_rate;  // == nframes / alsa_samples.
-	//double request_samples = nframes / resamp_rate;  //== alsa_samples;
-	double request_samples = nframes * current_resample_factor;  //== alsa_samples;
+    double request_samples = nframes * current_resample_factor;  //== alsa_samples;
 
-	offset = delay - target_delay;
+    offset = delay - target_delay;
 
-	//double frlen = request_samples - offset / catch_factor;
-	double frlen = request_samples - offset;
+    double frlen = request_samples - offset;
 
-	double compute_factor = frlen / (double) nframes;
-	//double compute_factor = (double) nframes / frlen;
+    // Calculate the added resampling factor, which would move us straight to target delay.
+    double compute_factor = frlen / (double) nframes;
 
-	diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
-	diff_value +=  pow(current_resample_factor - compute_factor, 1) / (double) catch_factor2;
-	current_resample_factor -= diff_value;
+    // Now calculate the diff_value, which we want to add to current_resample_factor
+    // here are the coefficients of the dll.
+    diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
+    diff_value +=  pow(current_resample_factor - compute_factor, 1) / (double) catch_factor2;
+    current_resample_factor -= diff_value;
 
-	if( good_window ) { 
-		if( (offset > 150) || (offset < -150) ) {
-			good_window = 0;
-		}
-	} else {
-		if( (offset < 50) && (offset > -50) ) {
-			if( 0.0001 < fabs( current_resample_factor - ((double) sample_rate / (double) jack_sample_rate) ) )
-				current_resample_factor = ((double) sample_rate / (double) jack_sample_rate);
-			good_window = 1;
-		}
-	}
-
-	periods_until_stability -= 1;
-    }
-    else
-    {
-	time_smoother_get_linear_params( smoother, this_frame_time, this_soundcard_time, jack_get_sample_rate(client)/4,
-		&a, &b );
-
-	if( dont_adjust_resampling_factor ) {
-	    current_resample_factor = 1.0/( b - a/(double)nframes/(double)catch_factor );
-	    //double delay_diff = (double)delay - (double)target_delay;
-	    //current_resample_factor = 1.0/( b + a/(double)nframes - delay_diff/(double)nframes/(double)catch_factor );
-	} else
-	    current_resample_factor = 1.0/b;
-
-	offset = delay - target_delay;
-	diff_value = b;
+    // Dampening:
+    // use hysteresis, only do it once offset was more than 150 off,
+    // and now came into 50samples window.
+    // Also only damp when current_resample_factor is more than 0.01% off.
+    if( good_window ) { 
+	    if( (offset > 150) || (offset < -150) ) {
+		    good_window = 0;
+	    }
+    } else {
+	    if( (offset < 50) && (offset > -50) ) {
+		    if( 0.0001 < fabs( current_resample_factor - ((double) sample_rate / (double) jack_sample_rate) ) )
+			    current_resample_factor = ((double) sample_rate / (double) jack_sample_rate);
+		    good_window = 1;
+	    }
     }
 
-
+    // Output "instrumentatio" gonna change that to real instrumentation in a few.
     output_resampling_factor = (float) current_resample_factor;
     output_diff = (float) diff_value;
     output_offset = (float) offset;
 
+    // Clamp a bit.
     if( current_resample_factor < 0.25 ) current_resample_factor = 0.25;
     if( current_resample_factor > 4 ) current_resample_factor = 4;
     rlen = ceil( ((double)nframes) * current_resample_factor )+2;
@@ -441,14 +406,6 @@ again:
       }
       goto again;
   }
-  soundcard_frames += err;
-
-//  if( err != rlen ) {
-//      printf( "write = %d\n", rlen );
-//  }
-
-
-
 
     return 0;      
 }
