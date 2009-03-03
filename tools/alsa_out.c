@@ -389,7 +389,7 @@ int process (jack_nframes_t nframes, void *arg) {
 	    smooth_offset = 0.0;
 
     current_resample_factor = 1.0 - smooth_offset / (double) catch_factor - offset_integral / (double) catch_factor / (double)catch_factor2;
-    current_resample_factor = floor( current_resample_factor * 100000.0 + 0.5 ) / 100000.0;
+    current_resample_factor = floor( (current_resample_factor - resample_mean) * 10000.0 + 0.5 ) / 10000.0 + resample_mean;
     //current_resample_factor -= offset_integral / (double) nframes / (double)10000000 / (double) catch_factor;
 
     //current_resample_factor -= pow(smooth_offset/ (double) nframes, 3) / (double) catch_factor;
@@ -437,7 +437,7 @@ int process (jack_nframes_t nframes, void *arg) {
     outbuf = alloca( rlen * sizeof( ALSASAMPLE ) * num_channels );
 
     floatbuf = alloca( rlen * sizeof( float ) );
-    resampbuf = alloca( nframes * sizeof( float ) );
+    resampbuf = alloca( rlen * sizeof( float ) );
     /*
      * render jack ports to the outbuf...
      */
