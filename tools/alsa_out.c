@@ -59,17 +59,11 @@ snd_pcm_t *alsa_handle;
 int jack_sample_rate;
 int jack_buffer_size;
 
-double current_resample_factor = 1.0;
-
 double resample_mean = 1.0;
-double old_offset = 0.0;
+double static_resample_factor = 1.0;
 
-double offset_differential_array[OFF_D_SIZE];
 double offset_array[OFF_D_SIZE];
 int offset_differential_index = 0;
-double old_resample_factor = 1.0;
-double old_old_resample_factor = 1.0;
-double dd_resample_factor = 0.0;
 
 double offset_integral = 0;
 // ------------------------------------------------------ commandline parameters
@@ -81,7 +75,7 @@ int num_periods = 2;
 
 int target_delay = 0;	    /* the delay which the program should try to approach. */
 int max_diff = 0;	    /* the diff value, when a hard readpointer skip should occur */
-int catch_factor = 1000;
+int catch_factor = 100000;
 int catch_factor2 = 10000;
 int good_window=0;
 int verbose = 0;
@@ -283,8 +277,6 @@ double hann( double x )
 	return 0.5 * (1.0 - cos( 2*M_PI * x ) );
 }
 
-    int jumped = 0;
-    int delay_offset = 0;
 /**
  * The process callback for this JACK application.
  * It is called by JACK at the appropriate times.
@@ -292,7 +284,7 @@ double hann( double x )
 int process (jack_nframes_t nframes, void *arg) {
 
     ALSASAMPLE *outbuf;
-    float *floatbuf, *resampbuf;
+    float *resampbuf;
     int rlen;
     int err;
     snd_pcm_sframes_t delay = target_delay;
@@ -309,13 +301,14 @@ int process (jack_nframes_t nframes, void *arg) {
 	output_new_delay = (int) delay;
 
 	delay = target_delay;
-	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
-	current_resample_factor = resample_mean;
-	offset_integral = - (resample_mean - 1.0) * catch_factor * catch_factor2;
-	//offset_integral = 0;
+
+	// Set the resample_rate... we need to adjust the offset integral, to do this.
+	// first look at the PI controller, this code is just a special case, which should never execute once
+	// everything is swung in. 
+	offset_integral = - (resample_mean - static_resample_factor) * catch_factor * catch_factor2;
+	// Also clear the array. we are beginning a new control cycle.
 	for( i=0; i<OFF_D_SIZE; i++ )
 		offset_array[i] = 0.0;
-	jumped = 3;
     }
     if( delay < (target_delay-max_diff) ) {
 	ALSASAMPLE *tmp = alloca( (target_delay-delay) * sizeof( ALSASAMPLE ) * num_channels ); 
@@ -325,15 +318,12 @@ int process (jack_nframes_t nframes, void *arg) {
 	output_new_delay = (int) delay;
 
 	delay = target_delay;
-	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
-	current_resample_factor = resample_mean;
+
 	// Set the resample_rate... we need to adjust the offset integral, to do this.
-	offset_integral = - (resample_mean - 1.0) * catch_factor * catch_factor2;
-	//offset_integral = 0;
+	offset_integral = - (resample_mean - static_resample_factor) * catch_factor * catch_factor2;
+	// Also clear the array. we are beginning a new control cycle.
 	for( i=0; i<OFF_D_SIZE; i++ )
 		offset_array[i] = 0.0;
-	
-	jumped = 3;
     }
     /* ok... now we should have target_delay +- max_diff on the alsa side.
      *
@@ -341,78 +331,35 @@ int process (jack_nframes_t nframes, void *arg) {
      */
 
     double offset = delay - target_delay;
-#if 0
-    double request_samples = nframes * current_resample_factor;  //== alsa_samples;
 
-
-    double frlen = request_samples - offset;
-
-    // Calculate the added resampling factor, which would move us straight to target delay.
-    double compute_factor = frlen / (double) nframes;
-
-    // Now calculate the diff_value, which we want to add to current_resample_factor
-    // here are the coefficients of the dll.
-    double diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
-    diff_value +=  pow(current_resample_factor - compute_factor, 1) / (double) catch_factor2;
-#endif
-
-    //smooth_offset_differential = 0.999 * smooth_offset_differential + 0.001 * (offset - old_offset);
-
+    // Save offset.
     offset_array[offset_differential_index% OFF_D_SIZE ] = offset;
 
-    if( jumped==0 ) //fabs(offset-old_offset) < 10.0 )
-	    offset_differential_array[(offset_differential_index++) % OFF_D_SIZE ] = offset-old_offset;
-    else
-    {
-	    jumped--;
-	    offset_differential_array[(offset_differential_index++) % OFF_D_SIZE ] = 0.0;
-    }
-
-    double smooth_offset_differential = 0.0;
-    for( i=0; i<OFF_D_SIZE; i++ )
-	    smooth_offset_differential +=
-		    offset_differential_array[ (i + offset_differential_index-1) % OFF_D_SIZE] * hann( (double) i / ((double) OFF_D_SIZE - 1.0) );
-    smooth_offset_differential /= (double) OFF_D_SIZE;
-
+    // Build the mean of the windowed offset array
+    // basically fir lowpassing.
     double smooth_offset = 0.0;
     for( i=0; i<OFF_D_SIZE; i++ )
 	    smooth_offset +=
 		    offset_array[ (i + offset_differential_index-1) % OFF_D_SIZE] * hann( (double) i / ((double) OFF_D_SIZE - 1.0) );
     smooth_offset /= (double) OFF_D_SIZE;
 
-    old_offset = offset;
-
+    // this is the integral of the smoothed_offset
     offset_integral += smooth_offset;
 
     // Clamp offset.
+    // the smooth offset still contains unwanted noise
+    // which would go straigth onto the resample coeff.
+    // it only used in the P component and the I component is used for the fine tuning anyways.
     if( fabs( smooth_offset ) < 15.0 )
 	    smooth_offset = 0.0;
 
-    current_resample_factor = 1.0 - smooth_offset / (double) catch_factor - offset_integral / (double) catch_factor / (double)catch_factor2;
+    // ok. now this is the PI controller. 
+    // u(t) = K * ( e(t) + 1/T \int e(t') dt' )
+    // K = 1/catch_factor and T = catch_factor2
+    double current_resample_factor = static_resample_factor - smooth_offset / (double) catch_factor - offset_integral / (double) catch_factor / (double)catch_factor2;
+
+    // now quantize this value around resample_mean, so that the noise which is in the integral component doesnt hurt.
     current_resample_factor = floor( (current_resample_factor - resample_mean) * 10000.0 + 0.5 ) / 10000.0 + resample_mean;
-    //current_resample_factor -= offset_integral / (double) nframes / (double)10000000 / (double) catch_factor;
-
-    //current_resample_factor -= pow(smooth_offset/ (double) nframes, 3) / (double) catch_factor;
-    //current_resample_factor -= dd_resample_factor/(double)nframes * 5.0;
-
-    // Dampening:
-    // use hysteresis, only do it once offset was more than 150 off,
-    // and now came into 50samples window.
-    // Also only damp when current_resample_factor is more than 0.01% off.
-#if 0
-    if( good_window ) { 
-	    if( (offset > max_diff*2/4) || (offset < -max_diff*2/4) ) {
-		    good_window = 0;
-	    }
-    } else {
-	    if( (offset < 20) && (offset > -20) ) {
-		    if( 0.0001 < fabs( current_resample_factor - resample_mean ) )
-			    //current_resample_factor = ((double) sample_rate / (double) jack_sample_rate);
-			    current_resample_factor = resample_mean;
-		    good_window = 1;
-	    }
-    }
-#endif
 
     // Output "instrumentatio" gonna change that to real instrumentation in a few.
     output_resampling_factor = (float) current_resample_factor;
@@ -436,7 +383,6 @@ int process (jack_nframes_t nframes, void *arg) {
 
     outbuf = alloca( rlen * sizeof( ALSASAMPLE ) * num_channels );
 
-    floatbuf = alloca( rlen * sizeof( float ) );
     resampbuf = alloca( rlen * sizeof( float ) );
     /*
      * render jack ports to the outbuf...
@@ -476,7 +422,6 @@ int process (jack_nframes_t nframes, void *arg) {
     }
 
     // now write the output...
-    delay_offset += (nframes-src.output_frames_gen);
 again:
   err = snd_pcm_writei(alsa_handle, outbuf, src.output_frames_gen);
   //err = snd_pcm_writei(alsa_handle, outbuf, src.output_frames_gen);
@@ -677,13 +622,10 @@ int main (int argc, char *argv[]) {
     if( !sample_rate )
 	sample_rate = jack_sample_rate;
 
-    current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
-    resample_mean = current_resample_factor;
+    static_resample_factor =  (double) sample_rate / (double) jack_sample_rate;
+    resample_mean = static_resample_factor;
 
     int i;
-    for( i=0; i<OFF_D_SIZE; i++ )
-	    offset_differential_array[i] = 0.0;
-    
     for( i=0; i<OFF_D_SIZE; i++ )
 	    offset_array[i] = 0.0;
 
