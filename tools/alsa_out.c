@@ -95,7 +95,7 @@ snd_pcm_uframes_t real_period_size;
 // Alsa stuff... i dont want to touch this bullshit in the next years.... please...
 
 static int xrun_recovery(snd_pcm_t *handle, int err) {
-    printf( "xrun !!!.... %d\n", err );
+//    printf( "xrun !!!.... %d\n", err );
 	if (err == -EPIPE) {	/* under-run */
 		err = snd_pcm_prepare(handle);
 		if (err < 0)
@@ -333,7 +333,7 @@ int process (jack_nframes_t nframes, void *arg) {
     double offset = delay - target_delay;
 
     // Save offset.
-    offset_array[offset_differential_index% OFF_D_SIZE ] = offset;
+    offset_array[(offset_differential_index++)% OFF_D_SIZE ] = offset;
 
     // Build the mean of the windowed offset array
     // basically fir lowpassing.
