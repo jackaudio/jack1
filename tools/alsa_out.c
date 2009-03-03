@@ -372,7 +372,7 @@ int process (jack_nframes_t nframes, void *arg) {
 
     ////////////////////////
     dd_resample_factor = 0.99 * dd_resample_factor + 0.01 * smooth_offset_differential;
-    smooth_offset_differential = dd_resample_factor;
+    //smooth_offset_differential = dd_resample_factor;
     ///////////////////////////////////
     old_offset = offset;
 
