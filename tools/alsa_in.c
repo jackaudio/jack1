@@ -52,10 +52,10 @@ int max_diff = 0;	    /* the diff value, when a hard readpointer skip should occ
 int catch_factor = 1000;
 int catch_factor2 = 1000000;
 int good_window=0;
+int verbose = 0;
+int instrument = 0;
 
 // Debug stuff:
-
-int print_counter = 10;
 
 volatile float output_resampling_factor = 0.0;
 volatile int output_new_delay = 0;
@@ -285,7 +285,6 @@ int process (jack_nframes_t nframes, void *arg) {
     // Calculate the added resampling factor, which would move us straight to target delay.
     double compute_factor = (double) nframes / frlen;
 
-
     // Now calculate the diff_value, which we want to add to current_resample_factor
     // here are the coefficients of the dll.
     double diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
@@ -474,6 +473,8 @@ fprintf(stderr, "usage: alsa_out [options]\n"
 		"  -m <max_diff> \n"
 		"  -t <target_delay> \n"
 		"  -f <catch_factor> \n"
+		"  -i  turns on instrumentation\n"
+		"  -v  turns on printouts\n"
 		"\n");
 }
 
@@ -492,7 +493,7 @@ int main (int argc, char *argv[]) {
     int errflg=0;
     int c;
 
-    while ((c = getopt(argc, argv, ":j:r:c:p:n:d:m:t:f:")) != -1) {
+    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:m:t:f:")) != -1) {
 	switch(c) {
 	    case 'j':
 		strcpy(jack_name,optarg);
@@ -520,6 +521,12 @@ int main (int argc, char *argv[]) {
 		break;
 	    case 'f':
 		catch_factor = atoi(optarg);
+		break;
+	    case 'v':
+		verbose = 1;
+		break;
+	    case 'i':
+		instrument = 1;
 		break;
 	    case ':':
 		fprintf(stderr,
@@ -597,15 +604,24 @@ int main (int argc, char *argv[]) {
 	return 1;
     }
 
-    while(1) {
-	usleep(500000);
-	if( output_new_delay ) {
-	    printf( "delay = %d\n", output_new_delay );
-	    output_new_delay = 0;
-	}
-	printf( "res: %f, \tdiff = %f, \toffset = %f \n", output_resampling_factor, output_diff, output_offset );
-	output_offset = 0.0;
-	
+    if( verbose ) {
+	    while(1) {
+		    usleep(500000);
+		    if( output_new_delay ) {
+			    printf( "delay = %d\n", output_new_delay );
+			    output_new_delay = 0;
+		    }
+		    printf( "res: %f, \tdiff = %f, \toffset = %f \n", output_resampling_factor, output_diff, output_offset );
+	    }
+    } else if( instrument ) {
+	    printf( "# n\tresamp\tdiff\toffseti\n");
+	    int n=0;
+	    while(1) {
+		    usleep(1000);
+		    printf( "%d\t%f\t%f\t%f\n", n++, output_resampling_factor, output_diff, output_offset );
+	    }
+    } else {
+	    while(1) sleep(10);
     }
 
     jack_client_close (client);
