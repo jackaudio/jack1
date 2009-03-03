@@ -89,9 +89,10 @@ int instrument = 0;
 
 // Debug stuff:
 
-volatile float output_resampling_factor = 0.0;
+volatile float output_resampling_factor = 1.0;
 volatile int output_new_delay = 0;
 volatile float output_offset = 0.0;
+volatile float output_integral = 0.0;
 volatile float output_diff = 0.0;
 
 snd_pcm_uframes_t real_buffer_size;
@@ -371,17 +372,19 @@ int process (jack_nframes_t nframes, void *arg) {
     smooth_offset /= (double) OFF_D_SIZE;
 
     ////////////////////////
-    dd_resample_factor = 0.99 * dd_resample_factor + 0.01 * smooth_offset_differential;
+    dd_resample_factor = 0.9999 * dd_resample_factor + 0.0001 * smooth_offset;
     //smooth_offset_differential = dd_resample_factor;
     ///////////////////////////////////
     old_offset = offset;
 
-    offset_integral += offset;
+    offset_integral += smooth_offset;
 
-    current_resample_factor -= pow(offset/ (double) nframes, 3) / (double) catch_factor;
-    current_resample_factor -= smooth_offset_differential / (double) nframes / (double)catch_factor2;
+    // Clamp offset.
+    if( fabs( smooth_offset ) < 15.0 )
+	    smooth_offset = 0.0;
 
     current_resample_factor = 1.0 - smooth_offset / (double) catch_factor - offset_integral / (double) catch_factor / (double)catch_factor2;
+    current_resample_factor = floor( current_resample_factor * 50000 + 0.5 ) / 50000;
     //current_resample_factor -= offset_integral / (double) nframes / (double)10000000 / (double) catch_factor;
 
     //current_resample_factor -= pow(smooth_offset/ (double) nframes, 3) / (double) catch_factor;
@@ -391,6 +394,7 @@ int process (jack_nframes_t nframes, void *arg) {
     // use hysteresis, only do it once offset was more than 150 off,
     // and now came into 50samples window.
     // Also only damp when current_resample_factor is more than 0.01% off.
+#if 0
     if( good_window ) { 
 	    if( (offset > max_diff*2/4) || (offset < -max_diff*2/4) ) {
 		    good_window = 0;
@@ -403,10 +407,12 @@ int process (jack_nframes_t nframes, void *arg) {
 		    good_window = 1;
 	    }
     }
+#endif
 
     // Output "instrumentatio" gonna change that to real instrumentation in a few.
     output_resampling_factor = (float) current_resample_factor;
-    output_diff = (float) smooth_offset_differential;
+    output_diff = (float) smooth_offset;
+    output_integral = (float) offset_integral;
     output_offset = (float) offset;
 
     // Clamp a bit.
@@ -715,11 +721,11 @@ int main (int argc, char *argv[]) {
 		    printf( "res: %f, \tdiff = %f, \toffset = %f \n", output_resampling_factor, output_diff, output_offset );
 	    }
     } else if( instrument ) {
-	    printf( "# n\tresamp\tdiff\toffseti\n");
+	    printf( "# n\tresamp\tdiff\toffseti\tintegral\n");
 	    int n=0;
 	    while(1) {
 		    usleep(1000);
-		    printf( "%d\t%f\t%f\t%f\n", n++, output_resampling_factor, output_diff, output_offset );
+		    printf( "%d\t%f\t%f\t%f\t%f\n", n++, output_resampling_factor, output_diff, output_offset, output_integral );
 	    }
     } else {
 	    while(1) sleep(10);
