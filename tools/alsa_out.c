@@ -214,11 +214,11 @@ static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams, int pe
 		return err;
 	}
 	/* align all transfers to 1 sample */
-	err = snd_pcm_sw_params_set_xfer_align(handle, swparams, 1);
-	if (err < 0) {
-		printf("Unable to set transfer align for capture: %s\n", snd_strerror(err));
-		return err;
-	}
+//	err = snd_pcm_sw_params_set_xfer_align(handle, swparams, 1);
+//	if (err < 0) {
+//		printf("Unable to set transfer align for capture: %s\n", snd_strerror(err));
+//		return err;
+//	}
 	/* write the parameters to the playback device */
 	err = snd_pcm_sw_params(handle, swparams);
 	if (err < 0) {
