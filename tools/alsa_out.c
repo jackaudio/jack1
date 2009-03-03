@@ -39,7 +39,7 @@
 		(d) = f_round ((s) * SAMPLE_16BIT_SCALING);\
 	}
 
-#define OFF_D_SIZE 256
+#define OFF_D_SIZE 128
 
 typedef signed short ALSASAMPLE;
 
@@ -63,7 +63,9 @@ double current_resample_factor = 1.0;
 
 double resample_mean = 1.0;
 double old_offset = 0.0;
+
 double offset_differential_array[OFF_D_SIZE];
+double offset_array[OFF_D_SIZE];
 int offset_differential_index = 0;
 double old_resample_factor = 1.0;
 double old_old_resample_factor = 1.0;
@@ -223,11 +225,11 @@ static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams, int pe
 		return err;
 	}
 	/* align all transfers to 1 sample */
-//	err = snd_pcm_sw_params_set_xfer_align(handle, swparams, 1);
-//	if (err < 0) {
-//		printf("Unable to set transfer align for capture: %s\n", snd_strerror(err));
-//		return err;
-//	}
+	err = snd_pcm_sw_params_set_xfer_align(handle, swparams, 1);
+	if (err < 0) {
+		printf("Unable to set transfer align for capture: %s\n", snd_strerror(err));
+		return err;
+	}
 	/* write the parameters to the playback device */
 	err = snd_pcm_sw_params(handle, swparams);
 	if (err < 0) {
@@ -275,7 +277,7 @@ static snd_pcm_t *open_audiofd( char *device_name, int capture, int rate, int ch
 
 double hann( double x )
 {
-	return 0.5 * (1.0 - cos( M_PI * x ) );
+	return 0.5 * (1.0 - cos( 2*M_PI * x ) );
 }
 
     int jumped = 0;
@@ -305,7 +307,7 @@ int process (jack_nframes_t nframes, void *arg) {
 	delay = target_delay;
 	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
 	current_resample_factor = resample_mean;
-	jumped = 10;
+	jumped = 3;
     }
     if( delay < (target_delay-max_diff) ) {
 	ALSASAMPLE *tmp = alloca( (target_delay-delay) * sizeof( ALSASAMPLE ) * num_channels ); 
@@ -317,7 +319,7 @@ int process (jack_nframes_t nframes, void *arg) {
 	delay = target_delay;
 	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
 	current_resample_factor = resample_mean;
-	jumped = 10;
+	jumped = 3;
     }
     /* ok... now we should have target_delay +- max_diff on the alsa side.
      *
@@ -341,6 +343,9 @@ int process (jack_nframes_t nframes, void *arg) {
 #endif
 
     //smooth_offset_differential = 0.999 * smooth_offset_differential + 0.001 * (offset - old_offset);
+
+    offset_array[offset_differential_index% OFF_D_SIZE ] = offset;
+
     if( jumped==0 ) //fabs(offset-old_offset) < 10.0 )
 	    offset_differential_array[(offset_differential_index++) % OFF_D_SIZE ] = offset-old_offset;
     else
@@ -356,18 +361,29 @@ int process (jack_nframes_t nframes, void *arg) {
 		    offset_differential_array[ (i + offset_differential_index-1) % OFF_D_SIZE] * hann( (double) i / ((double) OFF_D_SIZE - 1.0) );
     smooth_offset_differential /= (double) OFF_D_SIZE;
 
+    double smooth_offset = 0.0;
+    for( i=0; i<OFF_D_SIZE; i++ )
+	    smooth_offset +=
+		    offset_array[ (i + offset_differential_index-1) % OFF_D_SIZE] * hann( (double) i / ((double) OFF_D_SIZE - 1.0) );
+    smooth_offset /= (double) OFF_D_SIZE;
+
+    ////////////////////////
+    dd_resample_factor = 0.999 * dd_resample_factor + 0.001 * smooth_offset_differential;
+    smooth_offset_differential = dd_resample_factor;
+    ///////////////////////////////////
     old_offset = offset;
 
     current_resample_factor -= pow(offset/ (double) nframes, 3) / (double) catch_factor;
+    //current_resample_factor -= pow(smooth_offset/ (double) nframes, 3) / (double) catch_factor;
     //current_resample_factor -= dd_resample_factor/(double)nframes * 5.0;
-    current_resample_factor -= smooth_offset_differential / (double) nframes / 999.0;
+    current_resample_factor -= smooth_offset_differential / (double) nframes / (double)catch_factor2;
 
     // Dampening:
     // use hysteresis, only do it once offset was more than 150 off,
     // and now came into 50samples window.
     // Also only damp when current_resample_factor is more than 0.01% off.
     if( good_window ) { 
-	    if( (offset > 75) || (offset < -75) ) {
+	    if( (offset > max_diff*3/4) || (offset < max_diff*3/4) ) {
 		    good_window = 0;
 	    }
     } else {
@@ -440,7 +456,7 @@ int process (jack_nframes_t nframes, void *arg) {
     }
 
     // now write the output...
-
+again:
   err = snd_pcm_writei(alsa_handle, outbuf, src.output_frames_gen);
   //err = snd_pcm_writei(alsa_handle, outbuf, src.output_frames_gen);
   if( err < 0 ) {
@@ -449,6 +465,7 @@ int process (jack_nframes_t nframes, void *arg) {
 	  printf("Write error: %s\n", snd_strerror(err));
 	  exit(EXIT_FAILURE);
       }
+      goto again;
   }
 
     return 0;      
@@ -556,7 +573,7 @@ int main (int argc, char *argv[]) {
     int errflg=0;
     int c;
 
-    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:m:t:f:")) != -1) {
+    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:m:t:f:F:")) != -1) {
 	switch(c) {
 	    case 'j':
 		strcpy(jack_name,optarg);
@@ -584,6 +601,9 @@ int main (int argc, char *argv[]) {
 		break;
 	    case 'f':
 		catch_factor = atoi(optarg);
+		break;
+	    case 'F':
+		catch_factor2 = atoi(optarg);
 		break;
 	    case 'v':
 		verbose = 1;
@@ -643,6 +663,9 @@ int main (int argc, char *argv[]) {
     for( i=0; i<OFF_D_SIZE; i++ )
 	    offset_differential_array[i] = 0.0;
     
+    for( i=0; i<OFF_D_SIZE; i++ )
+	    offset_array[i] = 0.0;
+
     jack_buffer_size = jack_get_buffer_size( client );
     // Setup target delay and max_diff for the normal user, who does not play with them...
     if( !target_delay ) 
