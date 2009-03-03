@@ -380,6 +380,8 @@ int process (jack_nframes_t nframes, void *arg) {
 
     current_resample_factor -= pow(offset/ (double) nframes, 3) / (double) catch_factor;
     current_resample_factor -= smooth_offset_differential / (double) nframes / (double)catch_factor2;
+
+    current_resample_factor = 1.0 - smooth_offset / (double) catch_factor - offset_integral / (double) catch_factor / (double)catch_factor2;
     //current_resample_factor -= offset_integral / (double) nframes / (double)10000000 / (double) catch_factor;
 
     //current_resample_factor -= pow(smooth_offset/ (double) nframes, 3) / (double) catch_factor;
