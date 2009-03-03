@@ -36,9 +36,9 @@ snd_pcm_format_t format = SND_PCM_FORMAT_S16;	 /* sample format */
 snd_pcm_t *alsa_handle;
 
 int jack_sample_rate;
+int jack_buffer_size;
 
 double current_resample_factor = 1.0;
-
 
 // ------------------------------------------------------ commandline parameters
 
@@ -276,19 +276,19 @@ int process (jack_nframes_t nframes, void *arg) {
      * calculate the number of frames, we want to get.
      */
 
-    double resamp_rate = (double)jack_sample_rate / (double)sample_rate;  // == nframes / alsa_samples.
-    double request_samples = nframes / resamp_rate;  //== alsa_samples;
+    double request_samples = nframes / current_resample_factor;  //== alsa_samples;
 
     double offset = delay - target_delay;
 
     double frlen = request_samples + offset;
-    double compute_factor = (double) nframes / frlen;
 
     // Calculate the added resampling factor, which would move us straight to target delay.
-    double diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
+    double compute_factor = (double) nframes / frlen;
+
 
     // Now calculate the diff_value, which we want to add to current_resample_factor
     // here are the coefficients of the dll.
+    double diff_value =  pow(current_resample_factor - compute_factor, 3) / (double) catch_factor;
     diff_value +=  pow(current_resample_factor - compute_factor, 1) / (double) catch_factor2;
 
     current_resample_factor -= diff_value;
@@ -317,6 +317,8 @@ int process (jack_nframes_t nframes, void *arg) {
     // Clamp a bit.
     if( current_resample_factor < 0.25 ) current_resample_factor = 0.25;
     if( current_resample_factor > 4 ) current_resample_factor = 4;
+
+    // Now Calculate how many samples we need.
     rlen = ceil( ((double)nframes) / current_resample_factor )+20;
     assert( rlen > 10 );
 
@@ -383,6 +385,7 @@ again:
 	chn++;
     }
 
+    // Put back the samples libsamplerate did not consume.
     //printf( "putback = %d\n", put_back_samples );
     snd_pcm_rewind( alsa_handle, put_back_samples );
 
@@ -534,14 +537,6 @@ int main (int argc, char *argv[]) {
 	exit(2);
     }
 
-    // Setup target delay and max_diff for the normal user, who does not play with them...
-
-    if( !target_delay ) 
-	target_delay = num_periods*period_size / 2;
-
-    if( !max_diff )
-	max_diff = period_size / 2;	
-
     if ((client = jack_client_new (jack_name)) == 0) {
 	fprintf (stderr, "jack server not running?\n");
 	return 1;
@@ -572,8 +567,24 @@ int main (int argc, char *argv[]) {
 	sample_rate = jack_sample_rate;
 
     current_resample_factor = (double) jack_sample_rate / (double) sample_rate;
-    //// now open the alsa fd...
     
+    jack_buffer_size = jack_get_buffer_size( client );
+    // Setup target delay and max_diff for the normal user, who does not play with them...
+    if( !target_delay ) 
+	target_delay = (num_periods*period_size / 2) + jack_buffer_size;
+
+    if( !max_diff )
+	max_diff = period_size / 2;	
+
+    if( max_diff > target_delay ) {
+	    fprintf( stderr, "target_delay (%d) cant be smaller than max_diff(%d)\n", target_delay, max_diff );
+	    exit(20);
+    }
+    if( (target_delay+max_diff) > (num_periods*period_size) ) {
+	    fprintf( stderr, "target_delay+max_diff (%d) cant be bigger than buffersize(%d)\n", target_delay+max_diff, num_periods*period_size );
+	    exit(20);
+    }
+    // now open the alsa fd...
     alsa_handle = open_audiofd( alsa_device, 1, sample_rate, num_channels, period_size, num_periods);
     if( alsa_handle < 0 )
 	exit(20);
