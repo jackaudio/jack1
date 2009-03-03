@@ -296,7 +296,7 @@ int process (jack_nframes_t nframes, void *arg) {
     int rlen;
     int err;
     snd_pcm_sframes_t delay = target_delay;
-
+    int i;
 
     snd_pcm_delay( alsa_handle, &delay );
 
@@ -311,6 +311,10 @@ int process (jack_nframes_t nframes, void *arg) {
 	delay = target_delay;
 	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
 	current_resample_factor = resample_mean;
+	offset_integral = - (resample_mean - 1.0) * catch_factor * catch_factor2;
+	//offset_integral = 0;
+	for( i=0; i<OFF_D_SIZE; i++ )
+		offset_array[i] = 0.0;
 	jumped = 3;
     }
     if( delay < (target_delay-max_diff) ) {
@@ -323,6 +327,12 @@ int process (jack_nframes_t nframes, void *arg) {
 	delay = target_delay;
 	//current_resample_factor = (double) sample_rate / (double) jack_sample_rate;
 	current_resample_factor = resample_mean;
+	// Set the resample_rate... we need to adjust the offset integral, to do this.
+	offset_integral = - (resample_mean - 1.0) * catch_factor * catch_factor2;
+	//offset_integral = 0;
+	for( i=0; i<OFF_D_SIZE; i++ )
+		offset_array[i] = 0.0;
+	
 	jumped = 3;
     }
     /* ok... now we should have target_delay +- max_diff on the alsa side.
@@ -358,7 +368,6 @@ int process (jack_nframes_t nframes, void *arg) {
 	    offset_differential_array[(offset_differential_index++) % OFF_D_SIZE ] = 0.0;
     }
 
-    int i;
     double smooth_offset_differential = 0.0;
     for( i=0; i<OFF_D_SIZE; i++ )
 	    smooth_offset_differential +=
@@ -371,10 +380,6 @@ int process (jack_nframes_t nframes, void *arg) {
 		    offset_array[ (i + offset_differential_index-1) % OFF_D_SIZE] * hann( (double) i / ((double) OFF_D_SIZE - 1.0) );
     smooth_offset /= (double) OFF_D_SIZE;
 
-    ////////////////////////
-    dd_resample_factor = 0.9999 * dd_resample_factor + 0.0001 * smooth_offset;
-    //smooth_offset_differential = dd_resample_factor;
-    ///////////////////////////////////
     old_offset = offset;
 
     offset_integral += smooth_offset;
@@ -384,7 +389,7 @@ int process (jack_nframes_t nframes, void *arg) {
 	    smooth_offset = 0.0;
 
     current_resample_factor = 1.0 - smooth_offset / (double) catch_factor - offset_integral / (double) catch_factor / (double)catch_factor2;
-    current_resample_factor = floor( current_resample_factor * 50000 + 0.5 ) / 50000;
+    current_resample_factor = floor( current_resample_factor * 100000.0 + 0.5 ) / 100000.0;
     //current_resample_factor -= offset_integral / (double) nframes / (double)10000000 / (double) catch_factor;
 
     //current_resample_factor -= pow(smooth_offset/ (double) nframes, 3) / (double) catch_factor;
