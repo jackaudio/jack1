@@ -18,6 +18,10 @@ synchronized with JACK backend (or the hardware it might be using).
 alsa_in/alsa_out tries to resample the output stream in an attempt to
 compensate for drift between the two clocks.
 
+As of jack-0.116.3 this works almost perfectly. It takes some time, to reach
+absolute resample-rate stability. So give it some minutes (its intended to be
+running permanently anyways)
+
 .SH OPTIONS
 .TP
 \fB\-j \fI jack_client_name\fR
@@ -61,6 +65,10 @@ use a higher number of periods.
 .br
 Set number of periods. See note for period_size.
 .TP
+\fB\-q \fI quality\fR  
+.br
+Set the quality of the resampler from 0 to 4. can significanly reduce cpu usage.
+.TP
 \fB\-m \fI max_diff\fR  
 .br
 The value when a soft xrun occurs. Basically the window, in which
@@ -70,6 +78,12 @@ the dma pointer may jitter. I dont think its necessary to play with this anymore
 .br
 The delay alsa_io should try to approach. Same as for max_diff. It will be setup based on -p and -n
 which is generally sufficient.
+.TP
+\fB\-s \fI smooth_array_size\fR  
+.br
+This parameter controls the size of the array used for smoothing the delay measurement. Its default is 256.
+If you use a pretty low period size, you can lower the CPU usage a bit by decreasing this parameter.
+However most CPU time is spent in the resampling so this will not be much.
 .TP
 \fB\-C \fI P Control Clamp\fR  
 .br
