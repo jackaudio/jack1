@@ -23,8 +23,6 @@
 
 #include <samplerate.h>
 
-#define OFF_D_SIZE 256
-
 // Here are the lists of the jack ports...
 
 JSList	   *capture_ports = NULL;
@@ -41,7 +39,8 @@ int jack_buffer_size;
 double resample_mean = 1.0;
 double static_resample_factor = 1.0;
 
-double offset_array[OFF_D_SIZE];
+double *offset_array;
+double *window_array;
 int offset_differential_index = 0;
 
 double offset_integral = 0;
@@ -59,6 +58,7 @@ int catch_factor = 100000;
 int catch_factor2 = 10000;
 double pclamp = 15.0;
 double controlquant = 10000.0;
+int smooth_size = 256;
 int good_window=0;
 int verbose = 0;
 int instrument = 0;
@@ -329,7 +329,7 @@ int process (jack_nframes_t nframes, void *arg) {
 	// everything is swung in. 
 	offset_integral = - (resample_mean - static_resample_factor) * catch_factor * catch_factor2;
 	// Also clear the array. we are beginning a new control cycle.
-	for( i=0; i<OFF_D_SIZE; i++ )
+	for( i=0; i<smooth_size; i++ )
 		offset_array[i] = 0.0;
     }
     if( delay < (target_delay-max_diff) ) {
@@ -340,7 +340,7 @@ int process (jack_nframes_t nframes, void *arg) {
 	// Set the resample_rate... we need to adjust the offset integral, to do this.
 	offset_integral = - (resample_mean - static_resample_factor) * catch_factor * catch_factor2;
 	// Also clear the array. we are beginning a new control cycle.
-	for( i=0; i<OFF_D_SIZE; i++ )
+	for( i=0; i<smooth_size; i++ )
 		offset_array[i] = 0.0;
     }
     /* ok... now we should have target_delay +- max_diff on the alsa side.
@@ -351,15 +351,15 @@ int process (jack_nframes_t nframes, void *arg) {
     double offset = delay - target_delay;
 
     // Save offset.
-    offset_array[(offset_differential_index++)% OFF_D_SIZE ] = offset;
+    offset_array[(offset_differential_index++)% smooth_size ] = offset;
 
     // Build the mean of the windowed offset array
     // basically fir lowpassing.
     double smooth_offset = 0.0;
-    for( i=0; i<OFF_D_SIZE; i++ )
+    for( i=0; i<smooth_size; i++ )
 	    smooth_offset +=
-		    offset_array[ (i + offset_differential_index-1) % OFF_D_SIZE] * hann( (double) i / ((double) OFF_D_SIZE - 1.0) );
-    smooth_offset /= (double) OFF_D_SIZE;
+		    offset_array[ (i + offset_differential_index-1) % smooth_size] * window_array[i];
+    smooth_offset /= (double) smooth_size;
 
     // this is the integral of the smoothed_offset
     offset_integral += smooth_offset;
@@ -569,7 +569,7 @@ int main (int argc, char *argv[]) {
     int errflg=0;
     int c;
 
-    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:m:t:f:F:C:Q:")) != -1) {
+    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:m:t:f:F:C:Q:s:")) != -1) {
 	switch(c) {
 	    case 'j':
 		strcpy(jack_name,optarg);
@@ -612,6 +612,9 @@ int main (int argc, char *argv[]) {
 		break;
 	    case 'i':
 		instrument = 1;
+		break;
+	    case 's':
+		smooth_size = atoi(optarg);
 		break;
 	    case ':':
 		fprintf(stderr,
@@ -658,9 +661,21 @@ int main (int argc, char *argv[]) {
     static_resample_factor = (double) jack_sample_rate / (double) sample_rate;
     resample_mean = static_resample_factor;
 
+    offset_array = malloc( sizeof(double) * smooth_size );
+    if( offset_array == NULL ) {
+	    fprintf( stderr, "no memory for offset_array !!!\n" );
+	    exit(20);
+    }
+    window_array = malloc( sizeof(double) * smooth_size );
+    if( window_array == NULL ) {
+	    fprintf( stderr, "no memory for window_array !!!\n" );
+	    exit(20);
+    }
     int i;
-    for( i=0; i<OFF_D_SIZE; i++ )
+    for( i=0; i<smooth_size; i++ ) {
 	    offset_array[i] = 0.0;
+	    window_array[i] = hann( (double) i / ((double) smooth_size - 1.0) );
+    }
 
     jack_buffer_size = jack_get_buffer_size( client );
     // Setup target delay and max_diff for the normal user, who does not play with them...
