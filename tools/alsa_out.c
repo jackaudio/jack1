@@ -25,25 +25,7 @@
 
 #include <samplerate.h>
 
-#define SAMPLE_16BIT_SCALING  32767.0f
-#define SAMPLE_16BIT_MAX  32767
-#define SAMPLE_16BIT_MIN  -32767
-#define NORMALIZED_FLOAT_MIN -1.0f
-#define NORMALIZED_FLOAT_MAX  1.0f
-#define f_round(f) lrintf(f)
-
-#define float_16(s, d)\
-	if ((s) <= NORMALIZED_FLOAT_MIN) {\
-		(d) = SAMPLE_16BIT_MIN;\
-	} else if ((s) >= NORMALIZED_FLOAT_MAX) {\
-		(d) = SAMPLE_16BIT_MAX;\
-	} else {\
-		(d) = f_round ((s) * SAMPLE_16BIT_SCALING);\
-	}
-
 #define OFF_D_SIZE 256
-
-typedef signed short ALSASAMPLE;
 
 // Here are the lists of the jack ports...
 
@@ -301,8 +283,8 @@ static snd_pcm_t *open_audiofd( char *device_name, int capture, int rate, int ch
   //snd_pcm_start( handle );
   //snd_pcm_wait( handle, 200 );
   int num_null_samples = nperiods * period * channels;
-  ALSASAMPLE *tmp = alloca( num_null_samples * sizeof( ALSASAMPLE ) ); 
-  memset( tmp, 0, num_null_samples * sizeof( ALSASAMPLE ) );
+  char *tmp = alloca( num_null_samples * formats[format].sample_size ); 
+  memset( tmp, 0, num_null_samples * formats[format].sample_size );
   snd_pcm_writei( handle, tmp, num_null_samples );
   
 
@@ -348,8 +330,8 @@ int process (jack_nframes_t nframes, void *arg) {
 		offset_array[i] = 0.0;
     }
     if( delay < (target_delay-max_diff) ) {
-	ALSASAMPLE *tmp = alloca( (target_delay-delay) * sizeof( ALSASAMPLE ) * num_channels ); 
-	memset( tmp, 0, sizeof( ALSASAMPLE ) * num_channels * (target_delay-delay) );
+	char *tmp = alloca( (target_delay-delay) * formats[format].sample_size * num_channels ); 
+	memset( tmp, 0,  formats[format].sample_size * num_channels * (target_delay-delay) );
 	snd_pcm_writei( alsa_handle, tmp, target_delay-delay );
 
 	output_new_delay = (int) delay;
@@ -432,7 +414,6 @@ int process (jack_nframes_t nframes, void *arg) {
 
     while ( node != NULL)
     {
-	int i;
 	jack_port_t *port = (jack_port_t *) node->data;
 	float *buf = jack_port_get_buffer (port, nframes);
 

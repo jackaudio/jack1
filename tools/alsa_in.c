@@ -16,13 +16,13 @@
 #include <jack/jack.h>
 #include <jack/jslist.h>
 
+#include "memops.h"
+
 #include "alsa/asoundlib.h"
 
 #include <samplerate.h>
 
 #define OFF_D_SIZE 256
-
-typedef signed short ALSASAMPLE;
 
 // Here are the lists of the jack ports...
 
@@ -31,9 +31,6 @@ JSList	   *capture_srcs = NULL;
 JSList	   *playback_ports = NULL;
 JSList	   *playback_srcs = NULL;
 jack_client_t *client;
-
-// TODO: make the sample format configurable soon...
-snd_pcm_format_t format = SND_PCM_FORMAT_S16;	 /* sample format */
 
 snd_pcm_t *alsa_handle;
 
@@ -76,6 +73,23 @@ volatile float output_diff = 0.0;
 snd_pcm_uframes_t real_buffer_size;
 snd_pcm_uframes_t real_period_size;
 
+// format selection, and corresponding functions from memops in a nice set of structs.
+
+typedef struct alsa_format {
+	snd_pcm_format_t format_id;
+	size_t sample_size;
+	void (*jack_to_soundcard) (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
+	void (*soundcard_to_jack) (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
+} alsa_format_t;
+
+alsa_format_t formats[] = {
+	{ SND_PCM_FORMAT_S32, 4, sample_move_d32u24_sS, sample_move_dS_s32u24 },
+	{ SND_PCM_FORMAT_S24, 4, sample_move_d24_sS, sample_move_dS_s24 },
+	{ SND_PCM_FORMAT_S16, 2, sample_move_d16_sS, sample_move_dS_s16 }
+};
+#define NUMFORMATS (sizeof(formats)/sizeof(formats[0]))
+int format=0;
+
 // Alsa stuff... i dont want to touch this bullshit in the next years.... please...
 
 static int xrun_recovery(snd_pcm_t *handle, int err) {
@@ -98,6 +112,23 @@ static int xrun_recovery(snd_pcm_t *handle, int err) {
 	return err;
 }
 
+static int set_hwformat( snd_pcm_t *handle, snd_pcm_hw_params_t *params )
+{
+	int i;
+	int err;
+
+	for( i=0; i<NUMFORMATS; i++ ) {
+		/* set the sample format */
+		err = snd_pcm_hw_params_set_format(handle, params, formats[i].format_id);
+		if (err == 0) {
+			format = i;
+			return 0;
+		}
+	}
+
+	return err;
+}
+
 static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_access_t access, int rate, int channels, int period, int nperiods ) {
 	int err, dir=0;
 	unsigned int buffer_time;
@@ -116,8 +147,9 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
 		printf("Access type not available for playback: %s\n", snd_strerror(err));
 		return err;
 	}
+
 	/* set the sample format */
-	err = snd_pcm_hw_params_set_format(handle, params, format);
+	err = set_hwformat(handle, params);
 	if (err < 0) {
 		printf("Sample format not available for playback: %s\n", snd_strerror(err));
 		return err;
@@ -262,7 +294,7 @@ double hann( double x )
  */
 int process (jack_nframes_t nframes, void *arg) {
 
-    ALSASAMPLE *outbuf;
+    char *outbuf;
     float *resampbuf;
     int rlen;
     int err;
@@ -277,7 +309,7 @@ int process (jack_nframes_t nframes, void *arg) {
     // this is for compensating xruns etc...
 
     if( delay > (target_delay+max_diff) ) {
-	ALSASAMPLE *tmp = alloca( (delay-target_delay) * sizeof( ALSASAMPLE ) * num_channels ); 
+	char *tmp = alloca( (delay-target_delay) * formats[format].sample_size * num_channels ); 
 	snd_pcm_readi( alsa_handle, tmp, delay-target_delay );
 	output_new_delay = (int) delay;
 
@@ -358,7 +390,7 @@ int process (jack_nframes_t nframes, void *arg) {
      * now this should do it...
      */
 
-    outbuf = alloca( rlen * sizeof( ALSASAMPLE ) * num_channels );
+    outbuf = alloca( rlen * formats[format].sample_size * num_channels );
 
     resampbuf = alloca( rlen * sizeof( float ) );
 
@@ -388,15 +420,15 @@ again:
 
     while ( node != NULL)
     {
-	int i;
 	jack_port_t *port = (jack_port_t *) node->data;
 	float *buf = jack_port_get_buffer (port, nframes);
 
 	SRC_STATE *src_state = src_node->data;
 
-	for (i=0; i < rlen; i++) {
-	    resampbuf[i] = (float) outbuf[chn+ i*num_channels] / 32767;
-	}
+	formats[format].soundcard_to_jack( resampbuf, outbuf + format[formats].sample_size * chn, rlen, num_channels*format[formats].sample_size );
+	//for (i=0; i < rlen; i++) {
+	//    resampbuf[i] = (float) outbuf[chn+ i*num_channels] / 32767;
+	//}
 
 	src.data_in = resampbuf;
 	src.input_frames = rlen;
