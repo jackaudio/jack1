@@ -4,9 +4,6 @@
  * as they would be used by many applications.
  */
 
-#define _ISOC99_SOURCE  1
-#define _XOPEN_SOURCE   600
-
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
@@ -83,13 +80,14 @@ typedef struct alsa_format {
 	size_t sample_size;
 	void (*jack_to_soundcard) (char *dst, jack_default_audio_sample_t *src, unsigned long nsamples, unsigned long dst_skip, dither_state_t *state);
 	void (*soundcard_to_jack) (jack_default_audio_sample_t *dst, char *src, unsigned long nsamples, unsigned long src_skip);
+	const char *name;
 } alsa_format_t;
 
 alsa_format_t formats[] = {
-	{ SND_PCM_FORMAT_FLOAT_LE, 4, sample_move_floatLE_sSs, sample_move_dS_floatLE },
-	{ SND_PCM_FORMAT_S32, 4, sample_move_d32u24_sS, sample_move_dS_s32u24 },
-	{ SND_PCM_FORMAT_S24, 4, sample_move_d24_sS, sample_move_dS_s24 },
-	{ SND_PCM_FORMAT_S16, 2, sample_move_d16_sS, sample_move_dS_s16 }
+	{ SND_PCM_FORMAT_FLOAT_LE, 4, sample_move_dS_floatLE, sample_move_floatLE_sSs, "float" },
+	{ SND_PCM_FORMAT_S32, 4, sample_move_d32u24_sS, sample_move_dS_s32u24, "32bit" },
+	{ SND_PCM_FORMAT_S24, 4, sample_move_d24_sS, sample_move_dS_s24, "24bit" },
+	{ SND_PCM_FORMAT_S16, 2, sample_move_d16_sS, sample_move_dS_s16, "16bit" }
 };
 #define NUMFORMATS (sizeof(formats)/sizeof(formats[0]))
 int format=0;
@@ -138,6 +136,7 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
 	unsigned int buffer_time;
 	unsigned int period_time;
 	unsigned int rrate;
+	unsigned int rchannels;
 
 	/* choose all parameters */
 	err = snd_pcm_hw_params_any(handle, params);
@@ -159,10 +158,15 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
 		return err;
 	}
 	/* set the count of channels */
-	err = snd_pcm_hw_params_set_channels(handle, params, channels);
+	rchannels = channels;
+	err = snd_pcm_hw_params_set_channels_near(handle, params, &rchannels);
 	if (err < 0) {
 		printf("Channels count (%i) not available for record: %s\n", channels, snd_strerror(err));
 		return err;
+	}
+	if (rchannels != channels) {
+		printf("WARNING: chennel count does not match (requested %d got %d)\n", channels, rchannels);
+		num_channels = rchannels;
 	}
 	/* set the stream rate */
 	rrate = rate;
@@ -432,9 +436,6 @@ int process (jack_nframes_t nframes, void *arg) {
 	src_process( src_state, &src );
 
 	formats[format].jack_to_soundcard( outbuf + format[formats].sample_size * chn, resampbuf, src.output_frames_gen, num_channels*format[formats].sample_size, NULL);
-	//for (i=0; i < rlen; i++) {
-	//    float_16( resampbuf[i], outbuf[chn+ i*num_channels] );
-	//}
 
 	src_node = jack_slist_next (src_node);
 	node = jack_slist_next (node);
@@ -530,7 +531,7 @@ void jack_shutdown (void *arg) {
 void printUsage() {
 fprintf(stderr, "usage: alsa_out [options]\n"
 		"\n"
-		"  -j <jack name> - reports a different name to jack\n"
+		"  -j <jack name> - client name\n"
 		"  -d <alsa_device> \n"
 		"  -c <channels> \n"
 		"  -p <period_size> \n"
@@ -538,7 +539,6 @@ fprintf(stderr, "usage: alsa_out [options]\n"
 		"  -r <sample_rate> \n"
 		"  -m <max_diff> \n"
 		"  -t <target_delay> \n"
-		"  -f <catch_factor> \n"
 		"  -i  turns on instrumentation\n"
 		"  -v  turns on printouts\n"
 		"\n");
@@ -619,7 +619,7 @@ int main (int argc, char *argv[]) {
 	exit(2);
     }
 
-    if ((client = jack_client_new (jack_name)) == 0) {
+    if ((client = jack_client_open (jack_name, 0, NULL)) == 0) {
 	fprintf (stderr, "jack server not running?\n");
 	return 1;
     }
@@ -637,9 +637,6 @@ int main (int argc, char *argv[]) {
 
     jack_on_shutdown (client, jack_shutdown, 0);
 
-
-    // alloc input ports, which are blasted out to alsa...
-    alloc_ports( 0, num_channels );
 
     // get jack sample_rate
     
@@ -673,8 +670,13 @@ int main (int argc, char *argv[]) {
     }
     // now open the alsa fd...
     alsa_handle = open_audiofd( alsa_device, 0, sample_rate, num_channels, period_size, num_periods);
-    if( alsa_handle < 0 )
+    if( alsa_handle == 0 )
 	exit(20);
+
+    printf( "selected sample format: %s\n", formats[format].name );
+
+    // alloc input ports, which are blasted out to alsa...
+    alloc_ports( 0, num_channels );
 
 
     /* tell the JACK server that we are ready to roll */
