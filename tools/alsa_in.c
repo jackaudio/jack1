@@ -36,6 +36,7 @@ snd_pcm_t *alsa_handle;
 int jack_sample_rate;
 int jack_buffer_size;
 
+int quit = 0;
 double resample_mean = 1.0;
 double static_resample_factor = 1.0;
 
@@ -557,8 +558,7 @@ fprintf(stderr, "usage: alsa_out [options]\n"
 void
 sigterm_handler( int signal )
 {
-	jack_deactivate( client );
-	jack_client_close( client );
+	quit = 1;
 }
 
 
@@ -721,9 +721,10 @@ int main (int argc, char *argv[]) {
     }
 
     signal( SIGTERM, sigterm_handler );
+    signal( SIGINT, sigterm_handler );
 
     if( verbose ) {
-	    while(1) {
+	    while(!quit) {
 		    usleep(500000);
 		    if( output_new_delay ) {
 			    printf( "delay = %d\n", output_new_delay );
@@ -734,12 +735,19 @@ int main (int argc, char *argv[]) {
     } else if( instrument ) {
 	    printf( "# n\tresamp\tdiff\toffseti\tintegral\n");
 	    int n=0;
-	    while(1) {
+	    while(!quit) {
 		    usleep(1000);
 		    printf( "%d\t%f\t%f\t%f\t%f\n", n++, output_resampling_factor, output_diff, output_offset, output_integral );
 	    }
     } else {
-	    while(1) sleep(10);
+	    while(!quit)
+	    {
+		    usleep(500000);
+		    if( output_new_delay ) {
+			    printf( "delay = %d\n", output_new_delay );
+			    output_new_delay = 0;
+		    }
+	    }
     }
 
     jack_deactivate( client );
