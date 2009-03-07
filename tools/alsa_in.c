@@ -62,6 +62,7 @@ int smooth_size = 256;
 int good_window=0;
 int verbose = 0;
 int instrument = 0;
+int samplerate_quality = 2;
 
 // Debug stuff:
 
@@ -488,7 +489,7 @@ void alloc_ports( int n_capture, int n_playback ) {
 	    break;
 	}
 
-	capture_srcs = jack_slist_append( capture_srcs, src_new( SRC_SINC_FASTEST, 1, NULL ) );
+	capture_srcs = jack_slist_append( capture_srcs, src_new( 4-samplerate_quality, 1, NULL ) );
 	capture_ports = jack_slist_append (capture_ports, port);
     }
 
@@ -509,7 +510,7 @@ void alloc_ports( int n_capture, int n_playback ) {
 	    break;
 	}
 
-	playback_srcs = jack_slist_append( playback_srcs, src_new( SRC_SINC_FASTEST, 1, NULL ) );
+	playback_srcs = jack_slist_append( playback_srcs, src_new( 4-samplerate_quality, 1, NULL ) );
 	playback_ports = jack_slist_append (playback_ports, port);
     }
 }
@@ -540,6 +541,7 @@ fprintf(stderr, "usage: alsa_out [options]\n"
 		"  -p <period_size> \n"
 		"  -n <num_period> \n"
 		"  -r <sample_rate> \n"
+		"  -q <sample_rate quality [0..4]\n"
 		"  -m <max_diff> \n"
 		"  -t <target_delay> \n"
 		"  -i  turns on instrumentation\n"
@@ -569,7 +571,7 @@ int main (int argc, char *argv[]) {
     int errflg=0;
     int c;
 
-    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:m:t:f:F:C:Q:s:")) != -1) {
+    while ((c = getopt(argc, argv, "ivj:r:c:p:n:d:q:m:t:f:F:C:Q:s:")) != -1) {
 	switch(c) {
 	    case 'j':
 		strcpy(jack_name,optarg);
@@ -591,6 +593,9 @@ int main (int argc, char *argv[]) {
 		break;
 	    case 't':
 		target_delay = atoi(optarg);
+		break;
+	    case 'q':
+		samplerate_quality = atoi(optarg);
 		break;
 	    case 'm':
 		max_diff = atoi(optarg);
@@ -632,6 +637,10 @@ int main (int argc, char *argv[]) {
 	exit(2);
     }
 
+    if( (samplerate_quality < 0) || (samplerate_quality > 4) ) {
+	fprintf (stderr, "invalid samplerate quality\n");
+	return 1;
+    }
     if ((client = jack_client_open (jack_name, 0, NULL)) == 0) {
 	fprintf (stderr, "jack server not running?\n");
 	return 1;
