@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
 #include <alloca.h>
 #include <math.h>
@@ -551,6 +552,13 @@ fprintf(stderr, "usage: alsa_out [options]\n"
  * the main function....
  */
 
+void
+sigterm_handler( int signal )
+{
+	jack_deactivate( client );
+	jack_client_close( client );
+}
+
 
 int main (int argc, char *argv[]) {
     char jack_name[30] = "alsa_in";
@@ -688,6 +696,8 @@ int main (int argc, char *argv[]) {
 	return 1;
     }
 
+    signal( SIGTERM, sigterm_handler );
+
     if( verbose ) {
 	    while(1) {
 		    usleep(500000);
@@ -708,6 +718,7 @@ int main (int argc, char *argv[]) {
 	    while(1) sleep(10);
     }
 
+    jack_deactivate( client );
     jack_client_close (client);
     exit (0);
 }
