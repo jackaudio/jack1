@@ -16,8 +16,7 @@
 
 #include <jack/jack.h>
 #include <jack/jslist.h>
-
-#include "memops.h"
+#include <jack/memops.h>
 
 #include "alsa/asoundlib.h"
 

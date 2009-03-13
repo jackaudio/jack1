@@ -58,6 +58,9 @@ extern void jack_info (const char *fmt, ...);
 #include <jack/types.h>
 #include <jack/port.h>
 #include <jack/transport.h>
+#include <jack/thread.h>
+
+extern jack_thread_creator_t jack_thread_creator;
 
 typedef enum {
 	JACK_TIMER_SYSTEM_CLOCK,
