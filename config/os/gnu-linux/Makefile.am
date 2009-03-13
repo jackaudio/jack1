@@ -1,3 +1,3 @@
 MAINTAINERCLEANFILES = Makefile.in
-noinst_HEADERS = time.c time.h
+noinst_HEADERS = systemtest.c sanitycheck.c time.c time.h
 

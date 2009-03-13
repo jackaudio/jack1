@@ -369,6 +369,7 @@ static void usage (FILE *file)
 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
 "             [ --port-max OR -p maximum-number-of-ports]\n"
 "             [ --debug-timer OR -D ]\n"
+"             [ --no-sanity-checks OR -N ]\n"
 "             [ --verbose OR -v ]\n"
 "             [ --clocksource OR -c [ c(ycle) | h(pet) | s(ystem) ]\n"
 "             [ --replace-registry OR -r ]\n"
@@ -519,6 +520,7 @@ main (int argc, char *argv[])
 		{ "port-max", 1, 0, 'p' },
 		{ "no-mlock", 0, 0, 'm' },
 		{ "name", 1, 0, 'n' },
+                { "no-sanity-checks", 1, 0, 'N' },
 		{ "unlock", 0, 0, 'u' },
 		{ "realtime", 0, 0, 'R' },
 		{ "replace-registry", 0, 0, 'r' },
@@ -540,6 +542,7 @@ main (int argc, char *argv[])
 	int driver_nargs = 1;
 	int show_version = 0;
 	int replace_registry = 0;
+	int do_sanity_checks = 1;
 	int i;
 	int rc;
 
@@ -586,6 +589,10 @@ main (int argc, char *argv[])
 
 		case 'n':
 			server_name = optarg;
+			break;
+
+		case 'N':
+			do_sanity_checks = 0;
 			break;
 
 		case 'p':
@@ -640,6 +647,10 @@ main (int argc, char *argv[])
 			usage (stdout);
 			return -1;
 		}
+	}
+
+	if (do_sanity_checks && (0 < sanitycheck())) {
+		return -1;
 	}
 
 	if (show_version) {
