@@ -39,6 +39,14 @@
 #include <sysdeps/pThreadUtilities.h>
 #endif
 
+jack_thread_creator_t jack_thread_creator = pthread_create;
+
+void
+jack_set_thread_creator (jack_thread_creator_t jtc) 
+{
+	jack_thread_creator = jtc;
+}
+
 static inline void
 log_result (char *msg, int res)
 {
@@ -126,7 +134,7 @@ jack_client_create_thread (jack_client_t* client,
 	int result = 0;
 
 	if (!realtime) {
-		result = pthread_create (thread, 0, start_routine, arg);
+		result = jack_thread_creator (thread, 0, start_routine, arg);
 		if (result) {
 			log_result("creating thread with default parameters",
 				   result);
@@ -176,7 +184,7 @@ jack_client_create_thread (jack_client_t* client,
 	thread_args->realtime = 1;
 	thread_args->priority = priority;
 
-	result = pthread_create (thread, &attr, jack_thread_proxy, thread_args);
+	result = jack_thread_creator (thread, &attr, jack_thread_proxy, thread_args);
 	if (result) {
 		log_result ("creating realtime thread", result);
 		return result;
@@ -184,7 +192,7 @@ jack_client_create_thread (jack_client_t* client,
 
 #else /* JACK_USE_MACH_THREADS */
 
-	result = pthread_create (thread, 0, start_routine, arg);
+	result = jack_thread_creator (thread, 0, start_routine, arg);
 	if (result) {
 		log_result ("creating realtime thread", result);
 		return result;

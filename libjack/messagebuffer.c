@@ -92,7 +92,7 @@ jack_messagebuffer_init ()
 	mb_overruns = 0;
 	mb_initialized = 1;
 
-	if (pthread_create(&mb_writer_thread, NULL, &mb_thread_func, NULL) != 0)
+	if (jack_thread_creator (&mb_writer_thread, NULL, &mb_thread_func, NULL) != 0)
 		mb_initialized = 0;
 }
 
