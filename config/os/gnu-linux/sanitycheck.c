@@ -11,8 +11,10 @@
 #include <jack/systemtest.h>
 #include <jack/sanitycheck.h>
 
-int sanitycheck() {
+int sanitycheck() 
+{
   int errors = 0;
+  int warnings = 0;
   int relogin = 0;
 
   if (!system_user_can_rtprio()) {
@@ -42,10 +44,14 @@ int sanitycheck() {
 	  }
   }
   if (system_has_frequencyscaling() && system_uses_frequencyscaling()) {
-	  errors++;
-	  fprintf(stderr, "\nYour system seems to use frequency scaling. This can have a serious impact\n");
-	  fprintf(stderr, "on the audio latency. Please turn it off, e.g. by chosing the 'performance'\n");
-	  fprintf(stderr, "governor.\n");
+	  warnings++;
+	  fprintf(stderr, "\n--------------------------------------------------------------------------------\n");
+	  fprintf(stderr, "WARNING: Your system seems to use frequency scaling.\n\n");
+	  fprintf(stderr, "   This can have a serious impact on audio latency. You have two choices:\n");
+	  fprintf(stderr, "\t(1)turn it off, e.g. by chosing the 'performance' governor.\n");
+	  fprintf(stderr, "\t(2)Use the HPET clocksource by passing \"-h h\" to JACK\n");
+	  fprintf(stderr, "\t   (this second option only works on relatively recent computers)\n");
+	  fprintf(stderr, "--------------------------------------------------------------------------------\n\n");
   }
   if (system_memlock_is_unlimited()) {
 	  fprintf(stderr, "\nMemory locking is unlimited - this is dangerous. Please alter the line");

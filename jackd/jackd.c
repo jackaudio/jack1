@@ -510,7 +510,7 @@ main (int argc, char *argv[])
 
 {
 	jack_driver_desc_t * desc;
-	const char *options = "-ad:P:uvshVRZTFlt:mn:p:c:";
+	const char *options = "-ad:P:uvshVRZTFlt:mn:Np:c:";
 	struct option long_options[] = 
 	{ 
 		{ "driver", 1, 0, 'd' },
@@ -520,7 +520,7 @@ main (int argc, char *argv[])
 		{ "port-max", 1, 0, 'p' },
 		{ "no-mlock", 0, 0, 'm' },
 		{ "name", 1, 0, 'n' },
-                { "no-sanity-checks", 1, 0, 'N' },
+                { "no-sanity-checks", 0, 0, 'N' },
 		{ "unlock", 0, 0, 'u' },
 		{ "realtime", 0, 0, 'R' },
 		{ "replace-registry", 0, 0, 'r' },
