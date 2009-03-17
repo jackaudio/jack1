@@ -21,7 +21,7 @@ int sanitycheck (int care_about_realtime,
   if (care_about_realtime && !system_user_can_rtprio()) {
 	  errors++;
 	  relogin++;
-	  fprintf(stderr, "\nYou are not allowed to set realtime priority.\n");
+	  fprintf(stderr, "\nJACK is running in realtime mode, but you are not allowed to use realtime scheduling.\n");
 		  
 	  if (!system_has_rtprio_limits_conf()) {
 		  errors++;
