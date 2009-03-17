@@ -56,7 +56,7 @@ static JSList *drivers = NULL;
 static sigset_t signals;
 static jack_engine_t *engine = NULL;
 static char *server_name = NULL;
-static int realtime = 0;
+static int realtime = 1;
 static int realtime_priority = 10;
 static int do_mlock = 1;
 static int temporary = 0;
@@ -510,26 +510,29 @@ main (int argc, char *argv[])
 
 {
 	jack_driver_desc_t * desc;
-	const char *options = "-ad:P:uvshVRZTFlt:mn:Np:c:";
+	const char *options = "-ad:P:uvshVRLZTFlt:mn:Np:c:";
 	struct option long_options[] = 
 	{ 
+		/* keep ordered by single-letter option code */
+
+		{ "clock-source", 1, 0, 'c' },
 		{ "driver", 1, 0, 'd' },
-		{ "verbose", 0, 0, 'v' },
 		{ "help", 0, 0, 'h' },
 		{ "tmpdir-location", 0, 0, 'l' },
-		{ "port-max", 1, 0, 'p' },
+		{ "no-realtime", 0, 0, 'L' },
 		{ "no-mlock", 0, 0, 'm' },
 		{ "name", 1, 0, 'n' },
                 { "no-sanity-checks", 0, 0, 'N' },
-		{ "unlock", 0, 0, 'u' },
+		{ "port-max", 1, 0, 'p' },
+		{ "realtime-priority", 1, 0, 'P' },
 		{ "realtime", 0, 0, 'R' },
 		{ "replace-registry", 0, 0, 'r' },
-		{ "realtime-priority", 1, 0, 'P' },
+		{ "silent", 0, 0, 's' },
 		{ "timeout", 1, 0, 't' },
 		{ "temporary", 0, 0, 'T' },
+		{ "unlock", 0, 0, 'u' },
 		{ "version", 0, 0, 'V' },
-		{ "silent", 0, 0, 's' },
-		{ "clock-source", 1, 0, 'c' },
+		{ "verbose", 0, 0, 'v' },
 		{ "nozombies", 0, 0, 'Z' },
 		{ 0, 0, 0, 0 }
 	};
@@ -583,6 +586,10 @@ main (int argc, char *argv[])
 			printf ("%s\n", jack_tmpdir);
 			exit (0);
 
+		case 'L':
+			realtime = 0;
+			break;
+
 		case 'm':
 			do_mlock = 0;
 			break;
@@ -608,6 +615,7 @@ main (int argc, char *argv[])
 			break;
 
 		case 'R':
+			/* this is now the default */
 			realtime = 1;
 			break;
 
@@ -649,7 +657,7 @@ main (int argc, char *argv[])
 		}
 	}
 
-	if (do_sanity_checks && (0 < sanitycheck())) {
+	if (do_sanity_checks && (0 < sanitycheck (realtime, (clock_source = JACK_TIMER_CYCLE_COUNTER)))) {
 		return -1;
 	}
 

@@ -11,13 +11,14 @@
 #include <jack/systemtest.h>
 #include <jack/sanitycheck.h>
 
-int sanitycheck() 
+int sanitycheck (int care_about_realtime, 
+		 int care_about_freqscaling) 
 {
   int errors = 0;
   int warnings = 0;
   int relogin = 0;
 
-  if (!system_user_can_rtprio()) {
+  if (care_about_realtime && !system_user_can_rtprio()) {
 	  errors++;
 	  relogin++;
 	  fprintf(stderr, "\nYou are not allowed to set realtime priority.\n");
@@ -43,13 +44,13 @@ int sanitycheck()
 		  fprintf(stderr, "  usermod -a -G audio %s\n", system_get_username());
 	  }
   }
-  if (system_has_frequencyscaling() && system_uses_frequencyscaling()) {
+  if (care_about_freqscaling && system_has_frequencyscaling() && system_uses_frequencyscaling()) {
 	  warnings++;
 	  fprintf(stderr, "\n--------------------------------------------------------------------------------\n");
 	  fprintf(stderr, "WARNING: Your system seems to use frequency scaling.\n\n");
 	  fprintf(stderr, "   This can have a serious impact on audio latency. You have two choices:\n");
 	  fprintf(stderr, "\t(1)turn it off, e.g. by chosing the 'performance' governor.\n");
-	  fprintf(stderr, "\t(2)Use the HPET clocksource by passing \"-h h\" to JACK\n");
+	  fprintf(stderr, "\t(2)Use the HPET clocksource by passing \"-c h\" to JACK\n");
 	  fprintf(stderr, "\t   (this second option only works on relatively recent computers)\n");
 	  fprintf(stderr, "--------------------------------------------------------------------------------\n\n");
   }

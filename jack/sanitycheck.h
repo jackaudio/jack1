@@ -16,6 +16,7 @@
  *
  **/
 
-int sanitycheck();
+int sanitycheck (int do_realtime_check,
+		 int do_freqscaling_check);
 
 #endif /* __jack_sanitycheck_h__ */

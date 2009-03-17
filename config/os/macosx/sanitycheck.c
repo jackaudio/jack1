@@ -1,7 +1,7 @@
 #include <jack/sanitycheck.c>
 
 int
-sanitycheck ()
+sanitycheck (int a, int b)
 {
 	return 0;
 }
