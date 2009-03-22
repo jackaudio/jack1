@@ -657,7 +657,7 @@ main (int argc, char *argv[])
 		}
 	}
 
-	if (do_sanity_checks && (0 < sanitycheck (realtime, (clock_source = JACK_TIMER_CYCLE_COUNTER)))) {
+	if (do_sanity_checks && (0 < sanitycheck (realtime, (clock_source == JACK_TIMER_CYCLE_COUNTER)))) {
 		return -1;
 	}
 
