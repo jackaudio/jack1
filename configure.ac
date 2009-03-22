@@ -13,7 +13,7 @@ not_overwriting=0
 installs=
 for dir in /usr/lib /usr/local/lib /opt/lib ; do
     if test -d $dir ; then
-	if test $(find $dir -name 'libjack.*' 2>/dev/null | wc -l) -gt 0 ; then
+	if test $(find $dir/ -name 'libjack.*' 2>/dev/null | wc -l) -gt 0 ; then
 	    if echo $prefix/lib | grep -vs $dir >/dev/null 2>&1 ; then
 		not_overwriting=$(expr $not_overwriting + 1)
 	    fi
