@@ -27,6 +27,7 @@ extern "C" {
 #include <limits.h>
 
 #include <jack/jack.h>
+#include <jack/internal.h>
 
 #define JACK_DRIVER_NAME_MAX          15
 #define JACK_DRIVER_PARAM_NAME_MAX    15

@@ -81,6 +81,14 @@ const char* jack_clock_source_name (jack_timer_type_t);
 
 #include <jack/messagebuffer.h>
 
+#ifndef PATH_MAX
+    #ifdef MAXPATHLEN
+	#define PATH_MAX MAXPATHLEN
+    #else
+	#define PATH_MAX 1024
+    #endif /* MAXPATHLEN */
+#endif /* !PATH_MAX */
+
 #ifdef DEBUG_ENABLED
 
 /* grab thread id instead of PID on linux */
