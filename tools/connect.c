@@ -65,6 +65,7 @@ main (int argc, char *argv[])
 	jack_port_t *port2 = 0;
 	int connecting, disconnecting;
 	int port1_flags, port2_flags;
+	int rc = 1;
 
 	struct option long_options[] = {
 	    { "server", 1, 0, 's' },
@@ -124,11 +125,11 @@ main (int argc, char *argv[])
 
 	if ((port1 = jack_port_by_name(client, argv[argc-1])) == 0) {
 		fprintf (stderr, "ERROR %s not a valid port\n", argv[argc-1]);
-		return 1;
+		goto exit;
 		}
 	if ((port2 = jack_port_by_name(client, argv[argc-2])) == 0) {
 		fprintf (stderr, "ERROR %s not a valid port\n", argv[argc-2]);
-		return 1;
+		goto exit;
 		}
 
 	port1_flags = jack_port_flags (port1);
@@ -148,7 +149,7 @@ main (int argc, char *argv[])
 
 	if (!src_port || !dst_port) {
 		fprintf (stderr, "arguments must include 1 input port and 1 output port\n");
-		return 1;
+		goto exit;
 	}
 
 	/* connect the ports. Note: you can't do this before
@@ -157,16 +158,20 @@ main (int argc, char *argv[])
 
 	if (connecting) {
 		if (jack_connect(client, jack_port_name(src_port), jack_port_name(dst_port))) {
-			return 1;
+			goto exit;
 		}
 	}
 	if (disconnecting) {
 		if (jack_disconnect(client, jack_port_name(src_port), jack_port_name(dst_port))) {
-			return 1;
+			goto exit;
 		}
 	}
 
+	/* everything was ok, so setting exitcode to 0 */
+	rc = 0;
+
+exit:
 	jack_client_close (client);
-	exit (0);
+	exit (rc);
 }
 
