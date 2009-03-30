@@ -1,4 +1,4 @@
-#include <jack/sanitycheck.c>
+#include <jack/sanitycheck.h>
 
 int
 sanitycheck (int a, int b)
