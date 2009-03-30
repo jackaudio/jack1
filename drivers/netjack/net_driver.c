@@ -498,7 +498,7 @@ net_driver_write (net_driver_t* driver, jack_nframes_t nframes)
     {
 	int r;
 
-#ifdef __APPLE__
+#ifndef MSG_CONFIRM
 	static const int flag = 0;
 #else
 	static const int flag = MSG_CONFIRM;
