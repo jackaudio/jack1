@@ -42,6 +42,6 @@ Display help/usage message
 .TP
 \fB-v\fR, \fB--version\fR
 .br
-Output version information and exit\n
+Output version information and exit
 
 

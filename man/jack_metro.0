@@ -2,7 +2,7 @@
 .SH NAME
 jack_metro \- JACK toolkit metronome
 .SH SYNOPSIS
-\fBjack_metro\fR [ \fI-n\fR name ] [ \fI-f\R hz ] [ \fI-D\fR msecs ] [\fI-a\fR % ] [ \fI-d\fR % ] \fI-b\fR bpm 
+\fBjack_metro\fR [ \fI-n\fR name ] [ \fI-f\fR hz ] [ \fI-D\fR msecs ] [\fI-a\fR % ] [ \fI-d\fR % ] \fI-b\fR bpm 
 .SH DESCRIPTION
 \fBjack_metro\fR is a simple metronome for JACK. It generates a
 synthetic "tick" sound for every beat. Note that is does \fBnot\fR

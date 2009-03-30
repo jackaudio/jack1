@@ -5,7 +5,7 @@ jack_load \- JACK toolkit client for loading in-process clients
 \fBjack_load\fR [ \fI-i\fR initstring ] [ \fI-s\fR servername ] [\fI-w\fR ] client-name so-name [ initstring ]
 .SH DESCRIPTION
 \fBjack_load\fR is a JACK toolkit client. It loads the specified plugin and creates an in-process client.
-.ARGUMENTS
+.SH ARGUMENTS
 .PP
 The client-name must be a currently unused client name.
 .PP
