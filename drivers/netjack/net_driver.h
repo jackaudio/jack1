@@ -90,6 +90,7 @@ struct _net_driver
     int		   resync_threshold;
     int		   running_free;
     int		   deadline_goodness;
+    int		   jitter_val;
     jack_time_t	   time_to_deadline;
 };
 

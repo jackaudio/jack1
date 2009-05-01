@@ -98,7 +98,7 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	    if( driver->latency == 0 )
 		// for full sync mode... always wait for packet.
 		driver->next_deadline = jack_get_microseconds() + 500*driver->period_usecs;
-	    else if( driver->latency == 1 )
+	    else if( driver->latency < 4 )
 		// for normal 1 period latency mode, only 1 period for dealine.
 		driver->next_deadline = jack_get_microseconds() + driver->period_usecs;
 	    else
@@ -106,7 +106,7 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 		// not 100% sure yet. with the improved resync, it might be better,
 		// to have more than one period headroom for high latency.
 		//driver->next_deadline = jack_get_microseconds() + 5*driver->latency*driver->period_usecs/4;
-		driver->next_deadline = jack_get_microseconds() + 1*driver->period_usecs;
+		driver->next_deadline = jack_get_microseconds() + driver->jitter_val*driver->period_usecs/100*driver->latency;
 
 	    driver->next_deadline_valid = 1;
     } else {
@@ -169,11 +169,11 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 	    driver->next_deadline += driver->period_usecs/1000;
 	    */
 
-	if( driver->deadline_goodness < 10*(int)driver->period_usecs/100*driver->latency ) {
+	if( driver->deadline_goodness < driver->jitter_val*(int)driver->period_usecs/100*driver->latency ) {
 	    driver->next_deadline -= driver->period_usecs/1000;
 	    //printf( "goodness: %d, Adjust deadline: --- %d\n", driver->deadline_goodness, (int) driver->period_usecs*driver->latency/100 );
 	}
-	if( driver->deadline_goodness > 10*(int)driver->period_usecs/100*driver->latency ) {
+	if( driver->deadline_goodness > driver->jitter_val*(int)driver->period_usecs/100*driver->latency ) {
 	    driver->next_deadline += driver->period_usecs/1000;
 	    //printf( "goodness: %d, Adjust deadline: +++ %d\n", driver->deadline_goodness, (int) driver->period_usecs*driver->latency/100 );
 	}
@@ -677,7 +677,8 @@ net_driver_new (jack_client_t * client,
 		unsigned int latency,
 		unsigned int redundancy,
 		int always_wait_dedline,
-		int dont_htonl_floats)
+		int dont_htonl_floats,
+		unsigned int jitter_val)
 {
     net_driver_t * driver;
     int first_pack_len;
@@ -725,6 +726,7 @@ net_driver_new (jack_client_t * client,
     driver->latency = latency;
     driver->redundancy = redundancy;
     driver->always_wait_dedline = always_wait_dedline;
+    driver->jitter_val = jitter_val;
 
 
     driver->client = client;
@@ -881,7 +883,7 @@ driver_get_descriptor ()
 
     desc = calloc (1, sizeof (jack_driver_desc_t));
     strcpy (desc->name, "net");
-    desc->nparams = 17;
+    desc->nparams = 18;
 
     params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
@@ -1032,6 +1034,14 @@ driver_get_descriptor ()
             "always wait for the deadline, more friendly to alsa_io");
     strcpy (params[i].long_desc, params[i].short_desc);
 
+    i++;
+    strcpy (params[i].name, "jitter");
+    params[i].character  = 'j';
+    params[i].type       = JackDriverParamUInt;
+    params[i].value.ui  = 10U;
+    strcpy (params[i].short_desc,
+            "jitter on slave incoming, in percent of roundtrip");
+    strcpy (params[i].long_desc, params[i].short_desc);
     desc->params = params;
 
     return desc;
@@ -1058,6 +1068,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
     unsigned int redundancy = 1;
     int dont_htonl_floats = 0;
     int always_wait_dedline = 0;
+    unsigned int jitter_val = 10;
     const JSList * node;
     const jack_driver_param_t * param;
 
@@ -1149,6 +1160,10 @@ driver_initialize (jack_client_t *client, const JSList * params)
             case 'D':
                 always_wait_dedline = param->value.ui;
                 break;
+
+            case 'j':
+                jitter_val = param->value.ui;
+                break;
         }
     }
 
@@ -1158,7 +1173,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
                            listen_port, handle_transport_sync,
                            resample_factor, resample_factor_up, bitdepth,
 			   use_autoconfig, latency, redundancy,
-			   always_wait_dedline, dont_htonl_floats);
+			   always_wait_dedline, dont_htonl_floats, jitter_val);
 }
 
 void
