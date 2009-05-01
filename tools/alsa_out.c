@@ -318,7 +318,8 @@ int process (jack_nframes_t nframes, void *arg) {
 
     snd_pcm_delay( alsa_handle, &delay );
 
-    //delay -= jack_frames_since_cycle_start( client );
+    delay -= jack_frames_since_cycle_start( client );
+    delay += jack_get_buffer_size( client ) / 2;
     // Do it the hard way.
     // this is for compensating xruns etc...
 
