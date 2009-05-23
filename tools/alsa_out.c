@@ -468,7 +468,7 @@ again:
 
 void alloc_ports( int n_capture, int n_playback ) {
 
-    int port_flags = JackPortIsOutput;
+    int port_flags = JackPortIsOutput | JackPortIsPhysical | JackPortIsTerminal;
     int chn;
     jack_port_t *port;
     char buf[32];
