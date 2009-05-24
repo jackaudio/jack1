@@ -88,6 +88,7 @@ typedef struct alsa_format {
 alsa_format_t formats[] = {
 	{ SND_PCM_FORMAT_FLOAT_LE, 4, sample_move_dS_floatLE, sample_move_floatLE_sSs, "float" },
 	{ SND_PCM_FORMAT_S32, 4, sample_move_d32u24_sS, sample_move_dS_s32u24, "32bit" },
+	{ SND_PCM_FORMAT_S24_3LE, 4, sample_move_d24_sS, sample_move_dS_s24, "24bit" },
 	{ SND_PCM_FORMAT_S24, 4, sample_move_d24_sS, sample_move_dS_s24, "24bit" },
 	{ SND_PCM_FORMAT_S16, 2, sample_move_d16_sS, sample_move_dS_s16, "16bit" }
 };
@@ -178,8 +179,8 @@ static int set_hwparams(snd_pcm_t *handle, snd_pcm_hw_params_t *params, snd_pcm_
 		return err;
 	}
 	if (rrate != rate) {
-		printf("Rate doesn't match (requested %iHz, get %iHz)\n", rate, rrate);
-		return -EINVAL;
+		printf("WARNING: Rate doesn't match (requested %iHz, get %iHz)\n", rate, rrate);
+		sample_rate = rrate;
 	}
 	/* set the buffer time */
 
@@ -666,6 +667,13 @@ int main (int argc, char *argv[]) {
     if( !sample_rate )
 	sample_rate = jack_sample_rate;
 
+    // now open the alsa fd...
+    alsa_handle = open_audiofd( alsa_device, 1, sample_rate, num_channels, period_size, num_periods);
+    if( alsa_handle == 0 )
+	exit(20);
+
+    printf( "selected sample format: %s\n", formats[format].name );
+
     static_resample_factor = (double) jack_sample_rate / (double) sample_rate;
     resample_mean = static_resample_factor;
 
@@ -701,13 +709,6 @@ int main (int argc, char *argv[]) {
 	    fprintf( stderr, "target_delay+max_diff (%d) cant be bigger than buffersize(%d)\n", target_delay+max_diff, num_periods*period_size );
 	    exit(20);
     }
-    // now open the alsa fd...
-    alsa_handle = open_audiofd( alsa_device, 1, sample_rate, num_channels, period_size, num_periods);
-    if( alsa_handle == 0 )
-	exit(20);
-
-    printf( "selected sample format: %s\n", formats[format].name );
-
     // alloc input ports, which are blasted out to alsa...
     alloc_ports( num_channels, 0 );
 
