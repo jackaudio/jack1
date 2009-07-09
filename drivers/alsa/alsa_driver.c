@@ -1290,6 +1290,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 				    strerror (errno));
 			*status = -3;
 			return 0;
+
 			
 		}
 
@@ -1306,9 +1307,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 		}
 
 #ifdef DEBUG_WAKEUP
-		jack_info ("%" PRIu64 ": checked %d fds, %" PRIu64
-			 " usecs since poll entered", poll_ret, nfds,
-			 poll_ret - poll_enter);
+		fprintf (stderr, "%" PRIu64 ": checked %d fds, started at %" PRIu64 " %" PRIu64 "  usecs since poll entered\n", 
+			 poll_ret, nfds, poll_enter, poll_ret - poll_enter);
 #endif
 
 		/* check to see if it was the extra FD that caused us
@@ -1345,8 +1345,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			if (revents & POLLOUT) {
 				need_playback = 0;
 #ifdef DEBUG_WAKEUP
-				jack_info ("%" PRIu64
-					 " playback stream ready",
+				fprintf (stderr, "%" PRIu64
+					 " playback stream ready\n",
 					 poll_ret);
 #endif
 			}
@@ -1368,8 +1368,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			if (revents & POLLIN) {
 				need_capture = 0;
 #ifdef DEBUG_WAKEUP
-				jack_info ("%" PRIu64
-					 " capture stream ready",
+				fprintf (stderr, "%" PRIu64
+					 " capture stream ready\n",
 					 poll_ret);
 #endif
 			}
@@ -1426,8 +1426,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 	avail = capture_avail < playback_avail ? capture_avail : playback_avail;
 
 #ifdef DEBUG_WAKEUP
-	jack_info ("wakeup complete, avail = %lu, pavail = %lu "
-		 "cavail = %lu",
+	fprintf (stderr, "wakeup complete, avail = %lu, pavail = %lu "
+		 "cavail = %lu\n",
 		 avail, playback_avail, capture_avail);
 #endif
 

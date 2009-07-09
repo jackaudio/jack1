@@ -248,13 +248,14 @@ jack_time_to_frames(const jack_client_t *client, jack_time_t now)
 
 	if (time.initialized) {
 #if 0
-		jack_info ("now = %Lu current wakeup = %Lu next = %Lu frames = %lu + %f => %lu", 
+		jack_info ("now = %Lu current wakeup = %Lu next = %Lu frames = %lu + %f => %lu FC = %f SOI = %f", 
 			 now, time.current_wakeup, time.next_wakeup, time.frames,
-			 (double) (now - time.current_wakeup)/ 
-			 (time.next_wakeup - time.current_wakeup),
+			 (double) (now - time.current_wakeup)/ (time.next_wakeup - time.current_wakeup),
 			 time.frames + 
-			 (long) rint (((double) (now - time.current_wakeup)/ 
-						 (time.next_wakeup - time.current_wakeup)) * ectl->buffer_size));
+			   (long) rint (((double) ((long long) now - time.current_wakeup)/ 
+					 (long long) (time.next_wakeup - time.current_wakeup)) * ectl->buffer_size),
+			   time.filter_coefficient,  
+			   time.second_order_integrator);
 #endif
 
 		return time.frames + 
@@ -274,9 +275,7 @@ jack_frame_time (const jack_client_t *client)
 jack_nframes_t
 jack_last_frame_time (const jack_client_t *client)
 {
-	jack_frame_timer_t current;
-	jack_read_frame_time (client, &current);
-	return current.frames;
+	return client->engine->frame_timer.frames;
 }
 
 jack_time_t

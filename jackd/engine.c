@@ -2270,7 +2270,7 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		timer->current_wakeup = engine->driver->last_wait_ust;
 		timer->next_wakeup = engine->driver->last_wait_ust +
 			engine->driver->period_usecs;
-		
+
 		timer->reset_pending = 0;
 
 	} else {

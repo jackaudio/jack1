@@ -1,20 +1,28 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
+if HAVE_SNDFILE
+JACKREC = jackrec
+dist-check-sndfile:
+else
+JACKREC =
+dist-check-sndfile:
+	@echo
+	@echo ' ******' You need sndfile installed to make dist.' ******'
+	@echo
+	@false
+endif
+
 bin_PROGRAMS = jack_simple_client \
 	       jack_transport_client \
 	       jack_impulse_grabber \
 	       jack_metro \
 	       jack_showtime \
-		   jack_midisine \
-		   jack_midiseq
+	       jack_midisine \
+	       jack_midiseq \
+	       $(JACKREC)
 
-if HAVE_SNDFILE
-# note! jackrec_CFLAGS syntax not supported by automake-1.4
-sndfile_cflags = @SNDFILE_CFLAGS@
-endif
-
-AM_CFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
-AM_CXXFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
+AM_CFLAGS = -I.. $(JACK_CFLAGS)
+AM_CXXFLAGS = -I.. $(JACK_CFLAGS)
 
 jack_simple_client_SOURCES = simple_client.c
 jack_simple_client_LDFLAGS = @OS_LDFLAGS@
@@ -43,6 +51,12 @@ jack_midiseq_LDADD = $(top_builddir)/libjack/libjack.la
 jack_midisine_SOURCES = midisine.c
 jack_midisine_LDFLAGS = @OS_LDFLAGS@
 jack_midisine_LDADD = $(top_builddir)/libjack/libjack.la
+
+if HAVE_SNDFILE
+jackrec_SOURCES = capture_client.c
+jackrec_LDFLAGS = @SNDFILE_LIBS@ @OS_LDFLAGS@
+jackrec_LDADD = $(top_builddir)/libjack/libjack.la
+endif
 
 #
 # sample in-process client(s)

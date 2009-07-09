@@ -1,17 +1,5 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
-if HAVE_SNDFILE
-JACKREC = jackrec
-dist-check-sndfile:
-else
-JACKREC =
-dist-check-sndfile:
-	@echo
-	@echo ' ******' You need sndfile installed to make dist.' ******'
-	@echo
-	@false
-endif
-
 if HAVE_READLINE
 JACK_TRANSPORT = jack_transport
 dist-check-readline:
@@ -48,7 +36,6 @@ bin_PROGRAMS = jack_load \
 	       jack_freewheel \
 	       jack_evmon \
 	       jack_alias \
-	       $(JACKREC) \
 	       $(JACK_TRANSPORT) \
 	       $(NETJACK_TOOLS)
 
@@ -93,12 +80,6 @@ jack_lsp_LDADD = $(top_builddir)/libjack/libjack.la
 jack_freewheel_SOURCES = freewheel.c
 jack_freewheel_LDFLAGS = @OS_LDFLAGS@
 jack_freewheel_LDADD = $(top_builddir)/libjack/libjack.la
-
-if HAVE_SNDFILE
-jackrec_SOURCES = capture_client.c
-jackrec_LDFLAGS = @SNDFILE_LIBS@ @OS_LDFLAGS@
-jackrec_LDADD = $(top_builddir)/libjack/libjack.la
-endif
 
 if HAVE_READLINE
 jack_transport_SOURCES = transport.c
