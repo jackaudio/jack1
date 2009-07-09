@@ -1,7 +1,7 @@
 .TH "JACKD" "1" "@VERSION@" "April 2006" ""
 .SH "NAME"
 jackd, jackstart \- JACK Audio Connection Kit sound server
-.SH "SYNOPSYS"
+.SH "SYNOPSIS"
 \fBjackd\fR [\fIoptions\fR] \fB\-d\fI backend \fR 
 [\fIbackend\-parameters\fR]
 .br
