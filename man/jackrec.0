@@ -1,7 +1,7 @@
 .TH JACKREC "1" "!DATE!" "!VERSION!"
 .SH NAME
 jackrec \- JACK toolkit client for recording audio
-.SH SYNOPSYS
+.SH SYNOPSIS
 .B jackrec
 -f filename -d seconds [ -b bitdepth ] port1 [ port2 ... ]
 .SH DESCRIPTION

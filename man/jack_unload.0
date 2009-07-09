@@ -1,7 +1,7 @@
 .TH JACK_UNLOAD "1" "!DATE!" "!VERSION!"
 .SH NAME
 jack_unload \- The JACK Audio Connection Kit example client
-.SH SYNOPSYS
+.SH SYNOPSIS
 .B jack_unload 
 client-name
 .PP

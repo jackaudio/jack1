@@ -1,7 +1,7 @@
 .TH JACK_SHOWTIME "1" "!DATE!" "!VERSION!"
 .SH NAME
 jack_showtime \- The JACK Audio Connection Kit example client
-.SH SYNOPSYS
+.SH SYNOPSIS
 .B jack_showtime
 .SH DESCRIPTION
 .B jack_showtime

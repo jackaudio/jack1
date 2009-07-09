@@ -1,7 +1,7 @@
 .TH JACK_BUFSIZE "1" "!DATE!" "!VERSION!"
 .SH NAME
 jack_bufsize \- JACK toolkit client to change the JACK buffer size
-.SH SYNOPSYS
+.SH SYNOPSIS
 .B jack_bufsize bufsize
 .SH DESCRIPTION
 .B jack_bufsize
