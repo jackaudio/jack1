@@ -3,7 +3,7 @@
 jackrec \- JACK toolkit client for recording audio
 .SH SYNOPSIS
 .B jackrec
--f filename -d seconds [ -b bitdepth ] port1 [ port2 ... ]
+\-f filename \-d seconds [ \-b bitdepth ] port1 [ port2 ... ]
 .SH DESCRIPTION
 .B jackrec is a basic, but useful, audio recorder that will record
 audio from 1 or more JACK ports to a file on disk. The file format is

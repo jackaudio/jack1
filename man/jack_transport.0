@@ -5,7 +5,7 @@ jack_transport \- JACK toolkit client for transport control
 .B jack_transport
 .SH DESCRIPTION
 .B jack_transport
-is an toolkit client for the JACK Audio Connection Kit. It provides command-line
+is a toolkit client for the JACK Audio Connection Kit. It provides command-line
 control over the JACK transport system. Type help at jack_transport's
 command prompt to see the available commands.
 .SH AUTHOR

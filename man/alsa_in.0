@@ -72,11 +72,11 @@ Set the quality of the resampler from 0 to 4. can significanly reduce cpu usage.
 \fB\-m \fI max_diff\fR  
 .br
 The value when a soft xrun occurs. Basically the window, in which
-the dma pointer may jitter. I dont think its necessary to play with this anymore. 
+the dma pointer may jitter. I don't think its necessary to play with this anymore. 
 .TP
 \fB\-t \fI target_delay\fR  
 .br
-The delay alsa_io should try to approach. Same as for max_diff. It will be setup based on -p and -n
+The delay alsa_io should try to approach. Same as for max_diff. It will be setup based on \-p and \-n
 which is generally sufficient.
 .TP
 \fB\-s \fI smooth_array_size\fR  
@@ -87,7 +87,7 @@ However most CPU time is spent in the resampling so this will not be much.
 .TP
 \fB\-C \fI P Control Clamp\fR  
 .br
-If you have a PCI card, then the default value (15) of this parameter is too high for -p64 -n2... Setting it to 5 should fix that.
+If you have a PCI card, then the default value (15) of this parameter is too high for \-p64 \-n2... Setting it to 5 should fix that.
 Be aware that setting this parameter too low, lets the hf noise on the delay measurement come through onto the resamplerate, so this
 might degrade the quality of the output. (but its a threshold value, and it has been chosen, to mask the noise of a USB card,
 which has an amplitude which is 50 times higher than that of a PCI card, so 5 wont loose you any quality on a PCI card)
