@@ -970,6 +970,7 @@ jack_client_open_aux (const char *client_name,
 	/* validate parameters */
 	if ((options & ~JackOpenOptions)) {
 		*status |= (JackFailure|JackInvalidOption);
+		jack_messagebuffer_exit ();
 		return NULL;
 	}
 
@@ -981,6 +982,7 @@ jack_client_open_aux (const char *client_name,
 	*/
 	if (jack_get_tmpdir ()) {
 		*status |= JackFailure;
+		jack_messagebuffer_exit ();
 		return NULL;
 	}
 
@@ -991,6 +993,7 @@ jack_client_open_aux (const char *client_name,
 
 	if (jack_request_client (ClientExternal, client_name, options, status,
 				 &va, &res, &req_fd)) {
+		jack_messagebuffer_exit ();
 		return NULL;
 	}
 
@@ -1085,6 +1088,8 @@ jack_client_open_aux (const char *client_name,
  	return client;
 	
   fail:
+	jack_messagebuffer_exit ();
+
 	if (client->engine) {
 		jack_release_shm (&client->engine_shm);
 		client->engine = 0;
