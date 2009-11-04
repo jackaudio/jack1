@@ -709,7 +709,7 @@ fi
 
 # Celt low-latency audio codec. netjack transmission via internet.
 HAVE_CELT=false
-PKG_CHECK_MODULES(CELT, celt >= 0.5.0,[HAVE_CELT=true], [true])
+PKG_CHECK_MODULES(CELT, celt >= 0.7.0,[HAVE_CELT=true], [true])
 if test x$HAVE_CELT = xfalse; then
     	AC_DEFINE(HAVE_CELT,0,"Whether CELT is available")
 	AC_MSG_RESULT(no)
