@@ -123,9 +123,13 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
         }
 	if( bitdepth == 1000 ) {
 #if HAVE_CELT
-	    // XXX: memory leak
+#if HAVE_CELT_API_0_7
 	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate( client ), jack_get_buffer_size(client), NULL );
 	    capture_srcs = jack_slist_append(capture_srcs, celt_decoder_create( celt_mode, 1, NULL ) );
+#else
+	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate( client ), 1, jack_get_buffer_size(client), NULL );
+	    capture_srcs = jack_slist_append(capture_srcs, celt_decoder_create( celt_mode ) );
+#endif
 #endif
 	} else {
 #if HAVE_SAMPLERATE
@@ -162,9 +166,13 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
         }
 	if( bitdepth == 1000 ) {
 #if HAVE_CELT
-	    // XXX: memory leak
+#if HAVE_CELT_API_0_7
 	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate (client), jack_get_buffer_size(client), NULL );
 	    playback_srcs = jack_slist_append(playback_srcs, celt_encoder_create( celt_mode, 1, NULL ) );
+#else
+	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate (client), 1, jack_get_buffer_size(client), NULL );
+	    playback_srcs = jack_slist_append(playback_srcs, celt_encoder_create( celt_mode ) );
+#endif
 #endif
 	} else {
 #if HAVE_SAMPLERATE
