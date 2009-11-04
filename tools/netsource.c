@@ -264,7 +264,7 @@ process (jack_nframes_t nframes, void *arg)
 	    packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (jack_default_audio_sample_t);
 
 	    /* ---------- Send ---------- */
-	    render_jack_ports_to_payload (bitdepth, playback_ports, playback_srcs, nframes, 
+	    render_jack_ports_to_payload (bitdepth, playback_ports, playback_srcs, nframes,
 			    packet_bufX, net_period, dont_htonl_floats);
 
 	    /* fill in packet hdr */
@@ -272,7 +272,7 @@ process (jack_nframes_t nframes, void *arg)
 	    pkthdr->transport_frame = local_trans_pos.frame;
 	    pkthdr->framecnt = framecnt;
 	    pkthdr->latency = latency;
-	    pkthdr->reply_port = reply_port; 
+	    pkthdr->reply_port = reply_port;
 	    pkthdr->sample_rate = jack_get_sample_rate (client);
 	    pkthdr->period_size = nframes;
 
@@ -349,7 +349,7 @@ process (jack_nframes_t nframes, void *arg)
             //printf("Frame %d  \tRecovered from dropouts\n", framecnt);
             cont_miss = 0;
         }
-        render_payload_to_jack_ports (bitdepth, packet_bufX, net_period, 
+        render_payload_to_jack_ports (bitdepth, packet_bufX, net_period,
 		capture_ports, capture_srcs, nframes, dont_htonl_floats);
 
 	state_currentframe = framecnt;
@@ -396,7 +396,7 @@ process (jack_nframes_t nframes, void *arg)
 	    packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (jack_default_audio_sample_t);
 
 	    /* ---------- Send ---------- */
-	    render_jack_ports_to_payload (bitdepth, playback_ports, playback_srcs, nframes, 
+	    render_jack_ports_to_payload (bitdepth, playback_ports, playback_srcs, nframes,
 			    packet_bufX, net_period, dont_htonl_floats);
 
 	    /* fill in packet hdr */
@@ -404,7 +404,7 @@ process (jack_nframes_t nframes, void *arg)
 	    pkthdr->transport_frame = local_trans_pos.frame;
 	    pkthdr->framecnt = framecnt;
 	    pkthdr->latency = latency;
-	    pkthdr->reply_port = reply_port; 
+	    pkthdr->reply_port = reply_port;
 	    pkthdr->sample_rate = jack_get_sample_rate (client);
 	    pkthdr->period_size = nframes;
 
@@ -433,7 +433,7 @@ process (jack_nframes_t nframes, void *arg)
     }
 
     framecnt++;
-    return 0;      
+    return 0;
 }
 
 /**
@@ -456,15 +456,17 @@ init_sockaddr_in (struct sockaddr_in *name , const char *hostname , uint16_t por
     if (hostname)
     {
         struct hostent *hostinfo = gethostbyname (hostname);
-        if (hostinfo == NULL)
+        if (hostinfo == NULL) {
             fprintf (stderr, "init_sockaddr_in: unknown host: %s.\n", hostname);
+	    fflush( stderr );
+	}
         name->sin_addr = *(struct in_addr *) hostinfo->h_addr ;
     }
     else
         name->sin_addr.s_addr = htonl (INADDR_ANY) ;
 }
 
-void 
+void
 printUsage ()
 {
 fprintf (stderr, "usage: jack_netsource -h <host peer> [options]\n"
@@ -490,7 +492,7 @@ fprintf (stderr, "usage: jack_netsource -h <host peer> [options]\n"
 int
 main (int argc, char *argv[])
 {
-    /* Some startup related basics */    
+    /* Some startup related basics */
     char *client_name, *server_name = NULL, *peer_ip;
     int peer_port = 3000;
     jack_options_t options = JackNullOption;
@@ -500,7 +502,7 @@ main (int argc, char *argv[])
     /* heh ? these are only the copies of them ;)                 */
     int statecopy_connected, statecopy_latency, statecopy_netxruns;
     jack_nframes_t net_period;
-    /* Argument parsing stuff */    
+    /* Argument parsing stuff */
     extern char *optarg;
     extern int optind, optopt;
     int errflg=0, c;
@@ -510,7 +512,7 @@ main (int argc, char *argv[])
         printUsage ();
         return 1;
     }
-    
+
     client_name = (char *) malloc (sizeof (char) * 10);
     peer_ip = (char *) malloc (sizeof (char) * 10);
     sprintf(client_name, "netsource");
@@ -597,14 +599,16 @@ main (int argc, char *argv[])
 
     capture_channels = capture_channels_audio + capture_channels_midi;
     playback_channels = playback_channels_audio + playback_channels_midi;
-    
+
     outsockfd = socket (PF_INET, SOCK_DGRAM, 0);
     insockfd = socket (PF_INET, SOCK_DGRAM, 0);
     init_sockaddr_in ((struct sockaddr_in *) &destaddr, peer_ip, peer_port);
     if(reply_port)
     {
         init_sockaddr_in ((struct sockaddr_in *) &bindaddr, NULL, reply_port);
-        bind (insockfd, &bindaddr, sizeof (bindaddr));
+        if( bind (insockfd, &bindaddr, sizeof (bindaddr)) ) {
+		fprintf (stderr, "bind failure\n" );
+	}
     }
 
     /* try to become a client of the JACK server */
@@ -665,10 +669,13 @@ main (int argc, char *argv[])
 	{
             if (statecopy_netxruns != state_netxruns) {
 		statecopy_netxruns = state_netxruns;
-		printf ("at frame %06d -> total netxruns %d  (%d%%) queue time= %d\n", state_currentframe, 
-									     statecopy_netxruns, 
-									     100*statecopy_netxruns/state_currentframe,
-									     state_recv_packet_queue_time);
+		printf ("%s: at frame %06d -> total netxruns %d  (%d%%) queue time= %d\n",
+				client_name, 
+				state_currentframe,
+				statecopy_netxruns,
+				100*statecopy_netxruns/state_currentframe,
+				state_recv_packet_queue_time);
+
 		fflush(stdout);
             }
         }
