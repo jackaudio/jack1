@@ -11,4 +11,4 @@ man1_MANS = $(manpages)
 
 BUILT_SOURCES = $(manpages)
 
-dist_man_MANS = $(manpages)
+#dist_man_MANS = $(manpages)
