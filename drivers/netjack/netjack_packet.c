@@ -714,6 +714,9 @@ packet_cache_get_next_available_framecnt( packet_cache *pcache, jack_nframes_t e
 	    continue;
 	}
 
+	if( cpack->framecnt < expected_framecnt )
+	    continue;
+
 	if( (cpack->framecnt - expected_framecnt) > best_offset ) {
 	    continue;
 	}
