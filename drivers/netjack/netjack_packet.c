@@ -338,6 +338,27 @@ cache_packet_is_complete (cache_packet *pack)
     return TRUE;
 }
 
+static void report_poll_error(int error)
+{
+    switch (error)
+    {
+        case EBADF:
+            jack_error ("Error %d: An invalid file descriptor was given in one of the sets", errno);
+            break;
+        case EFAULT:
+            jack_error ("Error %d: The array given as argument was not contained in the calling program's address space", errno);
+            break;
+        case EINTR:
+            jack_error ("Error %d: A signal occurred before any requested event", errno);
+            break;
+        case EINVAL:
+            jack_error ("Error %d: The nfds value exceeds the RLIMIT_NOFILE value", errno);
+            break;
+        case ENOMEM:
+            jack_error ("Error %d: There was no space to allocate file descriptor tables", errno);
+            break;
+    }
+}
 
 // new poll using nanoseconds resolution and
 // not waiting forever.
@@ -394,27 +415,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
     sigprocmask (SIG_SETMASK, &rsigmask, NULL);
 #endif
 
-    if (poll_err == -1)
-    {
-        switch (errno)
-        {
-            case EBADF:
-            jack_error ("Error %d: An invalid file descriptor was given in one of the sets", errno);
-            break;
-            case EFAULT:
-            jack_error ("Error %d: The array given as argument was not contained in the calling program's address space", errno);
-            break;
-            case EINTR:
-            jack_error ("Error %d: A signal occurred before any requested event", errno);
-            break;
-            case EINVAL:
-            jack_error ("Error %d: The nfds value exceeds the RLIMIT_NOFILE value", errno);
-            break;
-            case ENOMEM:
-            jack_error ("Error %d: There was no space to allocate file descriptor tables", errno);
-            break;
-        }
-    }
+    if (poll_err == -1) report_poll_error (errno);
     return poll_err;
 }
 
@@ -453,26 +454,9 @@ netjack_poll (int sockfd, int timeout)
     }
     sigprocmask(SIG_SETMASK, &rsigmask, NULL);
 
-    if (poll_err == -1)
+    if (poll_err == -1) 
     {
-        switch (errno)
-        {
-            case EBADF:
-            jack_error ("Error %d: An invalid file descriptor was given in one of the sets", errno);
-            break;
-            case EFAULT:
-            jack_error ("Error %d: The array given as argument was not contained in the calling program's address space", errno);
-            break;
-            case EINTR:
-            jack_error ("Error %d: A signal occurred before any requested event", errno);
-            break;
-            case EINVAL:
-            jack_error ("Error %d: The nfds value exceeds the RLIMIT_NOFILE value", errno);
-            break;
-            case ENOMEM:
-            jack_error ("Error %d: There was no space to allocate file descriptor tables", errno);
-            break;
-        }
+        report_poll_error (errno);
         return FALSE;
     }
     return TRUE;
