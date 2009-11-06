@@ -59,7 +59,10 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 {
     netjack_driver_state_t *netj = &( driver->netj );
 
-    netjack_wait( netj );
+    if( netjack_wait( netj ) ) {
+	    driver->engine->delay( driver->engine, 0 );
+    }
+
     
     driver->last_wait_ust = jack_get_microseconds ();
     driver->engine->transport_cycle_start (driver->engine, driver->last_wait_ust);
@@ -200,6 +203,7 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
     }
 
     render_payload_to_jack_ports (netj->bitdepth, packet_bufX, netj->net_period_down, netj->capture_ports, netj->capture_srcs, nframes, netj->dont_htonl_floats );
+    packet_cache_release_packet(global_packcache, netj->expected_framecnt );
 
     return 0;
 }
