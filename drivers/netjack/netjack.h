@@ -24,11 +24,18 @@
 #include <unistd.h>
 
 #include <jack/types.h>
-#include <jack/driver.h>
+//#include <jack/driver.h>
 #include <jack/jack.h>
 #include <jack/transport.h>
 
-#include <netinet/in.h>
+#include "jack/jslist.h"
+
+//#include <netinet/in.h>
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
 
 typedef struct _netjack_driver_state netjack_driver_state_t;
 
@@ -41,6 +48,7 @@ struct _netjack_driver_state {
     jack_nframes_t  period_size;
     jack_time_t	    period_usecs;
     int		    dont_htonl_floats;
+    int		    always_deadline;
 
     jack_nframes_t  codec_latency;
 
@@ -60,8 +68,13 @@ struct _netjack_driver_state {
 
     jack_client_t   *client;
 
+#ifdef WIN32
+    SOCKET	    sockfd;
+    SOCKET	    outsockfd;
+#else
     int		    sockfd;
     int		    outsockfd;
+#endif
 
     struct sockaddr_in syncsource_address;
 
@@ -83,12 +96,16 @@ struct _netjack_driver_state {
     int		   expected_framecnt_valid;
     unsigned int   num_lost_packets;
     jack_time_t	   next_deadline;
+    jack_time_t	   deadline_offset;
     int		   next_deadline_valid;
     int		   packet_data_valid;
     int		   resync_threshold;
     int		   running_free;
     int		   deadline_goodness;
     jack_time_t	   time_to_deadline;
+    unsigned int   use_autoconfig;
+    unsigned int   resample_factor;
+    unsigned int   resample_factor_up;
 };
 
 void netjack_wait( netjack_driver_state_t *netj );
@@ -100,7 +117,7 @@ void netjack_detach( netjack_driver_state_t *netj );
 
 netjack_driver_state_t *netjack_init (netjack_driver_state_t *netj,
 		jack_client_t * client,
-                char *name,
+                const char *name,
                 unsigned int capture_ports,
                 unsigned int playback_ports,
                 unsigned int capture_ports_midi,
@@ -115,5 +132,14 @@ netjack_driver_state_t *netjack_init (netjack_driver_state_t *netj,
 		unsigned int use_autoconfig,
 		unsigned int latency,
 		unsigned int redundancy,
-		int dont_htonl_floats);
+		int dont_htonl_floats,
+		int always_deadline);
+
+void netjack_release( netjack_driver_state_t *netj );
+int netjack_startup( netjack_driver_state_t *netj );
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif
