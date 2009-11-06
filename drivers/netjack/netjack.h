@@ -39,6 +39,7 @@ struct _netjack_driver_state {
     jack_nframes_t  sample_rate;
     jack_nframes_t  bitdepth;
     jack_nframes_t  period_size;
+    jack_time_t	    period_usecs;
     int		    dont_htonl_floats;
 
     jack_nframes_t  codec_latency;
@@ -90,6 +91,29 @@ struct _netjack_driver_state {
     jack_time_t	   time_to_deadline;
 };
 
+void netjack_wait( netjack_driver_state_t *netj );
+void netjack_send_silence( netjack_driver_state_t *netj, int syncstate );
+void netjack_read( netjack_driver_state_t *netj, jack_nframes_t nframes ) ;
+void netjack_write( netjack_driver_state_t *netj, jack_nframes_t nframes, int syncstate );
+void netjack_attach( netjack_driver_state_t *netj );
+void netjack_detach( netjack_driver_state_t *netj );
 
-
+netjack_driver_state_t *netjack_init (netjack_driver_state_t *netj,
+		jack_client_t * client,
+                char *name,
+                unsigned int capture_ports,
+                unsigned int playback_ports,
+                unsigned int capture_ports_midi,
+                unsigned int playback_ports_midi,
+                jack_nframes_t sample_rate,
+                jack_nframes_t period_size,
+                unsigned int listen_port,
+                unsigned int transport_sync,
+                unsigned int resample_factor,
+                unsigned int resample_factor_up,
+                unsigned int bitdepth,
+		unsigned int use_autoconfig,
+		unsigned int latency,
+		unsigned int redundancy,
+		int dont_htonl_floats);
 #endif
