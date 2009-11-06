@@ -43,11 +43,16 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 
 
 #include "netjack.h"
+#include "netjack_packet.h"
 #include "net_driver.h"
 
 #undef DEBUG_WAKEUP
 
 
+#define MIN(x,y) ((x)<(y) ? (x) : (y))
+
+static jack_transport_state_t last_transport_state;
+static int sync_state = TRUE;
 
 static jack_nframes_t
 net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed_usecs)
@@ -120,7 +125,82 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
 {
     netjack_driver_state_t *netj = &(driver->netj);
 
-    netjack_read( netj, nframes );
+    jack_position_t local_trans_pos;
+    jack_transport_state_t local_trans_state;
+
+    unsigned int *packet_buf, *packet_bufX;
+
+    if( ! netj->packet_data_valid ) {
+	render_payload_to_jack_ports (netj->bitdepth, NULL, netj->net_period_down, netj->capture_ports, netj->capture_srcs, nframes, netj->dont_htonl_floats );
+	return 0;
+    }
+    packet_buf = netj->rx_buf;
+
+    jacknet_packet_header *pkthdr = (jacknet_packet_header *)packet_buf;
+
+    packet_bufX = packet_buf + sizeof(jacknet_packet_header) / sizeof(jack_default_audio_sample_t);
+
+    netj->reply_port = pkthdr->reply_port;
+    netj->latency = pkthdr->latency;
+
+    // Special handling for latency=0
+    if( netj->latency == 0 )
+	netj->resync_threshold = 0;
+    else
+	netj->resync_threshold = MIN( 15, pkthdr->latency-1 );
+
+    // check whether, we should handle the transport sync stuff, or leave trnasports untouched.
+    if (netj->handle_transport_sync) {
+	int compensated_tranport_pos = (pkthdr->transport_frame + (pkthdr->latency * nframes) + netj->codec_latency);
+
+        // read local transport info....
+        local_trans_state = jack_transport_query(netj->client, &local_trans_pos);
+
+        // Now check if we have to start or stop local transport to sync to remote...
+        switch (pkthdr->transport_state) {
+            case JackTransportStarting:
+                // the master transport is starting... so we set our reply to the sync_callback;
+                if (local_trans_state == JackTransportStopped) {
+                    jack_transport_start(netj->client);
+                    last_transport_state = JackTransportStopped;
+                    sync_state = FALSE;
+                    jack_info("locally stopped... starting...");
+                }
+
+                if (local_trans_pos.frame != compensated_tranport_pos)
+		{
+                    jack_transport_locate(netj->client, compensated_tranport_pos);
+                    last_transport_state = JackTransportRolling;
+                    sync_state = FALSE;
+                    jack_info("starting locate to %d", compensated_tranport_pos );
+                }
+                break;
+            case JackTransportStopped:
+                sync_state = TRUE;
+                if (local_trans_pos.frame != (pkthdr->transport_frame)) {
+                    jack_transport_locate(netj->client, (pkthdr->transport_frame));
+                    jack_info("transport is stopped locate to %d", pkthdr->transport_frame);
+                }
+                if (local_trans_state != JackTransportStopped)
+                    jack_transport_stop(netj->client);
+                break;
+            case JackTransportRolling:
+                sync_state = TRUE;
+//		    		if(local_trans_pos.frame != (pkthdr->transport_frame + (pkthdr->latency) * nframes)) {
+//				    jack_transport_locate(netj->client, (pkthdr->transport_frame + (pkthdr->latency + 2) * nframes));
+//				    jack_info("running locate to %d", pkthdr->transport_frame + (pkthdr->latency)*nframes);
+//		    		}
+                if (local_trans_state != JackTransportRolling)
+                    jack_transport_start (netj->client);
+                break;
+
+            case JackTransportLooping:
+                break;
+        }
+    }
+
+    render_payload_to_jack_ports (netj->bitdepth, packet_bufX, netj->net_period_down, netj->capture_ports, netj->capture_srcs, nframes, netj->dont_htonl_floats );
+
     return 0;
 }
 
@@ -130,7 +210,49 @@ net_driver_write (net_driver_t* driver, jack_nframes_t nframes)
     netjack_driver_state_t *netj = &(driver->netj);
 
     int sync_state = (driver->engine->control->sync_remain <= 1);;
-    netjack_write( netj, nframes, sync_state );
+
+    uint32_t *packet_buf, *packet_bufX;
+
+    int packet_size = get_sample_size(netj->bitdepth) * netj->playback_channels * netj->net_period_up + sizeof(jacknet_packet_header);
+    jacknet_packet_header *pkthdr; 
+
+    packet_buf = alloca(packet_size);
+    pkthdr = (jacknet_packet_header *)packet_buf;
+
+    if( netj->running_free ) {
+	return 0;
+    }
+
+    // offset packet_bufX by the packetheader.
+    packet_bufX = packet_buf + sizeof(jacknet_packet_header) / sizeof(jack_default_audio_sample_t);
+
+    pkthdr->sync_state = sync_state;
+    pkthdr->latency = netj->time_to_deadline;
+    //printf( "time to deadline = %d  goodness=%d\n", (int)netj->time_to_deadline, netj->deadline_goodness );
+    pkthdr->framecnt = netj->expected_framecnt;
+
+
+    render_jack_ports_to_payload(netj->bitdepth, netj->playback_ports, netj->playback_srcs, nframes, packet_bufX, netj->net_period_up, netj->dont_htonl_floats );
+
+    packet_header_hton(pkthdr);
+    if (netj->srcaddress_valid)
+    {
+	int r;
+
+#ifndef MSG_CONFIRM
+	static const int flag = 0;
+#else
+	static const int flag = MSG_CONFIRM;
+#endif
+
+        if (netj->reply_port)
+            netj->syncsource_address.sin_port = htons(netj->reply_port);
+
+	for( r=0; r<netj->redundancy; r++ )
+	    netjack_sendto(netj->outsockfd, (char *)packet_buf, packet_size,
+			   flag, (struct sockaddr*)&(netj->syncsource_address), sizeof(struct sockaddr_in), netj->mtu);
+    }
+
     return 0;
 }
 
@@ -186,7 +308,6 @@ net_driver_new (jack_client_t * client,
 		int always_deadline)
 {
     net_driver_t * driver;
-    netjack_driver_state_t *netj = &(driver->netj);
 
     jack_info ("creating net driver ... %s|%" PRIu32 "|%" PRIu32
             "|%u|%u|%u|transport_sync:%u", name, sample_rate, period_size, listen_port,
@@ -207,6 +328,7 @@ net_driver_new (jack_client_t * client,
     driver->last_wait_ust = 0;
     driver->engine = NULL;
 
+    netjack_driver_state_t *netj = &(driver->netj);
 
     netjack_init ( netj,
 		client,
@@ -228,6 +350,7 @@ net_driver_new (jack_client_t * client,
 		dont_htonl_floats,
 	        always_deadline	);
 
+    netjack_startup( netj );
 
     jack_info ("netjack: period   : up: %d / dn: %d", netj->net_period_up, netj->net_period_down);
     jack_info ("netjack: framerate: %d", netj->sample_rate);
