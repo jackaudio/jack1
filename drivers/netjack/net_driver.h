@@ -29,6 +29,8 @@
 
 #include <netinet/in.h>
 
+#define CELT_MODE 1000 // magic bitdepth value
+
 typedef struct _net_driver net_driver_t;
 
 struct _net_driver

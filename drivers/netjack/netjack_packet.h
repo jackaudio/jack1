@@ -32,6 +32,7 @@
 #include <jack/engine.h>
 
 #include <jack/midiport.h>
+#include "net_driver.h"
 
 #include <netinet/in.h>
 // The Packet Header.

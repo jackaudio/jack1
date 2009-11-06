@@ -121,7 +121,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
             printf( "jack_netsource: cannot register %s port\n", buf);
             break;
         }
-	if( bitdepth == 1000 ) {
+	if( bitdepth == CELT_MODE ) {
 #if HAVE_CELT
 #if HAVE_CELT_API_0_7
 	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate( client ), jack_get_buffer_size(client), NULL );
@@ -164,7 +164,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
             printf ("jack_netsource: cannot register %s port\n", buf);
             break;
         }
-	if( bitdepth == 1000 ) {
+	if( bitdepth == CELT_MODE ) {
 #if HAVE_CELT
 #if HAVE_CELT_API_0_7
 	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate (client), jack_get_buffer_size(client), NULL );
@@ -246,7 +246,7 @@ process (jack_nframes_t nframes, void *arg)
     uint32_t *packet_buf, *packet_bufX;
     jack_time_t packet_recv_timestamp;
 
-    if( bitdepth == 1000 )
+    if( bitdepth == CELT_MODE )
 	net_period = factor;
     else
 	net_period = (float) nframes / (float) factor;
@@ -574,7 +574,7 @@ main (int argc, char *argv[])
             break;
 	    case 'c':
 #if HAVE_CELT
-	    bitdepth = 1000;
+	    bitdepth = CELT_MODE;
 	    factor = atoi (optarg);
 #else
 	    printf( "not built with celt supprt\n" );
@@ -635,7 +635,7 @@ main (int argc, char *argv[])
 
     alloc_ports (capture_channels_audio, playback_channels_audio, capture_channels_midi, playback_channels_midi);
 
-    if( bitdepth == 1000 )
+    if( bitdepth == CELT_MODE )
 	net_period = factor;
     else
 	net_period = ceilf((float) jack_get_buffer_size (client) / (float) factor);

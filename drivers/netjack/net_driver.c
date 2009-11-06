@@ -547,7 +547,7 @@ net_driver_attach (net_driver_t *driver)
         driver->capture_ports =
             jack_slist_append (driver->capture_ports, port);
 
-	if( driver->bitdepth == 1000 ) {
+	if( driver->bitdepth == CELT_MODE ) {
 #if HAVE_CELT
 #if HAVE_CELT_API_0_7
 	    celt_int32 lookahead;
@@ -598,7 +598,7 @@ net_driver_attach (net_driver_t *driver)
 
         driver->playback_ports =
             jack_slist_append (driver->playback_ports, port);
-	if( driver->bitdepth == 1000 ) {
+	if( driver->bitdepth == CELT_MODE ) {
 #if HAVE_CELT
 #if HAVE_CELT_API_0_7
 	    CELTMode *celt_mode = celt_mode_create( driver->sample_rate, driver->period_size, NULL );
@@ -741,7 +741,7 @@ net_driver_new (jack_client_t * client,
     driver->engine = NULL;
 
 
-    if ((bitdepth != 0) && (bitdepth != 8) && (bitdepth != 16) && (bitdepth != 1000))
+    if ((bitdepth != 0) && (bitdepth != 8) && (bitdepth != 16) && (bitdepth != CELT_MODE))
     {
         jack_info ("Invalid bitdepth: %d (8, 16 or 0 for float) !!!", bitdepth);
         return NULL;
@@ -843,7 +843,7 @@ net_driver_new (jack_client_t * client,
         (jack_time_t) floor ((((float) driver->period_size) / (float)driver->sample_rate)
                              * 1000000.0f);
 
-    if( driver->bitdepth == 1000 ) {
+    if( driver->bitdepth == CELT_MODE ) {
 	// celt mode. 
 	// TODO: this is a hack. But i dont want to change the packet header.
 	driver->net_period_down = resample_factor;
@@ -1137,7 +1137,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
 
 	    case 'c':
 #if HAVE_CELT
-		bitdepth = 1000;
+		bitdepth = CELT_MODE;
 		resample_factor = param->value.ui;
 #else
 		printf( "not built with celt support\n" );
