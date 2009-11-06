@@ -26,7 +26,16 @@
  *
  */
 
-#include "config.h"
+//#include "config.h"
+
+#define HAVE_CELT 1
+
+#define _XOPEN_SOURCE 600
+#define _BSD_SOURCE
+
+#ifdef __APPLE__
+#define _DARWIN_C_SOURCE
+#endif
 
 #if HAVE_PPOLL
 #define _GNU_SOURCE
@@ -37,16 +46,23 @@
 #include <memory.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <alloca.h>
 #include <errno.h>
 #include <stdarg.h>
 
 #include <jack/types.h>
-#include <jack/engine.h>
+//#include <jack/engine.h>
 
 #include <sys/types.h>
+
+#ifdef WIN32
+#include <winsock2.h>
+#include <malloc.h>
+#else
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <poll.h>
+#endif
 
 #include <errno.h>
 #include <signal.h>
@@ -59,12 +75,18 @@
 #include <celt/celt.h>
 #endif
 
-#include "net_driver.h"
 #include "netjack_packet.h"
+
+// JACK2 specific.
+#include "jack/control.h"
+
+#ifdef NO_JACK_ERROR
+#define jack_error printf
+#endif
 
 int fraggo = 0;
 
-packet_cache *global_packcache;
+packet_cache *global_packcache = NULL;
 
 void
 packet_header_hton (jacknet_packet_header *pkthdr)
@@ -110,6 +132,8 @@ int get_sample_size (int bitdepth)
         return sizeof (int8_t);
     if (bitdepth == 16)
         return sizeof (int16_t);
+    //JN: why? is this for buffer sizes before or after encoding?
+    //JN: if the former, why not int16_t, if the latter, shouldn't it depend on -c N?    
     if( bitdepth == CELT_MODE )
 	return sizeof( unsigned char );
     return sizeof (int32_t);
@@ -119,11 +143,12 @@ int jack_port_is_audio(const char *porttype)
 {
     return (strncmp (porttype, JACK_DEFAULT_AUDIO_TYPE, jack_port_type_size()) == 0);
 }
-    
+
 int jack_port_is_midi(const char *porttype)
 {
     return (strncmp (porttype, JACK_DEFAULT_MIDI_TYPE, jack_port_type_size()) == 0);
 }
+
 
 // fragment management functions.
 
@@ -137,7 +162,7 @@ packet_cache
 	    fragment_number = 1;
     else
 	    fragment_number = (pkt_size - sizeof (jacknet_packet_header) - 1) / fragment_payload_size + 1;
-    
+
     packet_cache *pcache = malloc (sizeof (packet_cache));
     if (pcache == NULL)
     {
@@ -181,6 +206,8 @@ void
 packet_cache_free (packet_cache *pcache)
 {
     int i;
+    if( pcache == NULL )
+	return;
 
     for (i = 0; i < pcache->size; i++)
     {
@@ -333,33 +360,12 @@ cache_packet_is_complete (cache_packet *pack)
     int i;
     for (i = 0; i < pack->num_fragments; i++)
         if (pack->fragment_array[i] == 0)
-            return FALSE;
+            return 0;
 
-    return TRUE;
+    return 1;
 }
 
-static void report_poll_error(int error)
-{
-    switch (error)
-    {
-        case EBADF:
-            jack_error ("Error %d: An invalid file descriptor was given in one of the sets", errno);
-            break;
-        case EFAULT:
-            jack_error ("Error %d: The array given as argument was not contained in the calling program's address space", errno);
-            break;
-        case EINTR:
-            jack_error ("Error %d: A signal occurred before any requested event", errno);
-            break;
-        case EINVAL:
-            jack_error ("Error %d: The nfds value exceeds the RLIMIT_NOFILE value", errno);
-            break;
-        case ENOMEM:
-            jack_error ("Error %d: There was no space to allocate file descriptor tables", errno);
-            break;
-    }
-}
-
+#ifndef WIN32
 // new poll using nanoseconds resolution and
 // not waiting forever.
 int
@@ -370,7 +376,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
     sigset_t sigmask;
     struct sigaction action;
 #if HAVE_PPOLL
-    struct timespec timeout_spec = { 0, 0 }; 
+    struct timespec timeout_spec = { 0, 0 };
 #else
     sigset_t rsigmask;
     int timeout;
@@ -381,6 +387,10 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
     if( now >= deadline )
 	return 0;
 
+    if( (deadline-now) >= 1000000 ) {
+	    jack_error( "deadline more than 1 second in the future, trimming it." );
+	    deadline = now+500000;
+    }
 #if HAVE_PPOLL
     timeout_spec.tv_nsec = (deadline - now) * 1000;
 #else
@@ -395,7 +405,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
 	sigaddset(&sigmask, SIGTERM);
 	sigaddset(&sigmask, SIGUSR1);
 	sigaddset(&sigmask, SIGUSR2);
-	
+
 	action.sa_handler = SIG_DFL;
 	action.sa_mask = sigmask;
 	action.sa_flags = SA_RESTART;
@@ -415,7 +425,27 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
     sigprocmask (SIG_SETMASK, &rsigmask, NULL);
 #endif
 
-    if (poll_err == -1) report_poll_error (errno);
+    if (poll_err == -1)
+    {
+        switch (errno)
+        {
+            case EBADF:
+            jack_error ("Error %d: An invalid file descriptor was given in one of the sets", errno);
+            break;
+            case EFAULT:
+            jack_error ("Error %d: The array given as argument was not contained in the calling program's address space", errno);
+            break;
+            case EINTR:
+            jack_error ("Error %d: A signal occurred before any requested event", errno);
+            break;
+            case EINVAL:
+            jack_error ("Error %d: The nfds value exceeds the RLIMIT_NOFILE value", errno);
+            break;
+            case ENOMEM:
+            jack_error ("Error %d: There was no space to allocate file descriptor tables", errno);
+            break;
+        }
+    }
     return poll_err;
 }
 
@@ -435,7 +465,7 @@ netjack_poll (int sockfd, int timeout)
 	sigaddset(&sigmask, SIGTERM);
 	sigaddset(&sigmask, SIGUSR1);
 	sigaddset(&sigmask, SIGUSR2);
-	
+
 	action.sa_handler = SIG_DFL;
 	action.sa_mask = sigmask;
 	action.sa_flags = SA_RESTART;
@@ -454,14 +484,65 @@ netjack_poll (int sockfd, int timeout)
     }
     sigprocmask(SIG_SETMASK, &rsigmask, NULL);
 
-    if (poll_err == -1) 
+    if (poll_err == -1)
     {
-        report_poll_error (errno);
-        return FALSE;
+        switch (errno)
+        {
+            case EBADF:
+            jack_error ("Error %d: An invalid file descriptor was given in one of the sets", errno);
+            break;
+            case EFAULT:
+            jack_error ("Error %d: The array given as argument was not contained in the calling program's address space", errno);
+            break;
+            case EINTR:
+            jack_error ("Error %d: A signal occurred before any requested event", errno);
+            break;
+            case EINVAL:
+            jack_error ("Error %d: The nfds value exceeds the RLIMIT_NOFILE value", errno);
+            break;
+            case ENOMEM:
+            jack_error ("Error %d: There was no space to allocate file descriptor tables", errno);
+            break;
+        }
+        return 0;
     }
-    return TRUE;
+    return 1;
 }
 
+#else
+int
+netjack_poll (int sockfd, int timeout)
+{
+    jack_error( "netjack_poll not implemented\n" );
+    return 0;
+}
+int
+netjack_poll_deadline (int sockfd, jack_time_t deadline)
+{
+    fd_set fds;
+    FD_ZERO( &fds );
+    FD_SET( sockfd, &fds );
+
+    struct timeval timeout;
+    while( 1 ) {
+        jack_time_t now = jack_get_time();
+        if( now >= deadline )
+                return 0;
+
+        int timeout_usecs = (deadline - now);
+    //jack_error( "timeout = %d", timeout_usecs );
+        timeout.tv_sec = 0;
+        timeout.tv_usec = (timeout_usecs < 500) ? 500 : timeout_usecs;
+        timeout.tv_usec = (timeout_usecs > 1000000) ? 500000 : timeout_usecs;
+
+        int poll_err = select (0, &fds, NULL, NULL, &timeout);
+        if( poll_err != 0 )
+            return poll_err;
+    }
+
+    return 0;
+}
+#endif
 // This now reads all a socket has into the cache.
 // replacing netjack_recv functions.
 
@@ -474,12 +555,22 @@ packet_cache_drain_socket( packet_cache *pcache, int sockfd )
     jack_nframes_t framecnt;
     cache_packet *cpack;
     struct sockaddr_in sender_address;
+#ifdef WIN32
+    size_t senderlen = sizeof( struct sockaddr_in );
+    u_long parm = 1;
+    ioctlsocket( sockfd, FIONBIO, &parm );
+#else
     socklen_t senderlen = sizeof( struct sockaddr_in );
-
+#endif
     while (1)
     {
+#ifdef WIN32
+        rcv_len = recvfrom (sockfd, rx_packet, pcache->mtu, 0,
+			    (struct sockaddr*) &sender_address, &senderlen);
+#else
         rcv_len = recvfrom (sockfd, rx_packet, pcache->mtu, MSG_DONTWAIT,
 			    (struct sockaddr*) &sender_address, &senderlen);
+#endif
         if (rcv_len < 0)
             return;
 
@@ -490,7 +581,7 @@ packet_cache_drain_socket( packet_cache *pcache, int sockfd )
 	} else {
 	    // Setup this one as master
 	    //printf( "setup master...\n" );
-	    memcpy ( &(pcache->master_address), &sender_address, senderlen ); 
+	    memcpy ( &(pcache->master_address), &sender_address, senderlen );
 	    pcache->master_address_valid = 1;
 	}
 
@@ -498,14 +589,13 @@ packet_cache_drain_socket( packet_cache *pcache, int sockfd )
 	if( pcache->last_framecnt_retreived_valid && (framecnt <= pcache->last_framecnt_retreived ))
 	    continue;
 
-	//printf( "Got Packet %d\n", framecnt );
         cpack = packet_cache_get_packet (global_packcache, framecnt);
         cache_packet_add_fragment (cpack, rx_packet, rcv_len);
 	cpack->recv_timestamp = jack_get_time();
     }
 }
 
-void 
+void
 packet_cache_reset_master_address( packet_cache *pcache )
 {
     pcache->master_address_valid = 0;
@@ -528,7 +618,7 @@ packet_cache_clear_old_packets (packet_cache *pcache, jack_nframes_t framecnt )
 }
 
 int
-packet_cache_retreive_packet( packet_cache *pcache, jack_nframes_t framecnt, char *packet_buf, int pkt_size, jack_time_t *timestamp )
+packet_cache_retreive_packet_pointer( packet_cache *pcache, jack_nframes_t framecnt, char **packet_buf, int pkt_size, jack_time_t *timestamp )
 {
     int i;
     cache_packet *cpack = NULL;
@@ -551,19 +641,44 @@ packet_cache_retreive_packet( packet_cache *pcache, jack_nframes_t framecnt, cha
     }
 
     // ok. cpack is the one we want and its complete.
-    memcpy (packet_buf, cpack->packet_buf, pkt_size);
+    *packet_buf = cpack->packet_buf;
     if( timestamp )
 	*timestamp = cpack->recv_timestamp;
 
     pcache->last_framecnt_retreived_valid = 1;
     pcache->last_framecnt_retreived = framecnt;
 
-    cache_packet_reset (cpack);
-    packet_cache_clear_old_packets( pcache, framecnt );
-    
     return pkt_size;
 }
 
+int
+packet_cache_release_packet( packet_cache *pcache, jack_nframes_t framecnt )
+{
+    int i;
+    cache_packet *cpack = NULL;
+
+
+    for (i = 0; i < pcache->size; i++) {
+        if (pcache->packets[i].valid && (pcache->packets[i].framecnt == framecnt)) {
+	    cpack = &(pcache->packets[i]);
+            break;
+	}
+    }
+
+    if( cpack == NULL ) {
+	//printf( "retreive packet: %d....not found\n", framecnt );
+	return -1;
+    }
+
+    if( !cache_packet_is_complete( cpack ) ) {
+	return -1;
+    }
+
+    cache_packet_reset (cpack);
+    packet_cache_clear_old_packets( pcache, framecnt );
+
+    return 0;
+}
 float
 packet_cache_get_fill( packet_cache *pcache, jack_nframes_t expected_framecnt )
 {
@@ -603,7 +718,7 @@ packet_cache_get_next_available_framecnt( packet_cache *pcache, jack_nframes_t e
 	    continue;
 	}
 
-	best_offset = cpack->framecnt - expected_framecnt;	
+	best_offset = cpack->framecnt - expected_framecnt;
 	retval = 1;
 
 	if( best_offset == 0 )
@@ -636,7 +751,7 @@ packet_cache_get_highest_available_framecnt( packet_cache *pcache, jack_nframes_
 	    continue;
 	}
 
-	best_value = cpack->framecnt;	
+	best_value = cpack->framecnt;
 	retval = 1;
 
     }
@@ -668,7 +783,7 @@ packet_cache_find_latency( packet_cache *pcache, jack_nframes_t expected_framecn
 	    continue;
 	}
 
-	best_offset = cpack->framecnt - expected_framecnt;	
+	best_offset = cpack->framecnt - expected_framecnt;
 	retval = 1;
 
 	if( best_offset == 0 )
@@ -681,10 +796,16 @@ packet_cache_find_latency( packet_cache *pcache, jack_nframes_t expected_framecn
 }
 // fragmented packet IO
 int
-netjack_recvfrom (int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu)
+netjack_recvfrom (int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, size_t *addr_size, int mtu)
 {
-    if (pkt_size <= mtu)
-        return recvfrom (sockfd, packet_buf, pkt_size, flags, addr, addr_size);
+    int retval;
+    socklen_t from_len = *addr_size;
+    if (pkt_size <= mtu) {
+        retval = recvfrom (sockfd, packet_buf, pkt_size, flags, addr, &from_len);
+	*addr_size = from_len;
+	return retval;
+    }
+
     char *rx_packet = alloca (mtu);
     jacknet_packet_header *pkthdr = (jacknet_packet_header *) rx_packet;
     int rcv_len;
@@ -692,7 +813,7 @@ netjack_recvfrom (int sockfd, char *packet_buf, int pkt_size, int flags, struct 
     cache_packet *cpack;
     do
     {
-        rcv_len = recvfrom (sockfd, rx_packet, mtu, 0, addr, addr_size);
+        rcv_len = recvfrom (sockfd, rx_packet, mtu, 0, addr, &from_len);
         if (rcv_len < 0)
             return rcv_len;
         framecnt = ntohl (pkthdr->framecnt);
@@ -701,6 +822,7 @@ netjack_recvfrom (int sockfd, char *packet_buf, int pkt_size, int flags, struct 
     } while (!cache_packet_is_complete (cpack));
     memcpy (packet_buf, cpack->packet_buf, pkt_size);
     cache_packet_reset (cpack);
+    *addr_size = from_len;
     return pkt_size;
 }
 
@@ -747,7 +869,7 @@ netjack_sendto (int sockfd, char *packet_buf, int pkt_size, int flags, struct so
         pkthdr->fragment_nr = htonl (0);
         err = sendto(sockfd, packet_buf, pkt_size, flags, addr, addr_size);
 	if( err<0 ) {
-	    printf( "error in send\n" );
+	    //printf( "error in send\n" );
 	    perror( "send" );
 	}
     }
@@ -771,16 +893,17 @@ netjack_sendto (int sockfd, char *packet_buf, int pkt_size, int flags, struct so
         int last_payload_size = packet_buf + pkt_size - packet_bufX;
         memcpy (dataX, packet_bufX, last_payload_size);
         pkthdr->fragment_nr = htonl (frag_cnt);
-        //jack_error("last fragment_count = %d, payload_size = %d\n", fragment_count, last_payload_size);
+        //jack_log("last fragment_count = %d, payload_size = %d\n", fragment_count, last_payload_size);
 
         // sendto(last_pack_size);
         err = sendto(sockfd, tx_packet, last_payload_size + sizeof(jacknet_packet_header), flags, addr, addr_size);
 	if( err<0 ) {
-	    printf( "error in send\n" );
+	    //printf( "error in send\n" );
 	    perror( "send" );
 	}
     }
 }
+
 
 void
 decode_midi_buffer (uint32_t *buffer_uint32, unsigned int buffer_size_uint32, jack_default_audio_sample_t* buf)
@@ -854,9 +977,9 @@ encode_midi_buffer (uint32_t *buffer_uint32, unsigned int buffer_size_uint32, ja
 void
 render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes, int dont_htonl_floats)
 {
-    channel_t chn = 0;
+    int chn = 0;
     JSList *node = capture_ports;
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
     JSList *src_node = capture_srcs;
 #endif
 
@@ -869,7 +992,7 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
     {
         int i;
         int_float_t val;
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
         SRC_DATA src;
 #endif
 
@@ -880,7 +1003,7 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
 
         if (jack_port_is_audio (porttype))
         {
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
             // audio port, resample if necessary
             if (net_period_down != nframes)
             {
@@ -889,16 +1012,16 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
                 {
                     packet_bufX[i] = ntohl (packet_bufX[i]);
                 }
-    
+
                 src.data_in = (float *) packet_bufX;
                 src.input_frames = net_period_down;
-    
+
                 src.data_out = buf;
                 src.output_frames = nframes;
-    
+
                 src.src_ratio = (float) nframes / (float) net_period_down;
                 src.end_of_input = 0;
-    
+
                 src_set_ratio (src_state, src.src_ratio);
                 src_process (src_state, &src);
                 src_node = jack_slist_next (src_node);
@@ -906,7 +1029,7 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
             else
 #endif
             {
-		if( dont_htonl_floats ) 
+		if( dont_htonl_floats )
 		{
 		    memcpy( buf, packet_bufX, net_period_down*sizeof(jack_default_audio_sample_t));
 		}
@@ -938,7 +1061,7 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
 void
 render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up, int dont_htonl_floats )
 {
-    channel_t chn = 0;
+    int chn = 0;
     JSList *node = playback_ports;
 #if HAVE_SAMPLERATE
     JSList *src_node = playback_srcs;
@@ -948,7 +1071,7 @@ render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_src
 
     while (node != NULL)
     {
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
         SRC_DATA src;
 #endif
         int i;
@@ -961,22 +1084,22 @@ render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_src
         if (jack_port_is_audio (porttype))
         {
             // audio port, resample if necessary
-    
-#if HAVE_SAMPLERATE 
+
+#if HAVE_SAMPLERATE
             if (net_period_up != nframes) {
                 SRC_STATE *src_state = src_node->data;
                 src.data_in = buf;
                 src.input_frames = nframes;
-    
+
                 src.data_out = (float *) packet_bufX;
                 src.output_frames = net_period_up;
-    
+
                 src.src_ratio = (float) net_period_up / (float) nframes;
                 src.end_of_input = 0;
-    
+
                 src_set_ratio (src_state, src.src_ratio);
                 src_process (src_state, &src);
-    
+
                 for (i = 0; i < net_period_up; i++)
                 {
                     packet_bufX[i] = htonl (packet_bufX[i]);
@@ -1019,7 +1142,7 @@ render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_src
 void
 render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
 {
-    channel_t chn = 0;
+    int chn = 0;
     JSList *node = capture_ports;
 #if HAVE_SAMPLERATE
     JSList *src_node = capture_srcs;
@@ -1034,7 +1157,7 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
     {
         int i;
         //uint32_t val;
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
         SRC_DATA src;
 #endif
 
@@ -1049,8 +1172,8 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
         if (jack_port_is_audio (porttype))
         {
             // audio port, resample if necessary
-    
-#if HAVE_SAMPLERATE 
+
+#if HAVE_SAMPLERATE
             if (net_period_down != nframes)
             {
                 SRC_STATE *src_state = src_node->data;
@@ -1058,16 +1181,16 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
                 {
                     floatbuf[i] = ((float) ntohs(packet_bufX[i])) / 32767.0 - 1.0;
                 }
-    
+
                 src.data_in = floatbuf;
                 src.input_frames = net_period_down;
-    
+
                 src.data_out = buf;
                 src.output_frames = nframes;
-    
+
                 src.src_ratio = (float) nframes / (float) net_period_down;
                 src.end_of_input = 0;
-    
+
                 src_set_ratio (src_state, src.src_ratio);
                 src_process (src_state, &src);
                 src_node = jack_slist_next (src_node);
@@ -1094,9 +1217,9 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
 void
 render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
 {
-    channel_t chn = 0;
+    int chn = 0;
     JSList *node = playback_ports;
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
     JSList *src_node = playback_srcs;
 #endif
 
@@ -1104,7 +1227,7 @@ render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_src
 
     while (node != NULL)
     {
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
         SRC_DATA src;
 #endif
         int i;
@@ -1115,26 +1238,26 @@ render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_src
         if (jack_port_is_audio (porttype))
         {
             // audio port, resample if necessary
-    
-#if HAVE_SAMPLERATE 
+
+#if HAVE_SAMPLERATE
             if (net_period_up != nframes)
             {
                 SRC_STATE *src_state = src_node->data;
-    
+
                 float *floatbuf = alloca (sizeof(float) * net_period_up);
-    
+
                 src.data_in = buf;
                 src.input_frames = nframes;
-    
+
                 src.data_out = floatbuf;
                 src.output_frames = net_period_up;
-    
+
                 src.src_ratio = (float) net_period_up / (float) nframes;
                 src.end_of_input = 0;
-    
+
                 src_set_ratio (src_state, src.src_ratio);
                 src_process (src_state, &src);
-    
+
                 for (i = 0; i < net_period_up; i++)
                 {
                     packet_bufX[i] = htons (((uint16_t)((floatbuf[i] + 1.0) * 32767.0)));
@@ -1164,10 +1287,10 @@ render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_src
 void
 render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
 {
-    channel_t chn = 0;
+    int chn = 0;
     JSList *node = capture_ports;
 
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
     JSList *src_node = capture_srcs;
 #endif
 
@@ -1180,19 +1303,19 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
     {
         int i;
         //uint32_t val;
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
         SRC_DATA src;
 #endif
 
         jack_port_t *port = (jack_port_t *) node->data;
         jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
 
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
         float *floatbuf = alloca (sizeof (float) * net_period_down);
 #endif
         const char *porttype = jack_port_type (port);
 
-        if (jack_port_is_audio (porttype))
+        if (jack_port_is_audio(porttype))
         {
 #if HAVE_SAMPLERATE
             // audio port, resample if necessary
@@ -1201,16 +1324,16 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
                 SRC_STATE *src_state = src_node->data;
                 for (i = 0; i < net_period_down; i++)
                     floatbuf[i] = ((float) packet_bufX[i]) / 127.0;
-    
+
                 src.data_in = floatbuf;
                 src.input_frames = net_period_down;
-    
+
                 src.data_out = buf;
                 src.output_frames = nframes;
-    
+
                 src.src_ratio = (float) nframes / (float) net_period_down;
                 src.end_of_input = 0;
-    
+
                 src_set_ratio (src_state, src.src_ratio);
                 src_process (src_state, &src);
                 src_node = jack_slist_next (src_node);
@@ -1237,9 +1360,9 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
 void
 render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
 {
-    channel_t chn = 0;
+    int chn = 0;
     JSList *node = playback_ports;
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
     JSList *src_node = playback_srcs;
 #endif
 
@@ -1247,7 +1370,7 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
 
     while (node != NULL)
     {
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
         SRC_DATA src;
 #endif
         int i;
@@ -1258,27 +1381,27 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
 
         if (jack_port_is_audio (porttype))
         {
-#if HAVE_SAMPLERATE 
+#if HAVE_SAMPLERATE
             // audio port, resample if necessary
             if (net_period_up != nframes)
             {
 
                 SRC_STATE *src_state = src_node->data;
-    
+
                 float *floatbuf = alloca (sizeof (float) * net_period_up);
-    
+
                 src.data_in = buf;
                 src.input_frames = nframes;
-    
+
                 src.data_out = floatbuf;
                 src.output_frames = net_period_up;
-    
+
                 src.src_ratio = (float) net_period_up / (float) nframes;
                 src.end_of_input = 0;
-    
+
                 src_set_ratio (src_state, src.src_ratio);
                 src_process (src_state, &src);
-    
+
                 for (i = 0; i < net_period_up; i++)
                     packet_bufX[i] = floatbuf[i] * 127.0;
                 src_node = jack_slist_next (src_node);
@@ -1307,7 +1430,7 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
 void
 render_payload_to_jack_ports_celt (void *packet_payload, jack_nframes_t net_period_down, JSList *capture_ports, JSList *capture_srcs, jack_nframes_t nframes)
 {
-    channel_t chn = 0;
+    int chn = 0;
     JSList *node = capture_ports;
     JSList *src_node = capture_srcs;
 
@@ -1323,7 +1446,7 @@ render_payload_to_jack_ports_celt (void *packet_payload, jack_nframes_t net_peri
         if (jack_port_is_audio (porttype))
         {
             // audio port, decode celt data.
-	    
+
 	    CELTDecoder *decoder = src_node->data;
 	    if( !packet_payload )
 		celt_decode_float( decoder, NULL, net_period_down, buf );
@@ -1350,7 +1473,7 @@ render_payload_to_jack_ports_celt (void *packet_payload, jack_nframes_t net_peri
 void
 render_jack_ports_to_payload_celt (JSList *playback_ports, JSList *playback_srcs, jack_nframes_t nframes, void *packet_payload, jack_nframes_t net_period_up)
 {
-    channel_t chn = 0;
+    int chn = 0;
     JSList *node = playback_ports;
     JSList *src_node = playback_srcs;
 
@@ -1365,7 +1488,7 @@ render_jack_ports_to_payload_celt (JSList *playback_ports, JSList *playback_srcs
         if (jack_port_is_audio (porttype))
         {
             // audio port, encode celt data.
-    
+
 	    int encoded_bytes;
 	    float *floatbuf = alloca (sizeof(float) * nframes );
 	    memcpy( floatbuf, buf, nframes*sizeof(float) );

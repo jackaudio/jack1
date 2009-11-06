@@ -27,15 +27,23 @@
 #ifndef __JACK_NET_PACKET_H__
 #define __JACK_NET_PACKET_H__
 
+#ifdef __cplusplus
+    extern "C"
+    {
+#endif
+
 #include <jack/jack.h>
 #include <jack/types.h>
-#include <jack/engine.h>
+//#include <jack/engine.h>
+#include <jack/jslist.h>
 
 #include <jack/midiport.h>
-#include "net_driver.h"
 
-#include <netinet/in.h>
+//#include <netinet/in.h>
 // The Packet Header.
+
+#define CELT_MODE 1000   // Magic bitdepth value that indicates CELT compression
+#define MASTER_FREEWHEELS 0x80000000
 
 typedef struct _jacknet_packet_header jacknet_packet_header;
 
@@ -118,7 +126,8 @@ int	cache_packet_is_complete(cache_packet *pack);
 void packet_cache_drain_socket( packet_cache *pcache, int sockfd );
 void packet_cache_reset_master_address( packet_cache *pcache );
 float packet_cache_get_fill( packet_cache *pcache, jack_nframes_t expected_framecnt );
-int packet_cache_retreive_packet( packet_cache *pcache, jack_nframes_t framecnt, char *packet_buf, int pkt_size, jack_time_t *timestamp );
+int packet_cache_retreive_packet_pointer( packet_cache *pcache, jack_nframes_t framecnt, char **packet_buf, int pkt_size, jack_time_t *timestamp );
+int packet_cache_release_packet( packet_cache *pcache, jack_nframes_t framecnt );
 int packet_cache_get_next_available_framecnt( packet_cache *pcache, jack_nframes_t expected_framecnt, jack_nframes_t *framecnt );
 int packet_cache_get_highest_available_framecnt( packet_cache *pcache, jack_nframes_t *framecnt );
 int packet_cache_find_latency( packet_cache *pcache, jack_nframes_t expected_framecnt, jack_nframes_t *framecnt );
@@ -144,8 +153,13 @@ void render_jack_ports_to_payload(int bitdepth, JSList *playback_ports, JSList *
 int netjack_poll(int sockfd, int timeout);
 
 // TODO: these are deprecated.
-int netjack_recvfrom(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu);
-int netjack_recv(int sockfd, char *packet_buf, int pkt_size, int flags, int mtu);
+//int netjack_recvfrom(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, socklen_t *addr_size, int mtu);
+//int netjack_recv(int sockfd, char *packet_buf, int pkt_size, int flags, int mtu);
 
+void decode_midi_buffer (uint32_t *buffer_uint32, unsigned int buffer_size_uint32, jack_default_audio_sample_t* buf);
+void encode_midi_buffer (uint32_t *buffer_uint32, unsigned int buffer_size_uint32, jack_default_audio_sample_t* buf);
+#ifdef __cplusplus
+    }
+#endif
 #endif
 
