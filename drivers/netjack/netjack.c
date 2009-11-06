@@ -35,6 +35,9 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 #include <stdarg.h>
 
 #include <jack/types.h>
+// for jack_error in jack1
+#include <jack/internal.h>
+
 #include "jack/jslist.h"
 
 #include <sys/types.h>
@@ -63,7 +66,7 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 #include "netjack_packet.h"
 
 // JACK2
-#include "jack/control.h"
+//#include "jack/control.h"
 
 #define MIN(x,y) ((x)<(y) ? (x) : (y))
 

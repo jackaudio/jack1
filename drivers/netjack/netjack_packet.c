@@ -49,7 +49,9 @@
 #include <stdarg.h>
 
 #include <jack/types.h>
-//#include <jack/engine.h>
+
+// for jack_error in jack1
+#include <jack/internal.h>
 
 #include <sys/types.h>
 
@@ -76,7 +78,7 @@
 #include "netjack_packet.h"
 
 // JACK2 specific.
-#include "jack/control.h"
+//#include "jack/control.h"
 
 #ifdef NO_JACK_ERROR
 #define jack_error printf
