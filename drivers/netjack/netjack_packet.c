@@ -26,9 +26,7 @@
  *
  */
 
-//#include "config.h"
-
-#define HAVE_CELT 1
+#include "config.h"
 
 #define _XOPEN_SOURCE 600
 #define _BSD_SOURCE

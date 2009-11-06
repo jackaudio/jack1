@@ -26,20 +26,25 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  * @brief This client connects a remote slave JACK to a local JACK server assumed to be the master
  */
 
-#include "config.h" 
- 
+#include "config.h"
+
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef WIN32
+#include <winsock2.h>
+#include <malloc.h>
+#else
 #include <netinet/in.h>
 #include <netdb.h>
+#include <sys/socket.h>
+#endif
 
 /* These two required by FreeBSD. */
 #include <sys/types.h>
-#include <sys/socket.h>
 
 #if HAVE_ALLOCA_H
 #include <alloca.h>
@@ -47,7 +52,7 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 #include <jack/jack.h>
 
-#include <net_driver.h>
+//#include <net_driver.h>
 #include <netjack_packet.h>
 #if HAVE_SAMPLERATE
 #include <samplerate.h>
@@ -88,8 +93,13 @@ int state_recv_packet_queue_time = 0;
 
 int outsockfd;
 int insockfd;
+#ifdef WIN32
+struct sockaddr_in destaddr;
+struct sockaddr_in bindaddr;
+#else
 struct sockaddr destaddr;
 struct sockaddr bindaddr;
+#endif
 
 int sync_state;
 jack_transport_state_t last_transport_state;
@@ -97,6 +107,8 @@ jack_transport_state_t last_transport_state;
 int framecnt = 0;
 
 int cont_miss = 0;
+
+int freewheeling = 0;
 
 /**
  * This Function allocates all the I/O Ports which are added the lists.
@@ -121,7 +133,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
             printf( "jack_netsource: cannot register %s port\n", buf);
             break;
         }
-	if( bitdepth == CELT_MODE ) {
+	if( bitdepth == 1000 ) {
 #if HAVE_CELT
 #if HAVE_CELT_API_0_7
 	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate( client ), jack_get_buffer_size(client), NULL );
@@ -164,7 +176,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
             printf ("jack_netsource: cannot register %s port\n", buf);
             break;
         }
-	if( bitdepth == CELT_MODE ) {
+	if( bitdepth == 1000 ) {
 #if HAVE_CELT
 #if HAVE_CELT_API_0_7
 	    CELTMode *celt_mode = celt_mode_create( jack_get_sample_rate (client), jack_get_buffer_size(client), NULL );
@@ -202,7 +214,7 @@ alloc_ports (int n_capture_audio, int n_playback_audio, int n_capture_midi, int 
  * i dont really believe in it yet.
  */
 int
-sync_cb (jack_transport_state_t state, jack_position_t *pos, void *arg) 
+sync_cb (jack_transport_state_t state, jack_position_t *pos, void *arg)
 {
     static int latency_count = 0;
     int retval = sync_state;
@@ -222,6 +234,12 @@ sync_cb (jack_transport_state_t state, jack_position_t *pos, void *arg)
     return retval;
 }
 
+void
+freewheel_cb (int starting, void *arg)
+{
+	freewheeling = starting;
+}
+
     int deadline_goodness=0;
 /**
  * The process callback for this JACK application.
@@ -236,7 +254,7 @@ process (jack_nframes_t nframes, void *arg)
     jack_default_audio_sample_t *buf;
     jack_port_t *port;
     JSList *node;
-    channel_t chn;
+    int chn;
     int size, i;
     const char *porttype;
     int input_fd;
@@ -244,9 +262,10 @@ process (jack_nframes_t nframes, void *arg)
     jack_position_t local_trans_pos;
 
     uint32_t *packet_buf, *packet_bufX;
+    uint32_t *rx_packet_ptr;
     jack_time_t packet_recv_timestamp;
 
-    if( bitdepth == CELT_MODE )
+    if( bitdepth == 1000 )
 	net_period = factor;
     else
 	net_period = (float) nframes / (float) factor;
@@ -290,7 +309,10 @@ process (jack_nframes_t nframes, void *arg)
 	    pkthdr->capture_channels_midi = playback_channels_midi;
 	    pkthdr->playback_channels_midi = capture_channels_midi;
 	    pkthdr->mtu = mtu;
-	    pkthdr->sync_state = (jack_nframes_t)deadline_goodness;
+	    if( freewheeling!= 0 )
+		    pkthdr->sync_state = (jack_nframes_t)MASTER_FREEWHEELS;
+	    else
+		    pkthdr->sync_state = (jack_nframes_t)deadline_goodness;
 	    //printf("goodness=%d\n", deadline_goodness );
 
 	    packet_header_hton (pkthdr);
@@ -322,17 +344,19 @@ process (jack_nframes_t nframes, void *arg)
 	input_fd = outsockfd;
 
     // for latency == 0 we can poll.
-    if( latency == 0 ) {
+    if( (latency == 0) || (freewheeling!=0)  ) {
 	jack_time_t deadline = jack_get_time() + 1000000 * jack_get_buffer_size(client)/jack_get_sample_rate(client);
 	// Now loop until we get the right packet.
 	while(1) {
+	    jack_nframes_t got_frame;
 	    if ( ! netjack_poll_deadline( input_fd, deadline ) )
 		break;
 
 	    packet_cache_drain_socket(global_packcache, input_fd);
 
-	    if (packet_cache_get_next_available_framecnt( global_packcache, framecnt - latency, NULL ))
-		break;
+	    if (packet_cache_get_next_available_framecnt( global_packcache, framecnt - latency, &got_frame ))
+		if( got_frame == (framecnt - latency) )
+		    break;
 	}
     } else {
 	// normally:
@@ -340,11 +364,14 @@ process (jack_nframes_t nframes, void *arg)
 	packet_cache_drain_socket(global_packcache, input_fd);
     }
 
-    size = packet_cache_retreive_packet( global_packcache, framecnt - latency, (char *)packet_buf, rx_bufsize, &packet_recv_timestamp ); 
+    size = packet_cache_retreive_packet_pointer( global_packcache, framecnt - latency, (char**)&rx_packet_ptr, rx_bufsize, &packet_recv_timestamp );
     /* First alternative : we received what we expected. Render the data
      * to the JACK ports so it can be played. */
     if (size == rx_bufsize)
     {
+	packet_buf = rx_packet_ptr;
+	pkthdr = (jacknet_packet_header *) packet_buf;
+	packet_bufX = packet_buf + sizeof (jacknet_packet_header) / sizeof (jack_default_audio_sample_t);
 	// calculate how much time there would have been, if this packet was sent at the deadline.
 
 	int recv_time_offset = (int) (jack_get_time() - packet_recv_timestamp);
@@ -364,6 +391,7 @@ process (jack_nframes_t nframes, void *arg)
 	state_recv_packet_queue_time = recv_time_offset;
 	state_connected = 1;
         sync_state = pkthdr->sync_state;
+	packet_cache_release_packet( global_packcache, framecnt - latency );
     }
     /* Second alternative : we've received something that's not
      * as big as expected or we missed a packet. We render silence
@@ -422,7 +450,10 @@ process (jack_nframes_t nframes, void *arg)
 	    pkthdr->capture_channels_midi = playback_channels_midi;
 	    pkthdr->playback_channels_midi = capture_channels_midi;
 	    pkthdr->mtu = mtu;
-	    pkthdr->sync_state = (jack_nframes_t)deadline_goodness;
+	    if( freewheeling!= 0 )
+		    pkthdr->sync_state = (jack_nframes_t)MASTER_FREEWHEELS;
+	    else
+		    pkthdr->sync_state = (jack_nframes_t)deadline_goodness;
 	    //printf("goodness=%d\n", deadline_goodness );
 
 	    packet_header_hton (pkthdr);
@@ -459,6 +490,9 @@ jack_shutdown (void *arg)
 void
 init_sockaddr_in (struct sockaddr_in *name , const char *hostname , uint16_t port)
 {
+printf( "still here... \n" );
+fflush( stdout );
+
     name->sin_family = AF_INET ;
     name->sin_port = htons (port);
     if (hostname)
@@ -468,10 +502,15 @@ init_sockaddr_in (struct sockaddr_in *name , const char *hostname , uint16_t por
             fprintf (stderr, "init_sockaddr_in: unknown host: %s.\n", hostname);
 	    fflush( stderr );
 	}
+#ifdef WIN32
+        name->sin_addr.s_addr = inet_addr( hostname );
+#else
         name->sin_addr = *(struct in_addr *) hostinfo->h_addr ;
+#endif
     }
     else
         name->sin_addr.s_addr = htonl (INADDR_ANY) ;
+
 }
 
 void
@@ -505,7 +544,10 @@ main (int argc, char *argv[])
     int peer_port = 3000;
     jack_options_t options = JackNullOption;
     jack_status_t status;
-
+#ifdef WIN32
+    WSADATA wsa;
+    int rc = WSAStartup(MAKEWORD(2,0),&wsa);
+#endif
     /* Torben's famous state variables, aka "the reporting API" ! */
     /* heh ? these are only the copies of them ;)                 */
     int statecopy_connected, statecopy_latency, statecopy_netxruns;
@@ -574,7 +616,7 @@ main (int argc, char *argv[])
             break;
 	    case 'c':
 #if HAVE_CELT
-	    bitdepth = CELT_MODE;
+	    bitdepth = 1000;
 	    factor = atoi (optarg);
 #else
 	    printf( "not built with celt supprt\n" );
@@ -608,8 +650,14 @@ main (int argc, char *argv[])
     capture_channels = capture_channels_audio + capture_channels_midi;
     playback_channels = playback_channels_audio + playback_channels_midi;
 
-    outsockfd = socket (PF_INET, SOCK_DGRAM, 0);
-    insockfd = socket (PF_INET, SOCK_DGRAM, 0);
+    outsockfd = socket (AF_INET, SOCK_DGRAM, 0);
+    insockfd = socket (AF_INET, SOCK_DGRAM, 0);
+
+    if( (outsockfd == -1) || (insockfd == -1) ) {
+        fprintf (stderr, "cant open sockets\n" );
+        return 1;
+    }
+
     init_sockaddr_in ((struct sockaddr_in *) &destaddr, peer_ip, peer_port);
     if(reply_port)
     {
@@ -631,11 +679,12 @@ main (int argc, char *argv[])
     /* Set up jack callbacks */
     jack_set_process_callback (client, process, 0);
     jack_set_sync_callback (client, sync_cb, 0);
+    jack_set_freewheel_callback (client, freewheel_cb, 0);
     jack_on_shutdown (client, jack_shutdown, 0);
 
     alloc_ports (capture_channels_audio, playback_channels_audio, capture_channels_midi, playback_channels_midi);
 
-    if( bitdepth == CELT_MODE )
+    if( bitdepth == 1000 )
 	net_period = factor;
     else
 	net_period = ceilf((float) jack_get_buffer_size (client) / (float) factor);
@@ -658,7 +707,11 @@ main (int argc, char *argv[])
 
     while (1)
     {
-        sleep (1);
+#ifdef WIN32
+        Sleep (1000);
+#else
+        sleep(1);
+#endif
         if (statecopy_connected != state_connected)
         {
             statecopy_connected = state_connected;
