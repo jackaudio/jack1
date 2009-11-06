@@ -30,12 +30,15 @@
 
 #include "jack/jslist.h"
 
-//#include <netinet/in.h>
+#include <netinet/in.h>
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
+
+#define CELT_MODE 1000
+#define MASTER_FREEWHEELS 0x80000000
 
 typedef struct _netjack_driver_state netjack_driver_state_t;
 

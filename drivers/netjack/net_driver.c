@@ -182,7 +182,8 @@ net_driver_new (jack_client_t * client,
 		unsigned int use_autoconfig,
 		unsigned int latency,
 		unsigned int redundancy,
-		int dont_htonl_floats)
+		int dont_htonl_floats,
+		int always_deadline)
 {
     net_driver_t * driver;
     netjack_driver_state_t *netj = &(driver->netj);
@@ -224,7 +225,8 @@ net_driver_new (jack_client_t * client,
 		use_autoconfig,
 		latency,
 		redundancy,
-		dont_htonl_floats );
+		dont_htonl_floats,
+	        always_deadline	);
 
 
     jack_info ("netjack: period   : up: %d / dn: %d", netj->net_period_up, netj->net_period_down);
@@ -246,7 +248,7 @@ driver_get_descriptor ()
 
     desc = calloc (1, sizeof (jack_driver_desc_t));
     strcpy (desc->name, "net");
-    desc->nparams = 16;
+    desc->nparams = 17;
 
     params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
@@ -388,6 +390,14 @@ driver_get_descriptor ()
             "Dont convert samples to network byte order.");
     strcpy (params[i].long_desc, params[i].short_desc);
 
+    i++;
+    strcpy (params[i].name, "always-deadline");
+    params[i].character  = 'D';
+    params[i].type       = JackDriverParamUInt;
+    params[i].value.ui   = 0U;
+    strcpy (params[i].short_desc,
+            "Always wait until deadline");
+    strcpy (params[i].long_desc, params[i].short_desc);
     desc->params = params;
 
     return desc;
@@ -413,6 +423,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
     unsigned int latency = 5;
     unsigned int redundancy = 1;
     int dont_htonl_floats = 0;
+    int always_deadline = 0;
     const JSList * node;
     const jack_driver_param_t * param;
 
@@ -500,6 +511,9 @@ driver_initialize (jack_client_t *client, const JSList * params)
             case 'H':
                 dont_htonl_floats = param->value.ui;
                 break;
+            case 'D':
+                always_deadline = param->value.ui;
+                break;
         }
     }
 
@@ -509,7 +523,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
                            listen_port, handle_transport_sync,
                            resample_factor, resample_factor_up, bitdepth,
 			   use_autoconfig, latency, redundancy,
-			   dont_htonl_floats);
+			   dont_htonl_floats, always_deadline);
 }
 
 void
