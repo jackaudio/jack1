@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2003 Robert Ham <rah@bash.sh>
+    Copyright (C) 2005 Torben Hohn <torbenh@gmx.de>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -29,7 +30,7 @@
 
 #include <netinet/in.h>
 
-#define CELT_MODE 1000 // magic bitdepth value
+#include "netjack.h"
 
 typedef struct _net_driver net_driver_t;
 
@@ -37,63 +38,9 @@ struct _net_driver
 {
     JACK_DRIVER_NT_DECL;
 
-    jack_nframes_t  net_period_up;
-    jack_nframes_t  net_period_down;
-
-    jack_nframes_t  sample_rate;
-    jack_nframes_t  bitdepth;
-    jack_nframes_t  period_size;
-    int		    dont_htonl_floats;
+    netjack_driver_state_t netj;
     int		    always_wait_dedline;
-
-    jack_nframes_t  codec_latency;
-
-    unsigned int    listen_port;
-
-    unsigned int    capture_channels;
-    unsigned int    playback_channels;
-    unsigned int    capture_channels_audio;
-    unsigned int    playback_channels_audio;
-    unsigned int    capture_channels_midi;
-    unsigned int    playback_channels_midi;
-
-    JSList	    *capture_ports;
-    JSList	    *playback_ports;
-    JSList	    *playback_srcs;
-    JSList	    *capture_srcs;
-
-    jack_client_t   *client;
-
-    int		    sockfd;
-    int		    outsockfd;
-
-    struct sockaddr_in syncsource_address;
-
-    int		    reply_port;
-    int		    srcaddress_valid;
-
-    int sync_state;
-    unsigned int handle_transport_sync;
-
-    unsigned int *rx_buf;
-    unsigned int *pkt_buf;
-    unsigned int rx_bufsize;
-    //unsigned int tx_bufsize;
-    unsigned int mtu;
-    unsigned int latency;
-    unsigned int redundancy;
-
-    jack_nframes_t expected_framecnt;
-    int		   expected_framecnt_valid;
-    unsigned int   num_lost_packets;
-    jack_time_t	   next_deadline;
-    int		   next_deadline_valid;
-    int		   packet_data_valid;
-    int		   resync_threshold;
-    int		   running_free;
-    int		   deadline_goodness;
     int		   jitter_val;
-    jack_time_t	   time_to_deadline;
 };
 
 #endif /* __JACK_NET_DRIVER_H__ */
