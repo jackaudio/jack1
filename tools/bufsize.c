@@ -30,6 +30,7 @@
 char *package;				/* program name */
 jack_client_t *client;
 jack_nframes_t nframes;
+int just_print_bufsize=0;
 
 void jack_shutdown(void *arg)
 {
@@ -54,6 +55,10 @@ void parse_arguments(int argc, char *argv[])
 	else
 		package++;
 
+	if (argc==1) {
+		just_print_bufsize = 1;
+		return;
+	}
 	if (argc < 2) {
 		fprintf(stderr, "usage: %s <bufsize>\n", package);
 		exit(9);
@@ -86,10 +91,16 @@ int main(int argc, char *argv[])
 
 	jack_on_shutdown(client, jack_shutdown, 0);
 
-	rc = jack_set_buffer_size(client, nframes);
-	if (rc)
-		fprintf(stderr, "jack_set_buffer_size(): %s\n", strerror(rc));
-	
+	if (just_print_bufsize) {
+		fprintf(stdout, "%d", jack_get_buffer_size( client ) );
+		rc=0;
+	}
+	else
+	{
+		rc = jack_set_buffer_size(client, nframes);
+		if (rc)
+			fprintf(stderr, "jack_set_buffer_size(): %s\n", strerror(rc));
+	}
 	jack_client_close(client);
 
 	return rc;

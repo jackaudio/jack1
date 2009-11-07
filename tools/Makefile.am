@@ -36,6 +36,7 @@ bin_PROGRAMS = jack_load \
 	       jack_freewheel \
 	       jack_evmon \
 	       jack_alias \
+	       jack_bufsize \
 	       $(JACK_TRANSPORT) \
 	       $(NETJACK_TOOLS)
 
@@ -80,6 +81,10 @@ jack_lsp_LDADD = $(top_builddir)/libjack/libjack.la
 jack_freewheel_SOURCES = freewheel.c
 jack_freewheel_LDFLAGS = @OS_LDFLAGS@
 jack_freewheel_LDADD = $(top_builddir)/libjack/libjack.la
+
+jack_bufsize_SOURCES = bufsize.c
+jack_bufsize_LDFLAGS = @OS_LDFLAGS@
+jack_bufsize_LDADD = $(top_builddir)/libjack/libjack.la
 
 if HAVE_READLINE
 jack_transport_SOURCES = transport.c
