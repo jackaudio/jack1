@@ -256,7 +256,7 @@ net_driver_write (net_driver_t* driver, jack_nframes_t nframes)
             netj->syncsource_address.sin_port = htons(netj->reply_port);
 
 	for( r=0; r<netj->redundancy; r++ )
-	    netjack_sendto(netj->outsockfd, (char *)packet_buf, packet_size,
+	    netjack_sendto(netj->sockfd, (char *)packet_buf, packet_size,
 			   flag, (struct sockaddr*)&(netj->syncsource_address), sizeof(struct sockaddr_in), netj->mtu);
     }
 
