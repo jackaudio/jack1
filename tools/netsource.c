@@ -81,6 +81,7 @@ jack_nframes_t factor = 1;
 int bitdepth = 0;
 int mtu = 1400;
 int reply_port = 0;
+int bind_port = 0;
 int redundancy = 1;
 jack_client_t *client;
 
@@ -568,7 +569,7 @@ main (int argc, char *argv[])
     sprintf(client_name, "netsource");
     sprintf(peer_ip, "localhost");
 
-    while ((c = getopt (argc, argv, ":H:R:n:s:h:p:C:P:i:o:l:r:f:b:m:c:")) != -1)
+    while ((c = getopt (argc, argv, ":H:R:n:s:h:p:C:P:i:o:l:r:f:b:m:c:B:")) != -1)
     {
         switch (c)
         {
@@ -607,6 +608,9 @@ main (int argc, char *argv[])
             break;
             case 'r':
             reply_port = atoi (optarg);
+            break;
+            case 'B':
+            bind_port = atoi (optarg);
             break;
             case 'f':
             factor = atoi (optarg);
@@ -659,6 +663,12 @@ main (int argc, char *argv[])
     }
 
     init_sockaddr_in ((struct sockaddr_in *) &destaddr, peer_ip, peer_port);
+    if(bind_port) {
+        init_sockaddr_in ((struct sockaddr_in *) &bindaddr, NULL, bind_port);
+        if( bind (outsockfd, &bindaddr, sizeof (bindaddr)) ) {
+		fprintf (stderr, "bind failure\n" );
+	}
+    }
     if(reply_port)
     {
         init_sockaddr_in ((struct sockaddr_in *) &bindaddr, NULL, reply_port);
