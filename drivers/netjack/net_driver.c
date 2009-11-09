@@ -62,7 +62,7 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 
     delay = netjack_wait( netj );
     if( delay ) {
-	    driver->engine->delay( driver->engine, (float)delay );
+	    //driver->engine->delay( driver->engine, (float)delay );
 	    jack_error( "netxruns amount: %dms", delay/1000 );
     }
 
