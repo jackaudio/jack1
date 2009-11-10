@@ -154,7 +154,7 @@ int netjack_wait( netjack_driver_state_t *netj )
     //    jack_error( "netxrun... %d", netj->expected_framecnt );
 
     if( we_have_the_expected_frame ) {
-	
+
 	jack_time_t now =  jack_get_time();
 	if( now < netj->next_deadline )
 		netj->time_to_deadline = netj->next_deadline - now;
@@ -170,11 +170,11 @@ int netjack_wait( netjack_driver_state_t *netj )
 	if( netj->deadline_goodness != MASTER_FREEWHEELS ) {
 		if( netj->deadline_goodness < (int)(netj->period_usecs/4+10*(int)netj->period_usecs*netj->latency/100) ) {
 			netj->deadline_offset -= netj->period_usecs/100;
-			jack_error( "goodness: %d, Adjust deadline: --- %d\n", netj->deadline_goodness, (int) netj->period_usecs*netj->latency/100 );
+			//jack_log( "goodness: %d, Adjust deadline: --- %d\n", netj->deadline_goodness, (int) netj->period_usecs*netj->latency/100 );
 		}
 		if( netj->deadline_goodness > (int)(netj->period_usecs/4+10*(int)netj->period_usecs*netj->latency/100) ) {
 			netj->deadline_offset += netj->period_usecs/100;
-			jack_error( "goodness: %d, Adjust deadline: +++ %d\n", netj->deadline_goodness, (int) netj->period_usecs*netj->latency/100 );
+			//jack_log( "goodness: %d, Adjust deadline: +++ %d\n", netj->deadline_goodness, (int) netj->period_usecs*netj->latency/100 );
 		}
 	}
 	if( netj->deadline_offset < (netj->period_usecs*70/100) ) {
