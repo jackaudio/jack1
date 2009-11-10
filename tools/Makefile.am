@@ -38,6 +38,7 @@ bin_PROGRAMS = jack_load \
 	       jack_alias \
 	       jack_bufsize \
 	       jack_samplerate \
+	       jack_wait \
 	       $(JACK_TRANSPORT) \
 	       $(NETJACK_TOOLS)
 
@@ -66,6 +67,10 @@ jack_monitor_client_LDADD = $(top_builddir)/libjack/libjack.la
 jack_thread_wait_SOURCES = tw.c
 jack_thread_wait_LDFLAGS = @OS_LDFLAGS@
 jack_thread_wait_LDADD = $(top_builddir)/libjack/libjack.la
+
+jack_wait_SOURCES = wait.c
+jack_wait_LDFLAGS = @OS_LDFLAGS@
+jack_wait_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_evmon_SOURCES = evmon.c
 jack_evmon_LDFLAGS = @OS_LDFLAGS@
