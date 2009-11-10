@@ -364,6 +364,8 @@ net_driver_new (jack_client_t * client,
     jack_info ("netjack: audio    : cap: %d / pbk: %d)", netj->capture_channels_audio, netj->playback_channels_audio);
     jack_info ("netjack: midi     : cap: %d / pbk: %d)", netj->capture_channels_midi, netj->playback_channels_midi);
     jack_info ("netjack: buffsize : rx: %d)", netj->rx_bufsize);
+    driver->period_usecs = netj->period_usecs;
+
     return (jack_driver_t *) driver;
 }
 
