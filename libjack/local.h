@@ -29,6 +29,8 @@ struct _jack_client {
     char fifo_prefix[PATH_MAX+1];
     void (*on_shutdown)(void *arg);
     void *on_shutdown_arg;
+    void (*on_info_shutdown)(int, const char*, void *arg);
+    void *on_info_shutdown_arg;
     char thread_ok : 1;
     char first_active : 1;
     pthread_t thread_id;

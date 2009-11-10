@@ -300,6 +300,7 @@ jack_client_alloc ()
 	client->rt_thread_ok = FALSE;
 	client->first_active = TRUE;
 	client->on_shutdown = NULL;
+	client->on_info_shutdown = NULL;
 	client->n_port_types = 0;
 	client->port_segment = NULL;
 
@@ -332,6 +333,7 @@ jack_client_alloc ()
 	client->thread_ok = FALSE;
 	client->first_active = TRUE;
 	client->on_shutdown = NULL;
+	client->on_info_shutdown = NULL;
 	client->n_port_types = 0;
 	client->port_segment = NULL;
 
@@ -1290,7 +1292,10 @@ jack_stop_freewheel (jack_client_t* client)
 static void
 jack_client_thread_suicide (jack_client_t* client)
 {
-	if (client->on_shutdown) {
+	if (client->on_info_shutdown) {
+		jack_error ("zombified - calling shutdown handler");
+		client->on_info_shutdown (JackClientZombie, "Zombified", client->on_info_shutdown_arg);
+	} else if (client->on_shutdown) {
 		jack_error ("zombified - calling shutdown handler");
 		client->on_shutdown (client->on_shutdown_arg);
 	} else {
@@ -1438,7 +1443,7 @@ jack_client_core_wait (jack_client_t* client)
 {
 	jack_client_control_t *control = client->control;
 
-	DEBUG ("client polling on %s", client->pollmax == 2 ? 
+	DEBUG ("client polling on %s", client->pollmax == 2 ? x
 	       "event_fd and graph_wait_fd..." :
 	       "event_fd only");
 	
@@ -1829,7 +1834,7 @@ jack_client_process_thread (void *arg)
 			control->finished_at,
 			((float)(control->finished_at - control->awake_at)));
                   
-		/* check if we were killed during the process cycle
+ 		/* check if we were killed during the process cycle
 		 * (or whatever) */
 
 		if (client->control->dead) {
@@ -1850,7 +1855,10 @@ jack_client_process_thread (void *arg)
         
         client->rt_thread_ok = FALSE;
 
-	if (client->on_shutdown) {
+	if (client->on_info_shutdown) {
+		jack_error ("zombified - calling shutdown handler");
+		client->on_info_shutdown (JackClientZombie, "Zombified", client->on_info_shutdown_arg);
+	} else if (client->on_shutdown) {
 		jack_error ("zombified - calling shutdown handler");
 		client->on_shutdown (client->on_shutdown_arg);
 	} else {
@@ -2396,6 +2404,13 @@ jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg)
 	client->on_shutdown_arg = arg;
 }
 
+void
+jack_on_info_shutdown (jack_client_t *client, void (*function)(jack_status_t, const char*, void *arg), void *arg)
+{
+	client->on_info_shutdown = function;
+	client->on_info_shutdown_arg = arg;
+}
+
 const char **
 jack_get_ports (jack_client_t *client,
 		const char *port_name_pattern,
@@ -2525,3 +2540,8 @@ jack_port_type_size(void)
 	return JACK_PORT_TYPE_SIZE;
 }
 
+void
+jack_free (void* ptr)
+{
+	free (ptr);
+}

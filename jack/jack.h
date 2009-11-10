@@ -208,9 +208,7 @@ void jack_cycle_signal (jack_client_t* client, int status);
  * execution. That means that it cannot call functions that might
  * block for a long time. This includes malloc, free, printf,
  * pthread_mutex_lock, sleep, wait, poll, select, pthread_join,
- * pthread_cond_wait, etc, etc. See
- * http://jackit.sourceforge.net/docs/design/design.html#SECTION00411000000000000000
- * for more information.
+ * pthread_cond_wait, etc, etc. 
  *
  * @return 0 on success, otherwise a non-zero error code.
 */    
@@ -257,7 +255,28 @@ int jack_set_thread_init_callback (jack_client_t *client,
  * on.  It should be called before jack_client_activate().
  */
 void jack_on_shutdown (jack_client_t *client,
-		       void (*function)(void *arg), void *arg);
+		       JackShutdownCallback function, void *arg);
+
+/**
+ * @param client pointer to JACK client structure.
+ * @param function The jack_shutdown function pointer.
+ * @param arg The arguments for the jack_shutdown function.
+ *
+ * Register a function (and argument) to be called if and when the
+ * JACK server shuts down the client thread.  The function must
+ * be written as if it were an asynchonrous POSIX signal
+ * handler --- use only async-safe functions, and remember that it
+ * is executed from another thread.  A typical function might
+ * set a flag or write to a pipe so that the rest of the
+ * application knows that the JACK client thread has shut
+ * down.
+ *
+ * NOTE: clients do not need to call this.  It exists only
+ * to help more complex clients understand what is going
+ * on.  It should be called before jack_client_activate().
+ */
+void jack_on_info_shutdown (jack_client_t *client,
+			    JackInfoShutdownCallback function, void *arg);
 
 /**
  * Tell the Jack server to call @a process_callback whenever there is
@@ -267,9 +286,7 @@ void jack_on_shutdown (jack_client_t *client,
  * execution. That means that it cannot call functions that might
  * block for a long time. This includes malloc, free, printf,
  * pthread_mutex_lock, sleep, wait, poll, select, pthread_join,
- * pthread_cond_wait, etc, etc. See
- * http://jackit.sourceforge.net/docs/design/design.html#SECTION00411000000000000000
- * for more information.
+ * pthread_cond_wait, etc, etc. 
  *
  * @return 0 on success, otherwise a non-zero error code, causing JACK
  * to remove that client from the process() graph.
@@ -951,6 +968,15 @@ extern void (*jack_info_callback)(const char *msg);
  */
 void jack_set_info_function (void (*func)(const char *));
 /*@}*/
+
+/**
+ * The free function to be used on memory returned by jack_port_get_connections, 
+ * jack_port_get_all_connections and jack_get_ports functions.
+ * This is MANDATORY on Windows when otherwise all nasty runtime version related crashes can occur.
+ * Developers are strongly encouraged to use this function instead of the standard "free" function in new code.
+ *
+ */
+void jack_free(void* ptr);
 
 #ifdef __cplusplus
 }

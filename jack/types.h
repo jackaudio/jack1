@@ -73,6 +73,147 @@ typedef struct _jack_client  jack_client_t;
  */
 typedef uint32_t	     jack_port_id_t;
 
+
+/**
+ *  @ref jack_options_t bits
+ */
+enum JackOptions {
+
+     /**
+      * Null value to use when no option bits are needed.
+      */
+     JackNullOption = 0x00,
+
+     /**
+      * Do not automatically start the JACK server when it is not
+      * already running.  This option is always selected if
+      * \$JACK_NO_START_SERVER is defined in the calling process
+      * environment.
+      */
+     JackNoStartServer = 0x01,
+
+     /**
+      * Use the exact client name requested.  Otherwise, JACK
+      * automatically generates a unique one, if needed.
+      */
+     JackUseExactName = 0x02,
+
+     /**
+      * Open with optional <em>(char *) server_name</em> parameter.
+      */
+     JackServerName = 0x04,
+
+     /**
+      * Load internal client from optional <em>(char *)
+      * load_name</em>.  Otherwise use the @a client_name.
+      */
+     JackLoadName = 0x08,
+
+     /**
+      * Pass optional <em>(char *) load_init</em> string to the
+      * jack_initialize() entry point of an internal client.
+      */
+     JackLoadInit = 0x10
+};
+
+/** Valid options for opening an external client. */
+#define JackOpenOptions (JackServerName|JackNoStartServer|JackUseExactName)
+
+/** Valid options for loading an internal client. */
+#define JackLoadOptions (JackLoadInit|JackLoadName|JackUseExactName)
+
+/**
+ *  Options for several JACK operations, formed by OR-ing together the
+ *  relevant @ref JackOptions bits.
+ */
+typedef enum JackOptions jack_options_t;
+
+/**
+ *  @ref jack_status_t bits
+ */
+enum JackStatus {
+
+     /**
+      * Overall operation failed.
+      */
+     JackFailure = 0x01,
+
+     /**
+      * The operation contained an invalid or unsupported option.
+      */
+     JackInvalidOption = 0x02,
+
+     /**
+      * The desired client name was not unique.  With the @ref
+      * JackUseExactName option this situation is fatal.  Otherwise,
+      * the name was modified by appending a dash and a two-digit
+      * number in the range "-01" to "-99".  The
+      * jack_get_client_name() function will return the exact string
+      * that was used.  If the specified @a client_name plus these
+      * extra characters would be too long, the open fails instead.
+      */
+     JackNameNotUnique = 0x04,
+
+     /**
+      * The JACK server was started as a result of this operation.
+      * Otherwise, it was running already.  In either case the caller
+      * is now connected to jackd, so there is no race condition.
+      * When the server shuts down, the client will find out.
+      */
+     JackServerStarted = 0x08,
+
+     /**
+      * Unable to connect to the JACK server.
+      */
+     JackServerFailed = 0x10,
+
+     /**
+      * Communication error with the JACK server.
+      */
+     JackServerError = 0x20,
+
+     /**
+      * Requested client does not exist.
+      */
+     JackNoSuchClient = 0x40,
+
+     /**
+      * Unable to load internal client
+      */
+     JackLoadFailure = 0x80,
+
+     /**
+      * Unable to initialize client
+      */
+     JackInitFailure = 0x100,
+
+     /**
+      * Unable to access shared memory
+      */
+     JackShmFailure = 0x200,
+
+     /**
+      * Client's protocol version does not match
+      */
+     JackVersionError = 0x400,
+
+     /*
+      * BackendError
+      */
+     JackBackendError = 0x800,
+
+     /*
+      * Client is being shutdown against its will
+      */
+     JackClientZombie = 0x1000
+};
+
+/**
+ *  Status word returned from several JACK operations, formed by
+ *  OR-ing together the relevant @ref JackStatus bits.
+ */
+typedef enum JackStatus jack_status_t;
+
 /**
  * Prototype for the client supplied function that is called 
  * by the engine anytime there is work to be done.
@@ -196,6 +337,34 @@ typedef void (*JackFreewheelCallback)(int starting, void *arg);
 typedef void *(*JackThreadCallback)(void* arg);
 
 /**
+ * Prototype for the client supplied function that is called
+ * whenever jackd is shutdown. Note that after server shutdown, 
+ * the client pointer is *not* deallocated by libjack,
+ * the application is responsible to properly use jack_client_close()
+ * to release client ressources. Warning: jack_client_close() cannot be
+ * safely used inside the shutdown callback and has to be called outside of
+ * the callback context.
+ *
+ * @param arg pointer to a client supplied structure
+ */
+typedef void (*JackShutdownCallback)(void *arg);
+
+/**
+ * Prototype for the client supplied function that is called
+ * whenever jackd is shutdown. Note that after server shutdown, 
+ * the client pointer is *not* deallocated by libjack,
+ * the application is responsible to properly use jack_client_close()
+ * to release client ressources. Warning: jack_client_close() cannot be
+ * safely used inside the shutdown callback and has to be called outside of
+ * the callback context.
+ 
+ * @param code a shuntdown code
+ * @param reason a string discribing the shuntdown reason (backend failure, server crash... etc...)
+ * @param arg pointer to a client supplied structure
+ */
+typedef void (*JackInfoShutdownCallback)(jack_status_t code, const char* reason, void *arg);
+
+/**
  * Used for the type argument of jack_port_register() for default
  * audio and midi ports.
  */
@@ -267,134 +436,5 @@ enum JackPortFlags {
      JackPortIsTerminal = 0x10
 };	    
 
-/**
- *  @ref jack_options_t bits
- */
-enum JackOptions {
-
-     /**
-      * Null value to use when no option bits are needed.
-      */
-     JackNullOption = 0x00,
-
-     /**
-      * Do not automatically start the JACK server when it is not
-      * already running.  This option is always selected if
-      * \$JACK_NO_START_SERVER is defined in the calling process
-      * environment.
-      */
-     JackNoStartServer = 0x01,
-
-     /**
-      * Use the exact client name requested.  Otherwise, JACK
-      * automatically generates a unique one, if needed.
-      */
-     JackUseExactName = 0x02,
-
-     /**
-      * Open with optional <em>(char *) server_name</em> parameter.
-      */
-     JackServerName = 0x04,
-
-     /**
-      * Load internal client from optional <em>(char *)
-      * load_name</em>.  Otherwise use the @a client_name.
-      */
-     JackLoadName = 0x08,
-
-     /**
-      * Pass optional <em>(char *) load_init</em> string to the
-      * jack_initialize() entry point of an internal client.
-      */
-     JackLoadInit = 0x10
-};
-
-/** Valid options for opening an external client. */
-#define JackOpenOptions (JackServerName|JackNoStartServer|JackUseExactName)
-
-/** Valid options for loading an internal client. */
-#define JackLoadOptions (JackLoadInit|JackLoadName|JackUseExactName)
-
-/**
- *  Options for several JACK operations, formed by OR-ing together the
- *  relevant @ref JackOptions bits.
- */
-typedef enum JackOptions jack_options_t;
-
-/**
- *  @ref jack_status_t bits
- */
-enum JackStatus {
-
-     /**
-      * Overall operation failed.
-      */
-     JackFailure = 0x01,
-
-     /**
-      * The operation contained an invalid or unsupported option.
-      */
-     JackInvalidOption = 0x02,
-
-     /**
-      * The desired client name was not unique.  With the @ref
-      * JackUseExactName option this situation is fatal.  Otherwise,
-      * the name was modified by appending a dash and a two-digit
-      * number in the range "-01" to "-99".  The
-      * jack_get_client_name() function will return the exact string
-      * that was used.  If the specified @a client_name plus these
-      * extra characters would be too long, the open fails instead.
-      */
-     JackNameNotUnique = 0x04,
-
-     /**
-      * The JACK server was started as a result of this operation.
-      * Otherwise, it was running already.  In either case the caller
-      * is now connected to jackd, so there is no race condition.
-      * When the server shuts down, the client will find out.
-      */
-     JackServerStarted = 0x08,
-
-     /**
-      * Unable to connect to the JACK server.
-      */
-     JackServerFailed = 0x10,
-
-     /**
-      * Communication error with the JACK server.
-      */
-     JackServerError = 0x20,
-
-     /**
-      * Requested client does not exist.
-      */
-     JackNoSuchClient = 0x40,
-
-     /**
-      * Unable to load internal client
-      */
-     JackLoadFailure = 0x80,
-
-     /**
-      * Unable to initialize client
-      */
-     JackInitFailure = 0x100,
-
-     /**
-      * Unable to access shared memory
-      */
-     JackShmFailure = 0x200,
-
-     /**
-      * Client's protocol version does not match
-      */
-     JackVersionError = 0x400
-};
-
-/**
- *  Status word returned from several JACK operations, formed by
- *  OR-ing together the relevant @ref JackStatus bits.
- */
-typedef enum JackStatus jack_status_t;
 
 #endif /* __jack_types_h__ */
