@@ -622,6 +622,7 @@ netjack_startup( netjack_driver_state_t *netj )
 	//jack_info ("*** IMPORTANT *** Dont connect a client to jackd until the driver is attached to a clock source !!!");
 
     while(1) {
+    netjack_poll( netj->sockfd, 1000 );
     first_pack_len = recvfrom (netj->sockfd, (char *)first_packet, sizeof (jacknet_packet_header), 0, (struct sockaddr*) & netj->syncsource_address, &address_size);
 #ifdef WIN32
         if( first_pack_len == -1 ) {
