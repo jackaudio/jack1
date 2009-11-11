@@ -167,12 +167,13 @@ int netjack_wait( netjack_driver_state_t *netj )
 	netj->deadline_goodness = (int)pkthdr->sync_state;
 	netj->packet_data_valid = 1;
 
+	int want_deadline = (netj->period_usecs/4+10*(int)netj->period_usecs*netj->latency/100);
 	if( netj->deadline_goodness != MASTER_FREEWHEELS ) {
-		if( netj->deadline_goodness < (int)(netj->period_usecs/4+10*(int)netj->period_usecs*netj->latency/100) ) {
+		if( netj->deadline_goodness < want_deadline ) {
 			netj->deadline_offset -= netj->period_usecs/100;
 			//jack_log( "goodness: %d, Adjust deadline: --- %d\n", netj->deadline_goodness, (int) netj->period_usecs*netj->latency/100 );
 		}
-		if( netj->deadline_goodness > (int)(netj->period_usecs/4+10*(int)netj->period_usecs*netj->latency/100) ) {
+		if( netj->deadline_goodness > want_deadline ) {
 			netj->deadline_offset += netj->period_usecs/100;
 			//jack_log( "goodness: %d, Adjust deadline: +++ %d\n", netj->deadline_goodness, (int) netj->period_usecs*netj->latency/100 );
 		}
