@@ -622,7 +622,7 @@ netjack_startup( netjack_driver_state_t *netj )
 	//jack_info ("*** IMPORTANT *** Dont connect a client to jackd until the driver is attached to a clock source !!!");
 
     while(1) {
-    if(netjack_poll( netj->sockfd, 1000 ) ) {
+    if( ! netjack_poll( netj->sockfd, 1000 ) ) {
 	    jack_info ("Waiting aborted");
 	    return -1;
     }
