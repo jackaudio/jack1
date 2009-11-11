@@ -168,7 +168,7 @@ int netjack_wait( netjack_driver_state_t *netj )
 	netj->packet_data_valid = 1;
 
 	int want_deadline;
-	if( netj->latency == 1 )
+	if( netj->latency < 4 )
 		want_deadline = -netj->period_usecs/4;
 	else
 		want_deadline = (netj->period_usecs/4+10*(int)netj->period_usecs*netj->latency/100);
