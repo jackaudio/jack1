@@ -33,6 +33,7 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
 #ifdef WIN32
 #include <winsock2.h>
@@ -90,6 +91,8 @@ int state_latency = 0;
 int state_netxruns = 0;
 int state_currentframe = 0;
 int state_recv_packet_queue_time = 0;
+
+int quit=0;
 
 
 int outsockfd;
@@ -537,6 +540,12 @@ fprintf (stderr, "usage: jack_netsource -h <host peer> [options]\n"
         "\n");
 }
 
+void
+sigterm_handler( int signal )
+{
+	quit = 1;
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -711,11 +720,14 @@ main (int argc, char *argv[])
 
     /* Now sleep forever... and evaluate the state_ vars */
 
+    signal( SIGTERM, sigterm_handler );
+    signal( SIGINT, sigterm_handler );
+
     statecopy_connected = 2; // make it report unconnected on start.
     statecopy_latency = state_latency;
     statecopy_netxruns = state_netxruns;
 
-    while (1)
+    while ( !quit )
     {
 #ifdef WIN32
         Sleep (1000);
@@ -762,7 +774,6 @@ main (int argc, char *argv[])
         }
     }
 
-    /* Never reached. Well we will be a GtkApp someday... */
     packet_cache_free (global_packcache);
     jack_client_close (client);
     exit (0);
