@@ -2443,6 +2443,10 @@ jack_get_ports (jack_client_t *client,
 	matching_ports = (const char **)
 		malloc (sizeof (char *) * engine->port_max);
 
+	if (matching_ports == NULL) {
+		return NULL;
+	}
+
 	for (i = 0; i < engine->port_max; i++) {
 		matching = 1;
 
