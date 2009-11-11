@@ -687,6 +687,22 @@ netjack_startup( netjack_driver_state_t *netj )
     netj->capture_channels  = netj->capture_channels_audio + netj->capture_channels_midi;
     netj->playback_channels = netj->playback_channels_audio + netj->playback_channels_midi;
 
+    if( (netj->capture_channels * netj->period_size * netj->latency * 4) > 100000000 ) {
+	    jack_error( "autoconfig requests more than 100MB packet cache... bailing out" );
+	    exit(1);
+    }
+
+    if( netj->playback_channels > 1000 ) {
+	    jack_error( "autoconfig requests more than 1000 playback channels... bailing out" );
+	    exit(1);
+    }
+
+
+    if( netj->mtu < (2*sizeof( jacknet_packet_header )) ) {
+	    jack_error( "bullshit mtu requested by autoconfig" );
+	    exit(1);
+    }
+
     // After possible Autoconfig: do all calculations...
     netj->period_usecs =
         (jack_time_t) floor ((((float) netj->period_size) / (float)netj->sample_rate)
