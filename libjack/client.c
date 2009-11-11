@@ -1788,7 +1788,7 @@ jack_client_process_thread (void *arg)
 	jack_client_t *client = (jack_client_t *) arg;
 	jack_client_control_t *control = client->control;
 	int err = 0;
-      
+
 	if (client->control->thread_init_cbset) {
 	/* this means that the init callback will be called twice -taybin*/
 		DEBUG ("calling client thread init callback");
@@ -1836,7 +1836,7 @@ jack_client_process_thread (void *arg)
                   
  		/* check if we were killed during the process cycle
 		 * (or whatever) */
-
+		
 		if (client->control->dead) {
 				jack_error ("jack_client_process_thread: "
 						"client->control->dead");
