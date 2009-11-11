@@ -39,8 +39,6 @@ struct _net_driver
     JACK_DRIVER_NT_DECL;
 
     netjack_driver_state_t netj;
-    int		    always_wait_dedline;
-    int		   jitter_val;
 };
 
 #endif /* __JACK_NET_DRIVER_H__ */
