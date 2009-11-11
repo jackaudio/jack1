@@ -168,7 +168,9 @@ int netjack_wait( netjack_driver_state_t *netj )
 	netj->packet_data_valid = 1;
 
 	int want_deadline;
-	if( netj->latency < 4 )
+	if( netj->jitter_val != 0 ) 
+		want_deadline = netj->jitter_val;
+	else if( netj->latency < 4 )
 		want_deadline = -netj->period_usecs/2;
 	else
 		want_deadline = (netj->period_usecs/4+10*(int)netj->period_usecs*netj->latency/100);
@@ -512,7 +514,8 @@ netjack_driver_state_t *netjack_init (netjack_driver_state_t *netj,
 		unsigned int latency,
 		unsigned int redundancy,
 		int dont_htonl_floats,
-		int always_deadline)
+		int always_deadline,
+		int jitter_val )
 {
 
     // Fill in netj values.
