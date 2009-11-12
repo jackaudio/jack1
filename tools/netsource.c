@@ -781,7 +781,7 @@ main (int argc, char *argv[])
         }
     }
 
-    packet_cache_free (global_packcache);
     jack_client_close (client);
+    packet_cache_free (global_packcache);
     exit (0);
 }
