@@ -28,9 +28,6 @@
 
 #include "config.h"
 
-#define _XOPEN_SOURCE 600
-#define _BSD_SOURCE
-
 #ifdef __APPLE__
 #define _DARWIN_C_SOURCE
 #endif
