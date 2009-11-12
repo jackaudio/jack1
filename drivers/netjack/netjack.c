@@ -721,6 +721,9 @@ netjack_startup( netjack_driver_state_t *netj )
     if( netj->bitdepth == CELT_MODE ) {
 	// celt mode.
 	// TODO: this is a hack. But i dont want to change the packet header.
+	netj->resample_factor = (netj->resample_factor * netj->period_size * 1024 / netj->sample_rate / 8)&(~1);
+	netj->resample_factor_up = (netj->resample_factor_up * netj->period_size * 1024 / netj->sample_rate / 8)&(~1);
+	
 	netj->net_period_down = netj->resample_factor;
 	netj->net_period_up = netj->resample_factor_up;
     } else {

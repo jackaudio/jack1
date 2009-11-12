@@ -270,7 +270,7 @@ process (jack_nframes_t nframes, void *arg)
     jack_time_t packet_recv_timestamp;
 
     if( bitdepth == 1000 )
-	net_period = factor;
+	net_period = (factor * jack_get_buffer_size(client) * 1024 / jack_get_sample_rate(client) / 8)&(~1) ;
     else
 	net_period = (float) nframes / (float) factor;
 
@@ -704,7 +704,7 @@ main (int argc, char *argv[])
     alloc_ports (capture_channels_audio, playback_channels_audio, capture_channels_midi, playback_channels_midi);
 
     if( bitdepth == 1000 )
-	net_period = factor;
+	net_period = (factor * jack_get_buffer_size(client) * 1024 / jack_get_sample_rate(client) / 8)&(~1) ;
     else
 	net_period = ceilf((float) jack_get_buffer_size (client) / (float) factor);
 
