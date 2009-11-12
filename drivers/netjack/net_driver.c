@@ -657,7 +657,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
                 dont_htonl_floats = param->value.ui;
                 break;
             case 'J':
-                jitter_val = param->value.ui;
+                jitter_val = param->value.i;
                 break;
             case 'D':
                 always_deadline = param->value.ui;

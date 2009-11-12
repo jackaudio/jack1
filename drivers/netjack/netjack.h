@@ -37,7 +37,6 @@ extern "C"
 {
 #endif
 
-
 typedef struct _netjack_driver_state netjack_driver_state_t;
 
 struct _netjack_driver_state {
