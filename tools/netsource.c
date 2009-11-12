@@ -574,7 +574,7 @@ main (int argc, char *argv[])
 
     client_name = (char *) malloc (sizeof (char) * 10);
     peer_ip = (char *) malloc (sizeof (char) * 10);
-    sprintf(client_name, "netsource");
+    sprintf(client_name, "netjack");
     sprintf(peer_ip, "localhost");
 
     while ((c = getopt (argc, argv, ":h:H:o:i:O:I:n:p:r:B:b:c:m:R:e:N:s:")) != -1)
