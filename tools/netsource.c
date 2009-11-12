@@ -494,9 +494,6 @@ jack_shutdown (void *arg)
 void
 init_sockaddr_in (struct sockaddr_in *name , const char *hostname , uint16_t port)
 {
-printf( "still here... \n" );
-fflush( stdout );
-
     name->sin_family = AF_INET ;
     name->sin_port = htons (port);
     if (hostname)
