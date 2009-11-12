@@ -476,7 +476,7 @@ driver_get_descriptor ()
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 0U;
     strcpy (params[i].short_desc,
-            "sets celt encoding and number of bytes per period per channel");
+            "sets celt encoding and kbits value one channel is encoded at");
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
