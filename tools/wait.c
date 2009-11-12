@@ -44,7 +44,6 @@ main (int argc, char *argv[])
 	jack_options_t options = JackNoStartServer;
 	int c;
 	int option_index;
-	char* aliases[2];
 	char *server_name = NULL;
 	int wait_for_start = 0;
 	int wait_for_quit = 0;

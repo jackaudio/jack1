@@ -44,7 +44,6 @@
 #include <memory.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <alloca.h>
 #include <errno.h>
 #include <stdarg.h>
 
@@ -372,7 +371,7 @@ int
 netjack_poll_deadline (int sockfd, jack_time_t deadline)
 {
     struct pollfd fds;
-    int i, poll_err = 0;
+    int poll_err = 0;
 #if HAVE_PPOLL
     struct timespec timeout_spec = { 0, 0 };
 #else

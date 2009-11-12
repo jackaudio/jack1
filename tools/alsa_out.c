@@ -11,7 +11,6 @@
 #include <string.h>
 #include <signal.h>
 
-#include <alloca.h>
 #include <math.h>
 
 #include <jack/jack.h>

@@ -47,9 +47,6 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 /* These two required by FreeBSD. */
 #include <sys/types.h>
 
-#if HAVE_ALLOCA_H
-#include <alloca.h>
-#endif
 
 #include <jack/jack.h>
 
@@ -616,7 +613,7 @@ main (int argc, char *argv[])
                 break;
             case 'f':
                 factor = atoi (optarg);
-                jack_info("This feature is deprecated and will be removed in future netjack versions. CELT offers a superiour way to conserve bandwidth");
+                printf("This feature is deprecated and will be removed in future netjack versions. CELT offers a superiour way to conserve bandwidth");
                 break;
             case 'b':
                 bitdepth = atoi (optarg);
