@@ -114,7 +114,6 @@ AC_SUBST(JACK_VERSION)
 AC_SUBST(JACK_RELEASE)
 
 AM_INIT_AUTOMAKE(jack-audio-connection-kit,${JACK_VERSION})
-AM_MAINTAINER_MODE
 
 dnl
 dnl save any user-provided CFLAGS so we can forget
