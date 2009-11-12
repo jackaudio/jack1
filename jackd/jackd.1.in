@@ -277,6 +277,66 @@ capture latency in seconds is \fB\-\-period\fR divided by \fB\-\-rate\fR.
 \fB\-w, \-\-wait \fIint\fR 
 Specify number of usecs to wait between engine processes. 
 The default value is 21333.
+
+
+.SS NET BACKEND PARAMETERS
+
+.TP
+ \fB\-i, \-\-audio\-ins \fIint\fR
+Number of capture channels (default: 2)
+.TP
+ \fB\-o, \-\-audio\-outs \fIint\fR
+Number of playback channels (default: 2)
+.TP
+ \fB\-I, \-\-midi\-ins \fIint\fR
+Number of midi capture channels (default: 1)
+.TP 
+\fB\-O, \-\-midi\-outs \fIint\fR
+Number of midi playback channels (default: 1)
+.TP
+ \fB\-r, \-\-rate \fIint\fR
+Sample rate (default: 48000)
+.TP 
+\fB\-p, \-\-period \fIint\fR
+Frames per period (default: 1024)
+.TP 
+\fB\-n, \-\-num\-periods \fIint\fR
+Network latency setting in no. of periods (default: 5)
+.TP 
+\fB\-l, \-\-listen\-port \fIint\fR
+The socket port we are listening on for sync packets (default: 3000)
+.TP 
+\fB\-f, \-\-factor \fIint\fR
+Factor for sample rate reduction (default: 1)
+.TP 
+\fB\-u, \-\-upstream\-factor \fIint\fR
+Factor for sample rate reduction on the upstream (default: 0)
+.TP 
+\fB\-c, \-\-celt \fIint\fR
+sets celt encoding and number of kbits per channel (default: 0)
+.TP 
+\fB\-b, \-\-bit\-depth \fIint\fR
+Sample bit\-depth (0 for float, 8 for 8bit and 16 for 16bit) (default: 0)
+.TP 
+\fB\-t, \-\-transport\-sync \fIint\fR
+Whether to slave the transport to the master transport (default: true)
+.TP 
+\fB\-a, \-\-autoconf \fIint\fR
+Whether to use Autoconfig, or just start. (default: true)
+.TP 
+\fB\-R, \-\-redundancy \fIint\fR
+Send packets N times (default: 1)
+.TP 
+\fB\-e, \-\-native\-endian \fIint\fR
+Dont convert samples to network byte order. (default: false)
+.TP 
+\fB\-J, \-\-jitterval \fIint\fR
+attempted jitterbuffer microseconds on master (default: 0)
+.TP 
+\fB\-D, \-\-always\-deadline \fIint\fR
+always use deadline (default: false)
+
+
 .SS OSS BACKEND PARAMETERS
 .TP
 \fB\-r, \-\-rate \fIint\fR
