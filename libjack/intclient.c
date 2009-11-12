@@ -100,12 +100,14 @@ jack_get_internal_client_name (jack_client_t *client,
 
 	jack_client_deliver_request (client, &req);
 
-	if (req.status & JackFailure)
+	if (req.status & JackFailure) {
 		return NULL;
+	}
 
 	/* allocate storage for returning the name */
-	name = malloc (strlen (req.x.intclient.name));
-	strcpy (name, req.x.intclient.name);
+	if ((name = strdup (req.x.intclient.name)) == NULL) {
+		return NULL;
+	}
 
 	return name;
 }

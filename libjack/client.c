@@ -133,7 +133,9 @@ jack_get_tmpdir ()
 
 	/* don't let strtok(3) mess with the real environment variable */
 
-	pathcopy = strdup (pathenv);
+	if ((pathcopy = strdup (pathenv)) == NULL) {
+		return -1;
+	}
 	p = strtok (pathcopy, ":");
 
 	while (p) {
@@ -175,12 +177,17 @@ jack_get_tmpdir ()
 		return -1;
 	}
 
-	jack_tmpdir = (char *) malloc (len);
+	if ((jack_tmpdir = (char *) malloc (len)) == NULL) {
+		free (pathcopy);
+		return -1;
+	}
+
 	memcpy (jack_tmpdir, buf, len-1);
 	jack_tmpdir[len-1] = '\0';
 	
 	fclose (in);
 	free (pathcopy);
+
 	return 0;
 }
 
@@ -284,8 +291,15 @@ jack_client_alloc ()
 {
 	jack_client_t *client;
 
-	client = (jack_client_t *) malloc (sizeof (jack_client_t));
-	client->pollfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 1);
+	if ((client = (jack_client_t *) malloc (sizeof (jack_client_t))) == NULL) {
+		return NULL;
+	}
+
+	if ((client->pollfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 1)) == NULL) {
+		free (client);
+		return NULL;
+	}
+
 	client->pollmax = 1;
 	client->request_fd = -1;
 	client->event_fd = -1;
@@ -318,8 +332,14 @@ jack_client_alloc ()
 {
 	jack_client_t *client;
 
-	client = (jack_client_t *) malloc (sizeof (jack_client_t));
-	client->pollfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 2);
+	if ((client = (jack_client_t *) malloc (sizeof (jack_client_t))) == NULL) {
+		return NULL;
+	}
+	if ((client->pollfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 2)) == NULL) {
+		free (client);
+		return NULL;
+	}
+
 	client->pollmax = 2;
 	client->request_fd = -1;
 	client->event_fd = -1;
@@ -681,12 +701,16 @@ _start_server (const char *server_name)
 #endif /* USE_CAPABILITIES */
 	} else {
 		result = strcspn(arguments, " ");
-		command = (char *) malloc(result+1);
+		if ((command = (char *) malloc(result+1)) == NULL) {
+			goto failure;
+		}
 		strncpy(command, arguments, result);
 		command[result] = '\0';
 	}
 
-	argv = (char **) malloc (255);
+	if ((argv = (char **) malloc (255)) == NULL) {
+		goto failure;
+	}
   
 	while(1) {
 		/* insert -T and -nserver_name in front of arguments */
@@ -727,6 +751,7 @@ _start_server (const char *server_name)
 
 	execv (command, argv);
 
+failure:
 	/* If execv() succeeds, it does not return.  There's no point
 	 * in calling jack_error() here in the child process. */
 	fprintf (stderr, "exec of JACK server (command = \"%s\") failed: %s\n", command, strerror (errno));
@@ -1050,8 +1075,9 @@ jack_client_open_aux (const char *client_name,
 	jack_destroy_shm (&client->control_shm);
 
 	client->n_port_types = client->engine->n_port_types;
-	client->port_segment = (jack_shm_info_t *)
-		malloc (sizeof (jack_shm_info_t) * client->n_port_types);
+	if ((client->port_segment = (jack_shm_info_t *) malloc (sizeof (jack_shm_info_t) * client->n_port_types)) == NULL) {
+		goto fail;
+	}
 	
 	for (ptid = 0; ptid < client->n_port_types; ++ptid) {
 		client->port_segment[ptid].index =
@@ -2440,10 +2466,7 @@ jack_get_ports (jack_client_t *client,
 	psp = engine->ports;
 	match_cnt = 0;
 
-	matching_ports = (const char **)
-		malloc (sizeof (char *) * engine->port_max);
-
-	if (matching_ports == NULL) {
+	if ((matching_ports = (const char **) malloc (sizeof (char *) * engine->port_max)) == NULL) {
 		return NULL;
 	}
 

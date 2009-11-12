@@ -176,8 +176,12 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 {
 	jack_port_shared_t *shared = &control->ports[port_id];
 	jack_port_type_id_t ptid = shared->ptype_id;
-	jack_port_t *port = (jack_port_t *) malloc (sizeof (jack_port_t));
+	jack_port_t *port;
 
+	if ((port = (jack_port_t *) malloc (sizeof (jack_port_t))) == NULL) {
+		return NULL;
+	}
+	
 	port->mix_buffer = NULL;
 	port->client_segment_base = NULL;
 	port->shared = shared;
@@ -332,6 +336,11 @@ jack_port_get_connections (const jack_port_t *port)
 		ret = (const char **)
 			malloc (sizeof (char *)
 				* (jack_slist_length (port->connections) + 1));
+		if (ret == NULL) {
+			pthread_mutex_unlock (&((jack_port_t *)port)->connection_lock);
+			return NULL;
+		}
+
 		for (n = 0, node = port->connections; node;
 		     node = jack_slist_next (node), ++n) {
 			jack_port_t* other =(jack_port_t *) node->data;
@@ -380,8 +389,9 @@ jack_port_get_all_connections (const jack_client_t *client,
 		return req.x.port_connections.ports;
 	}
 
-	ret = (const char **)
-		malloc (sizeof (char *) * (req.x.port_connections.nports + 1));
+	if ((ret = (const char **) malloc (sizeof (char *) * (req.x.port_connections.nports + 1))) == NULL) {
+		return NULL;
+	}
 
 	for (i = 0; i < req.x.port_connections.nports; ++i ) {
 		jack_port_id_t port_id;

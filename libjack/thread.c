@@ -176,7 +176,9 @@ jack_client_create_thread (jack_client_t* client,
                 return result;
         }
 
-	thread_args = (jack_thread_arg_t *) malloc (sizeof (jack_thread_arg_t));
+	if ((thread_args = (jack_thread_arg_t *) malloc (sizeof (jack_thread_arg_t))) == NULL) {
+		return -1;
+	}
 
 	thread_args->client = client;
 	thread_args->work_function = start_routine;

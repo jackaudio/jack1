@@ -352,7 +352,7 @@ jack_drivers_load ()
 static void copyright (FILE* file)
 {
 	fprintf (file, "jackd " VERSION "\n"
-"Copyright 2001-2005 Paul Davis and others.\n"
+"Copyright 2001-2009 Paul Davis, Stephane Letz, Jack O'Quinn, Torben Hohn and others.\n"
 "jackd comes with ABSOLUTELY NO WARRANTY\n"
 "This is free software, and you are welcome to redistribute it\n"
 "under certain conditions; see the file COPYING for details\n\n");
@@ -362,7 +362,9 @@ static void usage (FILE *file)
 {
 	copyright (file);
 	fprintf (file, "\n"
-"usage: jackd [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
+"usage: jackd [ --no-realtime OR -L ]\n"
+"             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
+"      (the two previous arguments are mutually exclusive. The default is --realtime)\n"
 "             [ --name OR -n server-name ]\n"
 "             [ --no-mlock OR -m ]\n"
 "             [ --unlock OR -u ]\n"
@@ -377,8 +379,11 @@ static void usage (FILE *file)
 "             [ --version OR -V ]\n"
 "             [ --nozombies OR -Z ]\n"
 "         -d backend [ ... backend args ... ]\n"
-"             The backend can be `alsa', `coreaudio', `dummy',\n"
-"                                `freebob', `oss', `sun', or `portaudio'.\n\n"
+#ifdef __APPLE__
+"             Available backends may include: coreaudio, dummy, netjack, portaudio.\n\n"
+#else 
+"             Available backends may include: alsa, dummy, freebob, firewire, netjack, oss, sun, or portaudio.\n\n"
+#endif
 "       jackd -d backend --help\n"
 "             to display options for each backend\n\n");
 }	
