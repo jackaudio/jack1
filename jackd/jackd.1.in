@@ -1,21 +1,14 @@
 .TH "JACKD" "1" "@VERSION@" "April 2006" ""
 .SH "NAME"
-jackd, jackstart \- JACK Audio Connection Kit sound server
+jackd \- JACK Audio Connection Kit sound server
 .SH "SYNOPSIS"
 \fBjackd\fR [\fIoptions\fR] \fB\-d\fI backend \fR 
 [\fIbackend\-parameters\fR]
 .br
-\fBjackstart\fR [\fIoptions\fR] \fB\-d\fI backend \fR 
-[\fIbackend\-parameters\fR]
-.br
 \fBjackd \-\-help\fR
 .SH "DESCRIPTION"
-\fBjackd\fR invokes the JACK audio server daemon.  The \fBjackstart\fR
-command provides JACK's built\-in support for Linux 2.4.x kernels with
-the realtime capabilities patch.  Use \fBjackd\fR for Linux 2.6.x and
-all other systems.  All parameters are the same.
-
-JACK is a low\-latency audio server.  Originally written for the
+\fBjackd\fR is the JACK audio server daemon, a low\-latency audio
+server.  Originally written for the
 GNU/Linux operating system, it also supports Mac OS X and various Unix
 platforms.  JACK can connect a number of different client applications
 to an audio device and also to each other.  Most clients are external,
@@ -67,19 +60,14 @@ that are incompatible across JACK versions (which is rare).
 .TP
 \fB\-R, \-\-realtime\fR 
 .br
-Use realtime scheduling.  This is needed for reliable low\-latency
-performance.  On most systems, it requires \fBjackd\fR to run with
+Use realtime scheduling (default = true). This is needed for reliable low\-latency
+performance.  On many systems, it requires \fBjackd\fR to run with
 special scheduler and memory allocation privileges, which may be
-obtained in several ways.  The simplest, and least-secure method is to
-run \fBjackd\fR with root privileges.  This means that all JACK
-clients must also run as root.  With a Linux 2.6 kernel, ordinary
-users can run \fBjackd\fR and its clients using options of the
-realtime LSM.  Linux 2.4 kernels need "POSIX draft capabilities"
-enabled (see the \fB<linux/capability.h>\fR include file).  Using that
-method, ordinary users who invoke the daemon using \fBjackstart\fR,
-can later launch JACK clients without running them as root.  See
-.I http://jackit.sourceforge.net/docs/faq.php#a52 
-for more information.
+obtained in several ways. 
+.TP
+\fB\-L, \-\-no-realtime\fR
+.br
+Do not use realtime scheduling. 
 .TP
 \fB\-P, \-\-realtime\-priority \fIint\fR
 When running \fB\-\-realtime\fR, set the scheduler priority to
@@ -447,7 +435,11 @@ Print usage message for the parameters specific to each backend.
 .br
 \fBjackd \-d coreaudio \-\-help\fR
 .br
+\fBjackd \-d net \-\-help\fR
+.br
 \fBjackd \-d dummy \-\-help\fR
+.br
+\fBjackd \-d firewire \-\-help\fR
 .br
 \fBjackd \-d freebob \-\-help\fR
 .br
@@ -523,7 +515,7 @@ name to \fBjack_client_open()\fR.
 .br
 The official JACK website with news, docs and a list of JACK clients.
 .PP
-.I http://lists.sourceforge.net/mailman/listinfo/jackit\-devel
+.I http://jackaudio.org/email
 .br
 The JACK developers' mailing list.  Subscribe, to take part in
 development of JACK or JACK clients.  User questions are also welcome,
@@ -539,7 +531,7 @@ The Advanced Linux Sound Architecture.
 .SH "BUGS"
 Please report bugs to
 .br
-.I http://jackit.sourceforge.net/mantis/main_page.php
+.I http://trac.jackaudio.org/
 .SH "AUTHORS"
 Architect and original implementor: Paul Davis
 .PP
@@ -548,7 +540,8 @@ Richard Guenther, and other members of the Linux Audio Developers group.
 .PP
 Programming: Paul Davis, Jack O'Quin, Taybin Rutkin, Stephane Letz, Fernando
 Pablo Lopez-Lezcano, Steve Harris, Jeremy Hall, Andy Wingo, Kai
-Vehmanen, Melanie Thielker, Jussi Laako, Tilman Linneweh, Johnny Petrantoni.
+Vehmanen, Melanie Thielker, Jussi Laako, Tilman Linneweh, Johnny
+Petrantoni, Torben Hohn.
 .PP
 Manpage written by Stefan Schwandter, Jack O'Quin and Alexandre
 Prokoudine.
