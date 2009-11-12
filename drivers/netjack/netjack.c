@@ -703,6 +703,11 @@ netjack_startup( netjack_driver_state_t *netj )
 	    exit(1);
     }
 
+    if( netj->sample_rate == 0 ) {
+	    jack_error( "sample_rate 0 requested by autoconfig" );
+	    exit(1);
+    }
+
     // After possible Autoconfig: do all calculations...
     netj->period_usecs =
         (jack_time_t) floor ((((float) netj->period_size) / (float)netj->sample_rate)
