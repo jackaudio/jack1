@@ -387,7 +387,7 @@ driver_get_descriptor ()
     params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
     i = 0;
-    strcpy (params[i].name, "inchannels");
+    strcpy (params[i].name, "audio-ins");
     params[i].character  = 'i';
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 2U;
@@ -395,7 +395,7 @@ driver_get_descriptor ()
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
-    strcpy (params[i].name, "outchannels");
+    strcpy (params[i].name, "audio-outs");
     params[i].character  = 'o';
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 2U;
@@ -403,7 +403,7 @@ driver_get_descriptor ()
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
-    strcpy (params[i].name, "midi inchannels");
+    strcpy (params[i].name, "midi-ins");
     params[i].character  = 'I';
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 1U;
@@ -411,7 +411,7 @@ driver_get_descriptor ()
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
-    strcpy (params[i].name, "midi outchannels");
+    strcpy (params[i].name, "midi-outs");
     params[i].character  = 'O';
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 1U;
@@ -435,6 +435,15 @@ driver_get_descriptor ()
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
+    strcpy (params[i].name, "num-periods");
+    params[i].character  = 'n';
+    params[i].type       = JackDriverParamUInt;
+    params[i].value.ui   = 5U;
+    strcpy (params[i].short_desc,
+            "Network latency setting in no. of periods");
+    strcpy (params[i].long_desc, params[i].short_desc);
+
+    i++;
     strcpy (params[i].name, "listen-port");
     params[i].character  = 'l';
     params[i].type       = JackDriverParamUInt;
@@ -449,7 +458,7 @@ driver_get_descriptor ()
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 1U;
     strcpy (params[i].short_desc,
-            "Factor for sample rate reduction");
+            "Factor for sample rate reduction (deprecated)");
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
@@ -458,7 +467,7 @@ driver_get_descriptor ()
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 0U;
     strcpy (params[i].short_desc,
-            "Factor for sample rate reduction on the upstream");
+            "Factor for sample rate reduction on the upstream (deprecated)");
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
@@ -467,7 +476,7 @@ driver_get_descriptor ()
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 0U;
     strcpy (params[i].short_desc,
-            "sets celt encoding and number of bytes per channel");
+            "sets celt encoding and number of bytes per period per channel");
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
@@ -496,16 +505,6 @@ driver_get_descriptor ()
     strcpy (params[i].short_desc,
             "Whether to use Autoconfig, or just start.");
     strcpy (params[i].long_desc, params[i].short_desc);
-
-    i++;
-    strcpy (params[i].name, "latency");
-    params[i].character  = 'L';
-    params[i].type       = JackDriverParamUInt;
-    params[i].value.ui   = 5U;
-    strcpy (params[i].short_desc,
-            "Latency setting");
-    strcpy (params[i].long_desc, params[i].short_desc);
-
     i++;
     strcpy (params[i].name, "redundancy");
     params[i].character  = 'R';
@@ -516,12 +515,12 @@ driver_get_descriptor ()
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
-    strcpy (params[i].name, "no-htonl");
-    params[i].character  = 'H';
+    strcpy (params[i].name, "native-endian");
+    params[i].character  = 'e';
     params[i].type       = JackDriverParamUInt;
     params[i].value.ui   = 0U;
     strcpy (params[i].short_desc,
-            "Dont convert samples to network byte order.");
+            "Don't convert samples to network byte order.");
     strcpy (params[i].long_desc, params[i].short_desc);
 
     i++;
@@ -644,7 +643,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
                 use_autoconfig = param->value.ui;
                 break;
 
-            case 'L':
+            case 'n':
                 latency = param->value.ui;
                 break;
 
@@ -652,7 +651,7 @@ driver_initialize (jack_client_t *client, const JSList * params)
                 redundancy = param->value.ui;
                 break;
 
-            case 'H':
+            case 'e':
                 dont_htonl_floats = param->value.ui;
                 break;
             case 'J':

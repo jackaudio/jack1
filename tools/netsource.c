@@ -520,23 +520,25 @@ fflush( stdout );
 void
 printUsage ()
 {
-fprintf (stderr, "usage: jack_netsource -h <host peer> [options]\n"
+fprintf (stderr, "usage: jack_netsource [options]\n"
         "\n"
-        "  -n <jack name> - Reports a different name to jack\n"
-        "  -s <server name> - The name of the local jack server\n"
-        "  -h <host_peer> - Host name of the slave JACK\n"
-        "  -p <port> - UDP port used by the slave JACK\n"
-        "  -P <num channels> - Number of audio playback channels\n"
-        "  -C <num channels> - Number of audio capture channels\n"
-        "  -o <num channels> - Number of midi playback channels\n"
-        "  -i <num channels> - Number of midi capture channels\n"
-        "  -l <latency> - Network latency in number of NetJack frames\n"
-        "  -r <reply port> - Local UDP port to use\n"
-        "  -f <downsample ratio> - Downsample data in the wire by this factor\n"
+        "  -h this help text\n"
+        "  -H <slave host> - Host name of the slave JACK\n"
+        "  -o <num channels> - Number of audio playback channels\n"
+        "  -i <num channels> - Number of audio capture channels\n"
+        "  -O <num channels> - Number of midi playback channels\n"
+        "  -I <num channels> - Number of midi capture channels\n"
+        "  -n <periods> - Network latency in JACK periods\n"
+        "  -p <port> - UDP port that the slave is listening on\n"
+        "  -r <reply port> - UDP port that we are listening on\n"
+	"  -B <bind port> - reply port, for use in NAT environments\n"
         "  -b <bitdepth> - Set transport to use 16bit or 8bit\n"
+	"  -c <bytes> - Use CELT encoding with <bytes> per period and channel\n"
         "  -m <mtu> - Assume this mtu for the link\n"
-	"  -c <bytes> - Use Celt and encode <bytes> per channel and packet.\n"
-	"  -R <N> - Send out packets N times.\n"
+	"  -R <N> - Redundancy: send out packets N times.\n"
+	"  -e - skip host-to-network endianness conversion\n"
+        "  -N <jack name> - Reports a different name to jack\n"
+        "  -s <server name> - The name of the local jack server\n"
         "\n");
 }
 
@@ -578,80 +580,85 @@ main (int argc, char *argv[])
     sprintf(client_name, "netsource");
     sprintf(peer_ip, "localhost");
 
-    while ((c = getopt (argc, argv, ":H:R:n:s:h:p:C:P:i:o:l:r:f:b:m:c:B:")) != -1)
+    while ((c = getopt (argc, argv, ":h:H:o:i:O:I:n:p:r:B:b:c:m:R:e:N:s:")) != -1)
     {
         switch (c)
         {
-            case 'n':
-            free(client_name);
-            client_name = (char *) malloc (sizeof (char) * strlen (optarg)+1);
-            strcpy (client_name, optarg);
-            break;
-            case 's':
-            server_name = (char *) malloc (sizeof (char) * strlen (optarg)+1);
-            strcpy (server_name, optarg);
-            options |= JackServerName;
-            break;
             case 'h':
-            free(peer_ip);
-            peer_ip = (char *) malloc (sizeof (char) * strlen (optarg)+1);
-            strcpy (peer_ip, optarg);
-            break;
-            case 'p':
-            peer_port = atoi (optarg);
-            break;
-            case 'P':
-            playback_channels_audio = atoi (optarg);
-            break;
-            case 'C':
-            capture_channels_audio = atoi (optarg);
-            break;
+                printUsage();
+                exit (0);
+                break;
+            case 'H':
+                free(peer_ip);
+                peer_ip = (char *) malloc (sizeof (char) * strlen (optarg)+1);
+                strcpy (peer_ip, optarg);
+                break;
             case 'o':
-            playback_channels_midi = atoi (optarg);
-            break;
+                playback_channels_audio = atoi (optarg);
+                break;
             case 'i':
-            capture_channels_midi = atoi (optarg);
-            break;
-            case 'l':
-            latency = atoi (optarg);
-            break;
+                capture_channels_audio = atoi (optarg);
+                break;
+            case 'O':
+                playback_channels_midi = atoi (optarg);
+                break;
+            case 'I':
+                capture_channels_midi = atoi (optarg);
+                break;
+            case 'n':
+                latency = atoi (optarg);
+                break;
+            case 'p':
+                peer_port = atoi (optarg);
+                break;
             case 'r':
-            reply_port = atoi (optarg);
-            break;
+                reply_port = atoi (optarg);
+                break;
             case 'B':
-            bind_port = atoi (optarg);
-            break;
+                bind_port = atoi (optarg);
+                break;
             case 'f':
-            factor = atoi (optarg);
-            break;
+                factor = atoi (optarg);
+                jack_info("This feature is deprecated and will be removed in future netjack versions. CELT offers a superiour way to conserve bandwidth");
+                break;
             case 'b':
-            bitdepth = atoi (optarg);
-            break;
+                bitdepth = atoi (optarg);
+                break;
 	    case 'c':
 #if HAVE_CELT
-	    bitdepth = 1000;
-	    factor = atoi (optarg);
+	        bitdepth = 1000;
+                factor = atoi (optarg);
 #else
-	    printf( "not built with celt supprt\n" );
-	    exit(10);
+                printf( "not built with celt supprt\n" );
+                exit(10);
 #endif
-	    break;
+	        break;
             case 'm':
-            mtu = atoi (optarg);
-            break;
+                mtu = atoi (optarg);
+                break;
             case 'R':
-            redundancy = atoi (optarg);
-            break;
-            case 'H':
-            dont_htonl_floats = atoi (optarg);
-            break;
+                redundancy = atoi (optarg);
+                break;
+            case 'e':
+                dont_htonl_floats = 1;
+                break;
+            case 'N':
+                free(client_name);
+                client_name = (char *) malloc (sizeof (char) * strlen (optarg)+1);
+                strcpy (client_name, optarg);
+                break;
+            case 's':
+                server_name = (char *) malloc (sizeof (char) * strlen (optarg)+1);
+                strcpy (server_name, optarg);
+                options |= JackServerName;
+                break;
             case ':':
-            fprintf (stderr, "Option -%c requires an operand\n", optopt);
-            errflg++;
-            break;
+                fprintf (stderr, "Option -%c requires an operand\n", optopt);
+                errflg++;
+                break;
             case '?':
-            fprintf (stderr, "Unrecognized option: -%c\n", optopt);
-            errflg++;
+                fprintf (stderr, "Unrecognized option: -%c\n", optopt);
+                errflg++;
         }
     }
     if (errflg)
