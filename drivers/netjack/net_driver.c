@@ -290,6 +290,8 @@ net_driver_detach (net_driver_t *driver)
 static void
 net_driver_delete (net_driver_t *driver)
 {
+    netjack_driver_state_t *netj = &( driver->netj );
+    netjack_release( netj );
     jack_driver_nt_finish ((jack_driver_nt_t *) driver);
     free (driver);
 }
