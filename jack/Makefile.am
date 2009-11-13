@@ -29,8 +29,10 @@ noinst_HEADERS =		\
 	pool.h			\
 	port.h			\
 	ringbuffer.h	        \
+	sanitycheck.h           \
 	shm.h			\
 	start.h			\
+	systemtest.h            \
 	unlock.h		\
 	varargs.h		\
 	version.h

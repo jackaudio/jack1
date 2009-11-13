@@ -1,6 +1,12 @@
 MAINTAINERCLEANFILES = Makefile.in
 
+# systemtest.c and sanitycheck.c are not .h file's 
+# but they behaves like one, and need to be included
+# in the tarball.
+
 noinst_HEADERS =		\
+        systemtest.c            \
+        sanitycheck.c           \
 	atomicity.h		\
 	cycles.h		\
 	getopt.h		\

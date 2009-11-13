@@ -1,2 +1,2 @@
 MAINTAINERCLEANFILES = Makefile.in
-noinst_HEADERS = ipc.h poll.h time.c time.h
+noinst_HEADERS = sanitycheck.c ipc.h poll.h time.c time.h
