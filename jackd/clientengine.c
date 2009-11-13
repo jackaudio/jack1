@@ -793,7 +793,10 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 
 	if (write (client_fd, &res, sizeof (res)) != sizeof (res)) {
 		jack_error ("cannot write connection response to client");
-		jack_client_delete (engine, client);
+		jack_lock_graph (engine);
+		client->control->dead = 1;
+		jack_remove_client (engine, client);
+		jack_unlock_graph (engine);
 		return -1;
 	}
 
