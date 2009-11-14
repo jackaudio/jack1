@@ -67,6 +67,8 @@ static int do_unlock = 0;
 static jack_nframes_t frame_time_offset = 0;
 static int nozombies = 0;
 
+extern int sanitycheck (int, int);
+
 static void 
 do_nothing_handler (int sig)
 {
@@ -362,7 +364,7 @@ static void usage (FILE *file)
 {
 	copyright (file);
 	fprintf (file, "\n"
-"usage: jackd [ --no-realtime OR -L ]\n"
+"usage: jackd [ --no-realtime OR -r ]\n"
 "             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
 "      (the two previous arguments are mutually exclusive. The default is --realtime)\n"
 "             [ --name OR -n server-name ]\n"
@@ -374,15 +376,15 @@ static void usage (FILE *file)
 "             [ --no-sanity-checks OR -N ]\n"
 "             [ --verbose OR -v ]\n"
 "             [ --clocksource OR -c [ c(ycle) | h(pet) | s(ystem) ]\n"
-"             [ --replace-registry OR -r ]\n"
+"             [ --replace-registry ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
 "             [ --nozombies OR -Z ]\n"
 "         -d backend [ ... backend args ... ]\n"
 #ifdef __APPLE__
-"             Available backends may include: coreaudio, dummy, netjack, portaudio.\n\n"
+"             Available backends may include: coreaudio, dummy, net, portaudio.\n\n"
 #else 
-"             Available backends may include: alsa, dummy, freebob, firewire, netjack, oss, sun, or portaudio.\n\n"
+"             Available backends may include: alsa, dummy, freebob, firewire, net, oss, sun, or portaudio.\n\n"
 #endif
 "       jackd -d backend --help\n"
 "             to display options for each backend\n\n");
@@ -515,7 +517,11 @@ main (int argc, char *argv[])
 
 {
 	jack_driver_desc_t * desc;
-	const char *options = "-ad:P:uvshVRLZTFlt:mn:Np:c:";
+	int replace_registry = 0;
+	int do_sanity_checks = 1;
+	int show_version = 0;
+
+	const char *options = "-ad:P:uvshVrRZTFlt:mn:Np:c:";
 	struct option long_options[] = 
 	{ 
 		/* keep ordered by single-letter option code */
@@ -524,14 +530,14 @@ main (int argc, char *argv[])
 		{ "driver", 1, 0, 'd' },
 		{ "help", 0, 0, 'h' },
 		{ "tmpdir-location", 0, 0, 'l' },
-		{ "no-realtime", 0, 0, 'L' },
 		{ "no-mlock", 0, 0, 'm' },
 		{ "name", 1, 0, 'n' },
                 { "no-sanity-checks", 0, 0, 'N' },
 		{ "port-max", 1, 0, 'p' },
 		{ "realtime-priority", 1, 0, 'P' },
+		{ "no-realtime", 0, 0, 'r' },
 		{ "realtime", 0, 0, 'R' },
-		{ "replace-registry", 0, 0, 'r' },
+		{ "replace-registry", 0, &replace_registry, 0 },
 		{ "silent", 0, 0, 's' },
 		{ "timeout", 1, 0, 't' },
 		{ "temporary", 0, 0, 'T' },
@@ -548,9 +554,6 @@ main (int argc, char *argv[])
 	char **driver_args = NULL;
 	JSList * driver_params;
 	int driver_nargs = 1;
-	int show_version = 0;
-	int replace_registry = 0;
-	int do_sanity_checks = 1;
 	int i;
 	int rc;
 
@@ -591,10 +594,6 @@ main (int argc, char *argv[])
 			printf ("%s\n", jack_tmpdir);
 			exit (0);
 
-		case 'L':
-			realtime = 0;
-			break;
-
 		case 'm':
 			do_mlock = 0;
 			break;
@@ -616,7 +615,7 @@ main (int argc, char *argv[])
 			break;
 
 		case 'r':
-			replace_registry = 1;
+			realtime = 0;
 			break;
 
 		case 'R':

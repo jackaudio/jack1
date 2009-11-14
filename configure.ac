@@ -61,7 +61,7 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=117
+JACK_MINOR_VERSION=118
 JACK_MICRO_VERSION=0
 
 dnl ---
