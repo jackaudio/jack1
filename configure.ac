@@ -839,8 +839,8 @@ AC_ARG_ENABLE(alsa, AC_HELP_STRING([--disable-alsa],[ignore ALSA driver ]),
 HAVE_ALSA="false"
 if test "x$TRY_ALSA" = "xyes"
 then
-	# check for ALSA >= 1.0.0
-	PKG_CHECK_MODULES(ALSA, alsa >= 1.0.0,
+	# check for ALSA >= 1.0.18
+	PKG_CHECK_MODULES(ALSA, alsa >= 1.0.18,
 	     [HAVE_ALSA="true"
               ALSA_LIBS=-lasound
               JACK_DEFAULT_DRIVER=\"alsa\"
