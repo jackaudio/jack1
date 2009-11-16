@@ -67,11 +67,11 @@ static int read_string(char* filename, char* buf, size_t buflen) {
   int fd;
   ssize_t r=-1;
 
-  memset(buf, 0, buflen);
+  memset (buf, 0, buflen);
 
-  fd = open(filename, O_RDONLY);
+  fd = open (filename, O_RDONLY);
   if (-1<fd) {
-    r = read(fd, buf, buflen);
+    r = read (fd, buf, buflen-1);
     (void) close(fd);
     
     if (-1==r) {
@@ -272,26 +272,17 @@ int system_memlock_is_unlimited() {
 
 
 long long unsigned int system_available_physical_mem() {
-	int fd, i;
 	char buf[256];
 	long long unsigned int res = 0;
 
-	fd = open("/proc/meminfo", O_RDONLY);
-
-	if (0<fd) {
-		if (0<read(fd, buf, 256)) {
-			if (strcmp("MemTotal:", buf)) {
-				i=10;
-				while (buf[i]==' ') i++;
-				(void) sscanf(&buf[i], "%llu", &res);
-			}
-		} else {
-			perror("read from /proc/meminfo");
+	if (0<read_string("/proc/meminfo", buf, sizeof (buf))) {
+		if (strncmp (buf, "MemTotal:", 9) == 0) {
+			if (sscanf (buf, "%*s %llu", &res) != 1) {
+				perror ("parse error in /proc/meminfo");
+			} 
 		}
-
-		(void) close(fd);
 	} else {
-		perror("open /proc/meminfo");
+		perror("read from /proc/meminfo");
 	}
 
 	return res*1024;

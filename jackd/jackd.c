@@ -661,15 +661,17 @@ main (int argc, char *argv[])
 		}
 	}
 
-	if (do_sanity_checks && (0 < sanitycheck (realtime, (clock_source == JACK_TIMER_CYCLE_COUNTER)))) {
-		return -1;
-	}
-
 	if (show_version) {
 		printf ( "jackd version " VERSION 
 				" tmpdir " DEFAULT_TMP_DIR 
 				" protocol " PROTOCOL_VERSION
 				"\n");
+		return 0;
+	}
+
+	copyright (stdout);
+
+	if (do_sanity_checks && (0 < sanitycheck (realtime, (clock_source == JACK_TIMER_CYCLE_COUNTER)))) {
 		return -1;
 	}
 
@@ -722,8 +724,6 @@ main (int argc, char *argv[])
 
 	if (server_name == NULL)
 		server_name = jack_default_server_name ();
-
-	copyright (stdout);
 
 	rc = jack_register_server (server_name, replace_registry);
 	switch (rc) {
