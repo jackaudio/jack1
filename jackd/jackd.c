@@ -521,7 +521,7 @@ main (int argc, char *argv[])
 	int do_sanity_checks = 1;
 	int show_version = 0;
 
-	const char *options = "-ad:P:uvshVrRZTFlt:mn:Np:c:";
+	const char *options = "-d:P:uvshVrRZTFlt:mn:Np:c:";
 	struct option long_options[] = 
 	{ 
 		/* keep ordered by single-letter option code */
