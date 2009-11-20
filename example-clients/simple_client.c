@@ -37,6 +37,17 @@ process (jack_nframes_t nframes, void *arg)
 	return 0;      
 }
 
+char *session_callback( jack_session_event_t code, char *path, char *prefix, void *arg )
+{
+	printf( "session notification\n" );
+	printf( "path %s, prefix %s, type: %s", path, prefix, code == JackSessionSave ? "save" : "quit" );
+
+	if( code == JackSessionQuit )
+		exit(1); 
+
+	return strdup( "jack_simpleclient" );
+}
+
 /**
  * JACK calls this shutdown_callback if the server ever shuts down or
  * decides to disconnect the client.
@@ -88,6 +99,7 @@ main (int argc, char *argv[])
 
 	jack_on_shutdown (client, jack_shutdown, 0);
 
+	jack_set_session_callback( client, session_callback, NULL );
 	/* display the current sample rate. 
 	 */
 

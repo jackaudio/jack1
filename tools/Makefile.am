@@ -38,6 +38,7 @@ bin_PROGRAMS = jack_load \
 	       jack_alias \
 	       jack_bufsize \
 	       jack_samplerate \
+	       jack_session_notify \
 	       jack_wait \
 	       $(JACK_TRANSPORT) \
 	       $(NETJACK_TOOLS)
@@ -95,6 +96,10 @@ jack_bufsize_LDADD = $(top_builddir)/libjack/libjack.la
 jack_samplerate_SOURCES = samplerate.c
 jack_samplerate_LDFLAGS = @OS_LDFLAGS@
 jack_samplerate_LDADD = $(top_builddir)/libjack/libjack.la
+
+jack_session_notify_SOURCES = session_notify.c
+jack_session_notify_LDFLAGS = @OS_LDFLAGS@
+jack_session_notify_LDADD = $(top_builddir)/libjack/libjack.la
 
 if HAVE_READLINE
 jack_transport_SOURCES = transport.c
