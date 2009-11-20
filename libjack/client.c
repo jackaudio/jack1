@@ -1114,6 +1114,9 @@ jack_client_open_aux (const char *client_name,
 	client->deliver_request = oop_client_deliver_request;
 	client->deliver_arg = client;
 
+	if( va.sess_uuid )
+		client->control->uid = atoi( va.sess_uuid );
+
 	if ((ev_fd = server_event_connect (client, va.server_name)) < 0) {
 		goto fail;
 	}

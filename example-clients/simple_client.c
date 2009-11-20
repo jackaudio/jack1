@@ -69,7 +69,11 @@ main (int argc, char *argv[])
 	
 	/* open a client connection to the JACK server */
 
-	client = jack_client_open (client_name, options, &status, server_name);
+	if( argc == 1 )
+		client = jack_client_open (client_name, options, &status, server_name);
+	else if( argc == 2 )
+		client = jack_client_open (client_name, options |JackSessionUUID, &status, server_name, argv[1] );
+
 	if (client == NULL) {
 		fprintf (stderr, "jack_client_open() failed, "
 			 "status = 0x%2.0x\n", status);
