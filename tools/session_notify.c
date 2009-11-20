@@ -66,6 +66,7 @@ void parse_arguments(int argc, char *argv[])
 		if( !strcmp( argv[1], "save" ) ) {
 			notify_type = JackSessionSave;
 			save_path = argv[2];
+			return;
 		}
 
 	}

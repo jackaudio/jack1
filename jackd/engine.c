@@ -133,7 +133,7 @@ static void jack_check_acyclic (jack_engine_t* engine);
 static void jack_compute_all_port_total_latencies (jack_engine_t *engine);
 static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_shared_t*);
 static void jack_engine_signal_problems (jack_engine_t* engine);
-static int jack_session_notify (jack_engine_t *engine, jack_session_event_t type, const char *path );
+static int jack_do_session_notify (jack_engine_t *engine, jack_session_event_t type, const char *path );
 
 static inline int 
 jack_rolling_interval (jack_time_t period_usecs)
@@ -1342,7 +1342,7 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 
 	case SessionNotify:
 		jack_lock_graph (engine);
-		jack_session_notify (engine, req->x.session.type, req->x.session.path);
+		jack_do_session_notify (engine, req->x.session.type, req->x.session.path);
 		jack_unlock_graph (engine);
 		req->status = 0;
 		break;
@@ -2431,7 +2431,7 @@ jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event)
 }
 
 static int
-jack_session_notify (jack_engine_t *engine, jack_session_event_t type, const char *path )
+jack_do_session_notify (jack_engine_t *engine, jack_session_event_t type, const char *path )
 {
 	JSList *node;
 	jack_event_t event;
@@ -2439,13 +2439,9 @@ jack_session_notify (jack_engine_t *engine, jack_session_event_t type, const cha
 	int retval = 0;
 	int reply;
 
-	event.type = SessionNotify;
-	if( path )
-		snprintf (event.x.name, sizeof (event.x.name), "%s", path );
-	else
-		event.x.name[0]='\0';
-
-	event.x.n = type;
+	event.type = SaveSession;
+	snprintf (event.x.name, sizeof (event.x.name), "%s", path );
+	event.y.n = type;
  	
 	/* GRAPH MUST BE LOCKED : see callers of jack_send_connection_notification() 
 	 */
@@ -2492,7 +2488,7 @@ static int
 jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 		    jack_event_t *event)
 {
-	char status=-1;
+	char status=0;
 
 	/* caller must hold the graph lock */
 
@@ -2577,7 +2573,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 			}
 
  			if (client->error) {
- 				status = 1;
+ 				status = -1;
  			} else {
  				// then we check whether there really is an error.... :)
  

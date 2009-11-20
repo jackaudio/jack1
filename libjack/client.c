@@ -498,8 +498,9 @@ jack_client_handle_session_callback (jack_client_t *client, jack_event_t *event)
 	char prefix[32];
 	snprintf( prefix, sizeof(prefix), "%d", client->control->uid );
 
+
 	if (client->control->session_cbset) {
-		cb_ret = client->session_cb ( event->x.n, event->x.name, prefix, 
+		cb_ret = client->session_cb ( event->y.n, event->x.name, prefix, 
 					       client->session_cb_arg);
 		if(cb_ret) {
 			retval = 1;
@@ -1303,8 +1304,12 @@ jack_session_notify (jack_client_t* client, jack_session_event_t code, const cha
 {
 	jack_request_t request;
 
-	request.type = SaveSession;
-	snprintf( request.x.session.path, sizeof( request.x.session.path ), "%s", path );
+	request.type = SessionNotify;
+	if( path ) 
+		snprintf( request.x.session.path, sizeof( request.x.session.path ), "%s", path );
+	else
+		request.x.session.path[0] = '\0';
+
 	request.x.session.type = code;
 	return jack_client_deliver_request (client, &request);
 }
@@ -1504,7 +1509,7 @@ jack_client_core_wait (jack_client_t* client)
 {
 	jack_client_control_t *control = client->control;
 
-	DEBUG ("client polling on %s", client->pollmax == 2 ? x
+	DEBUG ("client polling on %s", client->pollmax == 2 ?
 	       "event_fd and graph_wait_fd..." :
 	       "event_fd only");
 	
