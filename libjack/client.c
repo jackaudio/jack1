@@ -490,6 +490,27 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 	return 0;
 }
 
+int
+jack_client_handle_session_callback (jack_client_t *client, jack_event_t *event)
+{
+	int retval = 0;
+	char *cb_ret = NULL;
+	char prefix[32];
+	snprintf( prefix, sizeof(prefix), "%d", client->control->uid );
+
+	if (client->control->session_cbset) {
+		cb_ret = client->session_cb ( event->x.n, event->x.name, prefix, 
+					       client->session_cb_arg);
+		if(cb_ret) {
+			retval = 1;
+			snprintf( (char *)client->control->session_command, sizeof(client->control->session_command),
+					"%s", cb_ret );
+			free( cb_ret );
+		}
+	}
+
+	return retval;
+}
 #if JACK_USE_MACH_THREADS
 
 static int 
@@ -1277,6 +1298,17 @@ jack_set_freewheel (jack_client_t* client, int onoff)
 	return jack_client_deliver_request (client, &request);
 }
 
+int
+jack_session_notify (jack_client_t* client, jack_session_event_t code, const char *path )
+{
+	jack_request_t request;
+
+	request.type = SaveSession;
+	snprintf( request.x.session.path, sizeof( request.x.session.path ), "%s", path );
+	request.x.session.type = code;
+	return jack_client_deliver_request (client, &request);
+}
+
 void
 jack_start_freewheel (jack_client_t* client)
 {
@@ -1447,6 +1479,9 @@ jack_client_process_events (jack_client_t* client)
 			
 		case StopFreewheel:
 			jack_stop_freewheel (client);
+			break;
+		case SaveSession:
+			status = jack_client_handle_session_callback (client, &event );
 			break;
 		}
 		
@@ -2417,6 +2452,19 @@ jack_set_process_thread(jack_client_t* client, JackThreadCallback callback, void
 	return 0;
 }
 
+int
+jack_set_session_callback(jack_client_t* client, JackSessionCallback callback, void *arg)
+{
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+
+	client->session_cb_arg = arg;
+	client->session_cb = callback;
+	client->control->session_cbset = (callback != NULL);
+	return 0;
+}
 int
 jack_get_process_done_fd (jack_client_t *client)
 {

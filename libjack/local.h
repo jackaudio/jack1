@@ -70,8 +70,10 @@ struct _jack_client {
     void *freewheel_arg;
     JackClientRegistrationCallback client_register;	
     void *client_register_arg;
-	JackThreadCallback thread_cb;	
+    JackThreadCallback thread_cb;	
     void *thread_cb_arg;
+    JackSessionCallback session_cb;	
+    void *session_cb_arg;
 
     /* external clients: set by libjack
      * internal clients: set by engine */

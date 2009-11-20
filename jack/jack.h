@@ -412,6 +412,16 @@ int jack_set_graph_order_callback (jack_client_t *,
  */
 int jack_set_xrun_callback (jack_client_t *,
 			    JackXRunCallback xrun_callback, void *arg);
+/**
+ * Tell the JACK server to call @a save_callback the session handler wants
+ * to save.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+
+int jack_set_session_callback(jack_client_t *client,
+			    JackSessionCallback session_save_callback,
+			    void *arg);
 
 /*@}*/
 

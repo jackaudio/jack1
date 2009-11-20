@@ -217,7 +217,8 @@ typedef enum  {
   StartFreewheel,
   StopFreewheel,
   ClientRegistered,
-  ClientUnregistered
+  ClientUnregistered,
+  SaveSession
 } JackEventType;
 
 typedef struct {
@@ -252,9 +253,11 @@ typedef enum {
 typedef volatile struct {
 
     volatile jack_client_id_t id;         /* w: engine r: engine and client */
+    volatile jack_client_id_t uid;        /* w: engine r: engine and client */
     volatile jack_nframes_t  nframes;     /* w: engine r: client */
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
     volatile char	name[JACK_CLIENT_NAME_SIZE];
+    volatile char	session_command[JACK_PORT_NAME_SIZE];
     volatile ClientType type;             /* w: engine r: engine and client */
     volatile int8_t     active;           /* w: engine r: engine and client */
     volatile int8_t     dead;             /* r/w: engine */
@@ -292,6 +295,7 @@ typedef volatile struct {
     volatile uint8_t	freewheel_cb_cbset;
     volatile uint8_t	client_register_cbset;
     volatile uint8_t	thread_cb_cbset;
+    volatile uint8_t	session_cbset;
 
 } POST_PACKED_STRUCTURE jack_client_control_t;
 
@@ -370,7 +374,8 @@ typedef enum {
 	IntClientName = 21,
 	IntClientUnload = 22,
 	RecomputeTotalLatencies = 23,
-	RecomputeTotalLatency = 24
+	RecomputeTotalLatency = 24,
+	SessionNotify = 25
 } RequestType;
 
 struct _jack_request {
@@ -390,6 +395,10 @@ struct _jack_request {
 	    char source_port[JACK_PORT_NAME_SIZE];
 	    char destination_port[JACK_PORT_NAME_SIZE];
 	} POST_PACKED_STRUCTURE connect;
+	struct {
+	    char path[JACK_PORT_NAME_SIZE];
+	    jack_session_event_t  type;
+	} POST_PACKED_STRUCTURE session;
 	struct {
 	    int32_t nports;
 	    const char **ports;	/* this is only exposed to internal clients, so there

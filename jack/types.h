@@ -214,6 +214,13 @@ enum JackStatus {
  */
 typedef enum JackStatus jack_status_t;
 
+enum JackSessionEvent {
+    JackSessionSave = 1,
+    JackSessionQuit = 2
+};
+
+typedef enum JackSessionEvent jack_session_event_t;
+
 /**
  * Prototype for the client supplied function that is called 
  * by the engine anytime there is work to be done.
@@ -363,6 +370,9 @@ typedef void (*JackShutdownCallback)(void *arg);
  * @param arg pointer to a client supplied structure
  */
 typedef void (*JackInfoShutdownCallback)(jack_status_t code, const char* reason, void *arg);
+
+
+typedef char *(*JackSessionCallback)(jack_session_event_t code, const char* session_dir, const char* prefix, void *arg);
 
 /**
  * Used for the type argument of jack_port_register() for default
