@@ -2440,7 +2440,11 @@ jack_session_notify (jack_engine_t *engine, jack_session_event_t type, const cha
 	int reply;
 
 	event.type = SessionNotify;
-	snprintf (event.x.name, sizeof (event.x.name), "%s", path );
+	if( path )
+		snprintf (event.x.name, sizeof (event.x.name), "%s", path );
+	else
+		event.x.name[0]='\0';
+
 	event.x.n = type;
  	
 	/* GRAPH MUST BE LOCKED : see callers of jack_send_connection_notification() 
