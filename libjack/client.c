@@ -2018,11 +2018,11 @@ jack_activate (jack_client_t *client)
 	 * usage in jack_start_thread())
 	 */
          
-	char buf[JACK_THREAD_STACK_TOUCH];
+	//char buf[JACK_THREAD_STACK_TOUCH];
 	int i;
 
 	for (i = 0; i < JACK_THREAD_STACK_TOUCH; i++) {
-		buf[i] = (char) (i & 0xff);
+		//buf[i] = (char) (i & 0xff);
 	}
 
 	if (client->control->type == ClientInternal ||
