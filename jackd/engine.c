@@ -2435,6 +2435,18 @@ jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event)
 	jack_unlock_graph (engine);
 }
 
+static jack_client_id_t jack_engine_get_max_uuid( jack_engine_t *engine )
+{
+	JSList *node;
+	jack_client_id_t retval = 0;
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+		if( client->control->uid > retval )
+			retval = client->control->uid;
+	}
+	return retval;
+}
+
 static int
 jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd )
 {
@@ -2456,6 +2468,8 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if (client->control->session_cbset) {
 			
+			if( client->control->uid == 0 )
+				client->control->uid=jack_engine_get_max_uuid( engine ) + 1;
 			reply = jack_deliver_event (engine, client, &event);
 
 			if (write (reply_fd, &client->control->uid, sizeof (client->control->uid))
