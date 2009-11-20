@@ -40,7 +40,7 @@ process (jack_nframes_t nframes, void *arg)
 char *session_callback( jack_session_event_t code, char *path, char *prefix, void *arg )
 {
 	printf( "session notification\n" );
-	printf( "path %s, prefix %s, type: %s", path, prefix, code == JackSessionSave ? "save" : "quit" );
+	printf( "path %s, prefix %s, type: %s\n", path, prefix, code == JackSessionSave ? "save" : "quit" );
 
 	if( code == JackSessionQuit )
 		exit(1); 
