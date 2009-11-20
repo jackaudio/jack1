@@ -525,6 +525,7 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	client->control->dead = FALSE;
 	client->control->timed_out = 0;
 	client->control->id = engine->next_client_id++;
+	client->control->uid = engine->next_client_id++;
 	strcpy ((char *) client->control->name, name);
 	client->subgraph_start_fd = -1;
 	client->subgraph_wait_fd = -1;

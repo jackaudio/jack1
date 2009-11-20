@@ -77,7 +77,9 @@ void parse_arguments(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 	parse_arguments(argc, argv);
-	int retval;
+	struct session_command *retval;
+	int i;
+
 
 	/* become a JACK client */
 	if ((client = jack_client_new(package)) == 0) {
@@ -94,8 +96,9 @@ int main(int argc, char *argv[])
 
 
 	retval = jack_session_notify( client, notify_type, save_path );
-	printf( "session notify returned: %d", retval );
-
+	for(i=0; retval[i].uid != 0; i++ )
+		printf( "%s &\n", retval[i].command );
+	free(retval);
 
 	jack_client_close(client);
 

@@ -1299,11 +1299,15 @@ jack_set_freewheel (jack_client_t* client, int onoff)
 	return jack_client_deliver_request (client, &request);
 }
 
-int
+
+
+struct session_command *
 jack_session_notify (jack_client_t* client, jack_session_event_t code, const char *path )
 {
 	jack_request_t request;
 
+	struct session_command *retval = NULL;
+	int num_replies = 0;
 	request.type = SessionNotify;
 	if( path ) 
 		snprintf( request.x.session.path, sizeof( request.x.session.path ), "%s", path );
@@ -1311,7 +1315,44 @@ jack_session_notify (jack_client_t* client, jack_session_event_t code, const cha
 		request.x.session.path[0] = '\0';
 
 	request.x.session.type = code;
-	return jack_client_deliver_request (client, &request);
+	// XXX: this is hacky now.
+	//      a) we dont support for internal clients :D FUCK EM 
+	
+	if( (write (client->request_fd, &request, sizeof (request))
+	       != sizeof (request)) ) {
+		jack_error ("cannot send request type %d to server",
+				    request.type);
+		goto out;
+	}
+
+	while( 1 ) {
+		jack_client_id_t uid;
+		if (read (client->request_fd, &uid, sizeof (uid)) != sizeof (uid)) {
+			jack_error ("cannot read result for request type %d from"
+					" server (%s)", request.type, strerror (errno));
+			goto out;
+		}
+
+		num_replies += 1;
+		retval = realloc( retval, (num_replies)*sizeof(struct session_command) );
+		if( uid == 0 )
+			break;
+
+
+		if (read (client->request_fd, retval[num_replies-1].command, sizeof (retval[num_replies].command))
+			       	!= sizeof (retval[num_replies-1].command)) {
+			jack_error ("cannot read result for request type %d from"
+					" server (%s)", request.type, strerror (errno));
+			goto out;
+		}
+		retval[num_replies-1].uid = uid;
+	}
+	retval[num_replies-1].uid = 0U;
+	return retval;
+out:
+	if( retval )
+		free(retval);
+	return NULL;
 }
 
 void

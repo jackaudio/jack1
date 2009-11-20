@@ -1019,6 +1019,13 @@ void jack_set_info_function (void (*func)(const char *));
  */
 void jack_free(void* ptr);
 
+struct session_command {
+	uint32_t uid;
+	char command[256];
+};
+
+struct session_command * jack_session_notify (jack_client_t* client, jack_session_event_t code, const char *path );
+
 #ifdef __cplusplus
 }
 #endif

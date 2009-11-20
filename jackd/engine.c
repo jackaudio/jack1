@@ -133,7 +133,7 @@ static void jack_check_acyclic (jack_engine_t* engine);
 static void jack_compute_all_port_total_latencies (jack_engine_t *engine);
 static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_shared_t*);
 static void jack_engine_signal_problems (jack_engine_t* engine);
-static int jack_do_session_notify (jack_engine_t *engine, jack_session_event_t type, const char *path );
+static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd );
 
 static inline int 
 jack_rolling_interval (jack_time_t period_usecs)
@@ -1342,7 +1342,12 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 
 	case SessionNotify:
 		jack_lock_graph (engine);
-		jack_do_session_notify (engine, req->x.session.type, req->x.session.path);
+		if ((req->status =
+	  	    jack_do_session_notify (engine, req, *reply_fd))
+		    == 0) {
+			/* we have already replied, don't do it again */
+			*reply_fd = -1;
+		}
 		jack_unlock_graph (engine);
 		req->status = 0;
 		break;
@@ -2431,17 +2436,18 @@ jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event)
 }
 
 static int
-jack_do_session_notify (jack_engine_t *engine, jack_session_event_t type, const char *path )
+jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd )
 {
 	JSList *node;
 	jack_event_t event;
   
 	int retval = 0;
 	int reply;
+	jack_client_id_t finalizer = 0;
 
 	event.type = SaveSession;
-	snprintf (event.x.name, sizeof (event.x.name), "%s", path );
-	event.y.n = type;
+	snprintf (event.x.name, sizeof (event.x.name), "%s", req->x.session.path );
+	event.y.n = req->x.session.type;
  	
 	/* GRAPH MUST BE LOCKED : see callers of jack_send_connection_notification() 
 	 */
@@ -2451,11 +2457,36 @@ jack_do_session_notify (jack_engine_t *engine, jack_session_event_t type, const 
 		if (client->control->session_cbset) {
 			
 			reply = jack_deliver_event (engine, client, &event);
+
+			if (write (reply_fd, &client->control->uid, sizeof (client->control->uid))
+			    < (ssize_t) sizeof (client->control->uid)) {
+				jack_error ("cannot write GetPortConnections result "
+					    "to client via fd = %d (%s)", 
+					    reply_fd, strerror (errno));
+				goto out;
+			}
+			if (write (reply_fd, client->control->session_command, sizeof (client->control->session_command))
+			    < (ssize_t) sizeof (client->control->session_command)) {
+				jack_error ("cannot write GetPortConnections result "
+					    "to client via fd = %d (%s)", 
+					    reply_fd, strerror (errno));
+				goto out;
+			}
+
 			if( reply >= 0 )
 				retval |= reply;
 		} 
 	}
+	if (write (reply_fd, &finalizer, sizeof (finalizer))
+			< (ssize_t) sizeof (finalizer)) {
+		jack_error ("cannot write GetPortConnections result "
+				"to client via fd = %d (%s)", 
+				reply_fd, strerror (errno));
+		goto out;
+	}
 	return retval;
+out:
+	return -3;
 }
 
 static void
