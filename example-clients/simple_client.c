@@ -37,7 +37,7 @@ process (jack_nframes_t nframes, void *arg)
 	return 0;      
 }
 
-char *session_callback( jack_session_event_t code, char *path, char *prefix, void *arg )
+char *session_callback( jack_session_event_t code, const char *path, const char *prefix, void *arg )
 {
 	printf( "session notification\n" );
 	printf( "path %s, prefix %s, type: %s\n", path, prefix, code == JackSessionSave ? "save" : "quit" );
