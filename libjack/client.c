@@ -2556,9 +2556,7 @@ jack_get_ports (jack_client_t *client,
 
 	if( port_name_pattern ) {
 		if((strncmp( "!uuid:", port_name_pattern, sizeof("!uuid:")  ) )) {
-			printf( "%s\n",port_name_pattern+6 );   
 			port_uuid_match = atoi( port_name_pattern+6);
-			printf( "port_uuid_match = %u\n", port_uuid_match );
 			port_name_pattern = NULL;
 		}
 	}
