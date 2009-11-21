@@ -1469,7 +1469,7 @@ jack_client_core_wait (jack_client_t* client)
 {
 	jack_client_control_t *control = client->control;
 
-	DEBUG ("client polling on %s", client->pollmax == 2 ? x
+	DEBUG ("client polling on %s", client->pollmax == 2 ?
 	       "event_fd and graph_wait_fd..." :
 	       "event_fd only");
 	
