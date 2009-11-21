@@ -134,6 +134,7 @@ static void jack_compute_all_port_total_latencies (jack_engine_t *engine);
 static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_shared_t*);
 static void jack_engine_signal_problems (jack_engine_t* engine);
 static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd );
+static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *req);
 
 static inline int 
 jack_rolling_interval (jack_time_t period_usecs)
@@ -1340,11 +1341,16 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		req->status = 0;
 		break;
 
+	case GetClientByUUID:
+		jack_lock_graph (engine);
+		jack_do_get_client_by_uuid (engine, req);
+		jack_unlock_graph (engine);
+		break;
 	case SessionNotify:
 		jack_lock_graph (engine);
 		if ((req->status =
 	  	    jack_do_session_notify (engine, req, *reply_fd))
-		    == 0) {
+		    >= 0) {
 			/* we have already replied, don't do it again */
 			*reply_fd = -1;
 		}
@@ -2447,16 +2453,17 @@ static jack_client_id_t jack_engine_get_max_uuid( jack_engine_t *engine )
 	return retval;
 }
 
-static void jack_client_fixup_uuid (jack_client_internal_t *client )
+static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *req)
 {
 	JSList *node;
-	jack_port_t *port;
-
-	for (node = client->ports; node; node = jack_slist_next (node)) {
-		port = (jack_port_t *) node->data;
-
-		port->shared->uid = client->control->uid;
-
+	req->status = -1;
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+		if( client->control->uid == req->x.client_id ) {
+			snprintf( req->x.port_info.name, sizeof(req->x.port_info.name), "%s", client->control->name );
+			req->status = 0;
+			return;
+		}
 	}
 }
 
@@ -2483,7 +2490,6 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 			
 			if( client->control->uid == 0 ) {
 				client->control->uid=jack_engine_get_max_uuid( engine ) + 1;
-				jack_client_fixup_uuid( client );
 			}
 			reply = jack_deliver_event (engine, client, &event);
 

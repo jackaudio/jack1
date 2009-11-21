@@ -375,7 +375,8 @@ typedef enum {
 	IntClientUnload = 22,
 	RecomputeTotalLatencies = 23,
 	RecomputeTotalLatency = 24,
-	SessionNotify = 25
+	SessionNotify = 25,
+	GetClientByUUID = 26
 } RequestType;
 
 struct _jack_request {

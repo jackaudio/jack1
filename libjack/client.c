@@ -2536,6 +2536,19 @@ jack_on_info_shutdown (jack_client_t *client, void (*function)(jack_status_t, co
 	client->on_info_shutdown_arg = arg;
 }
 
+char *jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
+{ 
+	jack_request_t request;
+
+	jack_client_id_t uuid_int = atoi( uuid );
+	request.type = GetClientByUUID;
+	request.x.client_id = uuid_int;
+	if( jack_client_deliver_request( client, &request ) )
+		return NULL;
+
+	return strdup( request.x.port_info.name );
+}
+
 const char **
 jack_get_ports (jack_client_t *client,
 		const char *port_name_pattern,
@@ -2550,18 +2563,9 @@ jack_get_ports (jack_client_t *client,
 	regex_t port_regex;
 	regex_t type_regex;
 	int matching;
-	jack_client_id_t port_uuid_match = 0U;
 
 	engine = client->engine;
 
-	if( port_name_pattern ) {
-		if((strncmp( "!uuid:", port_name_pattern, sizeof("!uuid:")  ) )) {
-			port_uuid_match = atoi( port_name_pattern+6);
-			port_name_pattern = NULL;
-		}
-	}
-			
-				
 	if (port_name_pattern && port_name_pattern[0]) {
 		regcomp (&port_regex, port_name_pattern,
 			 REG_EXTENDED|REG_NOSUB);
@@ -2591,10 +2595,6 @@ jack_get_ports (jack_client_t *client,
 			}
 		}
 
-		if (matching && port_uuid_match) {
-			if( psp[i].uid != port_uuid_match )
-				matching = 0;
-		}
 		if (matching && port_name_pattern && port_name_pattern[0]) {
 			if (regexec (&port_regex, psp[i].name, 0, NULL, 0)) {
 				matching = 0;

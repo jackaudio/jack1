@@ -201,7 +201,6 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 			port_functions = &jack_builtin_NULL_functions;
 		port->fptr = *port_functions;
 		port->shared->has_mixdown = (port->fptr.mixdown ? TRUE : FALSE);
-		port->shared->uid = client->control->uid;
 	}
 
 	/* set up a base address so that port->offset can be used to

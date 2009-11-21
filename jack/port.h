@@ -113,7 +113,6 @@ typedef struct _jack_port_shared {
     jack_port_type_id_t      ptype_id;	/* index into port type array */
     jack_shmsize_t           offset;	/* buffer offset in shm segment */
     jack_port_id_t           id;	/* index into engine port array */
-    jack_port_id_t           uid;	/* index into engine port array */
     uint32_t			     flags;    
     char                     name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
     char                     alias1[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];

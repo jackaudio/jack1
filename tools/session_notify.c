@@ -102,20 +102,28 @@ int main(int argc, char *argv[])
 
 	for(i=0; retval[i].uid != 0; i++ ) {
 		char uidstring[16];
-		snprintf( uidstring, sizeof(uidstring), "!uuid:%d", retval[i].uid );
-		const char **ports = jack_get_ports( client, uidstring, NULL, 0 );
+
+		snprintf( uidstring, sizeof(uidstring), "%d", retval[i].uid );
+		char* port_regexp = alloca( jack_client_name_size()+3 );
+		char* client_name = jack_get_client_name_by_uuid( client, uidstring );
+		printf( "client by uuid(%d) %s\n", retval[i].uid, client_name );
+		snprintf( port_regexp, jack_client_name_size()+3, "%s", client_name );
+		printf( "port_regexp: %s\n", port_regexp );
+		jack_free(client_name);
+		const char **ports = jack_get_ports( client, port_regexp, NULL, 0 );
 		if( !ports )
 			continue;
 		for (i = 0; ports[i]; ++i) {
+			printf( "port: %s\n", ports[i] );
 			const char **connections;
 			if ((connections = jack_port_get_all_connections (client, jack_port_by_name(client, ports[i]))) != 0) {
 				for (j = 0; connections[j]; j++) {
 					printf( "jack_connect %s %s\n", ports[i], connections[j] );
 				}
-				free (connections);
+				jack_free (connections);
 			} 
 		}
-		free(ports);
+		jack_free(ports);
 
 	}
 	free(retval);
