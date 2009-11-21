@@ -2550,9 +2550,20 @@ jack_get_ports (jack_client_t *client,
 	regex_t port_regex;
 	regex_t type_regex;
 	int matching;
+	jack_client_id_t port_uuid_match = 0U;
 
 	engine = client->engine;
 
+	if( port_name_pattern ) {
+		if((strncmp( "!uuid:", port_name_pattern, sizeof("!uuid:")  ) )) {
+			printf( "%s\n",port_name_pattern+6 );   
+			port_uuid_match = atoi( port_name_pattern+6);
+			printf( "port_uuid_match = %u\n", port_uuid_match );
+			port_name_pattern = NULL;
+		}
+	}
+			
+				
 	if (port_name_pattern && port_name_pattern[0]) {
 		regcomp (&port_regex, port_name_pattern,
 			 REG_EXTENDED|REG_NOSUB);
@@ -2582,6 +2593,10 @@ jack_get_ports (jack_client_t *client,
 			}
 		}
 
+		if (matching && port_uuid_match) {
+			if( psp[i].uid != port_uuid_match )
+				matching = 0;
+		}
 		if (matching && port_name_pattern && port_name_pattern[0]) {
 			if (regexec (&port_regex, psp[i].name, 0, NULL, 0)) {
 				matching = 0;

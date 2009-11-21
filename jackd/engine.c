@@ -2447,6 +2447,19 @@ static jack_client_id_t jack_engine_get_max_uuid( jack_engine_t *engine )
 	return retval;
 }
 
+static void jack_client_fixup_uuid (jack_client_internal_t *client )
+{
+	JSList *node;
+	jack_port_t *port;
+
+	for (node = client->ports; node; node = jack_slist_next (node)) {
+		port = (jack_port_t *) node->data;
+
+		port->shared->uid = client->control->uid;
+
+	}
+}
+
 static int
 jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd )
 {
@@ -2468,18 +2481,20 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if (client->control->session_cbset) {
 			
-			if( client->control->uid == 0 )
+			if( client->control->uid == 0 ) {
 				client->control->uid=jack_engine_get_max_uuid( engine ) + 1;
+				jack_client_fixup_uuid( client );
+			}
 			reply = jack_deliver_event (engine, client, &event);
 
-			if (write (reply_fd, &client->control->uid, sizeof (client->control->uid))
+			if (write (reply_fd, (const void *) &client->control->uid, sizeof (client->control->uid))
 			    < (ssize_t) sizeof (client->control->uid)) {
 				jack_error ("cannot write GetPortConnections result "
 					    "to client via fd = %d (%s)", 
 					    reply_fd, strerror (errno));
 				goto out;
 			}
-			if (write (reply_fd, client->control->session_command, sizeof (client->control->session_command))
+			if (write (reply_fd, (const void *) client->control->session_command, sizeof (client->control->session_command))
 			    < (ssize_t) sizeof (client->control->session_command)) {
 				jack_error ("cannot write GetPortConnections result "
 					    "to client via fd = %d (%s)", 
