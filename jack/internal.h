@@ -225,7 +225,7 @@ typedef struct {
     JackEventType type;
     union {
 	uint32_t n;
-        char name[JACK_CLIENT_NAME_SIZE];    
+        char name[JACK_PORT_NAME_SIZE];    
 	jack_port_id_t port_id;
 	jack_port_id_t self_id;
     } x;
