@@ -135,6 +135,9 @@ static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_sh
 static void jack_engine_signal_problems (jack_engine_t* engine);
 static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd );
 static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *req);
+static void jack_do_set_id ( jack_engine_t *engine, jack_request_t *req);
+static void jack_do_get_id_by_uuid ( jack_engine_t *engine, jack_request_t *req);
+
 
 static inline int 
 jack_rolling_interval (jack_time_t period_usecs)
@@ -1346,6 +1349,16 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		jack_do_get_client_by_uuid (engine, req);
 		jack_unlock_graph (engine);
 		break;
+	case GetIdentifier:
+		jack_lock_graph (engine);
+		jack_do_get_id_by_uuid( engine, req );
+		jack_unlock_graph (engine);
+		break;
+	case SetIdentifier:
+		jack_lock_graph (engine);
+		jack_do_set_id (engine, req);
+		jack_unlock_graph (engine);
+		break;
 	case SessionNotify:
 		jack_lock_graph (engine);
 		if ((req->status =
@@ -2464,6 +2477,65 @@ static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *
 			req->status = 0;
 			return;
 		}
+	}
+}
+
+static void jack_do_get_id_by_uuid ( jack_engine_t *engine, jack_request_t *req)
+{
+	JSList *node,*node2;
+	req->status = -1;
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+		if( client->control->uid == req->x.identifier.client_id ) {
+			for( node2=client->identifiers; node2; node2 = jack_slist_next (node2) ) {
+				jack_identifier_t *id = (jack_identifier_t *) node2->data;
+				if( !strcmp( req->x.identifier.key, id->id_key ) ) {
+					snprintf( req->x.identifier.val, sizeof(req->x.identifier.val),
+						       	"%s", id->value );
+					req->status = 0;
+					return;
+				}
+
+
+			}
+		}
+	}
+}
+
+static void jack_do_set_id ( jack_engine_t *engine, jack_request_t *req)
+{
+	JSList *node,*node2;
+	req->status = -1;
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+		if( client->control->id == req->x.identifier.client_id ) {
+			jack_identifier_t *new_id;
+			for( node2=client->identifiers; node2; node2 = jack_slist_next (node2) ) {
+				jack_identifier_t *id = (jack_identifier_t *) node2->data;
+				if( !strcmp( req->x.identifier.key, id->id_key ) ) {
+					snprintf( id->value, sizeof(id->value),
+						       	"%s", req->x.identifier.val );
+					req->status = 0;
+					return;
+				}
+
+
+			}
+			/* client doesnt have key set. create it... */
+			new_id = (jack_identifier_t *) malloc( sizeof(jack_identifier_t) );
+			if( new_id == NULL )
+				return;
+
+			snprintf( new_id->id_key, sizeof(new_id->id_key),
+					"%s", req->x.identifier.key );
+			snprintf( new_id->value, sizeof(new_id->value),
+					"%s", req->x.identifier.val );
+
+			client->identifiers = jack_slist_append( client->identifiers, new_id );
+			req->status = 0;
+			return;
+		}
+
 	}
 }
 

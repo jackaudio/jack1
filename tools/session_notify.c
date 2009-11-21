@@ -102,8 +102,29 @@ int main(int argc, char *argv[])
 
 	for(i=0; retval[i].uid != 0; i++ ) {
 		char uidstring[16];
-
+		char *info_cookie;
 		snprintf( uidstring, sizeof(uidstring), "%d", retval[i].uid );
+
+		info_cookie = jack_get_cookie_by_uuid( client, uidstring, "info" );
+		if( info_cookie ) {
+			printf( "info cookie: %s\n", info_cookie );
+			jack_free( info_cookie );
+		}
+
+		info_cookie = jack_get_cookie_by_uuid( client, uidstring, "info2" );
+		if( info_cookie ) {
+			printf( "info2 cookie: %s\n", info_cookie );
+			jack_free( info_cookie );
+		}
+
+		info_cookie = jack_get_cookie_by_uuid( client, uidstring, "unset" );
+		if( info_cookie ) {
+			printf( "info2 cookie: %s\n", info_cookie );
+			jack_free( info_cookie );
+		} else {
+			printf( "notset cookie not set\n" );
+		}
+
 		char* port_regexp = alloca( jack_client_name_size()+3 );
 		char* client_name = jack_get_client_name_by_uuid( client, uidstring );
 		printf( "client by uuid(%d) %s\n", retval[i].uid, client_name );

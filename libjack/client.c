@@ -2536,6 +2536,32 @@ jack_on_info_shutdown (jack_client_t *client, void (*function)(jack_status_t, co
 	client->on_info_shutdown_arg = arg;
 }
 
+int jack_client_set_cookie( jack_client_t *client, const char *key, const char *value )
+{
+	jack_request_t request;
+
+	request.type = SetIdentifier;
+	request.x.identifier.client_id = client->control->id;
+	snprintf( request.x.identifier.key, sizeof(request.x.identifier.key), "%s", key );
+	snprintf( request.x.identifier.val, sizeof(request.x.identifier.val), "%s", value );
+
+	return jack_client_deliver_request( client, &request );
+}
+
+char *jack_get_cookie_by_uuid( jack_client_t *client, const char *uuid, const char *key )
+{
+	jack_request_t request;
+
+	jack_client_id_t uuid_int = atoi( uuid );
+	request.type = GetIdentifier;
+	request.x.identifier.client_id = uuid_int;
+	snprintf( request.x.identifier.key, sizeof(request.x.identifier.key), "%s", key );
+
+	if( jack_client_deliver_request( client, &request ) )
+		return NULL;
+
+	return strdup( request.x.identifier.val ); 
+}
 char *jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
 { 
 	jack_request_t request;

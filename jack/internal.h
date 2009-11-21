@@ -376,7 +376,9 @@ typedef enum {
 	RecomputeTotalLatencies = 23,
 	RecomputeTotalLatency = 24,
 	SessionNotify = 25,
-	GetClientByUUID = 26
+	GetClientByUUID = 26,
+	SetIdentifier = 27,
+	GetIdentifier = 28
 } RequestType;
 
 struct _jack_request {
@@ -418,6 +420,11 @@ struct _jack_request {
 	    int32_t conditional;
 	} POST_PACKED_STRUCTURE timebase;
 	struct {
+	    jack_client_id_t client_id;
+	    char key[JACK_CLIENT_NAME_SIZE];
+	    char val[JACK_PORT_NAME_SIZE];
+	} POST_PACKED_STRUCTURE identifier;
+	struct {
 	    //jack_options_t options;
 	    uint32_t options;
 	    jack_client_id_t id;
@@ -436,6 +443,11 @@ struct _jack_request {
 /* Per-client structure allocated in the server's address space.
  * It's here because its not part of the engine structure.
  */
+
+typedef struct {
+    char id_key[JACK_CLIENT_NAME_SIZE];
+    char value[JACK_PORT_NAME_SIZE];
+} jack_identifier_t;
 
 typedef struct _jack_client_internal {
 
@@ -466,10 +478,7 @@ typedef struct _jack_client_internal {
     int portnum;
 #endif /* JACK_USE_MACH_THREADS */
    
-    /* external clients: set by libjack
-     * internal clients: set by engine */
-    //int (*deliver_request)(void*, jack_request_t*); /* JOQ: 64/32 bug! */
-    //void *deliver_arg;
+    JSList *identifiers;   /* listof identifiers */
     jack_client_t *private_client;
 } jack_client_internal_t;
 

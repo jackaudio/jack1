@@ -1027,6 +1027,8 @@ struct session_command {
 struct session_command * jack_session_notify (jack_client_t* client, jack_session_event_t code, const char *path );
 
 char *jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid );
+char *jack_get_cookie_by_uuid( jack_client_t *client, const char *uuid, const char *key );
+int jack_client_set_cookie( jack_client_t *client, const char *key, const char *value );
 
 #ifdef __cplusplus
 }

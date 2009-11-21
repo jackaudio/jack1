@@ -94,6 +94,8 @@ main (int argc, char *argv[])
 	   there is work to be done.
 	*/
 
+	jack_client_set_cookie( client, "info", "simple" );
+	jack_client_set_cookie( client, "info2", "no" );
 	jack_set_process_callback (client, process, 0);
 
 	/* tell the JACK server to call `jack_shutdown()' if
