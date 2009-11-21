@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 {
 	parse_arguments(argc, argv);
 	struct session_command *retval;
-	int i;
+	int i,j;
 
 
 	/* become a JACK client */
@@ -96,8 +96,28 @@ int main(int argc, char *argv[])
 
 
 	retval = jack_session_notify( client, notify_type, save_path );
-	for(i=0; retval[i].uid != 0; i++ )
+	for(i=0; retval[i].uid != 0; i++ ) {
 		printf( "%s &\n", retval[i].command );
+	}
+
+	for(i=0; retval[i].uid != 0; i++ ) {
+		char uidstring[16];
+		snprintf( uidstring, sizeof(uidstring), "!uuid:%d", retval[i].uid );
+		const char **ports = jack_get_ports( client, uidstring, NULL, 0 );
+		if( !ports )
+			continue;
+		for (i = 0; ports[i]; ++i) {
+			const char **connections;
+			if ((connections = jack_port_get_all_connections (client, jack_port_by_name(client, ports[i]))) != 0) {
+				for (j = 0; connections[j]; j++) {
+					printf( "jack_connect %s %s\n", ports[i], connections[j] );
+				}
+				free (connections);
+			} 
+		}
+		free(ports);
+
+	}
 	free(retval);
 
 	jack_client_close(client);
