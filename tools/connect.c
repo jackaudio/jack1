@@ -159,11 +159,13 @@ main (int argc, char *argv[])
 			jack_free( clientname );
 		} else {
 			snprintf( portB, sizeof(portB), "%s", argv[argc-2] );
-			printf( "argv...>%s<", argv[argc-2] );
 		}
 
 		free( tmpname );
 
+	} else {
+		snprintf( portA, sizeof(portA), "%s", argv[argc-1] );
+		snprintf( portB, sizeof(portB), "%s", argv[argc-2] );
 	}
 	if ((port1 = jack_port_by_name(client, portA)) == 0) {
 		fprintf (stderr, "ERROR %s not a valid port\n", portA);
