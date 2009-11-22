@@ -39,13 +39,15 @@ process (jack_nframes_t nframes, void *arg)
 
 char *session_callback( jack_session_event_t code, const char *path, const char *prefix, void *arg )
 {
+	char retval[100];
 	printf( "session notification\n" );
 	printf( "path %s, prefix %s, type: %s\n", path, prefix, code == JackSessionSave ? "save" : "quit" );
 
 	if( code == JackSessionQuit )
 		exit(1); 
 
-	return strdup( "jack_simpleclient" );
+	snprintf( retval, 100, "jack_simpleclient %s", prefix );
+	return strdup( retval );
 }
 
 /**
