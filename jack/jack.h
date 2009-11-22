@@ -1020,7 +1020,7 @@ void jack_set_info_function (void (*func)(const char *));
 void jack_free(void* ptr);
 
 struct session_command {
-	uint32_t uid;
+	char uid[16];
 	char command[256];
 };
 

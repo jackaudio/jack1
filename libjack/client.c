@@ -1350,9 +1350,9 @@ jack_session_notify (jack_client_t* client, jack_session_event_t code, const cha
 					" server (%s)", request.type, strerror (errno));
 			goto out;
 		}
-		retval[num_replies-1].uid = uid;
+		snprintf( retval[num_replies-1].uid, sizeof( retval[num_replies-1].uid ), "%d", uid );
 	}
-	retval[num_replies-1].uid = 0U;
+	retval[num_replies-1].uid[0] = '\0';
 	return retval;
 out:
 	if( retval )

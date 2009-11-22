@@ -138,21 +138,17 @@ int main(int argc, char *argv[])
 
 
 	retval = jack_session_notify( client, notify_type, save_path );
-	for(i=0; retval[i].uid != 0; i++ ) {
-		char uidstring[16];
-		snprintf( uidstring, sizeof(uidstring), "%d", retval[i].uid );
+	for(i=0; retval[i].uid[0] != 0; i++ ) {
 		printf( "%s &\n", retval[i].command );
-		add_uuid_mapping(uidstring); 
+		add_uuid_mapping(retval[i].uid); 
 	}
 
 	printf( "sleep 10\n" );
 
-	for(k=0; retval[k].uid != 0; k++ ) {
-		char uidstring[16];
-		snprintf( uidstring, sizeof(uidstring), "%d", retval[k].uid );
+	for(k=0; retval[k].uid[0] != 0; k++ ) {
 
 		char* port_regexp = alloca( jack_client_name_size()+3 );
-		char* client_name = jack_get_client_name_by_uuid( client, uidstring );
+		char* client_name = jack_get_client_name_by_uuid( client, retval[k].uid );
 		snprintf( port_regexp, jack_client_name_size()+3, "%s.*", client_name );
 		jack_free(client_name);
 		const char **ports = jack_get_ports( client, port_regexp, NULL, 0 );
