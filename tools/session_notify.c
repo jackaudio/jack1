@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
 {
 	parse_arguments(argc, argv);
 	struct session_command *retval;
-	int i,j;
+	int k,i,j;
 
 
 	/* become a JACK client */
@@ -145,17 +145,20 @@ int main(int argc, char *argv[])
 		add_uuid_mapping(uidstring); 
 	}
 
-	for(i=0; retval[i].uid != 0; i++ ) {
+	printf( "sleep 10\n" );
+
+	for(k=0; retval[k].uid != 0; k++ ) {
 		char uidstring[16];
-		snprintf( uidstring, sizeof(uidstring), "%d", retval[i].uid );
+		snprintf( uidstring, sizeof(uidstring), "%d", retval[k].uid );
 
 		char* port_regexp = alloca( jack_client_name_size()+3 );
 		char* client_name = jack_get_client_name_by_uuid( client, uidstring );
-		snprintf( port_regexp, jack_client_name_size()+3, "%s", client_name );
+		snprintf( port_regexp, jack_client_name_size()+3, "%s.*", client_name );
 		jack_free(client_name);
 		const char **ports = jack_get_ports( client, port_regexp, NULL, 0 );
-		if( !ports )
+		if( !ports ) {
 			continue;
+		}
 		for (i = 0; ports[i]; ++i) {
 			const char **connections;
 			if ((connections = jack_port_get_all_connections (client, jack_port_by_name(client, ports[i]))) != 0) {
