@@ -1019,16 +1019,35 @@ void jack_set_info_function (void (*func)(const char *));
  */
 void jack_free(void* ptr);
 
+/**
+ * send a save or quit event, to all clients listening for session
+ * callbacks. the returned strings of the clients are accumulated and
+ * returned as an array of jack_session_command_t.
+ * its terminated by ret[i].uuid[0]='\0'
+ */
 
 jack_session_command_t *jack_session_notify (jack_client_t* client,
 					     jack_session_event_t code,
 					     const char *path ) JACK_WEAK_EXPORT;
 
+/**
+ * get the jack client name for a uuid
+ */
+
 char *jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid ) JACK_WEAK_EXPORT;
+
+/**
+ * get some metadata cookie for client with uuid
+ */
 
 char *jack_get_cookie_by_uuid( jack_client_t *client,
 			       const char *uuid,
 			       const char *key ) JACK_WEAK_EXPORT;
+
+/**
+ * set metadata cookie on self
+ */
+
 int jack_client_set_cookie( jack_client_t *client,
 			    const char *key,
 			    const char *value ) JACK_WEAK_EXPORT;

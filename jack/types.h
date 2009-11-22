@@ -372,6 +372,24 @@ typedef void (*JackShutdownCallback)(void *arg);
  */
 typedef void (*JackInfoShutdownCallback)(jack_status_t code, const char* reason, void *arg);
 
+/**
+ * Prototype for the client supplied function that is called
+ * whenever a session notification is sent via jack_session_notify().
+ * for a save event the client is required to save its state.
+ * it must save it into session_dir, and at least use prefix for the first
+ * part of the filename. (it is free to create a directory or create more
+ * files, as long as these start with prefix.)
+ * the prefix also acts as uuid, which the client needs to specify
+ * to jack_client_open()  upon session reload.
+ *
+ * the return value is a commandline, which will restore the state.
+ *
+ 
+ * @param code the type of the Event (Save or Quit)
+ * @param session_dir with trailing separator.
+ * @param prefix for saved files. 
+ * @param arg pointer to a client supplied structure
+ */
 
 typedef char *(*JackSessionCallback)(jack_session_event_t code, const char* session_dir, const char* prefix, void *arg);
 
