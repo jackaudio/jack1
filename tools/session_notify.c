@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
 				for (j = 0; connections[j]; j++) {
 					char *src = map_port_name_to_uuid_port( ports[i] ); 
 					char *dst = map_port_name_to_uuid_port( connections[j] ); 
-					printf( "jack_connect -u %s %s\n", src, dst );
+					printf( "jack_connect -u \"%s\" \"%s\"\n", src, dst );
 				}
 				jack_free (connections);
 			} 
