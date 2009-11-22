@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <jack/jack.h>
+#include <jack/jslist.h>
 #include <jack/transport.h>
 
 char *package;				/* program name */
@@ -74,6 +75,47 @@ void parse_arguments(int argc, char *argv[])
 	exit(9);
 }
 
+typedef struct {
+	char name[32];
+	char uuid[16];
+} uuid_map_t;
+
+JSList *uuid_map = NULL;
+
+void add_uuid_mapping( const char *uuid ) {
+	char *clientname = jack_get_client_name_by_uuid( client, uuid );
+	if( !clientname ) {
+		printf( "error... cant find client for uuid" );
+		return;
+	}
+
+	uuid_map_t *mapping = malloc( sizeof(uuid_map_t) );
+	snprintf( mapping->uuid, sizeof(mapping->uuid), "%s", uuid );
+	snprintf( mapping->name, sizeof(mapping->name), "%s", clientname );
+	uuid_map = jack_slist_append( uuid_map, mapping );
+}
+
+char *map_port_name_to_uuid_port( const char *port_name )
+{
+	JSList *node;
+	char retval[300];
+	char *port_component = strchr( port_name,':' );
+	char *client_component = strdup( port_name );
+	strchr( client_component, ':' )[0] = '\0';
+
+	sprintf( retval, "%s", port_name );
+
+	for( node=uuid_map; node; node=jack_slist_next(node) ) {
+		uuid_map_t *mapping = node->data;
+		if( !strcmp( mapping->name, client_component ) ) {
+			sprintf( retval, "%s%s", mapping->uuid, port_component );
+			break;
+		}
+	}
+
+	return strdup(retval);
+}
+
 int main(int argc, char *argv[])
 {
 	parse_arguments(argc, argv);
@@ -97,49 +139,30 @@ int main(int argc, char *argv[])
 
 	retval = jack_session_notify( client, notify_type, save_path );
 	for(i=0; retval[i].uid != 0; i++ ) {
+		char uidstring[16];
+		snprintf( uidstring, sizeof(uidstring), "%d", retval[i].uid );
 		printf( "%s &\n", retval[i].command );
+		add_uuid_mapping(uidstring); 
 	}
 
 	for(i=0; retval[i].uid != 0; i++ ) {
 		char uidstring[16];
-		char *info_cookie;
 		snprintf( uidstring, sizeof(uidstring), "%d", retval[i].uid );
-
-		info_cookie = jack_get_cookie_by_uuid( client, uidstring, "info" );
-		if( info_cookie ) {
-			printf( "info cookie: %s\n", info_cookie );
-			jack_free( info_cookie );
-		}
-
-		info_cookie = jack_get_cookie_by_uuid( client, uidstring, "info2" );
-		if( info_cookie ) {
-			printf( "info2 cookie: %s\n", info_cookie );
-			jack_free( info_cookie );
-		}
-
-		info_cookie = jack_get_cookie_by_uuid( client, uidstring, "unset" );
-		if( info_cookie ) {
-			printf( "info2 cookie: %s\n", info_cookie );
-			jack_free( info_cookie );
-		} else {
-			printf( "notset cookie not set\n" );
-		}
 
 		char* port_regexp = alloca( jack_client_name_size()+3 );
 		char* client_name = jack_get_client_name_by_uuid( client, uidstring );
-		printf( "client by uuid(%d) %s\n", retval[i].uid, client_name );
 		snprintf( port_regexp, jack_client_name_size()+3, "%s", client_name );
-		printf( "port_regexp: %s\n", port_regexp );
 		jack_free(client_name);
 		const char **ports = jack_get_ports( client, port_regexp, NULL, 0 );
 		if( !ports )
 			continue;
 		for (i = 0; ports[i]; ++i) {
-			printf( "port: %s\n", ports[i] );
 			const char **connections;
 			if ((connections = jack_port_get_all_connections (client, jack_port_by_name(client, ports[i]))) != 0) {
 				for (j = 0; connections[j]; j++) {
-					printf( "jack_connect %s %s\n", ports[i], connections[j] );
+					char *src = map_port_name_to_uuid_port( ports[i] ); 
+					char *dst = map_port_name_to_uuid_port( connections[j] ); 
+					printf( "jack_connect -u %s %s\n", src, dst );
 				}
 				jack_free (connections);
 			} 
