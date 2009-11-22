@@ -447,5 +447,9 @@ enum JackPortFlags {
      JackPortIsTerminal = 0x10
 };	    
 
+typedef struct  {
+	char uuid[16];
+	char command[256];
+} jack_session_command_t;
 
 #endif /* __jack_types_h__ */

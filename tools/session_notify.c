@@ -119,7 +119,7 @@ char *map_port_name_to_uuid_port( const char *port_name )
 int main(int argc, char *argv[])
 {
 	parse_arguments(argc, argv);
-	struct session_command *retval;
+	jack_session_command_t *retval;
 	int k,i,j;
 
 
@@ -138,17 +138,17 @@ int main(int argc, char *argv[])
 
 
 	retval = jack_session_notify( client, notify_type, save_path );
-	for(i=0; retval[i].uid[0] != 0; i++ ) {
+	for(i=0; retval[i].uuid[0] != 0; i++ ) {
 		printf( "%s &\n", retval[i].command );
-		add_uuid_mapping(retval[i].uid); 
+		add_uuid_mapping(retval[i].uuid); 
 	}
 
 	printf( "sleep 10\n" );
 
-	for(k=0; retval[k].uid[0] != 0; k++ ) {
+	for(k=0; retval[k].uuid[0] != 0; k++ ) {
 
 		char* port_regexp = alloca( jack_client_name_size()+3 );
-		char* client_name = jack_get_client_name_by_uuid( client, retval[k].uid );
+		char* client_name = jack_get_client_name_by_uuid( client, retval[k].uuid );
 		snprintf( port_regexp, jack_client_name_size()+3, "%s.*", client_name );
 		jack_free(client_name);
 		const char **ports = jack_get_ports( client, port_regexp, NULL, 0 );

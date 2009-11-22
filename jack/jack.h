@@ -1019,16 +1019,19 @@ void jack_set_info_function (void (*func)(const char *));
  */
 void jack_free(void* ptr);
 
-struct session_command {
-	char uid[16];
-	char command[256];
-};
 
-struct session_command * jack_session_notify (jack_client_t* client, jack_session_event_t code, const char *path );
+jack_session_command_t *jack_session_notify (jack_client_t* client,
+					     jack_session_event_t code,
+					     const char *path ) JACK_WEAK_EXPORT;
 
-char *jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid );
-char *jack_get_cookie_by_uuid( jack_client_t *client, const char *uuid, const char *key );
-int jack_client_set_cookie( jack_client_t *client, const char *key, const char *value );
+char *jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid ) JACK_WEAK_EXPORT;
+
+char *jack_get_cookie_by_uuid( jack_client_t *client,
+			       const char *uuid,
+			       const char *key ) JACK_WEAK_EXPORT;
+int jack_client_set_cookie( jack_client_t *client,
+			    const char *key,
+			    const char *value ) JACK_WEAK_EXPORT;
 
 #ifdef __cplusplus
 }

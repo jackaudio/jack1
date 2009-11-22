@@ -1306,12 +1306,12 @@ jack_set_freewheel (jack_client_t* client, int onoff)
 
 
 
-struct session_command *
+jack_session_command_t *
 jack_session_notify (jack_client_t* client, jack_session_event_t code, const char *path )
 {
 	jack_request_t request;
 
-	struct session_command *retval = NULL;
+	jack_session_command_t *retval = NULL;
 	int num_replies = 0;
 	request.type = SessionNotify;
 	if( path ) 
@@ -1339,7 +1339,7 @@ jack_session_notify (jack_client_t* client, jack_session_event_t code, const cha
 		}
 
 		num_replies += 1;
-		retval = realloc( retval, (num_replies)*sizeof(struct session_command) );
+		retval = realloc( retval, (num_replies)*sizeof(jack_session_command_t) );
 		if( uid == 0 )
 			break;
 
@@ -1350,9 +1350,9 @@ jack_session_notify (jack_client_t* client, jack_session_event_t code, const cha
 					" server (%s)", request.type, strerror (errno));
 			goto out;
 		}
-		snprintf( retval[num_replies-1].uid, sizeof( retval[num_replies-1].uid ), "%d", uid );
+		snprintf( retval[num_replies-1].uuid, sizeof( retval[num_replies-1].uuid ), "%d", uid );
 	}
-	retval[num_replies-1].uid[0] = '\0';
+	retval[num_replies-1].uuid[0] = '\0';
 	return retval;
 out:
 	if( retval )
