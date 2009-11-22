@@ -2566,7 +2566,10 @@ char *jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
 { 
 	jack_request_t request;
 
-	jack_client_id_t uuid_int = atoi( uuid );
+	char *end_ptr;
+	jack_client_id_t uuid_int = strtol( uuid, &end_ptr, 10 );
+	if( *end_ptr != '\0' )
+		return NULL;
 	request.type = GetClientByUUID;
 	request.x.client_id = uuid_int;
 	if( jack_client_deliver_request( client, &request ) )
