@@ -1052,6 +1052,7 @@ int jack_client_set_cookie( jack_client_t *client,
 			    const char *key,
 			    const char *value ) JACK_WEAK_EXPORT;
 
+int jack_rename_client( jack_client_t *client, const char *oldname, const char *newname );
 #ifdef __cplusplus
 }
 #endif

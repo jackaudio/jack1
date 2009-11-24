@@ -2548,7 +2548,8 @@ int jack_client_set_cookie( jack_client_t *client, const char *key, const char *
 	return jack_client_deliver_request( client, &request );
 }
 
-char *jack_get_cookie_by_uuid( jack_client_t *client, const char *uuid, const char *key )
+char *
+jack_get_cookie_by_uuid( jack_client_t *client, const char *uuid, const char *key )
 {
 	jack_request_t request;
 
@@ -2562,7 +2563,9 @@ char *jack_get_cookie_by_uuid( jack_client_t *client, const char *uuid, const ch
 
 	return strdup( request.x.identifier.val ); 
 }
-char *jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
+
+char *
+jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
 { 
 	jack_request_t request;
 
@@ -2576,6 +2579,19 @@ char *jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
 		return NULL;
 
 	return strdup( request.x.port_info.name );
+}
+
+int 
+jack_rename_client( jack_client_t *client, const char *oldname, const char *newname )
+{
+	jack_request_t request;
+
+	request.type = RenameClient;
+	snprintf( request.x.clientrename.oldname, sizeof( request.x.clientrename.oldname ),
+			"%s", oldname );
+	snprintf( request.x.clientrename.newname, sizeof( request.x.clientrename.newname ),
+			"%s", newname );
+	return jack_client_deliver_request( client, &request );
 }
 
 const char **

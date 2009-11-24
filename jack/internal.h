@@ -378,7 +378,8 @@ typedef enum {
 	SessionNotify = 25,
 	GetClientByUUID = 26,
 	SetIdentifier = 27,
-	GetIdentifier = 28
+	GetIdentifier = 28,
+	RenameClient = 29
 } RequestType;
 
 struct _jack_request {
@@ -424,6 +425,10 @@ struct _jack_request {
 	    char key[JACK_CLIENT_NAME_SIZE];
 	    char val[JACK_PORT_NAME_SIZE];
 	} POST_PACKED_STRUCTURE identifier;
+	struct {
+	    char oldname[JACK_CLIENT_NAME_SIZE];
+	    char newname[JACK_CLIENT_NAME_SIZE];
+	} POST_PACKED_STRUCTURE clientrename;
 	struct {
 	    //jack_options_t options;
 	    uint32_t options;
