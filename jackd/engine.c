@@ -2549,6 +2549,15 @@ static void jack_do_client_rename ( jack_engine_t *engine, jack_request_t *req)
 {
 	JSList *node,*node2;
 	req->status = -1;
+
+	// first check if newname is not already taken.
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+		if( !strcmp( (char *)client->control->name, req->x.clientrename.newname )) {
+			req->status = -2;
+			return;
+		}
+	}
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if( !strcmp( (char *)client->control->name, req->x.clientrename.oldname )) {
