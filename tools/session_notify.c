@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
 
 		char* port_regexp = alloca( jack_client_name_size()+3 );
 		char* client_name = jack_get_client_name_by_uuid( client, retval[k].uuid );
-		snprintf( port_regexp, jack_client_name_size()+3, "%s.*", client_name );
+		snprintf( port_regexp, jack_client_name_size()+3, "%s:.*", client_name );
 		jack_free(client_name);
 		const char **ports = jack_get_ports( client, port_regexp, NULL, 0 );
 		if( !ports ) {
