@@ -1,6 +1,5 @@
 
 from ctypes import *
-from threading import Thread, Condition
 
 class jack_client_t(Structure):
     pass
@@ -95,57 +94,6 @@ JackPortIsPhysical = 0x4
 JackPortCanMonitor = 0x8
 JackPortIsTerminal = 0x10
 
-pthread_t = c_ulong
-
-thread_func = CFUNCTYPE( c_void_p, c_void_p )
-jack_thread_creator_t = CFUNCTYPE( c_int, POINTER(pthread_t), c_void_p, thread_func, c_void_p )
-
-set_thread_creator  = libjack.jack_set_thread_creator
-set_thread_creator.argtypes =  [jack_thread_creator_t]
-set_thread_creator.restype = None
-
-pthread = cdll.LoadLibrary( "libpthread.so.0" )
-
-pthread_self = pthread.pthread_self 
-pthread_self.argtypes = []
-pthread_self.restype = pthread_t
-
-#typedef int (*jack_thread_creator_t)(pthread_t*,
-#				     const pthread_attr_t*,
-#				     void* (*function)(void*),
-#				     void* arg);
-
-class JackThread( Thread ):
-    def __init__( self, func, arg ):
-	Thread.__init__( self )
-	self.func = func
-	self.arg = arg
-	self.cond = Condition()
-
-    def run(self):
-	print "thread runs..."
-	self.thread_id = pthread_self()
-	print "cond..."
-	self.cond.acquire()
-	self.cond.notify()
-	self.cond.release()
-	print "ok... calling func.." 
-	self.func( self.arg )
-	print "jack thread exiting" 
-
-def create_jack_thread( pthread_p, attr, func, arg ):
-    print "creating thread"
-
-    thread = JackThread( func, arg )
-    thread.cond.acquire()
-    thread.start()
-    thread.cond.wait()
-    thread.cond.release()
-    pthread_p[0] = thread.thread_id
-
-    return 0
-
-
 
 class Port( object ):
     def __init__( self, client, name ):
@@ -211,15 +159,11 @@ class JackClient(object):
     def __init__( self, name ):
 	self.client = client_new( name )
 	self.reg_cb = PortRegistrationCallback( self.port_registration_cb )
-	self.thread_creator = jack_thread_creator_t( create_jack_thread )
-
 	set_port_registration_callback( self.client, self.reg_cb, None )
 
-	#set_thread_creator( self.thread_creator )
 	activate( self.client )
 
     def close( self ):
-	deactivate( self.client )
 	client_close( self.client )
 
     def get_graph( self ):
