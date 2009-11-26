@@ -46,7 +46,7 @@ char *session_callback( jack_session_event_t code, const char *path, const char 
 	if( code == JackSessionQuit )
 		exit(1); 
 
-	snprintf( retval, 100, "jack_simpleclient %s", prefix );
+	snprintf( retval, 100, "jack_simple_client %s", prefix );
 	return strdup( retval );
 }
 
