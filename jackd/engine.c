@@ -4071,7 +4071,8 @@ next:
 	}
 
 	client->ports = jack_slist_prepend (client->ports, port);
-	jack_port_registration_notify (engine, port_id, TRUE);
+	if( client->control->active )
+		jack_port_registration_notify (engine, port_id, TRUE);
 	jack_unlock_graph (engine);
 
 	VERBOSE (engine, "registered port %s, offset = %u",

@@ -815,7 +815,7 @@ int
 jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 {
 	jack_client_internal_t *client;
-	JSList *node;
+	JSList *node, *node2;
 	int ret = -1;
 
 	jack_lock_graph (engine);
@@ -840,10 +840,17 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 					  ++engine->external_client_cnt);
 			jack_sort_graph (engine);
 
+			// send delayed notifications for ports.
+			for (node2 = client->ports; node2; node2 = jack_slist_next (node2)) {
+				jack_port_internal_t *port = (jack_port_internal_t *) node2->data;
+				jack_port_registration_notify (engine, port->shared->id, TRUE);
+			}
+
 			ret = 0;
 			break;
 		}
 	}
+
 
 	jack_unlock_graph (engine);
 	return ret;
