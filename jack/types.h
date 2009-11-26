@@ -467,6 +467,7 @@ enum JackPortFlags {
 
 typedef struct  {
 	char uuid[16];
+	char client_name[33];
 	char command[256];
 } jack_session_command_t;
 

@@ -1344,6 +1344,12 @@ jack_session_notify (jack_client_t* client, jack_session_event_t code, const cha
 			break;
 
 
+		if (read (client->request_fd, retval[num_replies-1].client_name, sizeof (retval[num_replies].client_name))
+			       	!= sizeof (retval[num_replies-1].client_name)) {
+			jack_error ("cannot read result for request type %d from"
+					" server (%s)", request.type, strerror (errno));
+			goto out;
+		}
 		if (read (client->request_fd, retval[num_replies-1].command, sizeof (retval[num_replies].command))
 			       	!= sizeof (retval[num_replies-1].command)) {
 			jack_error ("cannot read result for request type %d from"
