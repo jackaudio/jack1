@@ -2589,7 +2589,7 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
   
 	int retval = 0;
 	int reply;
-	jack_client_id_t finalizer = 0;
+	jack_client_id_t finalizer=0;
 
 	event.type = SaveSession;
 	snprintf (event.x.name, sizeof (event.x.name), "%s", req->x.session.path );
@@ -2609,14 +2609,22 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 
 			if (write (reply_fd, (const void *) &client->control->uid, sizeof (client->control->uid))
 			    < (ssize_t) sizeof (client->control->uid)) {
-				jack_error ("cannot write GetPortConnections result "
+				jack_error ("cannot write SessionNotify result " 
 					    "to client via fd = %d (%s)", 
 					    reply_fd, strerror (errno));
 				goto out;
 			}
-			if (write (reply_fd, (const void *) client->control->session_command, sizeof (client->control->session_command))
+			if (write (reply_fd, (const void *) client->control->name, sizeof (client->control->name))
+			    < (ssize_t) sizeof (client->control->name)) {
+				jack_error ("cannot write SessionNotify result "
+					    "to client via fd = %d (%s)", 
+					    reply_fd, strerror (errno));
+				goto out;
+			}
+			if (write (reply_fd, (const void *) client->control->session_command, 
+						sizeof (client->control->session_command))
 			    < (ssize_t) sizeof (client->control->session_command)) {
-				jack_error ("cannot write GetPortConnections result "
+				jack_error ("cannot write SessionNotify result "
 					    "to client via fd = %d (%s)", 
 					    reply_fd, strerror (errno));
 				goto out;
@@ -2628,7 +2636,7 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 	}
 	if (write (reply_fd, &finalizer, sizeof (finalizer))
 			< (ssize_t) sizeof (finalizer)) {
-		jack_error ("cannot write GetPortConnections result "
+		jack_error ("cannot write SessionNotify result "
 				"to client via fd = %d (%s)", 
 				reply_fd, strerror (errno));
 		goto out;
