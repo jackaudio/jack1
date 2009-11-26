@@ -49,7 +49,7 @@ rename_client.argtypes = [ client_p, c_char_p, c_char_p ]
 rename_client.restype = c_int 
 
 class jack_session_command_t( Structure ):
-    _fields_ = [ ("uuid", 16*c_char ), ("command", 256*c_char ) ]
+    _fields_ = [ ("uuid", 16*c_char ), ("client_name", 33*c_char), ("command", 256*c_char ) ]
 
 session_notify = libjack.jack_session_notify
 session_notify.argtypes = [ client_p, c_uint, c_char_p ]
@@ -101,6 +101,10 @@ JackPortIsOutput = 0x2
 JackPortIsPhysical = 0x4
 JackPortCanMonitor = 0x8
 JackPortIsTerminal = 0x10
+
+JackSessionSave = 1
+JackSessionQuit = 2
+
 
 
 class Port( object ):
@@ -220,6 +224,11 @@ class JackGraph( object ):
 	#      also needs to lock 
 	client.rename( "%s-%d"%(cname_prefix,num ) )
 
+class NotifyReply(object):
+    def __init__( self, uuid, clientname, commandline ):
+	self.uuid = uuid
+	self.clientname = clientname
+	self.commandline = commandline
 
 
 class JackClient(object):
@@ -247,6 +256,19 @@ class JackClient(object):
     def port_registration_cb( self, port_id, reg, arg ):
 	port_p = port_by_id( self.client, port_id )
 	self.port_queue.put( (port_p,reg) )
+
+
+    def session_save( self, path ):
+	commands = session_notify( self.client, JackSessionSave, path )
+	i=0
+	retval = []
+	while( commands[i].uuid[0] != 0 ):
+	    retval.append( NotifyReply( commands[i].uuid, commands[i].clientname, commands[i].commandline ) )
+	
+	jack_free( commands )
+
+
+
 
 
 
