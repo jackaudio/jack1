@@ -421,7 +421,7 @@ int jack_set_xrun_callback (jack_client_t *,
 
 int jack_set_session_callback(jack_client_t *client,
 			    JackSessionCallback session_save_callback,
-			    void *arg);
+			    void *arg) JACK_WEAK_EXPORT;
 
 /*@}*/
 

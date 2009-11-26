@@ -158,6 +158,7 @@ class Client( object ):
 	self.name = name
 	self.ports = []
 	self.commandline = None
+	self.isinfra = False
 
     def get_commandline( self ):
 	if self.commandline:
@@ -183,6 +184,10 @@ class Client( object ):
 	    i+=1
 
 	jack_free( ports )
+
+    def set_infra( self, cmdline ):
+	self.isinfra = True
+	self.commandline = cmdline
 
 
 

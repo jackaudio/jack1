@@ -5,17 +5,22 @@ import state
 import subprocess
 
 SESSION_PATH="/home/torbenh/jackSessions/"
-implicit_clients = ["system"]
-infra_clients = ["system"]
 
 sd = state.SessionDom( SESSION_PATH+"session.xml" )
 
 cl=libjack.JackClient("bla5")
 g=cl.get_graph()
 
+children = []
+
+for ic in sd.get_infra_clients():
+    if not ic[0] in g.clients.keys():
+	children.append( subprocess.Popen( ic[1], shell=True ) )
+
+
 print sd.get_client_names()
 
-g.ensure_clientnames( sd.get_client_names() )
+g.ensure_clientnames( sd.get_reg_client_names() )
 
 # get graph again... renaming isnt prefect yet.
 g=cl.get_graph()
@@ -28,8 +33,7 @@ for p in sd.get_port_names():
 print conns
 
 # now fire up the processes
-children = []
-for cname in sd.get_client_names():
+for cname in sd.get_reg_client_names():
     cmd = sd.get_commandline_for_client( cname )
     children.append( subprocess.Popen( cmd, shell=True ) )
 

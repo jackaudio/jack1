@@ -14,6 +14,10 @@ class SessionDom( object ):
 	cl_elem = Element( "jackclient" )
 	cl_elem.setAttribute( "cmdline", client.get_commandline() )
 	cl_elem.setAttribute( "jackname", client.name )
+	if client.isinfra:
+	    cl_elem.setAttribute( "infra", "True" )
+	else:
+	    cl_elem.setAttribute( "infra", "False" )
 
 	for p in client.ports:
 	    po_elem = Element( "port" )
@@ -41,6 +45,23 @@ class SessionDom( object ):
 
 	return retval
 
+    def get_reg_client_names(self):
+	retval = []
+	doc = self.dom.documentElement
+	for c in doc.getElementsByTagName( "jackclient" ):
+	    if c.getAttribute( "infra" ) != "True":
+		retval.append( c.getAttribute( "jackname" ) )
+
+	return retval
+
+    def get_infra_clients(self):
+	retval = []
+	doc = self.dom.documentElement
+	for c in doc.getElementsByTagName( "jackclient" ):
+	    if c.getAttribute( "infra" ) == "True":
+		retval.append( (c.getAttribute( "jackname" ), c.getAttribute( "cmdline" ) ) )
+
+	return retval
     def get_port_names(self):
 	retval = []
 	doc = self.dom.documentElement
