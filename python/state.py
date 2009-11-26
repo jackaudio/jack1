@@ -1,12 +1,12 @@
 
-from xml.dom.minidom import getDOMImplementation, parseString, Element
+from xml.dom.minidom import getDOMImplementation, parse, Element
 
 impl = getDOMImplementation()
 
 class SessionDom( object ):
     def __init__( self, filename=None ):
 	if filename:
-	    self.dom = parseString( filename )
+	    self.dom = parse( filename )
 	else:
 	    self.dom = impl.createDocument(None,"jacksession",None)
     
@@ -31,24 +31,37 @@ class SessionDom( object ):
 	self.dom.documentElement.appendChild( cl_elem )
 
     def get_xml(self):
-	return self.dom.toxml()
+	return self.dom.toprettyxml()
 
     def get_client_names(self):
+	retval = []
 	doc = self.dom.documentElement
 	for c in doc.getElementsByTagName( "jackclient" ):
-	    yield c.getAttribute( "jackname" ).value
+	    retval.append( c.getAttribute( "jackname" ) )
+
+	return retval
 
     def get_port_names(self):
+	retval = []
 	doc = self.dom.documentElement
 	for c in doc.getElementsByTagName( "port" ):
-	    yield c.getAttribute( "name" ).value
+	    retval.append( c.getAttribute( "name" ) )
+	return retval
 
     def get_connections_for_port( self, portname ):
+	retval = []
 	doc = self.dom.documentElement
 	for c in doc.getElementsByTagName( "port" ):
-	    if c.getAttribute( "name" ).value == portname:
+	    if c.getAttribute( "name" ) == portname:
 		for i in c.getElementsByTagName( "conn" ):
-		    yield i.getAttribute( "dst" ).value
+		    retval.append( i.getAttribute( "dst" ) )
+	return retval
+
+    def get_commandline_for_client( self, name ):
+	doc = self.dom.documentElement
+	for c in doc.getElementsByTagName( "jackclient" ):
+	    if c.getAttribute( "jackname" ) == name:
+		return c.getAttribute( "cmdline" )
 
 	
 

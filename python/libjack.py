@@ -1,6 +1,7 @@
 
 from ctypes import *
 import string
+from Queue import Queue
 
 class jack_client_t(Structure):
     pass
@@ -49,7 +50,7 @@ rename_client.argtypes = [ client_p, c_char_p, c_char_p ]
 rename_client.restype = c_int 
 
 class jack_session_command_t( Structure ):
-    _fields_ = [ ("uuid", 16*c_char ), ("client_name", 33*c_char), ("command", 256*c_char ) ]
+    _fields_ = [ ("uuid", 16*c_char ), ("clientname", 33*c_char), ("command", 256*c_char ) ]
 
 session_notify = libjack.jack_session_notify
 session_notify.argtypes = [ client_p, c_uint, c_char_p ]
@@ -113,8 +114,12 @@ class Port( object ):
 	self.name = name
 	self.portname = name.split(':')[1]
 	self.port_p = port_by_name( self.client, name )
+	self.conns = self.get_live_connections()
 
     def get_connections( self ):
+	return self.conns
+
+    def get_live_connections( self ):
 	conns = port_get_all_connections( self.client, self.port_p )
 	if not conns:
 	    return []
@@ -125,7 +130,6 @@ class Port( object ):
 	    retval.append( conns[i] )
 	    i+=1
 	jack_free(conns)
-	
 
 	return retval
 
@@ -161,13 +165,17 @@ class Client( object ):
 	else:
 	    return ""
 
+    def set_commandline( self, cmdline ):
+	self.commandline = cmdline
+
     def add_port( self, portname ):
 	self.ports.append( Port( self.client, portname ) )
 
     def rename( self, newname ):
-	rename_client( self.client, self.name, self.newname )
+	rename_client( self.client, self.name, newname )
 	self.ports = []
-	ports = get_ports( self.client, self.newname+":.*", None, 0 )
+	ports = get_ports( self.client, newname+":.*", None, 0 )
+	self.name = newname
 
 	i=0
 	while(ports[i]):
@@ -182,14 +190,6 @@ class JackGraph( object ):
     def __init__( self, client, ports, uuids=[] ):
 	self.client = client
 	self.clients = {}
-	self.uuid_to_name = {}
-	self.name_to_uuid = {}
-	for uid in uuids:
-	    name = get_client_name_by_uuid( self.client, uid )
-	    if name:
-		self.uuid_to_name[uid] = name
-		self.name_to_uuid[name] = uid
-		jack_free( name )
 
 	i=0
 	while(ports[i]):
@@ -203,26 +203,55 @@ class JackGraph( object ):
     def get_client( self, name ):
 	return self.clients[name]
 
-    def get_client_by_uuid( self, uuid ):
-	return self.clients[self.uuid_to_name[uuid]]
+    def get_port_list( self ):
+	retval = []
+	for c in self.clients.values():
+	    for p in c.ports:
+		retval.append( p.name )
+	return retval
+
+
 
     def check_client_name( self, client ):
-	if not client.name in self.clients.keys():
+	if not client.name in self.reserved_names:
 	    return
 
+	oldname = client.name
 	cname_split = client.name.split('-')
-	if len(cname_split) == 0:
+	if len(cname_split) == 1:
 	    cname_prefix = cname_split[0]
 	else:
-	    cname_prefix = string.join( name_split[:-1], '-' )
+	    cname_prefix = string.join( cname_split[:-1], '-' )
 
 	num = 1
-	while ("%s-%d"%(cname_prefix,num)) in self.clients.keys():
+	while ("%s-%d"%(cname_prefix,num)) in (self.clients.keys()+self.reserved_names):
 		num+=1
 
 	# XXX: this might still fail due to race. 
 	#      also needs to lock 
-	client.rename( "%s-%d"%(cname_prefix,num ) )
+	newname = "%s-%d"%(cname_prefix,num )
+
+	client.rename( newname )
+	del self.clients[oldname]
+	self.clients[newname] = client
+
+
+    def remove_client( self, name ):
+	del self.clients[name]
+	for c in self.clients.values():
+	    for p in c.ports:
+		for conn in p.get_connections():
+		    if conn.startswith(name+":"):
+			p.conns.remove( conn )
+
+    def remove_client_only( self, name ):
+	del self.clients[name]
+
+    def ensure_clientnames( self, names ):
+	self.reserved_names = names
+	for c in self.clients.values():
+	    self.check_client_name( c )
+
 
 class NotifyReply(object):
     def __init__( self, uuid, clientname, commandline ):
@@ -262,10 +291,21 @@ class JackClient(object):
 	commands = session_notify( self.client, JackSessionSave, path )
 	i=0
 	retval = []
-	while( commands[i].uuid[0] != 0 ):
-	    retval.append( NotifyReply( commands[i].uuid, commands[i].clientname, commands[i].commandline ) )
+	while( commands[i].uuid != "" ):
+	    retval.append( NotifyReply( commands[i].uuid, commands[i].clientname, commands[i].command ) )
+	    i+=1
 	
 	jack_free( commands )
+
+	return retval
+
+    def connect( self, a, b ):
+	portA_p = port_by_name( self.client, a )
+	
+	if( port_flags( portA_p ) & JackPortIsOutput ):
+	    connect( self.client, a, b )
+	else:
+	    connect( self.client, b, a )
 
 
 
