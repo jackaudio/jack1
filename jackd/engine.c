@@ -138,6 +138,7 @@ static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *
 static void jack_do_set_id ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_get_id_by_uuid ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_client_rename ( jack_engine_t *engine, jack_request_t *req);
+static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req);
 
 
 static inline int 
@@ -1365,6 +1366,11 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		jack_do_client_rename (engine, req);
 		jack_unlock_graph (engine);
 		break;
+	case ReserveName:
+		jack_lock_graph (engine);
+		jack_do_reserve_name (engine, req);
+		jack_unlock_graph (engine);
+		break;
 	case SessionNotify:
 		jack_lock_graph (engine);
 		if ((req->status =
@@ -1783,6 +1789,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	pthread_mutex_init (&engine->problem_lock, 0);
 
 	engine->clients = 0;
+	engine->reserved_client_names = 0;
 
 	engine->pfd_size = 0;
 	engine->pfd_max = 0;
@@ -2580,6 +2587,28 @@ static void jack_do_client_rename ( jack_engine_t *engine, jack_request_t *req)
 
 	}
 }
+
+static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req)
+{
+	jack_reserved_name_t *reservation;
+	if (jack_client_by_name (engine, req->x.reservename.name)) {
+		req->status = -1;
+		return;
+	}
+
+	reservation = malloc( sizeof( jack_reserved_name_t ) );
+	if( reservation == NULL ) {
+		req->status = -1;
+		return;
+	}
+
+	snprintf( reservation->name, sizeof( reservation->name ), "%s", req->x.reservename.name );
+	reservation->uuid = req->x.reservename.uuid;
+	engine->reserved_client_names = jack_slist_append( engine->reserved_client_names, reservation );
+
+	req->status = 0;
+}
+
 
 static int
 jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd )

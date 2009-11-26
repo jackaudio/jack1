@@ -305,6 +305,7 @@ typedef struct {
     int32_t    load;
     ClientType type;
     jack_options_t options;
+    jack_client_id_t uuid;
 
     char name[JACK_CLIENT_NAME_SIZE];
     char object_path[PATH_MAX+1];
@@ -379,7 +380,8 @@ typedef enum {
 	GetClientByUUID = 26,
 	SetIdentifier = 27,
 	GetIdentifier = 28,
-	RenameClient = 29
+	RenameClient = 29,
+	ReserveName = 30
 } RequestType;
 
 struct _jack_request {
@@ -429,6 +431,10 @@ struct _jack_request {
 	    char oldname[JACK_CLIENT_NAME_SIZE];
 	    char newname[JACK_CLIENT_NAME_SIZE];
 	} POST_PACKED_STRUCTURE clientrename;
+	struct {
+	    char name[JACK_CLIENT_NAME_SIZE];
+	    jack_client_id_t uuid;
+	} POST_PACKED_STRUCTURE reservename;
 	struct {
 	    //jack_options_t options;
 	    uint32_t options;

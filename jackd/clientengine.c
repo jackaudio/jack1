@@ -337,7 +337,7 @@ jack_client_unload (jack_client_internal_t *client)
 	}
 }
 
-static jack_client_internal_t *
+jack_client_internal_t *
 jack_client_by_name (jack_engine_t *engine, const char *name)
 {
 	jack_client_internal_t *client = NULL;
@@ -423,7 +423,7 @@ jack_generate_unique_name (jack_engine_t *engine, char *name)
 	name[tens] = '0';
 	name[ones] = '1';
 	name[length] = '\0';
-	while (jack_client_by_name (engine, name)) {
+	while (jack_client_by_name (engine, name) || jack_client_name_reserved( engine, name )) {
 		if (name[ones] == '9') {
 			if (name[tens] == '9') {
 				jack_error ("client %s has 99 extra"
@@ -451,7 +451,7 @@ jack_client_name_invalid (jack_engine_t *engine, char *name,
 	 * startup.  There are no other clients at that point, anyway.
 	 */
 
-	if (jack_client_by_name (engine, name)) {
+	if (jack_client_by_name (engine, name) || jack_client_name_reserved(engine, name )) {
 
 		*status |= JackNameNotUnique;
 
@@ -712,6 +712,22 @@ handle_unload_client (jack_engine_t *engine, jack_client_id_t id)
 	return status;
 }
 
+static char *
+jack_get_reserved_name( jack_engine_t *engine, jack_client_id_t uuid )
+{
+	JSList *node;
+        for (node = engine->reserved_client_names; node; node = jack_slist_next (node)) {
+		jack_reserved_name_t *reservation = (jack_reserved_name_t *) node->data;
+		if( reservation->uuid== uuid ) {
+			char *retval = strdup( reservation->name );
+			free( reservation );
+			engine->reserved_client_names = 
+				jack_slist_remove( engine->reserved_client_names, reservation );
+			return retval;
+		}
+	}
+	return 0;
+}
 int
 jack_client_create (jack_engine_t *engine, int client_fd)
 {
@@ -759,6 +775,13 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 	}
 	
 	pthread_mutex_lock (&engine->request_lock);
+	if( req.uuid ) {
+		char *res_name = jack_get_reserved_name( engine, req.uuid );
+		if( res_name ) {
+			snprintf( req.name, sizeof(req.name), "%s", res_name );
+			free(res_name);
+		}
+	}
 	client = setup_client (engine, req.type, req.name,
 			       req.options, &res.status, client_fd,
 			       req.object_path, req.object_data);
@@ -889,6 +912,19 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 
 	return ret;
 }	
+
+int
+jack_client_name_reserved( jack_engine_t *engine, const char *name )
+{
+	JSList *node;
+        for (node = engine->reserved_client_names; node; node = jack_slist_next (node)) {
+		jack_reserved_name_t *reservation = (jack_reserved_name_t *) node->data;
+		if( !strcmp( reservation->name, name ) )
+			return 1;
+	}
+	return 0;
+}
+
 
 int
 jack_mark_client_socket_error (jack_engine_t *engine, int fd)

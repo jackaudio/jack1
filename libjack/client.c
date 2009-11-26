@@ -872,6 +872,10 @@ jack_request_client (ClientType type,
 
 	/* format connection request */
 
+	if( va->sess_uuid )
+		req.uuid = atoi( va->sess_uuid );
+	else
+		req.uuid = 0;
 	req.protocol_v = jack_protocol_version;
 	req.load = TRUE;
 	req.type = type;
@@ -2587,6 +2591,21 @@ jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
 	return strdup( request.x.port_info.name );
 }
 
+int
+jack_reserve_client_name( jack_client_t *client, const char *name, const char *uuid )
+{ 
+	jack_request_t request;
+
+	char *end_ptr;
+	jack_client_id_t uuid_int = strtol( uuid, &end_ptr, 10 );
+	if( *end_ptr != '\0' )
+		return -1;
+	request.type = ReserveName;
+	snprintf( request.x.reservename.name, sizeof( request.x.reservename.name ),
+			"%s", name );
+	request.x.reservename.uuid = uuid_int;
+	return jack_client_deliver_request( client, &request );
+}
 int 
 jack_rename_client( jack_client_t *client, const char *oldname, const char *newname )
 {

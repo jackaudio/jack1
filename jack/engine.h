@@ -51,6 +51,11 @@ typedef struct _jack_port_buffer_list {
     jack_port_buffer_info_t *info;	/* jack_buffer_info_t array */
 } jack_port_buffer_list_t;
 
+typedef struct _jack_reserved_name {
+    jack_client_id_t uuid;
+    char name[JACK_CLIENT_NAME_SIZE];
+} jack_reserved_name_t;
+
 #define JACKD_WATCHDOG_TIMEOUT 10000
 #define JACKD_CLIENT_EVENT_TIMEOUT 2000
 
@@ -128,6 +133,7 @@ struct _jack_engine {
     /* these lists are protected by `client_lock' */
     JSList	   *clients;
     JSList	   *clients_waiting;
+    JSList	   *reserved_client_names;
 
     jack_port_internal_t    *internal_ports;
     jack_client_internal_t  *timebase_client;
@@ -231,5 +237,7 @@ void	jack_port_clear_connections (jack_engine_t *engine,
 void	jack_port_registration_notify (jack_engine_t *, jack_port_id_t, int);
 void	jack_port_release (jack_engine_t *engine, jack_port_internal_t *);
 void	jack_sort_graph (jack_engine_t *engine);
+jack_client_internal_t *
+jack_client_by_name (jack_engine_t *engine, const char *name);
 
 #endif /* __jack_engine_h__ */
