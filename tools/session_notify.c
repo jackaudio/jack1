@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
 	jack_on_shutdown(client, jack_shutdown, 0);
 
 
-	retval = jack_session_notify( client, notify_type, save_path );
+	retval = jack_session_notify( client, NULL, notify_type, save_path );
 	for(i=0; retval[i].uuid[0] != 0; i++ ) {
 		printf( "%s &\n", retval[i].command );
 		add_uuid_mapping(retval[i].uuid); 

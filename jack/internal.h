@@ -404,6 +404,7 @@ struct _jack_request {
 	struct {
 	    char path[JACK_PORT_NAME_SIZE];
 	    jack_session_event_t  type;
+	    char target[JACK_CLIENT_NAME_SIZE];
 	} POST_PACKED_STRUCTURE session;
 	struct {
 	    int32_t nports;

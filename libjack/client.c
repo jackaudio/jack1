@@ -1311,7 +1311,7 @@ jack_set_freewheel (jack_client_t* client, int onoff)
 
 
 jack_session_command_t *
-jack_session_notify (jack_client_t* client, jack_session_event_t code, const char *path )
+jack_session_notify (jack_client_t* client, const char *target, jack_session_event_t code, const char *path )
 {
 	jack_request_t request;
 
@@ -1322,6 +1322,11 @@ jack_session_notify (jack_client_t* client, jack_session_event_t code, const cha
 		snprintf( request.x.session.path, sizeof( request.x.session.path ), "%s", path );
 	else
 		request.x.session.path[0] = '\0';
+
+	if( target ) 
+		snprintf( request.x.session.target, sizeof( request.x.session.target ), "%s", target );
+	else
+		request.x.session.target[0] = '\0';
 
 	request.x.session.type = code;
 	// XXX: this is hacky now.

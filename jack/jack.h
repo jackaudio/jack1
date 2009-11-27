@@ -1024,9 +1024,11 @@ void jack_free(void* ptr);
  * callbacks. the returned strings of the clients are accumulated and
  * returned as an array of jack_session_command_t.
  * its terminated by ret[i].uuid[0]='\0'
+ * target == NULL means send to all interested clients. otherwise a clientname
  */
 
 jack_session_command_t *jack_session_notify (jack_client_t* client,
+					     const char *target,
 					     jack_session_event_t code,
 					     const char *path ) JACK_WEAK_EXPORT;
 
