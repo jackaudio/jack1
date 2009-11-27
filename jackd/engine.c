@@ -2634,6 +2634,12 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 			if( client->control->uid == 0 ) {
 				client->control->uid=jack_engine_get_max_uuid( engine ) + 1;
 			}
+
+			// in case we only want to send to a special client.
+			// uuid assign is still complete. not sure if thats necessary.
+			if( (req->x.session.target[0] != 0) && strcmp(req->x.session.target, client->control->name) )
+				continue;
+
 			reply = jack_deliver_event (engine, client, &event);
 
 			if (write (reply_fd, (const void *) &client->control->uid, sizeof (client->control->uid))
