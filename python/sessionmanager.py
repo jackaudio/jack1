@@ -15,7 +15,7 @@ except:
     have_dbus = False
 
 
-SESSION_PATH="/home/torbenh/jackSessions/"
+SESSION_PATH=os.path.join(os.getenv("HOME"), "jackSessions")
 
 defaults = { "jackclientname": "sessionmanager", "sessiondir": "~/jackSessions" }
 
