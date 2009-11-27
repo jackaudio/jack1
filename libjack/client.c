@@ -2531,6 +2531,7 @@ jack_set_session_callback(jack_client_t* client, JackSessionCallback callback, v
 	client->control->session_cbset = (callback != NULL);
 	return 0;
 }
+
 int
 jack_get_process_done_fd (jack_client_t *client)
 {
