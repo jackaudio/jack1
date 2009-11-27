@@ -365,7 +365,7 @@ typedef void (*JackShutdownCallback)(void *arg);
  * to release client ressources. Warning: jack_client_close() cannot be
  * safely used inside the shutdown callback and has to be called outside of
  * the callback context.
- 
+ *
  * @param code a shuntdown code
  * @param reason a string discribing the shuntdown reason (backend failure, server crash... etc...)
  * @param arg pointer to a client supplied structure
@@ -382,16 +382,14 @@ typedef void (*JackInfoShutdownCallback)(jack_status_t code, const char* reason,
  * the prefix also acts as uuid, which the client needs to specify
  * to jack_client_open()  upon session reload.
  *
- * the return value is a commandline, which will restore the state.
+ * The return value is a commandline, which will restore the state.
  *
- 
  * @param code the type of the Event (Save or Quit)
  * @param session_dir with trailing separator.
- * @param prefix for saved files. 
+ * @param prefix for saved files.
  * @param arg pointer to a client supplied structure
  */
-
-typedef char *(*JackSessionCallback)(jack_session_event_t code, const char* session_dir, const char* prefix, void *arg);
+typedef char *(*JackSessionCallback)(jack_session_event_t code, const char* session_dir, const char* uuid, void *arg);
 
 /**
  * Used for the type argument of jack_port_register() for default

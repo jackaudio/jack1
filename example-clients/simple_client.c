@@ -21,33 +21,34 @@ jack_client_t *client;
  * special realtime thread once for each audio cycle.
  *
  * This client does nothing more than copy data from its input
- * port to its output port. It will exit when stopped by 
+ * port to its output port. It will exit when stopped by
  * the user (e.g. using Ctrl-C on a unix-ish operating system)
  */
 int
 process (jack_nframes_t nframes, void *arg)
 {
 	jack_default_audio_sample_t *in, *out;
-	
+
 	in = jack_port_get_buffer (input_port, nframes);
 	out = jack_port_get_buffer (output_port, nframes);
 	memcpy (out, in,
 		sizeof (jack_default_audio_sample_t) * nframes);
 
-	return 0;      
+	return 0;
 }
 
-char *session_callback( jack_session_event_t code, const char *path, const char *prefix, void *arg )
+char *
+session_callback (jack_session_event_t code, const char *path, const char *uuid, void *arg)
 {
 	char retval[100];
-	printf( "session notification\n" );
-	printf( "path %s, prefix %s, type: %s\n", path, prefix, code == JackSessionSave ? "save" : "quit" );
+	printf ("session notification\n");
+	printf ("path %s, uuid %s, type: %s\n", path, uuid, code == JackSessionSave ? "save" : "quit");
 
-	if( code == JackSessionQuit )
-		exit(1); 
+	if (code == JackSessionQuit)
+		exit (1);
 
-	snprintf( retval, 100, "jack_simple_client %s", prefix );
-	return strdup( retval );
+	snprintf (retval, 100, "jack_simple_client %s", uuid);
+	return strdup (retval);
 }
 
 /**
@@ -68,7 +69,7 @@ main (int argc, char *argv[])
 	const char *server_name = NULL;
 	jack_options_t options = JackNullOption;
 	jack_status_t status;
-	
+
 	/* open a client connection to the JACK server */
 
 	if( argc == 1 )
@@ -96,8 +97,8 @@ main (int argc, char *argv[])
 	   there is work to be done.
 	*/
 
-	jack_client_set_cookie( client, "info", "simple" );
-	jack_client_set_cookie( client, "info2", "no" );
+	jack_client_set_cookie (client, "info", "simple");
+	jack_client_set_cookie (client, "info2", "no");
 	jack_set_process_callback (client, process, 0);
 
 	/* tell the JACK server to call `jack_shutdown()' if
@@ -107,8 +108,13 @@ main (int argc, char *argv[])
 
 	jack_on_shutdown (client, jack_shutdown, 0);
 
-	jack_set_session_callback( client, session_callback, NULL );
-	/* display the current sample rate. 
+	/* tell the JACK server to call `session_callback()' if
+	   the session is saved.
+	*/
+
+	jack_set_session_callback (client, session_callback, NULL);
+
+	/* display the current sample rate.
 	 */
 
 	printf ("engine sample rate: %" PRIu32 "\n",
@@ -156,7 +162,7 @@ main (int argc, char *argv[])
 	}
 
 	free (ports);
-	
+
 	ports = jack_get_ports (client, NULL, NULL,
 				JackPortIsPhysical|JackPortIsInput);
 	if (ports == NULL) {
