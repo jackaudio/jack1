@@ -17,6 +17,10 @@ client_new = libjack.jack_client_new
 client_new.argtypes = [ c_char_p ]
 client_new.restype = client_p
 
+client_open = libjack.jack_client_open
+client_open.argtypes = [ c_char_p, c_uint, POINTER( c_uint ) ]
+client_open.restype = client_p
+
 client_close = libjack.jack_client_close
 client_close.argtypes = [ client_p ]
 client_close.restype = None
@@ -267,7 +271,9 @@ class NotifyReply(object):
 
 class JackClient(object):
     def __init__( self, name ):
-	self.client = client_new( name )
+	self.client = client_open( name, 0, None )
+	if not self.client:
+	    raise Exception( "got no client name" )
 	self.reg_cb = PortRegistrationCallback( self.port_registration_cb )
 	set_port_registration_callback( self.client, self.reg_cb, None )
 	self.port_queue = Queue()
