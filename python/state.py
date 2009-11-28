@@ -1,5 +1,6 @@
 
 from xml.dom.minidom import getDOMImplementation, parse, Element
+import string
 
 impl = getDOMImplementation()
 
@@ -95,12 +96,31 @@ class SessionDom( object ):
 
 	return retval
 
+    def renameclient( self, celem, newname ):
+	doc = self.dom.documentElement
+	celem.setAttribute( "jackname", newname )
+	for pelem in celem.getElementsByTagName( "port" ):
+	    old_pname = pelem.getAttribute( "name" )
+	    pname_split = old_pname.split(":")
+	    pname_split[0] = newname
+	    new_pname = string.join( pname_split, ":" )
+	    pelem.setAttribute( "name", new_pname )
+	    for dst in doc.getElementsByTagName( "conn" ):
+		if dst.getAttribute( "dst" ) == old_pname:
+		    dst.setAttribute( "dst", new_pname )
+
+
+	    
     def fixup_client_names( self, graph ):
 	doc = self.dom.documentElement
 	for c in doc.getElementsByTagName( "jackclient" ):
+	    if c.getAttribute( "infra" ) == "True":
+		continue
 	    cname = c.getAttribute( "jackname" )
 	    if cname in graph.get_taken_names():
-		c.setAttribute( "jackname", graph.get_free_name( cname, self.get_reg_client_names() ) )
+		free_name = graph.get_free_name( cname, self.get_reg_client_names() )
+		print "name taken %s rename to %s"%(cname, free_name )
+		self.renameclient( c, free_name )
 		
 
 	

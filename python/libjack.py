@@ -255,6 +255,8 @@ class JackGraph( object ):
 	while ("%s-%d"%(cname_prefix,num)) in (self.clients.keys()+self.reserved_names+other_names):
 		num+=1
 
+	return ("%s-%d"%(cname_prefix,num))
+
 
 
     def remove_client( self, name ):
