@@ -59,12 +59,21 @@ class SessionManager( object ):
 
         print sd.get_client_names()
 
-        g.ensure_clientnames( sd.get_reg_client_names() )
+	if opt.renames:
+	    g.ensure_clientnames( sd.get_reg_client_names() )
+	    # get graph again... renaming isnt prefect yet.
+	    g=self.cl.get_graph()
 
-        # get graph again... renaming isnt prefect yet.
-        g=self.cl.get_graph()
+	# fixup names, doing this unconditionally, because
+	# a client rename might have failed.
+	sd.fixup_client_names( g )
+
+	# now we have mangled all the names, lets reserve them.
+	for (uuid, clientname) in sd.get_uuid_client_pairs():
+	    print "reserving name %s"%clientname
+	    g.reserve_name( uuid, clientname )
+
         # build up list of port connections
-
         conns = []
         for p in sd.get_port_names():
             for c in sd.get_connections_for_port( p ):
@@ -113,7 +122,7 @@ class SessionManager( object ):
 
     def save_session( self, name ): 
         if os.path.exists( self.sessiondir+name ):
-            print "session %s already exists"
+            print "session %s already exists"%name
             return -1
         os.mkdir( self.sessiondir+name )
         g=self.cl.get_graph()
@@ -122,6 +131,7 @@ class SessionManager( object ):
         for n in notify:
             c = g.get_client( n.clientname )
             c.set_commandline( n.commandline )
+	    c.set_uuid( n.uuid )
 
         sd = state.SessionDom()
 
@@ -196,6 +206,8 @@ oparser.add_option( "--quitdaemon", action="store_true", dest="quitdaemon", defa
 #                    help="SaveAs And Quit" )
 oparser.add_option( "--load", action="store", dest="load", type="string",
                     help="Load Session with <name>" )
+oparser.add_option( "--renames", action="store_true", dest="renames", default=False,
+                    help="Allow renaming offending clients" )
 
 (opt,args) = oparser.parse_args()
 

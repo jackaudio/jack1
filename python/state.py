@@ -14,6 +14,8 @@ class SessionDom( object ):
 	cl_elem = Element( "jackclient" )
 	cl_elem.setAttribute( "cmdline", client.get_commandline() )
 	cl_elem.setAttribute( "jackname", client.name )
+	if client.get_uuid():
+	    cl_elem.setAttribute( "uuid", client.get_uuid() )
 	if client.isinfra:
 	    cl_elem.setAttribute( "infra", "True" )
 	else:
@@ -83,6 +85,23 @@ class SessionDom( object ):
 	for c in doc.getElementsByTagName( "jackclient" ):
 	    if c.getAttribute( "jackname" ) == name:
 		return c.getAttribute( "cmdline" )
+
+    def get_uuid_client_pairs( self ):
+	retval = []
+	doc = self.dom.documentElement
+	for c in doc.getElementsByTagName( "jackclient" ):
+	    if c.getAttribute( "infra" ) != "True":
+		retval.append( (c.getAttribute( "uuid" ), c.getAttribute( "jackname" )) )
+
+	return retval
+
+    def fixup_client_names( self, graph ):
+	doc = self.dom.documentElement
+	for c in doc.getElementsByTagName( "jackclient" ):
+	    cname = c.getAttribute( "jackname" )
+	    if cname in graph.get_taken_names():
+		c.setAttribute( "jackname", graph.get_free_name( cname, self.get_reg_client_names() ) )
+		
 
 	
 

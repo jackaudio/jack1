@@ -53,6 +53,10 @@ rename_client = libjack.jack_rename_client
 rename_client.argtypes = [ client_p, c_char_p, c_char_p ]
 rename_client.restype = c_int 
 
+reserve_client_name = libjack.jack_reserve_client_name
+reserve_client_name.argtypes = [ client_p, c_char_p, c_char_p ]
+reserve_client_name.restype = c_int
+
 class jack_session_command_t( Structure ):
     _fields_ = [ ("uuid", 16*c_char ), ("clientname", 33*c_char), ("command", 256*c_char ) ]
 
@@ -163,6 +167,7 @@ class Client( object ):
 	self.ports = []
 	self.commandline = None
 	self.isinfra = False
+	self.uuid = None
 
     def get_commandline( self ):
 	if self.commandline:
@@ -172,6 +177,12 @@ class Client( object ):
 
     def set_commandline( self, cmdline ):
 	self.commandline = cmdline
+
+    def get_uuid( self ):
+	return self.uuid
+
+    def set_uuid( self, uuid ):
+	self.uuid = uuid
 
     def add_port( self, portname ):
 	self.ports.append( Port( self.client, portname ) )
@@ -199,6 +210,7 @@ class JackGraph( object ):
     def __init__( self, client, ports, uuids=[] ):
 	self.client = client
 	self.clients = {}
+	self.reserved_names = []
 
 	i=0
 	while(ports[i]):
@@ -226,23 +238,23 @@ class JackGraph( object ):
 	    return
 
 	oldname = client.name
-	cname_split = client.name.split('-')
+	newname = self.get_free_name( client.name )
+
+	client.rename( newname )
+	del self.clients[oldname]
+	self.clients[newname] = client
+
+    def get_free_name( self, oldname, other_names=[] ):
+	cname_split = oldname.split('-')
 	if len(cname_split) == 1:
 	    cname_prefix = cname_split[0]
 	else:
 	    cname_prefix = string.join( cname_split[:-1], '-' )
 
 	num = 1
-	while ("%s-%d"%(cname_prefix,num)) in (self.clients.keys()+self.reserved_names):
+	while ("%s-%d"%(cname_prefix,num)) in (self.clients.keys()+self.reserved_names+other_names):
 		num+=1
 
-	# XXX: this might still fail due to race. 
-	#      also needs to lock 
-	newname = "%s-%d"%(cname_prefix,num )
-
-	client.rename( newname )
-	del self.clients[oldname]
-	self.clients[newname] = client
 
 
     def remove_client( self, name ):
@@ -260,6 +272,14 @@ class JackGraph( object ):
 	self.reserved_names = names
 	for c in self.clients.values():
 	    self.check_client_name( c )
+
+    def get_taken_names( self ):
+	return self.clients.keys() + self.reserved_names
+
+    def reserve_name( self, uuid, name ):
+	if reserve_client_name( self.client, name, uuid ):
+	    raise Exception( "reservation failure" )
+	self.reserved_names.append( name )
 
 
 class NotifyReply(object):
