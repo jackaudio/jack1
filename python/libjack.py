@@ -61,7 +61,7 @@ class jack_session_command_t( Structure ):
     _fields_ = [ ("uuid", 16*c_char ), ("clientname", 33*c_char), ("command", 256*c_char ) ]
 
 session_notify = libjack.jack_session_notify
-session_notify.argtypes = [ client_p, c_uint, c_char_p ]
+session_notify.argtypes = [ client_p, c_char_p, c_uint, c_char_p ]
 session_notify.restype = POINTER( jack_session_command_t )
 
 get_client_name_by_uuid = libjack.jack_get_client_name_by_uuid
@@ -321,7 +321,7 @@ class JackClient(object):
 
 
     def session_save( self, path ):
-	commands = session_notify( self.client, JackSessionSave, path )
+	commands = session_notify( self.client, None, JackSessionSave, path )
 	i=0
 	retval = []
 	while( commands[i].uuid != "" ):
