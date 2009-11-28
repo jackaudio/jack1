@@ -114,6 +114,10 @@ enum JackOptions {
       * jack_initialize() entry point of an internal client.
       */
      JackLoadInit = 0x10,
+     /**
+      * pass a UUID Token, this will unlock and assign an assigned name
+      * to the client.
+      */
      JackSessionUUID = 0x20
 };
 
