@@ -2557,9 +2557,9 @@ int jack_client_set_cookie( jack_client_t *client, const char *key, const char *
 	jack_request_t request;
 
 	request.type = SetIdentifier;
-	request.x.identifier.client_id = client->control->id;
-	snprintf( request.x.identifier.key, sizeof(request.x.identifier.key), "%s", key );
-	snprintf( request.x.identifier.val, sizeof(request.x.identifier.val), "%s", value );
+	request.x.metadata.client_id = client->control->id;
+	snprintf( request.x.metadata.key, sizeof(request.x.metadata.key), "%s", key );
+	snprintf( request.x.metadata.val, sizeof(request.x.metadata.val), "%s", value );
 
 	return jack_client_deliver_request( client, &request );
 }
@@ -2571,13 +2571,13 @@ jack_get_cookie_by_uuid( jack_client_t *client, const char *uuid, const char *ke
 
 	jack_client_id_t uuid_int = atoi( uuid );
 	request.type = GetIdentifier;
-	request.x.identifier.client_id = uuid_int;
-	snprintf( request.x.identifier.key, sizeof(request.x.identifier.key), "%s", key );
+	request.x.metadata.client_id = uuid_int;
+	snprintf( request.x.metadata.key, sizeof(request.x.metadata.key), "%s", key );
 
 	if( jack_client_deliver_request( client, &request ) )
 		return NULL;
 
-	return strdup( request.x.identifier.val ); 
+	return strdup( request.x.metadata.val ); 
 }
 
 char *

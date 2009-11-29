@@ -427,7 +427,7 @@ struct _jack_request {
 	    jack_client_id_t client_id;
 	    char key[JACK_CLIENT_NAME_SIZE];
 	    char val[JACK_PORT_NAME_SIZE];
-	} POST_PACKED_STRUCTURE identifier;
+	} POST_PACKED_STRUCTURE metadata;
 	struct {
 	    char oldname[JACK_CLIENT_NAME_SIZE];
 	    char newname[JACK_CLIENT_NAME_SIZE];
@@ -459,7 +459,7 @@ struct _jack_request {
 typedef struct {
     char id_key[JACK_CLIENT_NAME_SIZE];
     char value[JACK_PORT_NAME_SIZE];
-} jack_identifier_t;
+} jack_metadata_t;
 
 typedef struct _jack_client_internal {
 
@@ -490,7 +490,7 @@ typedef struct _jack_client_internal {
     int portnum;
 #endif /* JACK_USE_MACH_THREADS */
    
-    JSList *identifiers;   /* listof identifiers */
+    JSList *metadatalist;   /* listof identifiers */
     jack_client_t *private_client;
 } jack_client_internal_t;
 

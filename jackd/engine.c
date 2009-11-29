@@ -2499,11 +2499,11 @@ static void jack_do_get_id_by_uuid ( jack_engine_t *engine, jack_request_t *req)
 	req->status = -1;
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
-		if( client->control->uid == req->x.identifier.client_id ) {
-			for( node2=client->identifiers; node2; node2 = jack_slist_next (node2) ) {
-				jack_identifier_t *id = (jack_identifier_t *) node2->data;
-				if( !strcmp( req->x.identifier.key, id->id_key ) ) {
-					snprintf( req->x.identifier.val, sizeof(req->x.identifier.val),
+		if( client->control->uid == req->x.metadata.client_id ) {
+			for( node2=client->metadatalist; node2; node2 = jack_slist_next (node2) ) {
+				jack_metadata_t *id = (jack_metadata_t *) node2->data;
+				if( !strcmp( req->x.metadata.key, id->id_key ) ) {
+					snprintf( req->x.metadata.val, sizeof(req->x.metadata.val),
 						       	"%s", id->value );
 					req->status = 0;
 					return;
@@ -2521,13 +2521,13 @@ static void jack_do_set_id ( jack_engine_t *engine, jack_request_t *req)
 	req->status = -1;
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
-		if( client->control->id == req->x.identifier.client_id ) {
-			jack_identifier_t *new_id;
-			for( node2=client->identifiers; node2; node2 = jack_slist_next (node2) ) {
-				jack_identifier_t *id = (jack_identifier_t *) node2->data;
-				if( !strcmp( req->x.identifier.key, id->id_key ) ) {
+		if( client->control->id == req->x.metadata.client_id ) {
+			jack_metadata_t *new_id;
+			for( node2=client->metadatalist; node2; node2 = jack_slist_next (node2) ) {
+				jack_metadata_t *id = (jack_metadata_t *) node2->data;
+				if( !strcmp( req->x.metadata.key, id->id_key ) ) {
 					snprintf( id->value, sizeof(id->value),
-						       	"%s", req->x.identifier.val );
+						       	"%s", req->x.metadata.val );
 					req->status = 0;
 					return;
 				}
@@ -2535,16 +2535,16 @@ static void jack_do_set_id ( jack_engine_t *engine, jack_request_t *req)
 
 			}
 			/* client doesnt have key set. create it... */
-			new_id = (jack_identifier_t *) malloc( sizeof(jack_identifier_t) );
+			new_id = (jack_metadata_t *) malloc( sizeof(jack_metadata_t) );
 			if( new_id == NULL )
 				return;
 
 			snprintf( new_id->id_key, sizeof(new_id->id_key),
-					"%s", req->x.identifier.key );
+					"%s", req->x.metadata.key );
 			snprintf( new_id->value, sizeof(new_id->value),
-					"%s", req->x.identifier.val );
+					"%s", req->x.metadata.val );
 
-			client->identifiers = jack_slist_append( client->identifiers, new_id );
+			client->metadatalist = jack_slist_append( client->metadatalist, new_id );
 			req->status = 0;
 			return;
 		}
