@@ -224,23 +224,32 @@ oparser.add_option( "--renames", action="store_true", dest="renames", default=Fa
 
 if not opt.dbus:
     sm = SessionManager()
-    if opt.saveas:
-        sm.save_session( opt.saveas )
+    try:
+	if opt.saveas:
+	    sm.save_session( opt.saveas )
 
-    if opt.load:
-        sm.load_session( opt.load )
+	if opt.load:
+	    sm.load_session( opt.load )
 
-    if opt.quitas:
-	sm.quit_session( opt.quitas ) 
+	if opt.quitas:
+	    sm.quit_session( opt.quitas ) 
+    except:
+	sm.exit()
+	raise
+
     sm.exit()
 else:
     if opt.daemon:
-        sm = SessionManager()
-        from dbus.mainloop.glib import DBusGMainLoop
-        DBusGMainLoop(set_as_default=True)
-        dbsm = DbusSM( sm )
-        loop = gobject.MainLoop()
-        loop.run()
+	try:
+	    sm = SessionManager()
+	    from dbus.mainloop.glib import DBusGMainLoop
+	    DBusGMainLoop(set_as_default=True)
+	    dbsm = DbusSM( sm )
+	    loop = gobject.MainLoop()
+	    loop.run()
+	except:
+	    sm.exit()
+	    raise
 
         sm.exit()
     else:
