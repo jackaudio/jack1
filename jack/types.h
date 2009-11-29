@@ -393,7 +393,7 @@ typedef void (*JackInfoShutdownCallback)(jack_status_t code, const char* reason,
  * @param prefix for saved files.
  * @param arg pointer to a client supplied structure
  */
-typedef char *(*JackSessionCallback)(jack_session_event_t code, const char* session_dir, const char* uuid, void *arg);
+typedef char *(*JackSessionCallback)(jack_session_event_t code, const char* session_dir, const char* client_name, void *arg);
 
 /**
  * Used for the type argument of jack_port_register() for default
