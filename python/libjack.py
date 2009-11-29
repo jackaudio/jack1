@@ -332,6 +332,18 @@ class JackClient(object):
 
 	return retval
 
+    def session_save_and_quit( self, path ):
+	commands = session_notify( self.client, None, JackSessionQuit, path )
+	i=0
+	retval = []
+	while( commands[i].uuid != "" ):
+	    retval.append( NotifyReply( commands[i].uuid, commands[i].clientname, commands[i].command ) )
+	    i+=1
+	
+	jack_free( commands )
+
+	return retval
+
     def connect( self, a, b ):
 	portA_p = port_by_name( self.client, a )
 	

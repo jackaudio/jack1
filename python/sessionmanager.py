@@ -119,14 +119,20 @@ class SessionManager( object ):
         print "session restored..."
         return 0
 
+    def quit_session( self, name ):
+	self.save_session( name, True )
 
-    def save_session( self, name ): 
+
+    def save_session( self, name, quit=False ): 
         if os.path.exists( self.sessiondir+name ):
             print "session %s already exists"%name
             return -1
         os.mkdir( self.sessiondir+name )
         g=self.cl.get_graph()
-        notify = self.cl.session_save( self.sessiondir+name+"/" )
+	if quit:
+	    notify = self.cl.session_save_and_quit( self.sessiondir+name+"/" )
+	else:
+	    notify = self.cl.session_save( self.sessiondir+name+"/" )
 
         for n in notify:
             c = g.get_client( n.clientname )
@@ -172,6 +178,11 @@ if have_dbus:
 
         @dbus.service.method( dbus_interface="org.jackaudio.sessionmanager",
                 in_signature="s", out_signature="i" )
+        def quit_as( self, name ):
+            return self.sm.quit_session( name )
+
+        @dbus.service.method( dbus_interface="org.jackaudio.sessionmanager",
+                in_signature="s", out_signature="i" )
         def load( self, name ):
             return self.sm.load_session( name )
 
@@ -202,8 +213,8 @@ oparser.add_option( "--list", action="store_true", dest="list", default=False,
                     help="List Projects" )
 oparser.add_option( "--quitdaemon", action="store_true", dest="quitdaemon", default=False,
                     help="Tell SessionManager Daemon to Exit" )
-#oparser.add_option( "--quitas", action="store", dest="quitas", type="string",
-#                    help="SaveAs And Quit" )
+oparser.add_option( "--quitas", action="store", dest="quitas", type="string",
+                    help="SaveAs And Quit" )
 oparser.add_option( "--load", action="store", dest="load", type="string",
                     help="Load Session with <name>" )
 oparser.add_option( "--renames", action="store_true", dest="renames", default=False,
@@ -218,6 +229,9 @@ if not opt.dbus:
 
     if opt.load:
         sm.load_session( opt.load )
+
+    if opt.quitas:
+	sm.quit_session( opt.quitas ) 
     sm.exit()
 else:
     if opt.daemon:
@@ -235,6 +249,8 @@ else:
         sm_iface = dbus.Interface( sm_proxy, "org.jackaudio.sessionmanager" )
         if opt.saveas:
             sm_iface.save_as( opt.saveas )
+        if opt.quitas:
+            sm_iface.quit_as( opt.quitas )
         if opt.load:
             sm_iface.load( opt.load )
         if opt.list:
