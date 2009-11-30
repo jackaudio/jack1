@@ -21,8 +21,13 @@ bin_PROGRAMS = jack_simple_client \
 	       jack_midiseq \
 	       $(JACKREC)
 
-AM_CFLAGS = -I.. $(JACK_CFLAGS)
-AM_CXXFLAGS = -I.. $(JACK_CFLAGS)
+if HAVE_SNDFILE
+# note! jackrec_CFLAGS syntax not supported by automake-1.4
+sndfile_cflags = @SNDFILE_CFLAGS@
+endif
+
+AM_CFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
+AM_CXXFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
 
 jack_simple_client_SOURCES = simple_client.c
 jack_simple_client_LDFLAGS = @OS_LDFLAGS@
