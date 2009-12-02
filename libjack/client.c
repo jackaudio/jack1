@@ -48,6 +48,7 @@
 #include <jack/thread.h>
 #include <jack/varargs.h>
 #include <jack/intsimd.h>
+#include <jack/messagebuffer.h>
 
 #include <sysdeps/time.h>
 
@@ -2326,6 +2327,11 @@ jack_set_thread_init_callback (jack_client_t *client,
 	client->thread_init_arg = arg;
 	client->thread_init = callback;
 	client->control->thread_init_cbset = (callback != NULL);
+
+	/* make sure that the message buffer thread is initialized too */
+
+	jack_messagebuffer_thread_init (callback, arg);
+
 	return 0;
 }
 
