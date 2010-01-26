@@ -305,7 +305,6 @@ jack_client_alloc ()
 	client->request_fd = -1;
 	client->event_fd = -1;
 	client->upstream_is_jackd = 0;
-	client->graph_wait_fd = -1;
 	client->graph_next_fd = -1;
 	client->ports = NULL;
 	client->ports_ext = NULL;
@@ -1539,12 +1538,14 @@ jack_client_core_wait (jack_client_t* client)
 			DEBUG ("event processing failed\n");
 			return 0;
 		}
-		
+
+#ifndef JACK_USE_MACH_THREADS		
 		if (client->graph_wait_fd >= 0 &&
 		    (client->pollfd[WAIT_POLL_INDEX].revents & POLLIN)) {
 			DEBUG ("time to run process()\n");
 			break;
 		}
+#endif
 	}
 
 	if (control->dead || client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
@@ -1778,7 +1779,7 @@ jack_client_thread_aux (void *arg)
 	jack_client_thread_suicide (client);
 }
 
-static void *
+static void* 
 jack_client_thread (void *arg)
 {
 	jack_client_t *client = (jack_client_t *) arg;
