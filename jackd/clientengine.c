@@ -216,7 +216,7 @@ jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 }
 
 void
-jack_remove_clients (jack_engine_t* engine)
+jack_remove_clients (jack_engine_t* engine, int* exit_freewheeling_when_done)
 {
 	JSList *tmp, *node;
 	int need_sort = FALSE;
@@ -237,6 +237,11 @@ jack_remove_clients (jack_engine_t* engine)
 		VERBOSE(engine, "client %s error status %d", client->control->name, client->error);
 		
 		if (client->error) {
+			
+			if (engine->freewheeling && client->control->id == engine->fwclient) {
+				VERBOSE (engine, "freewheeling client has errors");
+				*exit_freewheeling_when_done = 1;
+			}
 			
 			/* if we have a communication problem with the
 			   client, remove it. otherwise, turn it into
@@ -269,7 +274,7 @@ jack_remove_clients (jack_engine_t* engine)
 					client->error = 0;
 				}
 			}
-			
+
 			need_sort = TRUE;
 		}
 		

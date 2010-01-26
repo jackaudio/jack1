@@ -1274,6 +1274,7 @@ jack_set_freewheel (jack_client_t* client, int onoff)
 	jack_request_t request;
 
 	request.type = onoff ? FreeWheel : StopFreeWheel;
+	request.x.client_id = client->control->id;
 	return jack_client_deliver_request (client, &request);
 }
 
