@@ -120,7 +120,7 @@ jack_client_t *jack_client_open (const char *client_name,
  *  NEW JACK CLIENTS</b>
  *
  */
-jack_client_t *jack_client_new (const char *client_name) JACK_OPTIONAL_WEAK_DEPRECATED_EXPORTdd;
+jack_client_t *jack_client_new (const char *client_name) JACK_OPTIONAL_WEAK_DEPRECATED_EXPORT;
 
 /**
  * Disconnects an external client from a JACK server.
