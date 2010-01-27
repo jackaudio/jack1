@@ -111,8 +111,10 @@ struct _jack_engine {
     unsigned long   fifo_size;
     unsigned long   external_client_cnt;
     int		    rtpriority;
-    char	    freewheeling;
+    volatile char   freewheeling;
+    volatile char   stop_freewheeling;
     jack_client_id_t fwclient;
+    pthread_t       freewheel_thread;
     char	    verbose;
     char	    do_munlock;
     const char	   *server_name;
@@ -122,7 +124,6 @@ struct _jack_engine {
     int		    feedbackcount;
     int             removing_clients;
     pid_t           wait_pid;
-    pthread_t       freewheel_thread;
     int             nozombies;
     volatile int    problems;
 
