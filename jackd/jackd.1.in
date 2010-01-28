@@ -42,6 +42,11 @@ show how to list them.
 \fB\-m, \-\-no\-mlock\fR
 Do not attempt to lock memory, even if \fB\-\-realtime\fR.
 .TP
+\fB\-M, \-\-midi\-bufsize\fR [ \fIevent-count\fR ]
+Specify the size of the buffer used for MIDI ports. Units are "MIDI
+events", where an event occupies up to 4 bytes (as most common MIDI events
+do). The default buffer size is same as the one used for audio data. 
+.TP
 \fB\-n, \-\-name\fR \fIserver\-name\fR
 Name this \fBjackd\fR instance \fIserver\-name\fR.  If unspecified,
 this name comes from the \fB$JACK_DEFAULT_SERVER\fR environment
