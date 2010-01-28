@@ -2551,7 +2551,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 			break;
 
 		case BufferSizeChange:
-			jack_client_invalidate_port_buffers
+			jack_client_fix_port_buffers
 				(client->private_client);
 
 			if (client->control->bufsize_cbset) {

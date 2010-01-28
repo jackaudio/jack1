@@ -396,7 +396,7 @@ jack_client_free (jack_client_t *client)
 }
 
 void
-jack_client_invalidate_port_buffers (jack_client_t *client)
+jack_client_fix_port_buffers (jack_client_t *client)
 {
 	JSList *node;
 	jack_port_t *port;
@@ -412,8 +412,14 @@ jack_client_invalidate_port_buffers (jack_client_t *client)
 
 		if (port->shared->flags & JackPortIsInput) {
 			if (port->mix_buffer) {
+				size_t buffer_size = 
+					jack_port_type_buffer_size( port->type_info,
+								    client->engine->buffer_size );
 				jack_pool_release (port->mix_buffer);
-				port->mix_buffer = NULL;
+				port->mix_buffer = jack_pool_alloc (buffer_size);
+				port->fptr.buffer_init (port->mix_buffer, 
+								buffer_size, 
+								client->engine->buffer_size);
 			}
 		}
 	}
@@ -442,6 +448,19 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 			control_port = jack_port_by_id_int (client, event->x.self_id,
 							    &need_free);
 			pthread_mutex_lock (&control_port->connection_lock);
+
+			if ((control_port->shared->flags & JackPortIsInput)
+			 && (control_port->connections != NULL) 
+			 && (control_port->mix_buffer == NULL)  ) {
+				size_t buffer_size = 
+					jack_port_type_buffer_size( control_port->type_info,
+								    client->engine->buffer_size );
+				control_port->mix_buffer = jack_pool_alloc (buffer_size);
+				control_port->fptr.buffer_init (control_port->mix_buffer, 
+								buffer_size, 
+								client->engine->buffer_size);
+			}
+
 			control_port->connections =
 				jack_slist_prepend (control_port->connections,
 						    (void *) other);
@@ -1415,7 +1434,7 @@ jack_client_process_events (jack_client_t* client)
 			break;
 			
 		case BufferSizeChange:
-			jack_client_invalidate_port_buffers (client);
+			jack_client_fix_port_buffers (client);
 			if (control->bufsize_cbset) {
 				status = client->bufsize
 					(control->nframes,
