@@ -39,4 +39,6 @@ void jack_message_buffer_thread_init (void (*cb)(void*), void*);
 
 void jack_messagebuffer_add(const char *fmt, ...);
 
+void jack_messagebuffer_thread_init (void (*cb)(void*), void* arg);
+
 #endif /* __jack_messagebuffer_h__ */
