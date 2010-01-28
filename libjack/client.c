@@ -416,10 +416,15 @@ jack_client_fix_port_buffers (jack_client_t *client)
 					jack_port_type_buffer_size( port->type_info,
 								    client->engine->buffer_size );
 				jack_pool_release (port->mix_buffer);
-				port->mix_buffer = jack_pool_alloc (buffer_size);
-				port->fptr.buffer_init (port->mix_buffer, 
+				port->mix_buffer = NULL;
+				pthread_mutex_lock (&port->connection_lock);
+				if (jack_slist_length (port->connections) > 1) {
+					port->mix_buffer = jack_pool_alloc (buffer_size);
+					port->fptr.buffer_init (port->mix_buffer, 
 								buffer_size, 
 								client->engine->buffer_size);
+				}
+				pthread_mutex_unlock (&port->connection_lock);
 			}
 		}
 	}
