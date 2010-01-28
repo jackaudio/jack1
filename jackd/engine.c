@@ -446,6 +446,8 @@ jack_resize_port_segment (jack_engine_t *engine,
 			* engine->control->buffer_size;
 	}
 
+	VERBOSE (engine, "resizing port buffer segment for type %d, one buffer = %u bytes", ptid, one_buffer);
+
 	size = nports * one_buffer;
 
 	if (shm_info->attached_at == 0) {

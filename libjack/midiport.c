@@ -26,9 +26,7 @@
 #include <jack/midiport.h>
 #include <jack/port.h>
 
-
-enum { MIDI_INLINE_MAX = sizeof(jack_shmsize_t) };
-
+enum { MIDI_INLINE_MAX = 4 }; /* 4 bytes for default event size */
 
 typedef struct _jack_midi_port_info_private {
 	jack_nframes_t        nframes; /**< Number of frames in buffer */
@@ -39,14 +37,19 @@ typedef struct _jack_midi_port_info_private {
 } POST_PACKED_STRUCTURE jack_midi_port_info_private_t;
 
 typedef struct _jack_midi_port_internal_event {
-	int32_t        time;
-	jack_shmsize_t size;
-	union {
-		jack_shmsize_t byte_offset;
-		jack_midi_data_t inline_data[MIDI_INLINE_MAX];
+        uint16_t time; /* offset within buffer limit to 64k */
+        uint16_t size; /* event size limited to 64k */ 
+        union {
+	    jack_shmsize_t byte_offset;
+	    jack_midi_data_t inline_data[MIDI_INLINE_MAX];
 	} POST_PACKED_STRUCTURE;
 } POST_PACKED_STRUCTURE jack_midi_port_internal_event_t;
 
+size_t
+jack_midi_internal_event_size ()
+{
+	return sizeof (jack_midi_port_internal_event_t);
+}
 
 static inline jack_midi_data_t*
 jack_midi_event_data(void* port_buffer,
