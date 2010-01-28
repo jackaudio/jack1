@@ -11,7 +11,9 @@ libjackinclude_HEADERS = 	\
 	timestamps.h		\
 	transport.h		\
 	types.h	\
-	midiport.h
+	midiport.h \
+	weakmacros.h \
+	weakjack.h 
 
 noinst_HEADERS =		\
 	atomicity.h		\
