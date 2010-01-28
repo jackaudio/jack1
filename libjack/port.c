@@ -559,10 +559,15 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 	   connection process.
 	*/
 	if (port->mix_buffer == NULL) {
-		size_t buffer_size = 
+		size_t buffer_size;
+		if( port->type_info->buffer_scale_factor < 0 ) {
+			buffer_size = port->type_info->buffer_size;
+		} else {
+			buffer_size = 
 				port->type_info->buffer_scale_factor
 				* sizeof (jack_default_audio_sample_t)
 				* nframes;
+		}
 		port->mix_buffer = jack_pool_alloc (buffer_size);
 		port->fptr.buffer_init (port->mix_buffer, buffer_size, nframes);
 	}
