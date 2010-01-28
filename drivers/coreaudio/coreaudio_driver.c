@@ -440,7 +440,10 @@ coreaudio_driver_attach(coreaudio_driver_t * driver, jack_engine_t * engine)
 	
     driver->engine = engine;
 
-    driver->engine->set_buffer_size(engine, driver->frames_per_cycle);
+    if (driver->engine->set_buffer_size(engine, driver->frames_per_cycle)) {
+	    jack_error ("coreaudio: cannot set engine buffer size to %d (check MIDI)", driver->frames_per_cycle);
+	    return -1;
+    }
     driver->engine->set_sample_rate(engine, driver->frame_rate);
 
     port_flags = JackPortIsOutput | JackPortIsPhysical | JackPortIsTerminal;

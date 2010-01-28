@@ -237,7 +237,10 @@ dummy_driver_bufsize (dummy_driver_t* driver, jack_nframes_t nframes)
 				     * 1000000.0f);
 
 	/* tell the engine to change its buffer size */
-	driver->engine->set_buffer_size (driver->engine, nframes);
+	if (driver->engine->set_buffer_size (driver->engine, nframes)) {
+		jack_error ("dummy: cannot set engine buffer size to %d (check MIDI)", nframes);
+		return -1;
+	}
 
 	return 0;
 }
@@ -257,7 +260,10 @@ dummy_driver_attach (dummy_driver_t *driver)
 	unsigned int chn;
 	int port_flags;
 
-	driver->engine->set_buffer_size (driver->engine, driver->period_size);
+	if (driver->engine->set_buffer_size (driver->engine, driver->period_size)) {
+		jack_error ("dummy: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
+		return -1;
+	}
 	driver->engine->set_sample_rate (driver->engine, driver->sample_rate);
 
 	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;

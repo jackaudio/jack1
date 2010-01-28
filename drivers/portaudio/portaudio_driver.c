@@ -135,7 +135,10 @@ portaudio_driver_attach (portaudio_driver_t *driver, jack_engine_t *engine)
 		
 	driver->engine = engine;
 	
-	driver->engine->set_buffer_size (engine, driver->frames_per_cycle);
+	if (driver->engine->set_buffer_size (engine, driver->frames_per_cycle)) {
+		jack_error ("portaudio: cannot set engine buffer size to %d (check MIDI)", driver->frames_per_cycle);
+		return -1;
+	}
 	driver->engine->set_sample_rate (engine, driver->frame_rate);
 	
 	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
@@ -323,8 +326,12 @@ portaudio_driver_set_parameters (portaudio_driver_t* driver,
 
 		/* tell engine about buffer size */
 		if (driver->engine) {
-			driver->engine->set_buffer_size (
-				driver->engine, driver->frames_per_cycle);
+			if (driver->engine->set_buffer_size (
+				    driver->engine, driver->frames_per_cycle)) {
+				jack_error ("portaudio: cannot set engine buffer size to %d (check MIDI)", driver->frames_per_cycle);
+				return -1;
+			}
+				
 		}
 		return 0;
 

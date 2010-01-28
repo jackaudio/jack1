@@ -44,8 +44,13 @@ Do not attempt to lock memory, even if \fB\-\-realtime\fR.
 .TP
 \fB\-M, \-\-midi\-bufsize\fR [ \fIevent-count\fR ]
 Specify the size of the buffer used for MIDI ports. Units are "MIDI
-events", where an event occupies up to 4 bytes (as most common MIDI events
-do). The default buffer size is same as the one used for audio data. 
+events per process() cycle", where an event occupies up to 4 bytes (as most common MIDI events
+do). The default buffer size is same as the one used for audio
+data, which will store about 2 MIDI events per sample.
+Typical values for \fIevent-count\fR will range from 10 to about
+500. Be aware that using very high values along with a large number of
+ports may  cause JACK to fail to start because of the amount of memory 
+that would be required.
 .TP
 \fB\-n, \-\-name\fR \fIserver\-name\fR
 Name this \fBjackd\fR instance \fIserver\-name\fR.  If unspecified,

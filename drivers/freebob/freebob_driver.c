@@ -74,7 +74,10 @@ freebob_driver_attach (freebob_driver_t *driver)
 	g_verbose=driver->engine->verbose;
 	driver->device_options.verbose=g_verbose;
 
-	driver->engine->set_buffer_size (driver->engine, driver->period_size);
+	if (driver->engine->set_buffer_size (driver->engine, driver->period_size)) {
+		jack_error ("FREEBOB: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
+		return -1;
+	}
 	driver->engine->set_sample_rate (driver->engine, driver->sample_rate);
 
 	/* packetizer thread options */
@@ -678,8 +681,12 @@ freebob_driver_bufsize (freebob_driver_t* driver, jack_nframes_t nframes)
 	*/
 	
 	/* tell the engine to change its buffer size */
-	//driver->engine->set_buffer_size (driver->engine, nframes);
-
+#if 0
+	if (driver->engine->set_buffer_size (driver->engine, nframes)) {
+		jack_error ("FREEBOB: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
+		return -1;
+	}
+#endif
 	return -1; // unsupported
 }
 

@@ -426,8 +426,8 @@ jack_engine_place_port_buffers (jack_engine_t* engine,
 	pthread_mutex_unlock (&pti->lock);
 }
 
-// JOQ: this should have a return code...
-static void
+
+static int
 jack_resize_port_segment (jack_engine_t *engine,
 			  jack_port_type_id_t ptid,
 			  unsigned long nports)
@@ -457,13 +457,13 @@ jack_resize_port_segment (jack_engine_t *engine,
 				    " bytes (%s)", 
 				    size,
 				    strerror (errno));
-			return;
+			return -1;
 		}
 		
 		if (jack_attach_shm (shm_info)) {
 			jack_error ("cannot attach to new port segment "
 				    "(%s)", strerror (errno));
-			return;
+			return -1;
 		}
 
 		engine->control->port_types[ptid].shm_registry_index =
@@ -476,7 +476,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 			jack_error ("cannot resize port segment to %d bytes,"
 				    " (%s)", size,
 				    strerror (errno));
-			return;
+			return -1;
 		}
 	}
 
@@ -506,6 +506,10 @@ jack_resize_port_segment (jack_engine_t *engine,
 	event.type = AttachPortSegment;
 	event.y.ptid = ptid;
 	jack_deliver_event_to_all (engine, &event);
+
+	/* XXX need to clean up in the evnt of failures */
+
+	return 0;
 }
 
 /* The driver invokes this callback both initially and whenever its
@@ -526,7 +530,9 @@ jack_driver_buffer_size (jack_engine_t *engine, jack_nframes_t nframes)
 			jack_rolling_interval (engine->driver->period_usecs);
 
 	for (i = 0; i < engine->control->n_port_types; ++i) {
-		jack_resize_port_segment (engine, i, engine->control->port_max);
+		if (jack_resize_port_segment (engine, i, engine->control->port_max)) {
+			return -1;
+		}
 	}
 
 	/* update shared client copy of nframes */
