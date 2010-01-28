@@ -438,14 +438,7 @@ jack_resize_port_segment (jack_engine_t *engine,
 	jack_port_type_info_t* port_type = &engine->control->port_types[ptid];
 	jack_shm_info_t* shm_info = &engine->port_segment[ptid];
 
-	if (port_type->buffer_scale_factor < 0) {
-		one_buffer = port_type->buffer_size;
-	} else {
-		one_buffer = sizeof (jack_default_audio_sample_t)
-			* port_type->buffer_scale_factor
-			* engine->control->buffer_size;
-	}
-
+	one_buffer = jack_port_type_buffer_size (port_type, engine->control->buffer_size);
 	VERBOSE (engine, "resizing port buffer segment for type %d, one buffer = %u bytes", ptid, one_buffer);
 
 	size = nports * one_buffer;
