@@ -559,9 +559,8 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 	   connection process.
 	*/
 	if (port->mix_buffer == NULL) {
-		size_t buffer_size = jack_port_type_buffer_size (port->type_info, nframes);
-		port->mix_buffer = jack_pool_alloc (buffer_size);
-		port->fptr.buffer_init (port->mix_buffer, buffer_size, nframes);
+		jack_error( "internal jack error: mix_buffer not allocated" );
+		return NULL;
 	}
 	port->fptr.mixdown (port, nframes);
 	return (void *) port->mix_buffer;
