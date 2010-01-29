@@ -192,7 +192,7 @@ int  jack_release_timebase (jack_client_t *client) JACK_OPTIONAL_WEAK_EXPORT;
  */ 
 typedef int  (*JackSyncCallback)(jack_transport_state_t state,
 				 jack_position_t *pos,
-				 void *arg) JACK_OPTIONAL_WEAK_EXPORT;
+				 void *arg);
 
 /**
  * Register (or unregister) as a slow-sync client, one that cannot
@@ -271,7 +271,7 @@ typedef void (*JackTimebaseCallback)(jack_transport_state_t state,
 				     jack_nframes_t nframes, 
 				     jack_position_t *pos,
 				     int new_pos,
-				     void *arg) JACK_OPTIONAL_WEAK_EXPORT;
+				     void *arg);
 
 /**
  * Register as timebase master for the JACK subsystem.
