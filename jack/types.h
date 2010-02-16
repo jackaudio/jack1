@@ -343,14 +343,14 @@ typedef void (*JackPortConnectCallback)(jack_port_id_t a, jack_port_id_t b, int 
  *
  * @param starting non-zero if we start starting to freewheel, zero otherwise
  * @param arg pointer to a client supplied structure
- */ 
+ */
 typedef void (*JackFreewheelCallback)(int starting, void *arg);
 
 typedef void *(*JackThreadCallback)(void* arg);
 
 /**
  * Prototype for the client supplied function that is called
- * whenever jackd is shutdown. Note that after server shutdown, 
+ * whenever jackd is shutdown. Note that after server shutdown,
  * the client pointer is *not* deallocated by libjack,
  * the application is responsible to properly use jack_client_close()
  * to release client ressources. Warning: jack_client_close() cannot be
@@ -363,15 +363,15 @@ typedef void (*JackShutdownCallback)(void *arg);
 
 /**
  * Prototype for the client supplied function that is called
- * whenever jackd is shutdown. Note that after server shutdown, 
+ * whenever jackd is shutdown. Note that after server shutdown,
  * the client pointer is *not* deallocated by libjack,
  * the application is responsible to properly use jack_client_close()
  * to release client ressources. Warning: jack_client_close() cannot be
  * safely used inside the shutdown callback and has to be called outside of
  * the callback context.
  *
- * @param code a shuntdown code
- * @param reason a string discribing the shuntdown reason (backend failure, server crash... etc...)
+ * @param code a shutdown code
+ * @param reason a string describing the shutdown reason (backend failure, server crash... etc...)
  * @param arg pointer to a client supplied structure
  */
 typedef void (*JackInfoShutdownCallback)(jack_status_t code, const char* reason, void *arg);
@@ -379,21 +379,23 @@ typedef void (*JackInfoShutdownCallback)(jack_status_t code, const char* reason,
 /**
  * Prototype for the client supplied function that is called
  * whenever a session notification is sent via jack_session_notify().
- * for a save event the client is required to save its state.
- * it must save it into session_dir, and at least use prefix for the first
- * part of the filename. (it is free to create a directory or create more
- * files, as long as these start with prefix.)
- * the prefix also acts as uuid, which the client needs to specify
- * to jack_client_open()  upon session reload.
+ * For a save event the client is required to save its state.
+ * It must save it into session_dir, and any created files or directories
+ * must be contained in @a session_dir and start with @a uuid.
+ * The prefix also acts as uuid, which the client needs to specify
+ * to jack_client_open() upon session reload.
  *
  * The return value is a commandline, which will restore the state.
  *
- * @param code the type of the Event (Save or Quit)
- * @param session_dir with trailing separator.
- * @param prefix for saved files.
+ * The UUID must be passed to jack_client_open on session reload (this can be
+ * done by specifying it somehow on the returned command line).
+ *
+ * @param event type of the Event (Save or Quit)
+ * @param session_dir session directory, with trailing separator.
+ * @param uuid UUID for this client instance.
  * @param arg pointer to a client supplied structure
  */
-typedef char *(*JackSessionCallback)(jack_session_event_t code, const char* session_dir, const char* client_name, void *arg);
+typedef char *(*JackSessionCallback)(jack_session_event_t event, const char* session_dir, const char* uuid, void *arg);
 
 /**
  * Used for the type argument of jack_port_register() for default
