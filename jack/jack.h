@@ -406,17 +406,6 @@ int jack_set_graph_order_callback (jack_client_t *,
  */
 int jack_set_xrun_callback (jack_client_t *,
 			    JackXRunCallback xrun_callback, void *arg) JACK_OPTIONAL_WEAK_EXPORT;
-/**
- * Tell the JACK server to call @a save_callback the session handler wants
- * to save.
- *
- * @return 0 on success, otherwise a non-zero error code
- */
-
-int jack_set_session_callback(jack_client_t *client,
-			    JackSessionCallback session_save_callback,
-			    void *arg) JACK_WEAK_EXPORT;
-
 /*@}*/
 
 /**
@@ -1012,19 +1001,6 @@ void jack_set_info_function (void (*func)(const char *)) JACK_OPTIONAL_WEAK_EXPO
  *
  */
 void jack_free(void* ptr) JACK_OPTIONAL_WEAK_EXPORT;
-
-/**
- * send a save or quit event, to all clients listening for session
- * callbacks. the returned strings of the clients are accumulated and
- * returned as an array of jack_session_command_t.
- * its terminated by ret[i].uuid[0]='\0'
- * target == NULL means send to all interested clients. otherwise a clientname
- */
-
-jack_session_command_t *jack_session_notify (jack_client_t* client,
-					     const char *target,
-					     jack_session_event_t code,
-					     const char *path ) JACK_WEAK_EXPORT;
 
 /**
  * get the jack client name for a uuid

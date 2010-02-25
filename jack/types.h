@@ -114,15 +114,15 @@ enum JackOptions {
       * jack_initialize() entry point of an internal client.
       */
      JackLoadInit = 0x10,
+
      /**
-      * pass a UUID Token, this will unlock and assign an assigned name
-      * to the client.
+      * pass a SessionID Token this allows the sessionmanager to identify the client again.
       */
-     JackSessionUUID = 0x20
+     JackSessionID = 0x20
 };
 
 /** Valid options for opening an external client. */
-#define JackOpenOptions (JackSessionUUID|JackServerName|JackNoStartServer|JackUseExactName)
+#define JackOpenOptions (JackSessionID|JackServerName|JackNoStartServer|JackUseExactName)
 
 /** Valid options for loading an internal client. */
 #define JackLoadOptions (JackLoadInit|JackLoadName|JackUseExactName)
@@ -218,13 +218,6 @@ enum JackStatus {
  *  OR-ing together the relevant @ref JackStatus bits.
  */
 typedef enum JackStatus jack_status_t;
-
-enum JackSessionEvent {
-    JackSessionSave = 1,
-    JackSessionQuit = 2
-};
-
-typedef enum JackSessionEvent jack_session_event_t;
 
 /**
  * Prototype for the client supplied function that is called 
@@ -377,27 +370,6 @@ typedef void (*JackShutdownCallback)(void *arg);
 typedef void (*JackInfoShutdownCallback)(jack_status_t code, const char* reason, void *arg);
 
 /**
- * Prototype for the client supplied function that is called
- * whenever a session notification is sent via jack_session_notify().
- * For a save event the client is required to save its state.
- * It must save it into session_dir, and any created files or directories
- * must be contained in @a session_dir and start with @a uuid.
- * The prefix also acts as uuid, which the client needs to specify
- * to jack_client_open() upon session reload.
- *
- * The return value is a commandline, which will restore the state.
- *
- * The UUID must be passed to jack_client_open on session reload (this can be
- * done by specifying it somehow on the returned command line).
- *
- * @param event type of the Event (Save or Quit)
- * @param session_dir session directory, with trailing separator.
- * @param uuid UUID for this client instance.
- * @param arg pointer to a client supplied structure
- */
-typedef char *(*JackSessionCallback)(jack_session_event_t event, const char* session_dir, const char* uuid, void *arg);
-
-/**
  * Used for the type argument of jack_port_register() for default
  * audio and midi ports.
  */
@@ -469,10 +441,5 @@ enum JackPortFlags {
      JackPortIsTerminal = 0x10
 };	    
 
-typedef struct  {
-	char uuid[16];
-	char client_name[33];
-	char command[256];
-} jack_session_command_t;
 
 #endif /* __jack_types_h__ */
