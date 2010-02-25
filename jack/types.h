@@ -412,7 +412,7 @@ typedef char *(*JackSessionCallback)(jack_session_event_t event, const char* ses
 typedef float jack_default_audio_sample_t;
 
 /**
- *  A port has a set of flags that are formed by AND-ing together the
+ *  A port has a set of flags that are formed by OR-ing together the
  *  desired values from the list below. The flags "JackPortIsInput" and
  *  "JackPortIsOutput" are mutually exclusive and it is an error to use
  *  them both.

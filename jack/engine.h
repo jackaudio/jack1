@@ -116,7 +116,10 @@ struct _jack_engine {
     unsigned long   fifo_size;
     unsigned long   external_client_cnt;
     int		    rtpriority;
-    char	    freewheeling;
+    volatile char   freewheeling;
+    volatile char   stop_freewheeling;
+    jack_client_id_t fwclient;
+    pthread_t       freewheel_thread;
     char	    verbose;
     char	    do_munlock;
     const char	   *server_name;
@@ -126,7 +129,6 @@ struct _jack_engine {
     int		    feedbackcount;
     int             removing_clients;
     pid_t           wait_pid;
-    pthread_t       freewheel_thread;
     int             nozombies;
     volatile int    problems;
 
@@ -237,6 +239,7 @@ void	jack_port_clear_connections (jack_engine_t *engine,
 void	jack_port_registration_notify (jack_engine_t *, jack_port_id_t, int);
 void	jack_port_release (jack_engine_t *engine, jack_port_internal_t *);
 void	jack_sort_graph (jack_engine_t *engine);
+int     jack_stop_freewheeling (jack_engine_t* engine, int engine_exiting);
 jack_client_internal_t *
 jack_client_by_name (jack_engine_t *engine, const char *name);
 

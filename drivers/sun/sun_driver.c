@@ -565,7 +565,10 @@ sun_driver_attach (sun_driver_t *driver)
 	char channel_name[64];
 	jack_port_t *port;
 
-	driver->engine->set_buffer_size(driver->engine, driver->period_size);
+	if (driver->engine->set_buffer_size(driver->engine, driver->period_size)) {
+		jack_error ("sun_driver: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
+		return -1;
+	}
 	driver->engine->set_sample_rate(driver->engine, driver->sample_rate);
 
 	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
@@ -1002,8 +1005,11 @@ sun_driver_set_parameters (sun_driver_t *driver)
 		set_period_size (driver, period_size);
 
 		if (driver->engine)
-			driver->engine->set_buffer_size(driver->engine, 
-				driver->period_size);
+			if (driver->engine->set_buffer_size(driver->engine, 
+							    driver->period_size)) {
+				jack_error ("sun_driver: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
+				return -1;
+			}
 	}
 
 	if (driver->infd >= 0 && driver->capture_channels > 0)

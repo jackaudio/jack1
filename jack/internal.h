@@ -525,7 +525,7 @@ extern jack_port_functions_t jack_builtin_audio_functions;
 
 extern jack_port_type_info_t jack_builtin_port_types[];
 
-extern void jack_client_invalidate_port_buffers (jack_client_t *client);
+extern void jack_client_fix_port_buffers (jack_client_t *client);
 
 extern void jack_transport_copy_position (jack_position_t *from,
 					  jack_position_t *to);

@@ -59,6 +59,6 @@ void	jack_intclient_name_request (jack_engine_t *engine,
 void	jack_intclient_unload_request (jack_engine_t *engine,
 				       jack_request_t *req);
 void	jack_check_clients (jack_engine_t* engine, int with_timeout_check);
-void	jack_remove_clients (jack_engine_t* engine);
+void	jack_remove_clients (jack_engine_t* engine, int* exit_freewheeling);
 void    jack_client_registration_notify (jack_engine_t *engine,
 					 const char* name, int yn);

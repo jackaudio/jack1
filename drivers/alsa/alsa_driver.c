@@ -863,8 +863,11 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	driver->poll_timeout = (int) floor (1.5f * driver->period_usecs);
 
 	if (driver->engine) {
-		driver->engine->set_buffer_size (driver->engine,
-						 driver->frames_per_cycle);
+		if (driver->engine->set_buffer_size (driver->engine,
+						     driver->frames_per_cycle)) {
+			jack_error ("ALSA: Cannot set engine buffer size to %d (check MIDI)", driver->frames_per_cycle);
+			return -1;
+		}
 	}
 
 	return 0;
@@ -1733,7 +1736,10 @@ alsa_driver_attach (alsa_driver_t *driver)
 	jack_port_t *port;
 	int port_flags;
 
-	driver->engine->set_buffer_size (driver->engine, driver->frames_per_cycle);
+	if (driver->engine->set_buffer_size (driver->engine, driver->frames_per_cycle)) {
+		jack_error ("ALSA: cannot set engine buffer size for %d (check MIDI)", driver->frames_per_cycle);
+		return -1;
+	}
 	driver->engine->set_sample_rate (driver->engine, driver->frame_rate);
 
 	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;

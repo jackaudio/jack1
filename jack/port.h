@@ -179,5 +179,8 @@ struct _jack_port {
 #define jack_output_port_buffer(p) \
   ((void *) (*(p)->client_segment_base + (p)->shared->offset))
 
+/* not for use by JACK applications */
+size_t jack_port_type_buffer_size (jack_port_type_info_t* port_type_info, jack_nframes_t nframes);
+
 #endif /* __jack_port_h__ */
 

@@ -268,7 +268,10 @@ static int
 net_driver_attach (net_driver_t *driver)
 {
     netjack_driver_state_t *netj = &( driver->netj );
-    driver->engine->set_buffer_size (driver->engine, netj->period_size);
+    if (driver->engine->set_buffer_size (driver->engine, netj->period_size)) {
+	    jack_error ("netjack: cannot set engine buffer size to %d (check MIDI)", netj->period_size);
+	    return -1;
+    }
     driver->engine->set_sample_rate (driver->engine, netj->sample_rate);
 
     netjack_attach( netj );

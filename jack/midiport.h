@@ -147,6 +147,12 @@ jack_midi_event_write(void                   *port_buffer,
 jack_nframes_t
 jack_midi_get_lost_event_count(void           *port_buffer);
 
+/** Get the size (in bytes) of the data structure used to store
+ *  MIDI events internally. This is not useful for JACK applications.
+ */
+size_t
+jack_midi_internal_event_size ();
+
 /*@}*/
 
 

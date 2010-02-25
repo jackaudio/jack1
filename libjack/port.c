@@ -559,17 +559,24 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 	   connection process.
 	*/
 	if (port->mix_buffer == NULL) {
-		size_t buffer_size = 
-				port->type_info->buffer_scale_factor
-				* sizeof (jack_default_audio_sample_t)
-				* nframes;
-		port->mix_buffer = jack_pool_alloc (buffer_size);
-		port->fptr.buffer_init (port->mix_buffer, buffer_size, nframes);
+		jack_error( "internal jack error: mix_buffer not allocated" );
+		return NULL;
 	}
 	port->fptr.mixdown (port, nframes);
 	return (void *) port->mix_buffer;
 }
 
+size_t
+jack_port_type_buffer_size (jack_port_type_info_t* port_type_info, jack_nframes_t nframes)
+{
+	if( port_type_info->buffer_scale_factor < 0 ) {
+		return port_type_info->buffer_size;
+	} 
+
+	return port_type_info->buffer_scale_factor
+		* sizeof (jack_default_audio_sample_t)
+		* nframes;
+}
 int
 jack_port_tie (jack_port_t *src, jack_port_t *dst)
 

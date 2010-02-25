@@ -356,7 +356,10 @@ static int oss_driver_attach (oss_driver_t *driver, jack_engine_t *engine)
 
 	driver->engine = engine;
 
-	engine->set_buffer_size(engine, driver->period_size);
+	if (engine->set_buffer_size(engine, driver->period_size)) {
+		jack_error ("OSS: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
+		return -1;
+	}
 	engine->set_sample_rate(engine, driver->sample_rate);
 
 	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
@@ -612,8 +615,11 @@ static int oss_driver_start (oss_driver_t *driver)
 			driver->period_usecs = 
 				((double) driver->period_size / 
 				 (double) driver->sample_rate) * 1e6;
-			driver->engine->set_buffer_size(driver->engine, 
-				driver->period_size);
+			if (driver->engine->set_buffer_size(driver->engine, 
+							    driver->period_size)) {
+				jack_error ("OSS: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
+				return -1;
+			}
 		}
 	}
 
@@ -648,8 +654,11 @@ static int oss_driver_start (oss_driver_t *driver)
 			driver->period_usecs = 
 				((double) driver->period_size / 
 				 (double) driver->sample_rate) * 1e6;
-			driver->engine->set_buffer_size(driver->engine, 
-				driver->period_size);
+			if (driver->engine->set_buffer_size(driver->engine, 
+							    driver->period_size)) {
+				jack_error ("OSS: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
+				return -1;
+			}
 		}
 	}
 
@@ -906,7 +915,10 @@ static int oss_driver_bufsize (oss_driver_t *driver, jack_nframes_t nframes)
 	oss_driver_stop(driver);
 
 	set_period_size(driver, nframes);
-	driver->engine->set_buffer_size(driver->engine, driver->period_size);
+	if (driver->engine->set_buffer_size(driver->engine, driver->period_size)) {
+		jack_error ("OSS: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
+		return -1;
+	}
 	jack_info("oss_driver: period size update: %u", nframes);
 
 	oss_driver_start(driver);

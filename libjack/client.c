@@ -48,6 +48,7 @@
 #include <jack/thread.h>
 #include <jack/varargs.h>
 #include <jack/intsimd.h>
+#include <jack/messagebuffer.h>
 
 #include <sysdeps/time.h>
 
@@ -304,7 +305,6 @@ jack_client_alloc ()
 	client->request_fd = -1;
 	client->event_fd = -1;
 	client->upstream_is_jackd = 0;
-	client->graph_wait_fd = -1;
 	client->graph_next_fd = -1;
 	client->ports = NULL;
 	client->ports_ext = NULL;
@@ -396,7 +396,7 @@ jack_client_free (jack_client_t *client)
 }
 
 void
-jack_client_invalidate_port_buffers (jack_client_t *client)
+jack_client_fix_port_buffers (jack_client_t *client)
 {
 	JSList *node;
 	jack_port_t *port;
@@ -412,8 +412,19 @@ jack_client_invalidate_port_buffers (jack_client_t *client)
 
 		if (port->shared->flags & JackPortIsInput) {
 			if (port->mix_buffer) {
+				size_t buffer_size = 
+					jack_port_type_buffer_size( port->type_info,
+								    client->engine->buffer_size );
 				jack_pool_release (port->mix_buffer);
 				port->mix_buffer = NULL;
+				pthread_mutex_lock (&port->connection_lock);
+				if (jack_slist_length (port->connections) > 1) {
+					port->mix_buffer = jack_pool_alloc (buffer_size);
+					port->fptr.buffer_init (port->mix_buffer, 
+								buffer_size, 
+								client->engine->buffer_size);
+				}
+				pthread_mutex_unlock (&port->connection_lock);
 			}
 		}
 	}
@@ -442,6 +453,19 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 			control_port = jack_port_by_id_int (client, event->x.self_id,
 							    &need_free);
 			pthread_mutex_lock (&control_port->connection_lock);
+
+			if ((control_port->shared->flags & JackPortIsInput)
+			 && (control_port->connections != NULL) 
+			 && (control_port->mix_buffer == NULL)  ) {
+				size_t buffer_size = 
+					jack_port_type_buffer_size( control_port->type_info,
+								    client->engine->buffer_size );
+				control_port->mix_buffer = jack_pool_alloc (buffer_size);
+				control_port->fptr.buffer_init (control_port->mix_buffer, 
+								buffer_size, 
+								client->engine->buffer_size);
+			}
+
 			control_port->connections =
 				jack_slist_prepend (control_port->connections,
 						    (void *) other);
@@ -1305,6 +1329,7 @@ jack_set_freewheel (jack_client_t* client, int onoff)
 	jack_request_t request;
 
 	request.type = onoff ? FreeWheel : StopFreeWheel;
+	request.x.client_id = client->control->id;
 	return jack_client_deliver_request (client, &request);
 }
 
@@ -1512,7 +1537,7 @@ jack_client_process_events (jack_client_t* client)
 			break;
 			
 		case BufferSizeChange:
-			jack_client_invalidate_port_buffers (client);
+			jack_client_fix_port_buffers (client);
 			if (control->bufsize_cbset) {
 				status = client->bufsize
 					(control->nframes,
@@ -1639,12 +1664,14 @@ jack_client_core_wait (jack_client_t* client)
 			DEBUG ("event processing failed\n");
 			return 0;
 		}
-		
+
+#ifndef JACK_USE_MACH_THREADS		
 		if (client->graph_wait_fd >= 0 &&
 		    (client->pollfd[WAIT_POLL_INDEX].revents & POLLIN)) {
 			DEBUG ("time to run process()\n");
 			break;
 		}
+#endif
 	}
 
 	if (control->dead || client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
@@ -1878,7 +1905,7 @@ jack_client_thread_aux (void *arg)
 	jack_client_thread_suicide (client);
 }
 
-static void *
+static void* 
 jack_client_thread (void *arg)
 {
 	jack_client_t *client = (jack_client_t *) arg;
@@ -2427,6 +2454,11 @@ jack_set_thread_init_callback (jack_client_t *client,
 	client->thread_init_arg = arg;
 	client->thread_init = callback;
 	client->control->thread_init_cbset = (callback != NULL);
+
+	/* make sure that the message buffer thread is initialized too */
+
+	jack_messagebuffer_thread_init (callback, arg);
+
 	return 0;
 }
 

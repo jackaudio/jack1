@@ -48,6 +48,8 @@ static volatile _Atomic_word mb_overruns = 0;
 static pthread_t mb_writer_thread;
 static pthread_mutex_t mb_write_lock;
 static pthread_cond_t mb_ready_cond;
+static void (*mb_thread_init_callback)(void*) = 0;
+static void* mb_thread_init_callback_arg = 0;
 
 static void
 mb_flush()
@@ -68,6 +70,17 @@ mb_thread_func(void *arg)
 
 	while (mb_initialized) {
 		pthread_cond_wait(&mb_ready_cond, &mb_write_lock);
+
+		if (mb_thread_init_callback) {
+			/* the client asked for all threads to run a thread
+			   initialization callback, which includes us.
+			*/
+			mb_thread_init_callback (mb_thread_init_callback_arg);
+			mb_thread_init_callback = 0;
+
+			/* note that we've done it */
+			pthread_cond_signal(&mb_ready_cond);
+		}
 
 		/* releasing the mutex reduces contention */
 		pthread_mutex_unlock(&mb_write_lock);
@@ -147,3 +160,22 @@ jack_messagebuffer_add (const char *fmt, ...)
 		atomic_add(&mb_overruns, 1);
 	}
 }
+
+void
+jack_messagebuffer_thread_init (void (*cb)(void*), void* arg)
+{
+	pthread_mutex_lock (&mb_write_lock);
+
+	/* set up the callback */
+	mb_thread_init_callback_arg = arg;
+	mb_thread_init_callback = cb;
+
+	/* wake msg buffer thread */
+	pthread_cond_signal(&mb_ready_cond);
+
+	/* wait for it to be done */
+	pthread_cond_wait(&mb_ready_cond, &mb_write_lock);
+
+	/* and we're done */
+	pthread_mutex_unlock (&mb_write_lock);
+}	
