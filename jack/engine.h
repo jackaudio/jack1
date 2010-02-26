@@ -114,6 +114,11 @@ struct _jack_engine {
     char	    fifo_prefix[PATH_MAX+1];
     int		   *fifo;
     unsigned long   fifo_size;
+
+    /* session handling */
+    int		    session_reply_fd;
+    int		    session_pending_replies;
+
     unsigned long   external_client_cnt;
     int		    rtpriority;
     volatile char   freewheeling;

@@ -54,7 +54,7 @@ jack_varargs_parse (jack_options_t options, va_list ap, jack_varargs_t *va)
 		va->load_name = va_arg(ap, char *);
 	if ((options & JackLoadInit))
 		va->load_init = va_arg(ap, char *);
-	if ((options & JackSessionUUID))
+	if ((options & JackSessionID))
 		va->sess_uuid = va_arg(ap, char *);
 }
 

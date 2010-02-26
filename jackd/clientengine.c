@@ -406,6 +406,18 @@ jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id)
 	return client;
 }
 
+int
+jack_client_name_reserved( jack_engine_t *engine, const char *name )
+{
+	JSList *node;
+        for (node = engine->reserved_client_names; node; node = jack_slist_next (node)) {
+		jack_reserved_name_t *reservation = (jack_reserved_name_t *) node->data;
+		if( !strcmp( reservation->name, name ) )
+			return 1;
+	}
+	return 0;
+}
+
 /* generate a unique client name
  *
  * returns 0 if successful, updates name in place
@@ -534,6 +546,8 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	strcpy ((char *) client->control->name, name);
 	client->subgraph_start_fd = -1;
 	client->subgraph_wait_fd = -1;
+
+	client->session_reply_pending = FALSE;
 
 	client->control->process_cbset = FALSE;
 	client->control->bufsize_cbset = FALSE;
@@ -917,18 +931,6 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 
 	return ret;
 }	
-
-int
-jack_client_name_reserved( jack_engine_t *engine, const char *name )
-{
-	JSList *node;
-        for (node = engine->reserved_client_names; node; node = jack_slist_next (node)) {
-		jack_reserved_name_t *reservation = (jack_reserved_name_t *) node->data;
-		if( !strcmp( reservation->name, name ) )
-			return 1;
-	}
-	return 0;
-}
 
 
 int

@@ -58,6 +58,7 @@ extern void jack_info (const char *fmt, ...);
 #include <jack/types.h>
 #include <jack/port.h>
 #include <jack/transport.h>
+#include <jack/session.h>
 #include <jack/thread.h>
 
 extern jack_thread_creator_t jack_thread_creator;
@@ -381,7 +382,8 @@ typedef enum {
 	SetIdentifier = 27,
 	GetIdentifier = 28,
 	RenameClient = 29,
-	ReserveName = 30
+	ReserveName = 30,
+	SessionReply = 31
 } RequestType;
 
 struct _jack_request {
@@ -403,7 +405,7 @@ struct _jack_request {
 	} POST_PACKED_STRUCTURE connect;
 	struct {
 	    char path[JACK_PORT_NAME_SIZE];
-	    jack_session_event_t  type;
+	    jack_session_event_type_t  type;
 	    char target[JACK_CLIENT_NAME_SIZE];
 	} POST_PACKED_STRUCTURE session;
 	struct {
@@ -481,6 +483,8 @@ typedef struct _jack_client_internal {
     int     (*initialize)(jack_client_t*, const char*); /* int. clients only */
     void    (*finish)(void *);		/* internal clients only */
     int      error;
+
+    int		session_reply_pending;
     
 #ifdef JACK_USE_MACH_THREADS
     /* specific resources for server/client real-time thread communication */

@@ -35,6 +35,7 @@ struct _jack_client {
     char first_active : 1;
     pthread_t thread_id;
     char name[JACK_CLIENT_NAME_SIZE];
+    int	 session_cb_immediate_reply;
 
 #ifdef JACK_USE_MACH_THREADS
     /* specific ressources for server/client real-time thread communication */

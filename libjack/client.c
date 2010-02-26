@@ -517,24 +517,28 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 int
 jack_client_handle_session_callback (jack_client_t *client, jack_event_t *event)
 {
-	int retval = 0;
-	char *cb_ret = NULL;
 	char prefix[32];
-	snprintf( prefix, sizeof(prefix), "%d", client->control->uid );
+	jack_session_event_t *s_event;
 
-
-	if (client->control->session_cbset) {
-		cb_ret = client->session_cb ( event->y.n, event->x.name, prefix, 
-					       client->session_cb_arg);
-		if(cb_ret) {
-			retval = 1;
-			snprintf( (char *)client->control->session_command, sizeof(client->control->session_command),
-					"%s", cb_ret );
-			free( cb_ret );
-		}
+	if (! client->control->session_cbset) {
+		return -1;
 	}
 
-	return retval;
+	snprintf( prefix, sizeof(prefix), "%d", client->control->uid );
+
+	s_event = malloc( sizeof(jack_session_event_t) );
+	s_event->type = event->y.n;
+	s_event->session_dir = strdup( event->x.name );
+	s_event->client_uuid = strdup( prefix );
+	s_event->command_line = NULL;
+
+	client->session_cb_immediate_reply = 0;
+	client->session_cb ( s_event, client->session_cb_arg);
+
+	if (client->session_cb_immediate_reply) {
+		return 2;
+	}
+	return 1;
 }
 #if JACK_USE_MACH_THREADS
 
@@ -1333,10 +1337,40 @@ jack_set_freewheel (jack_client_t* client, int onoff)
 	return jack_client_deliver_request (client, &request);
 }
 
+int
+jack_session_reply (jack_client_t *client, jack_session_event_t *event )
+{
+	int retval = 0;
 
+	if (event->command_line) {
+		snprintf ((char *)client->control->session_command, 
+				sizeof(client->control->session_command),
+				"%s", event->command_line);
+
+		free (event->command_line);
+	} else {
+		retval = -1;
+	}
+
+	if (pthread_self() == client->thread_id) {
+		client->session_cb_immediate_reply = 1;
+	} else {
+		jack_request_t request;
+		request.type = SessionReply;
+		request.x.client_id = client->control->id;
+
+		retval = jack_client_deliver_request(client, &request);
+	}
+
+	free ((char *)event->session_dir);
+	free ((char *)event->client_uuid);
+	free (event);
+
+	return retval;
+}
 
 jack_session_command_t *
-jack_session_notify (jack_client_t* client, const char *target, jack_session_event_t code, const char *path )
+jack_session_notify (jack_client_t* client, const char *target, jack_session_event_type_t code, const char *path )
 {
 	jack_request_t request;
 

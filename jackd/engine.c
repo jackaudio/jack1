@@ -141,6 +141,7 @@ static void jack_do_set_id ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_get_id_by_uuid ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_client_rename ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req);
+static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req );
 
 
 static inline int 
@@ -1361,17 +1362,17 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		break;
 
 	case GetClientByUUID:
-		jack_lock_graph (engine);
+		jack_rdlock_graph (engine);
 		jack_do_get_client_by_uuid (engine, req);
 		jack_unlock_graph (engine);
 		break;
 	case GetIdentifier:
-		jack_lock_graph (engine);
+		jack_rdlock_graph (engine);
 		jack_do_get_id_by_uuid( engine, req );
 		jack_unlock_graph (engine);
 		break;
 	case SetIdentifier:
-		jack_lock_graph (engine);
+		jack_rdlock_graph (engine);
 		jack_do_set_id (engine, req);
 		jack_unlock_graph (engine);
 		break;
@@ -1381,12 +1382,17 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		jack_unlock_graph (engine);
 		break;
 	case ReserveName:
-		jack_lock_graph (engine);
+		jack_rdlock_graph (engine);
 		jack_do_reserve_name (engine, req);
 		jack_unlock_graph (engine);
 		break;
+	case SessionReply:
+		jack_rdlock_graph (engine);
+		jack_do_session_reply (engine, req);
+		jack_unlock_graph (engine);
+		break;
 	case SessionNotify:
-		jack_lock_graph (engine);
+		jack_rdlock_graph (engine);
 		if ((req->status =
 	  	    jack_do_session_notify (engine, req, *reply_fd))
 		    >= 0) {
@@ -1394,7 +1400,6 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 			*reply_fd = -1;
 		}
 		jack_unlock_graph (engine);
-		req->status = 0;
 		break;
 	default:
 		/* some requests are handled entirely on the client
@@ -1799,6 +1804,9 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->wait_pid = wait_pid;
 	engine->nozombies = nozombies;
 	engine->removing_clients = 0;
+
+	engine->session_reply_fd = -1;
+	engine->session_pending_replies = 0;
 
 	engine->audio_out_cnt = 0;
 	engine->audio_in_cnt = 0;
@@ -2683,6 +2691,33 @@ static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req)
 	req->status = 0;
 }
 
+static int jack_send_session_reply ( jack_engine_t *engine, jack_client_internal_t *client )
+{
+	if (write (engine->session_reply_fd, (const void *) &client->control->uid, sizeof (client->control->uid))
+	    < (ssize_t) sizeof (client->control->uid)) {
+		jack_error ("cannot write SessionNotify result " 
+			    "to client via fd = %d (%s)", 
+			    engine->session_reply_fd, strerror (errno));
+		return -1;
+	}
+	if (write (engine->session_reply_fd, (const void *) client->control->name, sizeof (client->control->name))
+	    < (ssize_t) sizeof (client->control->name)) {
+		jack_error ("cannot write SessionNotify result "
+			    "to client via fd = %d (%s)", 
+			    engine->session_reply_fd, strerror (errno));
+		return -1;
+	}
+	if (write (engine->session_reply_fd, (const void *) client->control->session_command, 
+				sizeof (client->control->session_command))
+	    < (ssize_t) sizeof (client->control->session_command)) {
+		jack_error ("cannot write SessionNotify result "
+			    "to client via fd = %d (%s)", 
+			    engine->session_reply_fd, strerror (errno));
+		return -1;
+	}
+
+	return 0;
+}
 
 static int
 jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd )
@@ -2690,9 +2725,17 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 	JSList *node;
 	jack_event_t event;
   
-	int retval = 0;
 	int reply;
 	jack_client_id_t finalizer=0;
+
+	if (engine->session_reply_fd != -1) {
+		// we should have a notion of busy or somthing.
+		// just sending empty reply now.
+		goto send_final;
+	}
+
+	engine->session_reply_fd = reply_fd;
+	engine->session_pending_replies = 0;
 
 	event.type = SaveSession;
 	snprintf (event.x.name, sizeof (event.x.name), "%s", req->x.session.path );
@@ -2711,48 +2754,74 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 
 			// in case we only want to send to a special client.
 			// uuid assign is still complete. not sure if thats necessary.
-			if( (req->x.session.target[0] != 0) && strcmp(req->x.session.target, client->control->name) )
+			if( (req->x.session.target[0] != 0) && strcmp(req->x.session.target, (char *)client->control->name) )
 				continue;
 
 			reply = jack_deliver_event (engine, client, &event);
 
-			if (write (reply_fd, (const void *) &client->control->uid, sizeof (client->control->uid))
-			    < (ssize_t) sizeof (client->control->uid)) {
-				jack_error ("cannot write SessionNotify result " 
-					    "to client via fd = %d (%s)", 
-					    reply_fd, strerror (errno));
-				goto out;
+			if (reply == 1) {
+				// delayed reply
+				engine->session_pending_replies += 1;
+				client->session_reply_pending = TRUE;
+			} else if (reply == 2) {
+				// immediate reply
+				if (jack_send_session_reply (engine, client))
+					goto error_out;
 			}
-			if (write (reply_fd, (const void *) client->control->name, sizeof (client->control->name))
-			    < (ssize_t) sizeof (client->control->name)) {
-				jack_error ("cannot write SessionNotify result "
-					    "to client via fd = %d (%s)", 
-					    reply_fd, strerror (errno));
-				goto out;
-			}
-			if (write (reply_fd, (const void *) client->control->session_command, 
-						sizeof (client->control->session_command))
-			    < (ssize_t) sizeof (client->control->session_command)) {
-				jack_error ("cannot write SessionNotify result "
-					    "to client via fd = %d (%s)", 
-					    reply_fd, strerror (errno));
-				goto out;
-			}
-
-			if( reply >= 0 )
-				retval |= reply;
 		} 
 	}
+
+	if (engine->session_pending_replies != 0)
+		return 0;
+
+send_final:
 	if (write (reply_fd, &finalizer, sizeof (finalizer))
 			< (ssize_t) sizeof (finalizer)) {
 		jack_error ("cannot write SessionNotify result "
 				"to client via fd = %d (%s)", 
 				reply_fd, strerror (errno));
-		goto out;
+		goto error_out;
 	}
-	return retval;
-out:
+
+	engine->session_reply_fd = -1;
+	return 0;
+error_out:
 	return -3;
+}
+
+static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req )
+{
+	jack_client_id_t client_id = req->x.client_id;
+	jack_client_internal_t *client = jack_client_internal_by_id (engine, client_id);
+	jack_client_id_t finalizer=0;
+
+	req->status = 0;
+
+	client->session_reply_pending = FALSE;
+
+	if (engine->session_reply_fd == -1) {
+		jack_error ("spurious Session Reply");
+		return;
+	}
+
+	engine->session_pending_replies -= 1;
+
+	if (jack_send_session_reply (engine, client)) {
+		// need to fix all client pendings.
+		client->session_reply_pending =0;
+		engine->session_reply_fd = -1;
+		return;
+	}
+
+	if (engine->session_pending_replies == 0) {
+		if (write (engine->session_reply_fd, &finalizer, sizeof (finalizer))
+				< (ssize_t) sizeof (finalizer)) {
+			jack_error ("cannot write SessionNotify result "
+					"to client via fd = %d (%s)", 
+					engine->session_reply_fd, strerror (errno));
+			req->status = -1;
+		}
+	}
 }
 
 static void
