@@ -27,11 +27,12 @@
 #include <jack/jack.h>
 #include <jack/jslist.h>
 #include <jack/transport.h>
+#include <jack/session.h>
 
 char *package;				/* program name */
 jack_client_t *client;
 
-jack_session_event_t notify_type;
+jack_session_event_type_t notify_type;
 char *save_path = NULL;
 
 void jack_shutdown(void *arg)
@@ -59,7 +60,7 @@ void parse_arguments(int argc, char *argv[])
 
 	if (argc==2) {
 		if( !strcmp( argv[1], "quit" ) ) {
-			notify_type = JackSessionQuit;
+			notify_type = JackSessionSaveAndQuit;
 			return;
 		}
 	}
@@ -124,7 +125,7 @@ int main(int argc, char *argv[])
 
 
 	/* become a JACK client */
-	if ((client = jack_client_new(package)) == 0) {
+	if ((client = jack_client_open(package, JackNullOption, NULL)) == 0) {
 		fprintf(stderr, "JACK server not running?\n");
 		exit(1);
 	}
@@ -135,6 +136,8 @@ int main(int argc, char *argv[])
 	signal(SIGINT, signal_handler);
 
 	jack_on_shutdown(client, jack_shutdown, 0);
+
+	jack_activate(client);
 
 
 	retval = jack_session_notify( client, NULL, notify_type, save_path );

@@ -11,10 +11,13 @@
 #include <string.h>
 
 #include <jack/jack.h>
+#include <jack/session.h>
 
 jack_port_t *input_port;
 jack_port_t *output_port;
 jack_client_t *client;
+
+int simple_quit = 0;
 
 /**
  * The process callback for this JACK application is called in a
@@ -37,18 +40,24 @@ process (jack_nframes_t nframes, void *arg)
 	return 0;
 }
 
-char *
-session_callback (jack_session_event_t code, const char *path, const char *uuid, void *arg)
+void
+session_callback (jack_session_event_t *event, void *arg)
 {
 	char retval[100];
+	int type_save;
 	printf ("session notification\n");
-	printf ("path %s, uuid %s, type: %s\n", path, uuid, code == JackSessionSave ? "save" : "quit");
+	printf ("path %s, uuid %s, type: %s\n", event->session_dir, event->client_uuid, event->type == JackSessionSave ? "save" : "quit");
 
-	if (code == JackSessionQuit)
-		exit (1);
 
-	snprintf (retval, 100, "jack_simple_client %s", uuid);
-	return strdup (retval);
+	snprintf (retval, 100, "jack_simple_client %s", event->client_uuid);
+	event->command_line = strdup (retval);
+	type_save = event->type;
+
+	jack_session_reply( client, event );
+
+	if (type_save == JackSessionSaveAndQuit) {
+		simple_quit = 1;
+	}
 }
 
 /**
@@ -75,7 +84,7 @@ main (int argc, char *argv[])
 	if( argc == 1 )
 		client = jack_client_open (client_name, options, &status, server_name);
 	else if( argc == 2 )
-		client = jack_client_open (client_name, options |JackSessionUUID, &status, argv[1] );
+		client = jack_client_open (client_name, options |JackSessionID, &status, argv[1] );
 
 	if (client == NULL) {
 		fprintf (stderr, "jack_client_open() failed, "
