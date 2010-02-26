@@ -55,7 +55,7 @@ enum JackSessionEventType {
     JackSessionSaveTemplate = 3
 };
 
-typedef enum JackSessionEvent jack_session_event_type_t;
+typedef enum JackSessionEventType jack_session_event_type_t;
 
 struct _jack_session_event {
     /**
