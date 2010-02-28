@@ -259,6 +259,7 @@ typedef volatile struct {
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
     volatile char	name[JACK_CLIENT_NAME_SIZE];
     volatile char	session_command[JACK_PORT_NAME_SIZE];
+    volatile jack_session_flags_t session_flags;
     volatile ClientType type;             /* w: engine r: engine and client */
     volatile int8_t     active;           /* w: engine r: engine and client */
     volatile int8_t     dead;             /* r/w: engine */

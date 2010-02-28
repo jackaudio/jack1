@@ -164,6 +164,7 @@ typedef struct  {
 	const char *uuid;
 	const char *client_name;
 	const char *command;
+	jack_session_flags_t flags;
 } jack_session_command_t;
 
 /**

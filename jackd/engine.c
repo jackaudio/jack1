@@ -2644,6 +2644,14 @@ static int jack_send_session_reply ( jack_engine_t *engine, jack_client_internal
 			    engine->session_reply_fd, strerror (errno));
 		return -1;
 	}
+	if (write (engine->session_reply_fd, & client->control->session_flags, 
+				sizeof (client->control->session_flags))
+	    < (ssize_t) sizeof (client->control->session_flags)) {
+		jack_error ("cannot write SessionNotify result "
+			    "to client via fd = %d (%s)", 
+			    engine->session_reply_fd, strerror (errno));
+		return -1;
+	}
 
 	return 0;
 }

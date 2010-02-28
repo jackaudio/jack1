@@ -1346,6 +1346,7 @@ jack_session_reply (jack_client_t *client, jack_session_event_t *event )
 		snprintf ((char *)client->control->session_command, 
 				sizeof(client->control->session_command),
 				"%s", event->command_line);
+		client->control->session_flags = event->flags;
 
 		free (event->command_line);
 	} else {
@@ -1382,6 +1383,8 @@ jack_session_commands_free (jack_session_command_t *cmds)
 			free ((char *)cmds[i].uuid);
 		else
 			break;
+
+		i += 1;
 	}
 
 	free(cmds);
@@ -1445,6 +1448,12 @@ jack_session_notify (jack_client_t* client, const char *target, jack_session_eve
 		}
 		if (read (client->request_fd, (char *)retval[num_replies-1].command, JACK_PORT_NAME_SIZE)
 			       	!= JACK_PORT_NAME_SIZE) {
+			jack_error ("cannot read result for request type %d from"
+					" server (%s)", request.type, strerror (errno));
+			goto out;
+		}
+		if (read (client->request_fd, & retval[num_replies-1].flags, sizeof(retval[num_replies-1].flags) )
+			       	!= sizeof(retval[num_replies-1].flags) ) {
 			jack_error ("cannot read result for request type %d from"
 					" server (%s)", request.type, strerror (errno));
 			goto out;
