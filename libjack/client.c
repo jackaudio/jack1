@@ -1369,6 +1369,24 @@ jack_session_reply (jack_client_t *client, jack_session_event_t *event )
 	return retval;
 }
 
+void
+jack_session_commands_free (jack_session_command_t *cmds)
+{
+	int i=0;
+	while(1) {
+		if (cmds[i].client_name)
+			free ((char *)cmds[i].client_name);
+		if (cmds[i].command)
+			free ((char *)cmds[i].command);
+		if (cmds[i].uuid)
+			free ((char *)cmds[i].uuid);
+		else
+			break;
+	}
+
+	free(cmds);
+}
+
 jack_session_command_t *
 jack_session_notify (jack_client_t* client, const char *target, jack_session_event_type_t code, const char *path )
 {
@@ -1388,8 +1406,6 @@ jack_session_notify (jack_client_t* client, const char *target, jack_session_eve
 		request.x.session.target[0] = '\0';
 
 	request.x.session.type = code;
-	// XXX: this is hacky now.
-	//      a) we dont support for internal clients :D FUCK EM 
 	
 	if( (write (client->request_fd, &request, sizeof (request))
 	       != sizeof (request)) ) {
@@ -1408,29 +1424,39 @@ jack_session_notify (jack_client_t* client, const char *target, jack_session_eve
 
 		num_replies += 1;
 		retval = realloc( retval, (num_replies)*sizeof(jack_session_command_t) );
+		retval[num_replies-1].client_name = malloc (JACK_CLIENT_NAME_SIZE);
+		retval[num_replies-1].command = malloc (JACK_PORT_NAME_SIZE);
+		retval[num_replies-1].uuid = malloc (16);
+
+		if ( (retval[num_replies-1].client_name == NULL)
+		   ||(retval[num_replies-1].command     == NULL)
+		   ||(retval[num_replies-1].uuid        == NULL) )
+			   goto out;
+
 		if( uid == 0 )
 			break;
 
 
-		if (read (client->request_fd, retval[num_replies-1].client_name, sizeof (retval[num_replies].client_name))
-			       	!= sizeof (retval[num_replies-1].client_name)) {
+		if (read (client->request_fd, (char *)retval[num_replies-1].client_name, JACK_CLIENT_NAME_SIZE) 
+			       	!= JACK_CLIENT_NAME_SIZE) {
 			jack_error ("cannot read result for request type %d from"
 					" server (%s)", request.type, strerror (errno));
 			goto out;
 		}
-		if (read (client->request_fd, retval[num_replies-1].command, sizeof (retval[num_replies].command))
-			       	!= sizeof (retval[num_replies-1].command)) {
+		if (read (client->request_fd, (char *)retval[num_replies-1].command, JACK_PORT_NAME_SIZE)
+			       	!= JACK_PORT_NAME_SIZE) {
 			jack_error ("cannot read result for request type %d from"
 					" server (%s)", request.type, strerror (errno));
 			goto out;
 		}
-		snprintf( retval[num_replies-1].uuid, sizeof( retval[num_replies-1].uuid ), "%d", uid );
+		snprintf( (char *)retval[num_replies-1].uuid, 16, "%d", uid );
 	}
-	retval[num_replies-1].uuid[0] = '\0';
+	free((char *)retval[num_replies-1].uuid);
+	retval[num_replies-1].uuid = NULL;
 	return retval;
 out:
 	if( retval )
-		free(retval);
+		jack_session_commands_free(retval);
 	return NULL;
 }
 

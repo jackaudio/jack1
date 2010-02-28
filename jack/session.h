@@ -57,6 +57,23 @@ enum JackSessionEventType {
 
 typedef enum JackSessionEventType jack_session_event_type_t;
 
+enum JackSessionFlags {
+    /**
+     * an error occured while saving.
+     */
+    JackSessionSaveError = 0x01,
+
+    /**
+     * this reply indicates that a client is part of a multiclient application.
+     * the command reply is left empty. but the session manager should still
+     * consider this client part of a session. it will come up due to invocation of another
+     * client.
+     */
+    JackSessionChildClient = 0x02
+};
+
+typedef enum JackSessionFlags jack_session_flags_t;
+
 struct _jack_session_event {
     /**
      * the actual type of this session event.
@@ -87,6 +104,11 @@ struct _jack_session_event {
      * initially set to NULL by jack;
      */
     char *command_line;
+
+    /**
+     * flags to be set by the client. normally left 0.
+     */
+    jack_session_flags_t flags;
 };
 
 typedef struct _jack_session_event jack_session_event_t;
@@ -139,16 +161,16 @@ int jack_session_reply( jack_client_t *client, jack_session_event_t *event ) JAC
  */
 
 typedef struct  {
-	char uuid[16];
-	char client_name[33];
-	char command[256];
+	const char *uuid;
+	const char *client_name;
+	const char *command;
 } jack_session_command_t;
 
 /**
  * send a save or quit event, to all clients listening for session
  * callbacks. the returned strings of the clients are accumulated and
  * returned as an array of jack_session_command_t.
- * its terminated by ret[i].uuid[0]='\0'
+ * its terminated by ret[i].uuid == NULL
  * target == NULL means send to all interested clients. otherwise a clientname
  */
 
@@ -156,6 +178,12 @@ jack_session_command_t *jack_session_notify (jack_client_t* client,
 					     const char *target,
 					     jack_session_event_type_t type,
 					     const char *path ) JACK_WEAK_EXPORT;
+
+/**
+ * free the memory allocated by a session command.
+ */
+
+void jack_session_commands_free (jack_session_command_t *cmds) JACK_WEAK_EXPORT;
 
 /**
  * get the sessionid for a client name.
@@ -170,7 +198,20 @@ char *jack_get_uuid_for_client_name( jack_client_t *client, const char *client_n
  * session_ids to client names.
  */
 
-char *jack_get_client_name_for_uuid( jack_client_t *client, const char *client_uuid ) JACK_WEAK_EXPORT;
+char *jack_get_client_name_by_uuid( jack_client_t *client, const char *client_uuid ) JACK_WEAK_EXPORT;
+
+/**
+ * reserve a client name and associate it to a uuid.
+ * when a client later call jack_client_open() and specifies the uuid,
+ * jackd will assign the reserved name.
+ * this allows a session manager to know in advance under which client name
+ * its managed clients will appear.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+
+int
+jack_reserve_client_name( jack_client_t *client, const char *name, const char *uuid ) JACK_WEAK_EXPORT;
 
 #ifdef __cplusplus
 }
