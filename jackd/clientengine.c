@@ -492,7 +492,7 @@ jack_client_name_invalid (jack_engine_t *engine, char *name,
  * internal and external clients. */
 static jack_client_internal_t *
 jack_setup_client_control (jack_engine_t *engine, int fd,
-			   ClientType type, const char *name)
+			   ClientType type, const char *name, jack_client_id_t uuid)
 {
 	jack_client_internal_t *client;
 
@@ -542,7 +542,7 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	client->control->dead = FALSE;
 	client->control->timed_out = 0;
 	client->control->id = engine->next_client_id++;
-	client->control->uid = engine->next_client_id++;
+	client->control->uid = uuid;
 	strcpy ((char *) client->control->name, name);
 	client->subgraph_start_fd = -1;
 	client->subgraph_wait_fd = -1;
@@ -594,9 +594,23 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	return client;
 }
 
+static void
+jack_ensure_uuid_unique (jack_engine_t *engine, jack_client_id_t uuid)
+{
+	JSList *node;
+
+	jack_lock_graph (engine);
+	for (node=engine->clients; node; node=jack_slist_next (node)) {
+		jack_client_internal_t *client = (jack_client_internal_t *) node->data;
+		if (client->control->uid == uuid)
+			client->control->uid = 0;
+	}
+	jack_unlock_graph (engine);
+}
+
 /* set up all types of clients */
 static jack_client_internal_t *
-setup_client (jack_engine_t *engine, ClientType type, char *name,
+setup_client (jack_engine_t *engine, ClientType type, char *name, jack_client_id_t uuid,
 	      jack_options_t options, jack_status_t *status, int client_fd,
 	      const char *object_path, const char *object_data)
 {
@@ -607,9 +621,12 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 	if (jack_client_name_invalid (engine, name, options, status))
 		return NULL;
 
+	if (uuid != 0)
+		jack_ensure_uuid_unique (engine, uuid);
+
 	/* create a client struct for this name */
 	if ((client = jack_setup_client_control (engine, client_fd,
-						 type, name)) == NULL) {
+						 type, name, uuid )) == NULL) {
 		*status |= (JackFailure|JackInitFailure);
 		jack_error ("cannot create new client object");
 		return NULL;
@@ -703,7 +720,7 @@ jack_create_driver_client (jack_engine_t *engine, char *name)
 	snprintf (req.name, sizeof (req.name), "%s", name);
 
 	pthread_mutex_lock (&engine->request_lock);
-	client = setup_client (engine, ClientDriver, name, JackUseExactName,
+	client = setup_client (engine, ClientDriver, name, 0, JackUseExactName,
 			       &status, -1, NULL, NULL);
 	pthread_mutex_unlock (&engine->request_lock);
 
@@ -801,7 +818,7 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 			free(res_name);
 		}
 	}
-	client = setup_client (engine, req.type, req.name,
+	client = setup_client (engine, req.type, req.name, req.uuid,
 			       req.options, &res.status, client_fd,
 			       req.object_path, req.object_data);
 	pthread_mutex_unlock (&engine->request_lock);
@@ -1015,7 +1032,7 @@ jack_intclient_load_request (jack_engine_t *engine, jack_request_t *req)
 		 req->x.intclient.path, req->x.intclient.init,
 		 req->x.intclient.options);
 
-	client = setup_client (engine, ClientInternal, req->x.intclient.name,
+	client = setup_client (engine, ClientInternal, req->x.intclient.name, 0,
 			       req->x.intclient.options, &status, -1,
 			       req->x.intclient.path, req->x.intclient.init);
 
