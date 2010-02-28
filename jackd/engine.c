@@ -2667,7 +2667,6 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 	engine->session_pending_replies = 0;
 
 	event.type = SaveSession;
-	snprintf (event.x.name, sizeof (event.x.name), "%s", req->x.session.path );
 	event.y.n = req->x.session.type;
  	
 	/* GRAPH MUST BE LOCKED : see callers of jack_send_connection_notification() 
@@ -2686,6 +2685,8 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 			if( (req->x.session.target[0] != 0) && strcmp(req->x.session.target, (char *)client->control->name) )
 				continue;
 
+			snprintf (event.x.name, sizeof (event.x.name), "%s%s/", req->x.session.path, client->control->name );
+			mkdir (event.x.name, 0777 );
 			reply = jack_deliver_event (engine, client, &event);
 
 			if (reply == 1) {
