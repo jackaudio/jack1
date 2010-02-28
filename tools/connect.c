@@ -27,6 +27,7 @@
 #include <config.h>
 
 #include <jack/jack.h>
+#include <jack/session.h>
 
 #define TRUE 1
 #define FALSE 0
