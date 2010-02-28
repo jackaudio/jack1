@@ -75,16 +75,14 @@ main (int argc, char *argv[])
 {
 	const char **ports;
 	const char *client_name = "simple";
-	const char *server_name = NULL;
-	jack_options_t options = JackNullOption;
 	jack_status_t status;
 
 	/* open a client connection to the JACK server */
 
 	if( argc == 1 )
-		client = jack_client_open (client_name, options, &status, server_name);
+		client = jack_client_open (client_name, JackNullOption, &status );
 	else if( argc == 2 )
-		client = jack_client_open (client_name, options |JackSessionID, &status, argv[1] );
+		client = jack_client_open (client_name, JackSessionID, &status, argv[1] );
 
 	if (client == NULL) {
 		fprintf (stderr, "jack_client_open() failed, "
@@ -106,8 +104,6 @@ main (int argc, char *argv[])
 	   there is work to be done.
 	*/
 
-	jack_client_set_cookie (client, "info", "simple");
-	jack_client_set_cookie (client, "info2", "no");
 	jack_set_process_callback (client, process, 0);
 
 	/* tell the JACK server to call `jack_shutdown()' if
@@ -185,14 +181,11 @@ main (int argc, char *argv[])
 
 	free (ports);
 
-	/* keep running until stopped by the user */
+	/* keep running until until we get a quit event */
 
-	sleep (-1);
-
-	/* this is never reached but if the program
-	   had some other way to exit besides being killed,
-	   they would be important to call.
-	*/
+	while (!simple_quit)
+		sleep(1);
+	
 
 	jack_client_close (client);
 	exit (0);
