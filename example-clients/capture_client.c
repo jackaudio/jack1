@@ -314,7 +314,7 @@ main (int argc, char *argv[])
 		exit (1);
 	}
 
-	if ((client = jack_client_new ("jackrec")) == 0) {
+	if ((client = jack_client_open ("jackrec", JackNullOption, NULL)) == 0) {
 		fprintf (stderr, "jack server not running?\n");
 		exit (1);
 	}

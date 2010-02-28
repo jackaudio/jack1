@@ -104,7 +104,7 @@ int main(int narg, char **args)
 {
 	jack_client_t *client;
 
-	if ((client = jack_client_new("midisine")) == 0)
+	if ((client = jack_client_open ("midisine", JackNullOption, NULL)) == 0)
 	{
 		fprintf(stderr, "jack server not running?\n");
 		return 1;
