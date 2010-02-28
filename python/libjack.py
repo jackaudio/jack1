@@ -58,19 +58,19 @@ reserve_client_name.argtypes = [ client_p, c_char_p, c_char_p ]
 reserve_client_name.restype = c_int
 
 class jack_session_command_t( Structure ):
-    _fields_ = [ ("uuid", 16*c_char ), ("clientname", 33*c_char), ("command", 256*c_char ) ]
+    _fields_ = [ ("uuid", c_char_p ), ("clientname", c_char_p), ("command", c_char_p ), ("flags", c_int) ]
 
 session_notify = libjack.jack_session_notify
 session_notify.argtypes = [ client_p, c_char_p, c_uint, c_char_p ]
 session_notify.restype = POINTER( jack_session_command_t )
 
+session_commands_free = libjack.jack_session_commands_free
+session_commands_free.argtypes = [ POINTER( jack_session_command_t ) ]
+session_commands_free.restype = None
+
 get_client_name_by_uuid = libjack.jack_get_client_name_by_uuid
 get_client_name_by_uuid.argtypes = [ client_p, c_char_p ]
 get_client_name_by_uuid.restype = c_char_p
-
-get_cookie_by_uuid = libjack.jack_get_cookie_by_uuid
-get_cookie_by_uuid.argtypes = [ client_p, c_char_p, c_char_p ]
-get_cookie_by_uuid.restype = c_char_p 
 
 connect = libjack.jack_connect
 connect.argtypes = [ client_p, c_char_p, c_char_p ]
@@ -324,11 +324,11 @@ class JackClient(object):
 	commands = session_notify( self.client, None, JackSessionSave, path )
 	i=0
 	retval = []
-	while( commands[i].uuid != "" ):
+	while( commands[i].uuid ):
 	    retval.append( NotifyReply( commands[i].uuid, commands[i].clientname, commands[i].command ) )
 	    i+=1
 	
-	jack_free( commands )
+	session_commands_free( commands )
 
 	return retval
 
@@ -336,11 +336,11 @@ class JackClient(object):
 	commands = session_notify( self.client, None, JackSessionQuit, path )
 	i=0
 	retval = []
-	while( commands[i].uuid != "" ):
+	while( commands[i].uuid ):
 	    retval.append( NotifyReply( commands[i].uuid, commands[i].clientname, commands[i].command ) )
 	    i+=1
 	
-	jack_free( commands )
+	session_commands_free( commands )
 
 	return retval
 
