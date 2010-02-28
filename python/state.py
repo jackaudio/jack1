@@ -119,7 +119,7 @@ class SessionDom( object ):
 	    cname = c.getAttribute( "jackname" )
 	    if cname in graph.get_taken_names():
 		free_name = graph.get_free_name( cname, self.get_reg_client_names() )
-		print "name taken %s rename to %s"%(cname, free_name )
+		print "name taken %s.. reallocate to %s"%(cname, free_name )
 		self.renameclient( c, free_name )
 		
 
