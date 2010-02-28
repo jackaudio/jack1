@@ -1002,30 +1002,6 @@ void jack_set_info_function (void (*func)(const char *)) JACK_OPTIONAL_WEAK_EXPO
  */
 void jack_free(void* ptr) JACK_OPTIONAL_WEAK_EXPORT;
 
-/**
- * get the jack client name for a uuid
- */
-
-char *jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid ) JACK_WEAK_EXPORT;
-
-/**
- * get some metadata cookie for client with uuid
- */
-
-char *jack_get_cookie_by_uuid( jack_client_t *client,
-			       const char *uuid,
-			       const char *key ) JACK_WEAK_EXPORT;
-
-/**
- * set metadata cookie on self
- */
-
-int jack_client_set_cookie( jack_client_t *client,
-			    const char *key,
-			    const char *value ) JACK_WEAK_EXPORT;
-
-int jack_rename_client( jack_client_t *client, const char *oldname, const char *newname ) JACK_WEAK_EXPORT;
-int jack_reserve_client_name( jack_client_t *client, const char *name, const char *uuid ) JACK_WEAK_EXPORT;
 #ifdef __cplusplus
 }
 #endif
