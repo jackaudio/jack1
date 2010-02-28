@@ -137,8 +137,6 @@ static void jack_engine_signal_problems (jack_engine_t* engine);
 static int jack_check_client_status (jack_engine_t* engine);
 static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd );
 static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *req);
-static void jack_do_set_id ( jack_engine_t *engine, jack_request_t *req);
-static void jack_do_get_id_by_uuid ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_client_rename ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req );
@@ -1366,16 +1364,6 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		jack_do_get_client_by_uuid (engine, req);
 		jack_unlock_graph (engine);
 		break;
-	case GetIdentifier:
-		jack_rdlock_graph (engine);
-		jack_do_get_id_by_uuid( engine, req );
-		jack_unlock_graph (engine);
-		break;
-	case SetIdentifier:
-		jack_rdlock_graph (engine);
-		jack_do_set_id (engine, req);
-		jack_unlock_graph (engine);
-		break;
 	case RenameClient:
 		jack_lock_graph (engine);
 		jack_do_client_rename (engine, req);
@@ -2567,65 +2555,6 @@ static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *
 			req->status = 0;
 			return;
 		}
-	}
-}
-
-static void jack_do_get_id_by_uuid ( jack_engine_t *engine, jack_request_t *req)
-{
-	JSList *node,*node2;
-	req->status = -1;
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
-		if( client->control->uid == req->x.metadata.client_id ) {
-			for( node2=client->metadatalist; node2; node2 = jack_slist_next (node2) ) {
-				jack_metadata_t *id = (jack_metadata_t *) node2->data;
-				if( !strcmp( req->x.metadata.key, id->id_key ) ) {
-					snprintf( req->x.metadata.val, sizeof(req->x.metadata.val),
-						       	"%s", id->value );
-					req->status = 0;
-					return;
-				}
-
-
-			}
-		}
-	}
-}
-
-static void jack_do_set_id ( jack_engine_t *engine, jack_request_t *req)
-{
-	JSList *node,*node2;
-	req->status = -1;
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
-		if( client->control->id == req->x.metadata.client_id ) {
-			jack_metadata_t *new_id;
-			for( node2=client->metadatalist; node2; node2 = jack_slist_next (node2) ) {
-				jack_metadata_t *id = (jack_metadata_t *) node2->data;
-				if( !strcmp( req->x.metadata.key, id->id_key ) ) {
-					snprintf( id->value, sizeof(id->value),
-						       	"%s", req->x.metadata.val );
-					req->status = 0;
-					return;
-				}
-
-
-			}
-			/* client doesnt have key set. create it... */
-			new_id = (jack_metadata_t *) malloc( sizeof(jack_metadata_t) );
-			if( new_id == NULL )
-				return;
-
-			snprintf( new_id->id_key, sizeof(new_id->id_key),
-					"%s", req->x.metadata.key );
-			snprintf( new_id->value, sizeof(new_id->value),
-					"%s", req->x.metadata.val );
-
-			client->metadatalist = jack_slist_append( client->metadatalist, new_id );
-			req->status = 0;
-			return;
-		}
-
 	}
 }
 

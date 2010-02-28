@@ -426,11 +426,6 @@ struct _jack_request {
 	    int32_t conditional;
 	} POST_PACKED_STRUCTURE timebase;
 	struct {
-	    jack_client_id_t client_id;
-	    char key[JACK_CLIENT_NAME_SIZE];
-	    char val[JACK_PORT_NAME_SIZE];
-	} POST_PACKED_STRUCTURE metadata;
-	struct {
 	    char oldname[JACK_CLIENT_NAME_SIZE];
 	    char newname[JACK_CLIENT_NAME_SIZE];
 	} POST_PACKED_STRUCTURE clientrename;
@@ -457,11 +452,6 @@ struct _jack_request {
 /* Per-client structure allocated in the server's address space.
  * It's here because its not part of the engine structure.
  */
-
-typedef struct {
-    char id_key[JACK_CLIENT_NAME_SIZE];
-    char value[JACK_PORT_NAME_SIZE];
-} jack_metadata_t;
 
 typedef struct _jack_client_internal {
 
@@ -494,7 +484,6 @@ typedef struct _jack_client_internal {
     int portnum;
 #endif /* JACK_USE_MACH_THREADS */
    
-    JSList *metadatalist;   /* listof identifiers */
     jack_client_t *private_client;
 } jack_client_internal_t;
 

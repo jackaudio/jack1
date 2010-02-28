@@ -2618,34 +2618,6 @@ jack_on_info_shutdown (jack_client_t *client, void (*function)(jack_status_t, co
 	client->on_info_shutdown_arg = arg;
 }
 
-int jack_client_set_cookie( jack_client_t *client, const char *key, const char *value )
-{
-	jack_request_t request;
-
-	request.type = SetIdentifier;
-	request.x.metadata.client_id = client->control->id;
-	snprintf( request.x.metadata.key, sizeof(request.x.metadata.key), "%s", key );
-	snprintf( request.x.metadata.val, sizeof(request.x.metadata.val), "%s", value );
-
-	return jack_client_deliver_request( client, &request );
-}
-
-char *
-jack_get_cookie_by_uuid( jack_client_t *client, const char *uuid, const char *key )
-{
-	jack_request_t request;
-
-	jack_client_id_t uuid_int = atoi( uuid );
-	request.type = GetIdentifier;
-	request.x.metadata.client_id = uuid_int;
-	snprintf( request.x.metadata.key, sizeof(request.x.metadata.key), "%s", key );
-
-	if( jack_client_deliver_request( client, &request ) )
-		return NULL;
-
-	return strdup( request.x.metadata.val ); 
-}
-
 char *
 jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
 { 
@@ -2678,6 +2650,7 @@ jack_reserve_client_name( jack_client_t *client, const char *name, const char *u
 	request.x.reservename.uuid = uuid_int;
 	return jack_client_deliver_request( client, &request );
 }
+
 int 
 jack_rename_client( jack_client_t *client, const char *oldname, const char *newname )
 {
