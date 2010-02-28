@@ -83,7 +83,7 @@ int main(int narg, char **args)
 		usage();
 		exit(1);
 	}
-	if((client = jack_client_new (args[1])) == 0)
+	if((client = jack_client_open (args[1], JackNullOption, NULL)) == 0)
 	{
 		fprintf (stderr, "jack server not running?\n");
 		return 1;

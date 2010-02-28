@@ -83,7 +83,7 @@ main (int argc, char *argv[])
 {
 	/* try to become a client of the JACK server */
 
-	if ((client = jack_client_new ("showtime")) == 0) {
+	if ((client = jack_client_open ("showtime", JackNullOption, NULL)) == 0) {
 		fprintf (stderr, "jack server not running?\n");
 		return 1;
 	}
