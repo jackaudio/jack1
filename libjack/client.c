@@ -1348,7 +1348,6 @@ jack_session_reply (jack_client_t *client, jack_session_event_t *event )
 				"%s", event->command_line);
 		client->control->session_flags = event->flags;
 
-		free (event->command_line);
 	} else {
 		retval = -1;
 	}
@@ -1363,11 +1362,18 @@ jack_session_reply (jack_client_t *client, jack_session_event_t *event )
 		retval = jack_client_deliver_request(client, &request);
 	}
 
+	return retval;
+}
+
+void
+jack_session_event_free (jack_session_event_t *event)
+{
+	if (event->command_line)
+		free (event->command_line);
+
 	free ((char *)event->session_dir);
 	free ((char *)event->client_uuid);
 	free (event);
-
-	return retval;
 }
 
 void

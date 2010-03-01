@@ -26,6 +26,7 @@
 extern "C" {
 #endif
 
+#include <jack/types.h>
 #include <jack/weakmacros.h>
 
 /**
@@ -147,6 +148,14 @@ int jack_set_session_callback(jack_client_t *client,
 
 int jack_session_reply( jack_client_t *client, jack_session_event_t *event ) JACK_WEAK_EXPORT;
 
+
+/**
+ * free memory used by a jack_session_event_t
+ * this also frees the memory used by the command_line pointer.
+ * if its non NULL.
+ */
+
+void jack_session_event_free (jack_session_event_t *event);
 
 /*@}*/
 
