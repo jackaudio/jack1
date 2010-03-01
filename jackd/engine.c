@@ -2735,7 +2735,7 @@ static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req )
 
 	req->status = 0;
 
-	client->session_reply_pending = FALSE;
+	client->session_reply_pending = 0;
 
 	if (engine->session_reply_fd == -1) {
 		jack_error ("spurious Session Reply");
@@ -2759,6 +2759,7 @@ static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req )
 					engine->session_reply_fd, strerror (errno));
 			req->status = -1;
 		}
+		engine->session_reply_fd = -1;
 	}
 }
 
