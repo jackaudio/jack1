@@ -44,20 +44,20 @@ void
 session_callback (jack_session_event_t *event, void *arg)
 {
 	char retval[100];
-	int type_save;
 	printf ("session notification\n");
 	printf ("path %s, uuid %s, type: %s\n", event->session_dir, event->client_uuid, event->type == JackSessionSave ? "save" : "quit");
 
 
 	snprintf (retval, 100, "jack_simple_client %s", event->client_uuid);
 	event->command_line = strdup (retval);
-	type_save = event->type;
 
 	jack_session_reply( client, event );
 
-	if (type_save == JackSessionSaveAndQuit) {
+	if (event->type == JackSessionSaveAndQuit) {
 		simple_quit = 1;
 	}
+
+	jack_session_event_free (event);
 }
 
 /**
