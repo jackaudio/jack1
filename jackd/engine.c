@@ -2745,8 +2745,8 @@ static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req )
 	engine->session_pending_replies -= 1;
 
 	if (jack_send_session_reply (engine, client)) {
-		// need to fix all client pendings.
-		client->session_reply_pending =0;
+		// maybe need to fix all client pendings.
+		// but we will just get a set of spurious replies now.
 		engine->session_reply_fd = -1;
 		return;
 	}

@@ -109,6 +109,7 @@ static void
 jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
 	JSList *node;
+	jack_client_id_t finalizer=0;
 
 	/* caller must write-hold the client lock */
 
@@ -118,6 +119,20 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	if (!client->control->dead) {
 		jack_zombify_client (engine, client);
+	}
+
+	if (client->session_reply_pending) {
+		engine->session_pending_replies -= 1;
+
+		if (engine->session_pending_replies == 0) {
+			if (write (engine->session_reply_fd, &finalizer, sizeof (finalizer))
+					< (ssize_t) sizeof (finalizer)) {
+				jack_error ("cannot write SessionNotify result "
+						"to client via fd = %d (%s)", 
+						engine->session_reply_fd, strerror (errno));
+			}
+			engine->session_reply_fd = -1;
+		}
 	}
 
 	if (client->control->type == ClientExternal) {
