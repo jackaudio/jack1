@@ -424,10 +424,6 @@ struct _jack_request {
 	    int32_t conditional;
 	} POST_PACKED_STRUCTURE timebase;
 	struct {
-	    char oldname[JACK_CLIENT_NAME_SIZE];
-	    char newname[JACK_CLIENT_NAME_SIZE];
-	} POST_PACKED_STRUCTURE clientrename;
-	struct {
 	    char name[JACK_CLIENT_NAME_SIZE];
 	    jack_client_id_t uuid;
 	} POST_PACKED_STRUCTURE reservename;

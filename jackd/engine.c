@@ -2559,7 +2559,7 @@ static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req)
 	// check is name is free...
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
-		if( !strcmp( (char *)client->control->name, req->x.clientrename.newname )) {
+		if( !strcmp( (char *)client->control->name, req->x.reservename.name )) {
 			req->status = -1;
 			return;
 		}
