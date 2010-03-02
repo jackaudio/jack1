@@ -380,7 +380,6 @@ typedef enum {
 	RecomputeTotalLatency = 24,
 	SessionNotify = 25,
 	GetClientByUUID = 26,
-	RenameClient = 29,
 	ReserveName = 30,
 	SessionReply = 31
 } RequestType;

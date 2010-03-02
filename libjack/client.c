@@ -2692,19 +2692,6 @@ jack_reserve_client_name( jack_client_t *client, const char *name, const char *u
 	return jack_client_deliver_request( client, &request );
 }
 
-int 
-jack_rename_client( jack_client_t *client, const char *oldname, const char *newname )
-{
-	jack_request_t request;
-
-	request.type = RenameClient;
-	snprintf( request.x.clientrename.oldname, sizeof( request.x.clientrename.oldname ),
-			"%s", oldname );
-	snprintf( request.x.clientrename.newname, sizeof( request.x.clientrename.newname ),
-			"%s", newname );
-	return jack_client_deliver_request( client, &request );
-}
-
 const char **
 jack_get_ports (jack_client_t *client,
 		const char *port_name_pattern,

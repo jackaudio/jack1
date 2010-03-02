@@ -137,7 +137,6 @@ static void jack_engine_signal_problems (jack_engine_t* engine);
 static int jack_check_client_status (jack_engine_t* engine);
 static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd );
 static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *req);
-static void jack_do_client_rename ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req );
 
@@ -1364,11 +1363,6 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		jack_do_get_client_by_uuid (engine, req);
 		jack_unlock_graph (engine);
 		break;
-	case RenameClient:
-		jack_lock_graph (engine);
-		jack_do_client_rename (engine, req);
-		jack_unlock_graph (engine);
-		break;
 	case ReserveName:
 		jack_rdlock_graph (engine);
 		jack_do_reserve_name (engine, req);
@@ -2558,42 +2552,6 @@ static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *
 	}
 }
 
-static void jack_do_client_rename ( jack_engine_t *engine, jack_request_t *req)
-{
-	JSList *node,*node2;
-	req->status = -1;
-
-	// first check if newname is not already taken.
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
-		if( !strcmp( (char *)client->control->name, req->x.clientrename.newname )) {
-			req->status = -2;
-			return;
-		}
-	}
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
-		if( !strcmp( (char *)client->control->name, req->x.clientrename.oldname )) {
-			// client found... rename it.
-			snprintf( (char *)client->control->name, sizeof( client->control->name ),
-					"%s", req->x.clientrename.newname );
-
-			// now rename all ports...
-			for( node2=client->ports; node2; node2 = jack_slist_next (node2)) {
-				jack_port_internal_t* port = (jack_port_internal_t*) node2->data;
-				char *pcomp = strchr( port->shared->name, ':' );
-				char tmp[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE]; 
-				snprintf( tmp, sizeof(tmp), "%s%s", req->x.clientrename.newname, pcomp );
-				snprintf( port->shared->name, sizeof(port->shared->name), "%s", tmp );
-			}
-
-			req->status=0;
-			return;
-		}
-
-	}
-}
-
 static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req)
 {
 	jack_reserved_name_t *reservation;
@@ -2644,7 +2602,7 @@ static int jack_send_session_reply ( jack_engine_t *engine, jack_client_internal
 			    engine->session_reply_fd, strerror (errno));
 		return -1;
 	}
-	if (write (engine->session_reply_fd, & client->control->session_flags, 
+	if (write (engine->session_reply_fd, (const void *) ( & client->control->session_flags ), 
 				sizeof (client->control->session_flags))
 	    < (ssize_t) sizeof (client->control->session_flags)) {
 		jack_error ("cannot write SessionNotify result "
