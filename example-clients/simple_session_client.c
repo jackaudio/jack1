@@ -1,7 +1,8 @@
-/** @file simple_client.c
+/** @file simple_session_client.c
  *
  * @brief This simple client demonstrates the most basic features of JACK
  * as they would be used by many applications.
+ * this version also adds session manager functionality.
  */
 
 #include <stdio.h>

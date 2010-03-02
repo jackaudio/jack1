@@ -13,6 +13,7 @@ dist-check-sndfile:
 endif
 
 bin_PROGRAMS = jack_simple_client \
+	       jack_simple_session_client \
 	       jack_transport_client \
 	       jack_impulse_grabber \
 	       jack_metro \
@@ -32,6 +33,10 @@ AM_CXXFLAGS = -I.. $(JACK_CFLAGS) $(sndfile_cflags)
 jack_simple_client_SOURCES = simple_client.c
 jack_simple_client_LDFLAGS = @OS_LDFLAGS@
 jack_simple_client_LDADD = $(top_builddir)/libjack/libjack.la
+
+jack_simple_session_client_SOURCES = simple_session_client.c
+jack_simple_session_client_LDFLAGS = @OS_LDFLAGS@
+jack_simple_session_client_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_transport_client_SOURCES = transport_client.c
 jack_transport_client_LDFLAGS = @OS_LDFLAGS@
