@@ -63,14 +63,6 @@ enum JackSessionFlags {
      * an error occured while saving.
      */
     JackSessionSaveError = 0x01,
-
-    /**
-     * this reply indicates that a client is part of a multiclient application.
-     * the command reply is left empty. but the session manager should still
-     * consider this client part of a session. it will come up due to invocation of another
-     * client.
-     */
-    JackSessionChildClient = 0x02
 };
 
 typedef enum JackSessionFlags jack_session_flags_t;
@@ -130,6 +122,10 @@ typedef void (*JackSessionCallback)(jack_session_event_t *event, void *arg);
  * Tell the JACK server to call @a save_callback the session handler wants
  * to save.
  *
+ * setting more than one session_callback per process is probably a design
+ * error. if you have a multiclient application its more sensible to create
+ * a jack_client with only a session callback set. 
+ *
  * @return 0 on success, otherwise a non-zero error code
  */
 int jack_set_session_callback(jack_client_t *client,
@@ -155,7 +151,16 @@ int jack_session_reply( jack_client_t *client, jack_session_event_t *event ) JAC
  * if its non NULL.
  */
 
-void jack_session_event_free (jack_session_event_t *event);
+void jack_session_event_free (jack_session_event_t *event) JACK_WEAK_EXPORT;
+
+
+/**
+ * get the assigned uuid for client.
+ * safe to call from callback and all other threads.
+ * memory needs to be freed.
+ */
+
+char *jack_client_get_uuid (jack_client_t *client) JACK_WEAK_EXPORT;
 
 /*@}*/
 

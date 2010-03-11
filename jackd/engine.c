@@ -2638,14 +2638,18 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 	/* GRAPH MUST BE LOCKED : see callers of jack_send_connection_notification() 
 	 */
 
+	// make sure all uuids are set.
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+		if( client->control->uid == 0 ) {
+			client->control->uid=jack_engine_get_max_uuid( engine ) + 1;
+		}
+	}
+
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if (client->control->session_cbset) {
 			
-			if( client->control->uid == 0 ) {
-				client->control->uid=jack_engine_get_max_uuid( engine ) + 1;
-			}
-
 			// in case we only want to send to a special client.
 			// uuid assign is still complete. not sure if thats necessary.
 			if( (req->x.session.target[0] != 0) && strcmp(req->x.session.target, (char *)client->control->name) )

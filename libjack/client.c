@@ -2676,6 +2676,16 @@ jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
 	return strdup( request.x.port_info.name );
 }
 
+char *
+jack_client_get_uuid( jack_client_t *client )
+{ 
+	char retval[16];
+
+	snprintf( retval, sizeof(retval), "%d", client->control->uid );
+
+	return strdup(retval);
+}
+
 int
 jack_reserve_client_name( jack_client_t *client, const char *name, const char *uuid )
 { 
