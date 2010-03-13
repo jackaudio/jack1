@@ -1486,11 +1486,8 @@ alsa_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 		while (nf) {
 			contiguous = nf;
 			
-			if (snd_pcm_mmap_begin (
-				    driver->playback_handle,
-				    &driver->playback_areas,
-				    (snd_pcm_uframes_t *) &offset, 
-				    (snd_pcm_uframes_t *) &contiguous)) {
+			if (alsa_driver_get_channel_addresses (driver,
+						0, &contiguous, 0, &offset)) {
 				return -1;
 			}
 			
