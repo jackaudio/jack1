@@ -63,6 +63,10 @@ enum JackSessionFlags {
      * an error occured while saving.
      */
     JackSessionSaveError = 0x01,
+    /**
+     * client needs to be run in a terminal.
+     */
+    JackSessionNeedTerminal = 0x02
 };
 
 typedef enum JackSessionFlags jack_session_flags_t;
@@ -90,10 +94,10 @@ struct _jack_session_event {
      * the command_line is the reply of the client.
      * it specifies in a platform dependent way, how the client must be restarted upon session reload.
      *
-     * probably it should contain ${SESSION_DIR} instead of the actual session dir.
+     * it should contain ${SESSION_DIR} instead of the actual session dir.
      * this would basically make the session dir moveable.
      *
-     * ownership of the memory is handed to jack.
+     * memory will be freed along with jack_session_event_free()
      * initially set to NULL by jack;
      */
     char *command_line;
@@ -102,6 +106,11 @@ struct _jack_session_event {
      * flags to be set by the client. normally left 0.
      */
     jack_session_flags_t flags;
+
+    /**
+     * future flags. will be set to zero for now.
+     */
+    uint32_t future;
 };
 
 typedef struct _jack_session_event jack_session_event_t;

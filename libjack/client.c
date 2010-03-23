@@ -531,6 +531,7 @@ jack_client_handle_session_callback (jack_client_t *client, jack_event_t *event)
 	s_event->session_dir = strdup( event->x.name );
 	s_event->client_uuid = strdup( prefix );
 	s_event->command_line = NULL;
+	s_event->future = 0;
 
 	client->session_cb_immediate_reply = 0;
 	client->session_cb ( s_event, client->session_cb_arg);
