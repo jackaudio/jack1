@@ -49,10 +49,6 @@ jack_free = libjack.jack_free
 jack_free.argtypes = [ c_void_p ]
 jack_free.restype = None
 
-rename_client = libjack.jack_rename_client
-rename_client.argtypes = [ client_p, c_char_p, c_char_p ]
-rename_client.restype = c_int 
-
 reserve_client_name = libjack.jack_reserve_client_name
 reserve_client_name.argtypes = [ client_p, c_char_p, c_char_p ]
 reserve_client_name.restype = c_int

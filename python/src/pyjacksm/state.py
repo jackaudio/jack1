@@ -8,8 +8,13 @@ class SessionDom( object ):
     def __init__( self, filename=None ):
 	if filename:
 	    self.dom = parse( filename )
+
+	    doc = self.dom.documentElement
+	    for c in doc.getElementsByTagName( "jackclient" ):
+		c.orig_name = c.getAttribute( "jackname" )
 	else:
 	    self.dom = impl.createDocument(None,"jacksession",None)
+
     
     def add_client( self, client ):
 	cl_elem = Element( "jackclient" )
@@ -81,11 +86,14 @@ class SessionDom( object ):
 		    retval.append( i.getAttribute( "dst" ) )
 	return retval
 
-    def get_commandline_for_client( self, name ):
+    def get_commandline_for_client( self, name, session_dir ):
 	doc = self.dom.documentElement
 	for c in doc.getElementsByTagName( "jackclient" ):
 	    if c.getAttribute( "jackname" ) == name:
-		return c.getAttribute( "cmdline" )
+		client_session_dir = session_dir + c.orig_name 
+		cmdline = c.getAttribute( "cmdline" )
+
+		return cmdline.replace( "${SESSION_DIR}", client_session_dir )
 
     def get_uuid_client_pairs( self ):
 	retval = []

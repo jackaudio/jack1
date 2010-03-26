@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import libjack
-import state
+from pyjacksm import libjack
+from pyjacksm import state
 import subprocess
 from optparse import OptionParser
 from ConfigParser import SafeConfigParser
@@ -82,7 +82,7 @@ class SessionManager( object ):
 
         # now fire up the processes
         for cname in sd.get_reg_client_names():
-            cmd = sd.get_commandline_for_client( cname )
+            cmd = sd.get_commandline_for_client( cname, self.sessiondir + name + "/" )
             children.append( subprocess.Popen( cmd, shell=True ) )
 
         avail_ports = g.get_port_list()
