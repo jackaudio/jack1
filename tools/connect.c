@@ -27,6 +27,7 @@
 #include <config.h>
 
 #include <jack/jack.h>
+#include <jack/session.h>
 
 #define TRUE 1
 #define FALSE 0
@@ -49,6 +50,7 @@ show_usage (char *my_name)
 	fprintf (stderr, "For more information see http://jackaudio.org/\n");
 }
 
+
 int
 main (int argc, char *argv[])
 {
@@ -63,6 +65,9 @@ main (int argc, char *argv[])
 	jack_port_t *dst_port = 0;
 	jack_port_t *port1 = 0;
 	jack_port_t *port2 = 0;
+	char portA[300];
+	char portB[300];
+	int use_uuid=0;
 	int connecting, disconnecting;
 	int port1_flags, port2_flags;
 	int rc = 1;
@@ -71,15 +76,19 @@ main (int argc, char *argv[])
 	    { "server", 1, 0, 's' },
 	    { "help", 0, 0, 'h' },
 	    { "version", 0, 0, 'v' },
+	    { "uuid", 0, 0, 'u' },
 	    { 0, 0, 0, 0 }
 	};
 
-	while ((c = getopt_long (argc, argv, "s:hv", long_options, &option_index)) >= 0) {
+	while ((c = getopt_long (argc, argv, "s:hvu", long_options, &option_index)) >= 0) {
 		switch (c) {
 		case 's':
 			server_name = (char *) malloc (sizeof (char) * strlen(optarg));
 			strcpy (server_name, optarg);
 			options |= JackServerName;
+			break;
+		case 'u':
+			use_uuid = 1;
 			break;
 		case 'h':
 			show_usage (my_name);
@@ -123,12 +132,48 @@ main (int argc, char *argv[])
 
 	/* find the two ports */
 
-	if ((port1 = jack_port_by_name(client, argv[argc-1])) == 0) {
-		fprintf (stderr, "ERROR %s not a valid port\n", argv[argc-1]);
+	if( use_uuid ) {
+		char *tmpname;
+		char *clientname;
+		char *portname;
+		tmpname = strdup( argv[argc-1] );
+		portname = strchr( tmpname, ':' );
+		portname[0] = '\0';
+		portname+=1;
+		clientname = jack_get_client_name_by_uuid( client, tmpname );
+		if( clientname ) {
+
+			snprintf( portA, sizeof(portA), "%s:%s", clientname, portname );
+			jack_free( clientname );
+		} else {
+			snprintf( portA, sizeof(portA), "%s", argv[argc-1] );
+		}
+		free( tmpname );
+
+		tmpname = strdup( argv[argc-2] );
+		portname = strchr( tmpname, ':' );
+		portname[0] = '\0';
+		portname+=1;
+		clientname = jack_get_client_name_by_uuid( client, tmpname );
+		if( clientname ) {
+			snprintf( portB, sizeof(portB), "%s:%s", clientname, portname );
+			jack_free( clientname );
+		} else {
+			snprintf( portB, sizeof(portB), "%s", argv[argc-2] );
+		}
+
+		free( tmpname );
+
+	} else {
+		snprintf( portA, sizeof(portA), "%s", argv[argc-1] );
+		snprintf( portB, sizeof(portB), "%s", argv[argc-2] );
+	}
+	if ((port1 = jack_port_by_name(client, portA)) == 0) {
+		fprintf (stderr, "ERROR %s not a valid port\n", portA);
 		goto exit;
 		}
-	if ((port2 = jack_port_by_name(client, argv[argc-2])) == 0) {
-		fprintf (stderr, "ERROR %s not a valid port\n", argv[argc-2]);
+	if ((port2 = jack_port_by_name(client, portB)) == 0) {
+		fprintf (stderr, "ERROR %s not a valid port\n", portB);
 		goto exit;
 		}
 

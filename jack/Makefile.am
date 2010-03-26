@@ -7,6 +7,7 @@ libjackinclude_HEADERS = 	\
 	jack.h			\
 	ringbuffer.h		\
 	statistics.h            \
+	session.h               \
 	thread.h                \
 	timestamps.h		\
 	transport.h		\

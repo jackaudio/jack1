@@ -514,6 +514,32 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 	return 0;
 }
 
+int
+jack_client_handle_session_callback (jack_client_t *client, jack_event_t *event)
+{
+	char prefix[32];
+	jack_session_event_t *s_event;
+
+	if (! client->control->session_cbset) {
+		return -1;
+	}
+
+	snprintf( prefix, sizeof(prefix), "%d", client->control->uid );
+
+	s_event = malloc( sizeof(jack_session_event_t) );
+	s_event->type = event->y.n;
+	s_event->session_dir = strdup( event->x.name );
+	s_event->client_uuid = strdup( prefix );
+	s_event->command_line = NULL;
+
+	client->session_cb_immediate_reply = 0;
+	client->session_cb ( s_event, client->session_cb_arg);
+
+	if (client->session_cb_immediate_reply) {
+		return 2;
+	}
+	return 1;
+}
 #if JACK_USE_MACH_THREADS
 
 static int 
@@ -874,6 +900,10 @@ jack_request_client (ClientType type,
 
 	/* format connection request */
 
+	if( va->sess_uuid )
+		req.uuid = atoi( va->sess_uuid );
+	else
+		req.uuid = 0;
 	req.protocol_v = jack_protocol_version;
 	req.load = TRUE;
 	req.type = type;
@@ -1116,6 +1146,11 @@ jack_client_open_aux (const char *client_name,
 	client->deliver_request = oop_client_deliver_request;
 	client->deliver_arg = client;
 
+	if( va.sess_uuid )
+		client->control->uid = atoi( va.sess_uuid );
+	else
+		client->control->uid = 0U;
+
 	if ((ev_fd = server_event_connect (client, va.server_name)) < 0) {
 		goto fail;
 	}
@@ -1302,6 +1337,144 @@ jack_set_freewheel (jack_client_t* client, int onoff)
 	return jack_client_deliver_request (client, &request);
 }
 
+int
+jack_session_reply (jack_client_t *client, jack_session_event_t *event )
+{
+	int retval = 0;
+
+	if (event->command_line) {
+		snprintf ((char *)client->control->session_command, 
+				sizeof(client->control->session_command),
+				"%s", event->command_line);
+		client->control->session_flags = event->flags;
+
+	} else {
+		retval = -1;
+	}
+
+	if (pthread_self() == client->thread_id) {
+		client->session_cb_immediate_reply = 1;
+	} else {
+		jack_request_t request;
+		request.type = SessionReply;
+		request.x.client_id = client->control->id;
+
+		retval = jack_client_deliver_request(client, &request);
+	}
+
+	return retval;
+}
+
+void
+jack_session_event_free (jack_session_event_t *event)
+{
+	if (event->command_line)
+		free (event->command_line);
+
+	free ((char *)event->session_dir);
+	free ((char *)event->client_uuid);
+	free (event);
+}
+
+void
+jack_session_commands_free (jack_session_command_t *cmds)
+{
+	int i=0;
+	while(1) {
+		if (cmds[i].client_name)
+			free ((char *)cmds[i].client_name);
+		if (cmds[i].command)
+			free ((char *)cmds[i].command);
+		if (cmds[i].uuid)
+			free ((char *)cmds[i].uuid);
+		else
+			break;
+
+		i += 1;
+	}
+
+	free(cmds);
+}
+
+jack_session_command_t *
+jack_session_notify (jack_client_t* client, const char *target, jack_session_event_type_t code, const char *path )
+{
+	jack_request_t request;
+
+	jack_session_command_t *retval = NULL;
+	int num_replies = 0;
+	request.type = SessionNotify;
+	if( path ) 
+		snprintf( request.x.session.path, sizeof( request.x.session.path ), "%s", path );
+	else
+		request.x.session.path[0] = '\0';
+
+	if( target ) 
+		snprintf( request.x.session.target, sizeof( request.x.session.target ), "%s", target );
+	else
+		request.x.session.target[0] = '\0';
+
+	request.x.session.type = code;
+	
+	if( (write (client->request_fd, &request, sizeof (request))
+	       != sizeof (request)) ) {
+		jack_error ("cannot send request type %d to server",
+				    request.type);
+		goto out;
+	}
+
+	while( 1 ) {
+		jack_client_id_t uid;
+		if (read (client->request_fd, &uid, sizeof (uid)) != sizeof (uid)) {
+			jack_error ("cannot read result for request type %d from"
+					" server (%s)", request.type, strerror (errno));
+			goto out;
+		}
+
+		num_replies += 1;
+		retval = realloc( retval, (num_replies)*sizeof(jack_session_command_t) );
+		retval[num_replies-1].client_name = malloc (JACK_CLIENT_NAME_SIZE);
+		retval[num_replies-1].command = malloc (JACK_PORT_NAME_SIZE);
+		retval[num_replies-1].uuid = malloc (16);
+
+		if ( (retval[num_replies-1].client_name == NULL)
+		   ||(retval[num_replies-1].command     == NULL)
+		   ||(retval[num_replies-1].uuid        == NULL) )
+			   goto out;
+
+		if( uid == 0 )
+			break;
+
+
+		if (read (client->request_fd, (char *)retval[num_replies-1].client_name, JACK_CLIENT_NAME_SIZE) 
+			       	!= JACK_CLIENT_NAME_SIZE) {
+			jack_error ("cannot read result for request type %d from"
+					" server (%s)", request.type, strerror (errno));
+			goto out;
+		}
+		if (read (client->request_fd, (char *)retval[num_replies-1].command, JACK_PORT_NAME_SIZE)
+			       	!= JACK_PORT_NAME_SIZE) {
+			jack_error ("cannot read result for request type %d from"
+					" server (%s)", request.type, strerror (errno));
+			goto out;
+		}
+		if (read (client->request_fd, & retval[num_replies-1].flags, sizeof(retval[num_replies-1].flags) )
+			       	!= sizeof(retval[num_replies-1].flags) ) {
+			jack_error ("cannot read result for request type %d from"
+					" server (%s)", request.type, strerror (errno));
+			goto out;
+		}
+		snprintf( (char *)retval[num_replies-1].uuid, 16, "%d", uid );
+	}
+	free((char *)retval[num_replies-1].uuid);
+	retval[num_replies-1].uuid = NULL;
+	return retval;
+out:
+	if( retval )
+		jack_session_commands_free(retval);
+	return NULL;
+}
+
 void
 jack_start_freewheel (jack_client_t* client)
 {
@@ -1472,6 +1645,9 @@ jack_client_process_events (jack_client_t* client)
 			
 		case StopFreewheel:
 			jack_stop_freewheel (client);
+			break;
+		case SaveSession:
+			status = jack_client_handle_session_callback (client, &event );
 			break;
 		}
 		
@@ -2005,11 +2181,11 @@ jack_activate (jack_client_t *client)
 	 * usage in jack_start_thread())
 	 */
          
-	char buf[JACK_THREAD_STACK_TOUCH];
+	//char buf[JACK_THREAD_STACK_TOUCH];
 	int i;
 
 	for (i = 0; i < JACK_THREAD_STACK_TOUCH; i++) {
-		buf[i] = (char) (i & 0xff);
+		//buf[i] = (char) (i & 0xff);
 	}
 
 	if (client->control->type == ClientInternal ||
@@ -2450,6 +2626,20 @@ jack_set_process_thread(jack_client_t* client, JackThreadCallback callback, void
 }
 
 int
+jack_set_session_callback(jack_client_t* client, JackSessionCallback callback, void *arg)
+{
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+
+	client->session_cb_arg = arg;
+	client->session_cb = callback;
+	client->control->session_cbset = (callback != NULL);
+	return 0;
+}
+
+int
 jack_get_process_done_fd (jack_client_t *client)
 {
 	return client->graph_next_fd;
@@ -2467,6 +2657,39 @@ jack_on_info_shutdown (jack_client_t *client, void (*function)(jack_status_t, co
 {
 	client->on_info_shutdown = function;
 	client->on_info_shutdown_arg = arg;
+}
+
+char *
+jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
+{ 
+	jack_request_t request;
+
+	char *end_ptr;
+	jack_client_id_t uuid_int = strtol( uuid, &end_ptr, 10 );
+	if( *end_ptr != '\0' )
+		return NULL;
+	request.type = GetClientByUUID;
+	request.x.client_id = uuid_int;
+	if( jack_client_deliver_request( client, &request ) )
+		return NULL;
+
+	return strdup( request.x.port_info.name );
+}
+
+int
+jack_reserve_client_name( jack_client_t *client, const char *name, const char *uuid )
+{ 
+	jack_request_t request;
+
+	char *end_ptr;
+	jack_client_id_t uuid_int = strtol( uuid, &end_ptr, 10 );
+	if( *end_ptr != '\0' )
+		return -1;
+	request.type = ReserveName;
+	snprintf( request.x.reservename.name, sizeof( request.x.reservename.name ),
+			"%s", name );
+	request.x.reservename.uuid = uuid_int;
+	return jack_client_deliver_request( client, &request );
 }
 
 const char **

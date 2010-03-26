@@ -113,11 +113,16 @@ enum JackOptions {
       * Pass optional <em>(char *) load_init</em> string to the
       * jack_initialize() entry point of an internal client.
       */
-     JackLoadInit = 0x10
+     JackLoadInit = 0x10,
+
+     /**
+      * pass a SessionID Token this allows the sessionmanager to identify the client again.
+      */
+     JackSessionID = 0x20
 };
 
 /** Valid options for opening an external client. */
-#define JackOpenOptions (JackServerName|JackNoStartServer|JackUseExactName)
+#define JackOpenOptions (JackSessionID|JackServerName|JackNoStartServer|JackUseExactName)
 
 /** Valid options for loading an internal client. */
 #define JackLoadOptions (JackLoadInit|JackLoadName|JackUseExactName)
@@ -331,14 +336,14 @@ typedef void (*JackPortConnectCallback)(jack_port_id_t a, jack_port_id_t b, int 
  *
  * @param starting non-zero if we start starting to freewheel, zero otherwise
  * @param arg pointer to a client supplied structure
- */ 
+ */
 typedef void (*JackFreewheelCallback)(int starting, void *arg);
 
 typedef void *(*JackThreadCallback)(void* arg);
 
 /**
  * Prototype for the client supplied function that is called
- * whenever jackd is shutdown. Note that after server shutdown, 
+ * whenever jackd is shutdown. Note that after server shutdown,
  * the client pointer is *not* deallocated by libjack,
  * the application is responsible to properly use jack_client_close()
  * to release client ressources. Warning: jack_client_close() cannot be
@@ -351,15 +356,15 @@ typedef void (*JackShutdownCallback)(void *arg);
 
 /**
  * Prototype for the client supplied function that is called
- * whenever jackd is shutdown. Note that after server shutdown, 
+ * whenever jackd is shutdown. Note that after server shutdown,
  * the client pointer is *not* deallocated by libjack,
  * the application is responsible to properly use jack_client_close()
  * to release client ressources. Warning: jack_client_close() cannot be
  * safely used inside the shutdown callback and has to be called outside of
  * the callback context.
- 
- * @param code a shuntdown code
- * @param reason a string discribing the shuntdown reason (backend failure, server crash... etc...)
+ *
+ * @param code a shutdown code
+ * @param reason a string describing the shutdown reason (backend failure, server crash... etc...)
  * @param arg pointer to a client supplied structure
  */
 typedef void (*JackInfoShutdownCallback)(jack_status_t code, const char* reason, void *arg);

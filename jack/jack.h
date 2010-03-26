@@ -406,7 +406,6 @@ int jack_set_graph_order_callback (jack_client_t *,
  */
 int jack_set_xrun_callback (jack_client_t *,
 			    JackXRunCallback xrun_callback, void *arg) JACK_OPTIONAL_WEAK_EXPORT;
-
 /*@}*/
 
 /**

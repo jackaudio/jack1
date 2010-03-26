@@ -58,6 +58,7 @@ extern void jack_info (const char *fmt, ...);
 #include <jack/types.h>
 #include <jack/port.h>
 #include <jack/transport.h>
+#include <jack/session.h>
 #include <jack/thread.h>
 
 extern jack_thread_creator_t jack_thread_creator;
@@ -217,14 +218,15 @@ typedef enum  {
   StartFreewheel,
   StopFreewheel,
   ClientRegistered,
-  ClientUnregistered
+  ClientUnregistered,
+  SaveSession
 } JackEventType;
 
 typedef struct {
     JackEventType type;
     union {
 	uint32_t n;
-        char name[JACK_CLIENT_NAME_SIZE];    
+        char name[JACK_PORT_NAME_SIZE];    
 	jack_port_id_t port_id;
 	jack_port_id_t self_id;
     } x;
@@ -252,9 +254,12 @@ typedef enum {
 typedef volatile struct {
 
     volatile jack_client_id_t id;         /* w: engine r: engine and client */
+    volatile jack_client_id_t uid;        /* w: engine r: engine and client */
     volatile jack_nframes_t  nframes;     /* w: engine r: client */
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
     volatile char	name[JACK_CLIENT_NAME_SIZE];
+    volatile char	session_command[JACK_PORT_NAME_SIZE];
+    volatile jack_session_flags_t session_flags;
     volatile ClientType type;             /* w: engine r: engine and client */
     volatile int8_t     active;           /* w: engine r: engine and client */
     volatile int8_t     dead;             /* r/w: engine */
@@ -292,6 +297,7 @@ typedef volatile struct {
     volatile uint8_t	freewheel_cb_cbset;
     volatile uint8_t	client_register_cbset;
     volatile uint8_t	thread_cb_cbset;
+    volatile uint8_t	session_cbset;
 
 } POST_PACKED_STRUCTURE jack_client_control_t;
 
@@ -301,6 +307,7 @@ typedef struct {
     int32_t    load;
     ClientType type;
     jack_options_t options;
+    jack_client_id_t uuid;
 
     char name[JACK_CLIENT_NAME_SIZE];
     char object_path[PATH_MAX+1];
@@ -370,7 +377,11 @@ typedef enum {
 	IntClientName = 21,
 	IntClientUnload = 22,
 	RecomputeTotalLatencies = 23,
-	RecomputeTotalLatency = 24
+	RecomputeTotalLatency = 24,
+	SessionNotify = 25,
+	GetClientByUUID = 26,
+	ReserveName = 30,
+	SessionReply = 31
 } RequestType;
 
 struct _jack_request {
@@ -391,6 +402,11 @@ struct _jack_request {
 	    char destination_port[JACK_PORT_NAME_SIZE];
 	} POST_PACKED_STRUCTURE connect;
 	struct {
+	    char path[JACK_PORT_NAME_SIZE];
+	    jack_session_event_type_t  type;
+	    char target[JACK_CLIENT_NAME_SIZE];
+	} POST_PACKED_STRUCTURE session;
+	struct {
 	    int32_t nports;
 	    const char **ports;	/* this is only exposed to internal clients, so there
 				   is no 64/32 issue. external clients read the ports
@@ -407,6 +423,10 @@ struct _jack_request {
 	    jack_client_id_t client_id;
 	    int32_t conditional;
 	} POST_PACKED_STRUCTURE timebase;
+	struct {
+	    char name[JACK_CLIENT_NAME_SIZE];
+	    jack_client_id_t uuid;
+	} POST_PACKED_STRUCTURE reservename;
 	struct {
 	    //jack_options_t options;
 	    uint32_t options;
@@ -447,6 +467,8 @@ typedef struct _jack_client_internal {
     int     (*initialize)(jack_client_t*, const char*); /* int. clients only */
     void    (*finish)(void *);		/* internal clients only */
     int      error;
+
+    int		session_reply_pending;
     
 #ifdef JACK_USE_MACH_THREADS
     /* specific resources for server/client real-time thread communication */
@@ -456,10 +478,6 @@ typedef struct _jack_client_internal {
     int portnum;
 #endif /* JACK_USE_MACH_THREADS */
    
-    /* external clients: set by libjack
-     * internal clients: set by engine */
-    //int (*deliver_request)(void*, jack_request_t*); /* JOQ: 64/32 bug! */
-    //void *deliver_arg;
     jack_client_t *private_client;
 } jack_client_internal_t;
 

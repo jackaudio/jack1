@@ -29,6 +29,7 @@ typedef struct {
 	char *server_name;		/* server name */
 	char *load_name;		/* load module name */
 	char *load_init;		/* initialization string */
+	char *sess_uuid;
 } jack_varargs_t;
 
 static inline void
@@ -53,6 +54,8 @@ jack_varargs_parse (jack_options_t options, va_list ap, jack_varargs_t *va)
 		va->load_name = va_arg(ap, char *);
 	if ((options & JackLoadInit))
 		va->load_init = va_arg(ap, char *);
+	if ((options & JackSessionID))
+		va->sess_uuid = va_arg(ap, char *);
 }
 
 #ifdef __cplusplus
