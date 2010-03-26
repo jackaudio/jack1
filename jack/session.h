@@ -119,8 +119,12 @@ typedef struct _jack_session_event jack_session_event_t;
  * Prototype for the client supplied function that is called
  * whenever a session notification is sent via jack_session_notify().
  *
- * The session_id must be passed to jack_client_open on session reload (this can be
- * done by specifying it somehow on the returned command line).
+ * ownership of the memory of @a event is passed to the application.
+ * it must be freed using jack_session_event_free when its not used anymore.
+ *
+ * the client is also required to call jack_session_reply for this event.
+ * there is no timeout yet. and the only way to get back to a sane state
+ * would be to kill this client.
  *
  * @param event the event_structure.
  * @param arg pointer to a client supplied structure
@@ -128,8 +132,8 @@ typedef struct _jack_session_event jack_session_event_t;
 typedef void (*JackSessionCallback)(jack_session_event_t *event, void *arg);
 
 /**
- * Tell the JACK server to call @a save_callback the session handler wants
- * to save.
+ * Tell the JACK server to call @a session_callback when a session event
+ * is to be delivered.
  *
  * setting more than one session_callback per process is probably a design
  * error. if you have a multiclient application its more sensible to create
