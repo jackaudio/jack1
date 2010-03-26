@@ -63,14 +63,10 @@ enum JackSessionFlags {
      * an error occured while saving.
      */
     JackSessionSaveError = 0x01,
-
     /**
-     * this reply indicates that a client is part of a multiclient application.
-     * the command reply is left empty. but the session manager should still
-     * consider this client part of a session. it will come up due to invocation of another
-     * client.
+     * client needs to be run in a terminal.
      */
-    JackSessionChildClient = 0x02
+    JackSessionNeedTerminal = 0x02
 };
 
 typedef enum JackSessionFlags jack_session_flags_t;
@@ -98,10 +94,10 @@ struct _jack_session_event {
      * the command_line is the reply of the client.
      * it specifies in a platform dependent way, how the client must be restarted upon session reload.
      *
-     * probably it should contain ${SESSION_DIR} instead of the actual session dir.
+     * it should contain ${SESSION_DIR} instead of the actual session dir.
      * this would basically make the session dir moveable.
      *
-     * ownership of the memory is handed to jack.
+     * memory will be freed along with jack_session_event_free()
      * initially set to NULL by jack;
      */
     char *command_line;
@@ -110,6 +106,11 @@ struct _jack_session_event {
      * flags to be set by the client. normally left 0.
      */
     jack_session_flags_t flags;
+
+    /**
+     * future flags. will be set to zero for now.
+     */
+    uint32_t future;
 };
 
 typedef struct _jack_session_event jack_session_event_t;
@@ -118,8 +119,12 @@ typedef struct _jack_session_event jack_session_event_t;
  * Prototype for the client supplied function that is called
  * whenever a session notification is sent via jack_session_notify().
  *
- * The session_id must be passed to jack_client_open on session reload (this can be
- * done by specifying it somehow on the returned command line).
+ * ownership of the memory of @a event is passed to the application.
+ * it must be freed using jack_session_event_free when its not used anymore.
+ *
+ * the client is also required to call jack_session_reply for this event.
+ * there is no timeout yet. and the only way to get back to a sane state
+ * would be to kill this client.
  *
  * @param event the event_structure.
  * @param arg pointer to a client supplied structure
@@ -127,8 +132,12 @@ typedef struct _jack_session_event jack_session_event_t;
 typedef void (*JackSessionCallback)(jack_session_event_t *event, void *arg);
 
 /**
- * Tell the JACK server to call @a save_callback the session handler wants
- * to save.
+ * Tell the JACK server to call @a session_callback when a session event
+ * is to be delivered.
+ *
+ * setting more than one session_callback per process is probably a design
+ * error. if you have a multiclient application its more sensible to create
+ * a jack_client with only a session callback set. 
  *
  * @return 0 on success, otherwise a non-zero error code
  */
@@ -155,7 +164,16 @@ int jack_session_reply( jack_client_t *client, jack_session_event_t *event ) JAC
  * if its non NULL.
  */
 
-void jack_session_event_free (jack_session_event_t *event);
+void jack_session_event_free (jack_session_event_t *event) JACK_WEAK_EXPORT;
+
+
+/**
+ * get the assigned uuid for client.
+ * safe to call from callback and all other threads.
+ * memory needs to be freed.
+ */
+
+char *jack_client_get_uuid (jack_client_t *client) JACK_WEAK_EXPORT;
 
 /*@}*/
 

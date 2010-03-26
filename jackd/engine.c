@@ -134,8 +134,8 @@ static void jack_check_acyclic (jack_engine_t* engine);
 static void jack_compute_all_port_total_latencies (jack_engine_t *engine);
 static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_shared_t*);
 static void jack_engine_signal_problems (jack_engine_t* engine);
-static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd );
 static int jack_check_client_status (jack_engine_t* engine);
+static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd );
 static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req );
@@ -2638,14 +2638,18 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 	/* GRAPH MUST BE LOCKED : see callers of jack_send_connection_notification() 
 	 */
 
+	// make sure all uuids are set.
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+		if( client->control->uid == 0 ) {
+			client->control->uid=jack_engine_get_max_uuid( engine ) + 1;
+		}
+	}
+
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if (client->control->session_cbset) {
 			
-			if( client->control->uid == 0 ) {
-				client->control->uid=jack_engine_get_max_uuid( engine ) + 1;
-			}
-
 			// in case we only want to send to a special client.
 			// uuid assign is still complete. not sure if thats necessary.
 			if( (req->x.session.target[0] != 0) && strcmp(req->x.session.target, (char *)client->control->name) )
