@@ -49,7 +49,7 @@ session_callback (jack_session_event_t *event, void *arg)
 	printf ("path %s, uuid %s, type: %s\n", event->session_dir, event->client_uuid, event->type == JackSessionSave ? "save" : "quit");
 
 
-	snprintf (retval, 100, "jack_simple_client %s", event->client_uuid);
+	snprintf (retval, 100, "jack_simple_session_client %s", event->client_uuid);
 	event->command_line = strdup (retval);
 
 	jack_session_reply( client, event );
@@ -156,31 +156,39 @@ main (int argc, char *argv[])
 	 * it.
 	 */
 
-	ports = jack_get_ports (client, NULL, NULL,
+
+	/* only do the autoconnect when not reloading from a session.
+	 * in case of a session reload, the SM will restore our connections
+	 */
+
+	if (argc==1) {
+
+		ports = jack_get_ports (client, NULL, NULL,
 				JackPortIsPhysical|JackPortIsOutput);
-	if (ports == NULL) {
-		fprintf(stderr, "no physical capture ports\n");
-		exit (1);
-	}
+		if (ports == NULL) {
+			fprintf(stderr, "no physical capture ports\n");
+			exit (1);
+		}
 
-	if (jack_connect (client, ports[0], jack_port_name (input_port))) {
-		fprintf (stderr, "cannot connect input ports\n");
-	}
+		if (jack_connect (client, ports[0], jack_port_name (input_port))) {
+			fprintf (stderr, "cannot connect input ports\n");
+		}
 
-	free (ports);
+		free (ports);
 
-	ports = jack_get_ports (client, NULL, NULL,
+		ports = jack_get_ports (client, NULL, NULL,
 				JackPortIsPhysical|JackPortIsInput);
-	if (ports == NULL) {
-		fprintf(stderr, "no physical playback ports\n");
-		exit (1);
-	}
+		if (ports == NULL) {
+			fprintf(stderr, "no physical playback ports\n");
+			exit (1);
+		}
 
-	if (jack_connect (client, jack_port_name (output_port), ports[0])) {
-		fprintf (stderr, "cannot connect output ports\n");
-	}
+		if (jack_connect (client, jack_port_name (output_port), ports[0])) {
+			fprintf (stderr, "cannot connect output ports\n");
+		}
 
-	free (ports);
+		free (ports);
+	}
 
 	/* keep running until until we get a quit event */
 
