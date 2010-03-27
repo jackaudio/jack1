@@ -861,7 +861,7 @@ jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
 		DEBUG ("considering client %s for processing",
 		       client->control->name);
 
-		if (!client->control->active || client->control->dead) {
+		if (!client->control->active || !client->control->process_cbset || client->control->dead) {
 			node = jack_slist_next (node);
 		} else if (jack_client_is_internal (client)) {
 			node = jack_process_internal (engine, node, nframes);
@@ -2963,6 +2963,10 @@ jack_rechain_graph (jack_engine_t *engine)
 
 		next = jack_slist_next (node);
 
+		if (! ((jack_client_internal_t *) node->data)->control->process_cbset) {
+			continue;
+		}
+
 		VERBOSE(engine, "+++ client is now %s active ? %d",
 			((jack_client_internal_t *) node->data)->control->name,
 			((jack_client_internal_t *) node->data)->control->active);
@@ -2976,7 +2980,7 @@ jack_rechain_graph (jack_engine_t *engine)
 			
 			while (next) {
 				if (((jack_client_internal_t *)
-				     next->data)->control->active) {
+				     next->data)->control->active && ((jack_client_internal_t *)next->data)->control->process_cbset ) {
 					break;
 				}
 				next = jack_slist_next (next);
