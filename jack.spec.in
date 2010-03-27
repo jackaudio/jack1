@@ -21,7 +21,7 @@
 Summary:	The Jack Audio Connection Kit
 Name:		@PACKAGE@
 Version:	@VERSION@
-Release:	8
+Release:	9
 License:	GPL
 Group:		System Environment/Daemons
 Source0:	%{name}-%{version}.tar.gz
@@ -140,12 +140,15 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 %doc %{_mandir}/man1/jackstart*
 %endif
 %{_bindir}/jackd
-#{_bindir}/jack_bufsize
+%{_bindir}/jack_bufsize
 %{_bindir}/jack_freewheel
 %{_bindir}/jack_load
 %{_bindir}/jack_netsource
+%{_bindir}/jack_samplerate
+%{_bindir}/jack_session_notify
 %{_bindir}/jack_transport
 %{_bindir}/jack_unload
+%{_bindir}/jack_wait
 %{_bindir}/alsa_in
 %{_bindir}/alsa_out
 %dir %{_libdir}/%{name}
@@ -181,16 +184,23 @@ rm -rf $RPM_BUILD_ROOT%{_datadir}/%{name}/*
 %{_bindir}/jack_midisine
 %{_bindir}/jack_monitor_client
 #{_bindir}/jack_netsource
+#{_bindir}/jack_session_notify
 %{_bindir}/jack_showtime
+#{_bindir}/jack_samplerate
 %{_bindir}/jack_simple_client
+%{_bindir}/jack_simple_session_client
 #{_bindir}/jack_transport
 %{_bindir}/jack_transport_client
 #{_bindir}/jack_unload
+#{_bindir}/jack_wait
 #{_bindir}/alsa_in
 #{_bindir}/alsa_out
 
 
 %changelog
+
+* Sat Mar 27 2010 Rui Nuno Capela <rncbc@rncbc.org> - 0.118.3-9
+- session management infrastructure introduced
 
 * Wed Dec  3 2008 Rui Nuno Capela <rncbc@rncbc.org> - 0.116.0-8
 - enable dynamic SIMD optimizations by default
