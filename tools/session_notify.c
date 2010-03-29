@@ -142,6 +142,7 @@ int main(int argc, char *argv[])
 
 	retval = jack_session_notify( client, NULL, notify_type, save_path );
 	for(i=0; retval[i].uuid; i++ ) {
+		printf( "export SESSION_DIR=\"%s%s/\"\n", save_path, retval[i].client_name );
 		printf( "%s &\n", retval[i].command );
 		add_uuid_mapping(retval[i].uuid); 
 	}
