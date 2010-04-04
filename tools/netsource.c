@@ -220,6 +220,9 @@ sync_cb (jack_transport_state_t state, jack_position_t *pos, void *arg)
     static int latency_count = 0;
     int retval = sync_state;
 
+    if (! state_connected) {
+	return 1;
+    }
     if (latency_count) {
         latency_count--;
         retval = 0;
