@@ -861,7 +861,9 @@ jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
 		DEBUG ("considering client %s for processing",
 		       client->control->name);
 
-		if (!client->control->active || !client->control->process_cbset || client->control->dead) {
+		if (!client->control->active || 
+                    (!client->control->process_cbset && !client->control->thread_cb_cbset) || 
+                    client->control->dead) {
 			node = jack_slist_next (node);
 		} else if (jack_client_is_internal (client)) {
 			node = jack_process_internal (engine, node, nframes);
@@ -1671,7 +1673,7 @@ jack_server_thread (void *arg)
 				     &client_addrlen)) < 0) {
 				jack_error ("cannot accept new connection (%s)",
 					    strerror (errno));
-			} else if (jack_client_create (engine, client_socket) < 0) {
+			} else if (!engine->new_clients_allowed || jack_client_create (engine, client_socket) < 0) {
 				jack_error ("cannot complete client "
 					    "connection process");
 				close (client_socket);
@@ -1786,6 +1788,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->wait_pid = wait_pid;
 	engine->nozombies = nozombies;
 	engine->removing_clients = 0;
+        engine->new_clients_allowed = 1;
 
 	engine->session_reply_fd = -1;
 	engine->session_pending_replies = 0;
@@ -2098,7 +2101,7 @@ jack_start_freewheeling (jack_engine_t* engine, jack_client_id_t client_id)
 
 	client = jack_client_internal_by_id (engine, client_id);
 
-	if (client->control->process_cbset) {
+	if (client->control->process_cbset || client->control->thread_cb_cbset) {
 		engine->fwclient = client_id;
 	}
 
@@ -2649,14 +2652,30 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if (client->control->session_cbset) {
-			
+                        struct stat sbuf;
+
 			// in case we only want to send to a special client.
 			// uuid assign is still complete. not sure if thats necessary.
 			if( (req->x.session.target[0] != 0) && strcmp(req->x.session.target, (char *)client->control->name) )
 				continue;
 
-			snprintf (event.x.name, sizeof (event.x.name), "%s%s/", req->x.session.path, client->control->name );
-			mkdir (event.x.name, 0777 );
+                        /* the caller of jack_session_notify() is required to have created the session dir
+                         */
+                        
+                        if (stat (req->x.session.path, &sbuf) != 0 || !S_ISDIR (sbuf.st_mode)) {
+                                jack_error ("session parent directory (%s) does not exist", req->x.session.path);
+                                goto error_out;
+                        }
+                        if (req->x.session.path[strlen(req->x.session.path)-1] == '/') {
+                                snprintf (event.x.name, sizeof (event.x.name), "%s%s/", req->x.session.path, client->control->name );
+                        } else {
+                                snprintf (event.x.name, sizeof (event.x.name), "%s/%s/", req->x.session.path, client->control->name );
+                        }
+			if (mkdir (event.x.name, 0777) != 0) {
+                                jack_error ("cannot create session directory (%s) for client %s: %s",
+                                            event.x.name, client->control->name, strerror (errno));
+                                goto error_out;
+                        }
 			reply = jack_deliver_event (engine, client, &event);
 
 			if (reply == 1) {
@@ -2961,26 +2980,24 @@ jack_rechain_graph (jack_engine_t *engine)
 
 	for (n = 0, node = engine->clients, next = NULL; node; node = next) {
 
-		next = jack_slist_next (node);
+                jack_client_internal_t* client = (jack_client_internal_t *) node->data;
 
-		if (! ((jack_client_internal_t *) node->data)->control->process_cbset) {
+		next = jack_slist_next (node);
+                
+		if (!client->control->process_cbset && !client->control->thread_cb_cbset) {
 			continue;
 		}
 
 		VERBOSE(engine, "+++ client is now %s active ? %d",
-			((jack_client_internal_t *) node->data)->control->name,
-			((jack_client_internal_t *) node->data)->control->active);
+			client->control->name, client->control->active);
 
-		if (((jack_client_internal_t *) node->data)->control->active) {
-
-			client = (jack_client_internal_t *) node->data;
+		if (client->control->active) {
 
 			/* find the next active client. its ok for
 			 * this to be NULL */
 			
 			while (next) {
-				if (((jack_client_internal_t *)
-				     next->data)->control->active && ((jack_client_internal_t *)next->data)->control->process_cbset ) {
+				if (client->control->active && (client->control->process_cbset || client->control->thread_cb_cbset)) {
 					break;
 				}
 				next = jack_slist_next (next);
@@ -3465,12 +3482,13 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
 	        client = (jack_client_internal_t *) clientnode->data;
 		ctl = client->control;
 
-		jack_info ("client #%d: %s (type: %d, process? %s,"
+		jack_info ("client #%d: %s (type: %d, process? %s, thread ? %s"
 			 " start=%d wait=%d",
 			 ++n,
 			 ctl->name,
 			 ctl->type,
 			 ctl->process_cbset ? "yes" : "no",
+			 ctl->thread_cb_cbset ? "yes" : "no",
 			 client->subgraph_start_fd,
 			 client->subgraph_wait_fd);
 
@@ -4092,14 +4110,19 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req, int internal)
 
 	shared = &engine->control->ports[port_id];
 
-	if (!internal || !engine->driver)
+	if (!internal || !engine->driver) {
 		goto fallback;
+        }
+
+        /* if the port belongs to the backend client, do some magic with names 
+         */
 
 	backend_client_name = (char *) engine->driver->internal_client->control->name;
 	len = strlen (backend_client_name);
 
-	if (strncmp (req->x.port_info.name, backend_client_name, len) != 0)
+	if (strncmp (req->x.port_info.name, backend_client_name, len) != 0) {
 		goto fallback;
+        }
 
 	/* use backend's original as an alias, use predefined names */
 

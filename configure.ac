@@ -844,7 +844,7 @@ then
 	     [HAVE_ALSA="true"
               ALSA_LIBS=-lasound
               JACK_DEFAULT_DRIVER=\"alsa\"
-             ], AC_MSG_RESULT([no]), [-lm]
+             ], AC_MSG_RESULT([no - cannot find ALSA 1.0.18 or later]), [-lm]
 	)
 	AC_SUBST(ALSA_LIBS)
 fi
@@ -928,6 +928,7 @@ doc/reference.doxygen
 drivers/Makefile
 drivers/alsa/Makefile
 drivers/alsa-midi/Makefile
+drivers/a2j/Makefile
 drivers/dummy/Makefile
 drivers/oss/Makefile
 drivers/sun/Makefile

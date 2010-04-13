@@ -25,6 +25,7 @@
 extern "C" {
 #endif
 	
+#include <jack/weakmacros.h>
 #include <jack/types.h>
 #include <stdlib.h>
 
@@ -53,7 +54,7 @@ typedef struct _jack_midi_event
  * @return number of events inside @a port_buffer
  */
 jack_nframes_t
-jack_midi_get_event_count(void*          port_buffer);
+jack_midi_get_event_count(void*          port_buffer) JACK_OPTIONAL_WEAK_EXPORT;
 
 
 /** Get a MIDI event from an event port buffer.
@@ -70,7 +71,7 @@ jack_midi_get_event_count(void*          port_buffer);
 int
 jack_midi_event_get(jack_midi_event_t *event,
                     void              *port_buffer,
-                    jack_nframes_t     event_index);
+                    jack_nframes_t     event_index) JACK_OPTIONAL_WEAK_EXPORT;
 
 
 /** Clear an event buffer.
@@ -82,7 +83,7 @@ jack_midi_event_get(jack_midi_event_t *event,
  * @param port_buffer Port buffer to clear (must be an output port buffer).
  */
 void
-jack_midi_clear_buffer(void           *port_buffer);
+jack_midi_clear_buffer(void           *port_buffer) JACK_OPTIONAL_WEAK_EXPORT;
 
 
 /** Get the size of the largest event that can be stored by the port.
@@ -93,7 +94,7 @@ jack_midi_clear_buffer(void           *port_buffer);
  * @param port_buffer Port buffer to check size of.
  */
 size_t
-jack_midi_max_event_size(void* port_buffer);
+jack_midi_max_event_size(void* port_buffer) JACK_OPTIONAL_WEAK_EXPORT;
 
 
 /** Allocate space for an event to be written to an event port buffer.
@@ -114,7 +115,7 @@ jack_midi_max_event_size(void* port_buffer);
 jack_midi_data_t*
 jack_midi_event_reserve(void           *port_buffer,
                         jack_nframes_t  time, 
-                        size_t          data_size);
+                        size_t          data_size) JACK_OPTIONAL_WEAK_EXPORT;
 
 
 /** Write an event into an event port buffer.
@@ -133,7 +134,7 @@ int
 jack_midi_event_write(void                   *port_buffer,
                       jack_nframes_t          time,
                       const jack_midi_data_t *data,
-                      size_t                  data_size);
+                      size_t                  data_size) JACK_OPTIONAL_WEAK_EXPORT;
 
 
 /** Get the number of events that could not be written to @a port_buffer.
@@ -145,13 +146,7 @@ jack_midi_event_write(void                   *port_buffer,
  * @returns Number of events that could not be written to @a port_buffer.
  */
 jack_nframes_t
-jack_midi_get_lost_event_count(void           *port_buffer);
-
-/** Get the size (in bytes) of the data structure used to store
- *  MIDI events internally. This is not useful for JACK applications.
- */
-size_t
-jack_midi_internal_event_size ();
+jack_midi_get_lost_event_count(void           *port_buffer) JACK_OPTIONAL_WEAK_EXPORT;
 
 /*@}*/
 

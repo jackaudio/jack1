@@ -525,12 +525,17 @@ extern char *jack_default_server_name (void);
 void silent_jack_error_callback (const char *desc);
 
 /* needed for port management */
-jack_port_t *jack_port_by_id_int (const jack_client_t *client,
-				  jack_port_id_t id, int* free);
+extern jack_port_t *jack_port_by_id_int (const jack_client_t *client,
+					 jack_port_id_t id, int* free);
 
-jack_port_t *jack_port_by_name_int (jack_client_t *client,
-				    const char *port_name);
-int jack_port_name_equals (jack_port_shared_t* port, const char* target);
+extern jack_port_t *jack_port_by_name_int (jack_client_t *client,
+					   const char *port_name);
+extern int jack_port_name_equals (jack_port_shared_t* port, const char* target);
+
+/** Get the size (in bytes) of the data structure used to store
+ *  MIDI events internally. 
+ */
+extern size_t jack_midi_internal_event_size ();
 
 #ifdef __GNUC__
 #  define likely(x)	__builtin_expect((x),1)
