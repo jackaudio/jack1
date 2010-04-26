@@ -2625,6 +2625,7 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
   
 	int reply;
 	jack_client_id_t finalizer=0;
+        struct stat sbuf;
 
 	if (engine->session_reply_fd != -1) {
 		// we should have a notion of busy or somthing.
@@ -2649,10 +2650,14 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 		}
 	}
 
+        if (stat (req->x.session.path, &sbuf) != 0 || !S_ISDIR (sbuf.st_mode)) {
+                jack_error ("session parent directory (%s) does not exist", req->x.session.path);
+                goto send_final;
+        }
+
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if (client->control->session_cbset) {
-                        struct stat sbuf;
 
 			// in case we only want to send to a special client.
 			// uuid assign is still complete. not sure if thats necessary.
@@ -2662,10 +2667,6 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
                         /* the caller of jack_session_notify() is required to have created the session dir
                          */
                         
-                        if (stat (req->x.session.path, &sbuf) != 0 || !S_ISDIR (sbuf.st_mode)) {
-                                jack_error ("session parent directory (%s) does not exist", req->x.session.path);
-                                goto error_out;
-                        }
                         if (req->x.session.path[strlen(req->x.session.path)-1] == '/') {
                                 snprintf (event.x.name, sizeof (event.x.name), "%s%s/", req->x.session.path, client->control->name );
                         } else {
@@ -2674,7 +2675,7 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 			if (mkdir (event.x.name, 0777) != 0) {
                                 jack_error ("cannot create session directory (%s) for client %s: %s",
                                             event.x.name, client->control->name, strerror (errno));
-                                goto error_out;
+                                break;
                         }
 			reply = jack_deliver_event (engine, client, &event);
 
