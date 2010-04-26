@@ -1469,6 +1469,8 @@ jack_session_notify (jack_client_t* client, const char *target, jack_session_eve
 	}
 	free((char *)retval[num_replies-1].uuid);
 	retval[num_replies-1].uuid = NULL;
+	retval[num_replies-1].client_name = NULL;
+	retval[num_replies-1].command = NULL;
 	return retval;
 out:
 	if( retval )
