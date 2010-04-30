@@ -105,6 +105,13 @@ jack_thread_proxy (void* varg)
 	void* warg;
 	jack_client_t* client = arg->client;
 
+	char buf[JACK_THREAD_STACK_TOUCH];
+	int i;
+
+	for (i = 0; i < JACK_THREAD_STACK_TOUCH; i++) {
+                buf[i] = (char) (i & 0xff);
+	}
+
 	if (arg->realtime) {
 		maybe_get_capabilities (client);
 		jack_acquire_real_time_scheduling (pthread_self(), arg->priority);
