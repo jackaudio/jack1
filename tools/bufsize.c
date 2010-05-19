@@ -72,11 +72,18 @@ void parse_arguments(int argc, char *argv[])
 	}
 }
 
+void silent_function( const char *ignore )
+{
+}
+
 int main(int argc, char *argv[])
 {
 	int rc;
 
 	parse_arguments(argc, argv);
+
+        if (just_print_bufsize)
+                jack_set_info_function( silent_function );
 
 	/* become a JACK client */
 	if ((client = jack_client_open(package, JackNullOption, NULL)) == 0) {

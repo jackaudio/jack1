@@ -36,6 +36,10 @@ show_usage (void)
 	fprintf (stderr, "For more information see http://jackaudio.org/\n");
 }
 
+void silent_function( const char *ignore )
+{
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -107,6 +111,7 @@ main (int argc, char *argv[])
 	/* try to open server in a loop. breaking under certein conditions */
 
 	start_timestamp = time( NULL );
+        jack_set_info_function( silent_function );
 
 	while(1) {
 		client = jack_client_open ("wait", options, &status, server_name);
