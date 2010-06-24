@@ -2179,11 +2179,6 @@ jack_activate (jack_client_t *client)
 {
 	jack_request_t req;
 
-	/* we need to scribble on our stack to ensure that its memory
-	 * pages are actually mapped (more important for mlockall(2)
-	 * usage in jack_start_thread())
-	 */
-         
 
 	if (client->control->type == ClientInternal ||
 	    client->control->type == ClientDriver) {
