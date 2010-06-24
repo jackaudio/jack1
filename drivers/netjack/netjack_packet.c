@@ -82,8 +82,6 @@
 
 int fraggo = 0;
 
-packet_cache *global_packcache = NULL;
-
 void
 packet_header_hton (jacknet_packet_header *pkthdr)
 {
@@ -564,7 +562,7 @@ packet_cache_drain_socket( packet_cache *pcache, int sockfd )
 	if( pcache->last_framecnt_retreived_valid && (framecnt <= pcache->last_framecnt_retreived ))
 	    continue;
 
-        cpack = packet_cache_get_packet (global_packcache, framecnt);
+        cpack = packet_cache_get_packet (pcache, framecnt);
         cache_packet_add_fragment (cpack, rx_packet, rcv_len);
 	cpack->recv_timestamp = jack_get_time();
     }
@@ -773,61 +771,6 @@ packet_cache_find_latency( packet_cache *pcache, jack_nframes_t expected_framecn
     return retval;
 }
 // fragmented packet IO
-int
-netjack_recvfrom (int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, size_t *addr_size, int mtu)
-{
-    int retval;
-    socklen_t from_len = *addr_size;
-    if (pkt_size <= mtu) {
-        retval = recvfrom (sockfd, packet_buf, pkt_size, flags, addr, &from_len);
-	*addr_size = from_len;
-	return retval;
-    }
-
-    char *rx_packet = alloca (mtu);
-    jacknet_packet_header *pkthdr = (jacknet_packet_header *) rx_packet;
-    int rcv_len;
-    jack_nframes_t framecnt;
-    cache_packet *cpack;
-    do
-    {
-        rcv_len = recvfrom (sockfd, rx_packet, mtu, 0, addr, &from_len);
-        if (rcv_len < 0)
-            return rcv_len;
-        framecnt = ntohl (pkthdr->framecnt);
-        cpack = packet_cache_get_packet (global_packcache, framecnt);
-        cache_packet_add_fragment (cpack, rx_packet, rcv_len);
-    } while (!cache_packet_is_complete (cpack));
-    memcpy (packet_buf, cpack->packet_buf, pkt_size);
-    cache_packet_reset (cpack);
-    *addr_size = from_len;
-    return pkt_size;
-}
-
-int
-netjack_recv (int sockfd, char *packet_buf, int pkt_size, int flags, int mtu)
-{
-    if (pkt_size <= mtu)
-        return recv (sockfd, packet_buf, pkt_size, flags);
-    char *rx_packet = alloca (mtu);
-    jacknet_packet_header *pkthdr = (jacknet_packet_header *) rx_packet;
-    int rcv_len;
-    jack_nframes_t framecnt;
-    cache_packet *cpack;
-    do
-    {
-        rcv_len = recv (sockfd, rx_packet, mtu, flags);
-        if (rcv_len < 0)
-            return rcv_len;
-        framecnt = ntohl (pkthdr->framecnt);
-        cpack = packet_cache_get_packet (global_packcache, framecnt);
-        cache_packet_add_fragment (cpack, rx_packet, rcv_len);
-    } while (!cache_packet_is_complete (cpack));
-    memcpy (packet_buf, cpack->packet_buf, pkt_size);
-    cache_packet_reset (cpack);
-    return pkt_size;
-}
-
 void
 netjack_sendto (int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, int addr_size, int mtu)
 {

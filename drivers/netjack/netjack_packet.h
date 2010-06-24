@@ -107,8 +107,6 @@ struct _packet_cache
     int last_framecnt_retreived_valid;
 };
 
-extern packet_cache *global_packcache;
-
 // fragment cache function prototypes
 // XXX: Some of these are private.
 packet_cache *packet_cache_new(int num_packets, int pkt_size, int mtu);

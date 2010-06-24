@@ -41,6 +41,8 @@ extern "C"
 {
 #endif
 
+struct _packet_cache;
+
 typedef struct _netjack_driver_state netjack_driver_state_t;
 
 struct _netjack_driver_state {
@@ -110,6 +112,7 @@ struct _netjack_driver_state {
     unsigned int   resample_factor;
     unsigned int   resample_factor_up;
     int		   jitter_val;
+    struct _packet_cache * packcache;
 #if HAVE_CELT
     CELTMode	   *celt_mode;
 #endif

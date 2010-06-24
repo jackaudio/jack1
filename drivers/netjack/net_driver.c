@@ -206,7 +206,7 @@ net_driver_read (net_driver_t* driver, jack_nframes_t nframes)
     }
 
     render_payload_to_jack_ports (netj->bitdepth, packet_bufX, netj->net_period_down, netj->capture_ports, netj->capture_srcs, nframes, netj->dont_htonl_floats );
-    packet_cache_release_packet(global_packcache, netj->expected_framecnt );
+    packet_cache_release_packet(netj->packcache, netj->expected_framecnt );
 
     return 0;
 }
