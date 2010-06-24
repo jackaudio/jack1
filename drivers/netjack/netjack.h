@@ -32,6 +32,10 @@
 
 #include <netinet/in.h>
 
+#if HAVE_CELT
+#include <celt/celt.h>
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -107,6 +111,9 @@ struct _netjack_driver_state {
     unsigned int   resample_factor;
     unsigned int   resample_factor_up;
     int		   jitter_val;
+#if HAVE_CELT
+    CELTMode	   *celt_mode;
+#endif
 };
 
 int netjack_wait( netjack_driver_state_t *netj );

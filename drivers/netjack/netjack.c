@@ -50,9 +50,10 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 #include <netinet/in.h>
 #endif
 
+#include "config.h"
+
 #include "netjack.h"
 
-#include "config.h"
 
 #if HAVE_SAMPLERATE
 #include <samplerate.h>
@@ -369,6 +370,21 @@ void netjack_attach( netjack_driver_state_t *netj )
     int port_flags;
 
 
+    if( netj->bitdepth == CELT_MODE ) 
+    {
+#if HAVE_CELT
+#if HAVE_CELT_API_0_7
+	    celt_int32 lookahead;
+	    netj->celt_mode = celt_mode_create( netj->sample_rate, netj->period_size, NULL );
+#else
+	    celt_int32_t lookahead;
+	    netj->celt_mode = celt_mode_create( netj->sample_rate, 1, netj->period_size, NULL );
+#endif
+	    celt_mode_info( netj->celt_mode, CELT_GET_LOOKAHEAD, &lookahead );
+	    netj->codec_latency = 2*lookahead;
+#endif
+    }
+
     if (netj->handle_transport_sync)
         jack_set_sync_callback(netj->client, (JackSyncCallback) net_driver_sync_cb, NULL);
 
@@ -391,16 +407,10 @@ void netjack_attach( netjack_driver_state_t *netj )
 	if( netj->bitdepth == CELT_MODE ) {
 #if HAVE_CELT
 #if HAVE_CELT_API_0_7
-	    celt_int32 lookahead;
-	    CELTMode *celt_mode = celt_mode_create( netj->sample_rate, netj->period_size, NULL );
-	    netj->capture_srcs = jack_slist_append(netj->capture_srcs, celt_decoder_create( celt_mode, 1, NULL ) );
+	    netj->capture_srcs = jack_slist_append(netj->capture_srcs, celt_decoder_create( netj->celt_mode, 1, NULL ) );
 #else
-	    celt_int32_t lookahead;
-	    CELTMode *celt_mode = celt_mode_create( netj->sample_rate, 1, netj->period_size, NULL );
-	    netj->capture_srcs = jack_slist_append(netj->capture_srcs, celt_decoder_create( celt_mode ) );
+	    netj->capture_srcs = jack_slist_append(netj->capture_srcs, celt_decoder_create( netj->celt_mode ) );
 #endif
-	    celt_mode_info( celt_mode, CELT_GET_LOOKAHEAD, &lookahead );
-	    netj->codec_latency = 2*lookahead;
 #endif
 	} else {
 #if HAVE_SAMPLERATE
@@ -408,6 +418,7 @@ void netjack_attach( netjack_driver_state_t *netj )
 #endif
 	}
     }
+
     for (chn = netj->capture_channels_audio; chn < netj->capture_channels; chn++) {
         snprintf (buf, sizeof(buf) - 1, "capture_%u", chn + 1);
 
@@ -492,9 +503,7 @@ void netjack_detach( netjack_driver_state_t *netj )
         if( netj->bitdepth == CELT_MODE )
         {
             CELTDecoder * decoder = node->data;
-//          CELTMode * mode = CELT_GET_MODE(decoder);
             celt_decoder_destroy(decoder);
-//          celt_mode_destroy((CELTMode*) mode);
         }
         else
 #endif
@@ -521,9 +530,7 @@ void netjack_detach( netjack_driver_state_t *netj )
         if( netj->bitdepth == CELT_MODE )
         {
             CELTEncoder * encoder = node->data;
-//          CELTMode * mode = CELT_GET_MODE(encoder);
             celt_encoder_destroy(encoder);
-//          celt_mode_destroy(mode);
         }
         else
 #endif
@@ -536,6 +543,11 @@ void netjack_detach( netjack_driver_state_t *netj )
     }
     jack_slist_free (netj->playback_srcs);
     netj->playback_srcs = NULL;
+
+#if HAVE_CELT
+        if( netj->bitdepth == CELT_MODE )
+		celt_mode_destroy(netj->celt_mode);
+#endif
 }
 
 
