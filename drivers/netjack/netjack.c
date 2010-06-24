@@ -479,7 +479,6 @@ void netjack_detach( netjack_driver_state_t *netj )
 {
     JSList * node;
 
-
     for (node = netj->capture_ports; node; node = jack_slist_next (node))
         jack_port_unregister (netj->client,
                               ((jack_port_t *) node->data));
@@ -487,12 +486,56 @@ void netjack_detach( netjack_driver_state_t *netj )
     jack_slist_free (netj->capture_ports);
     netj->capture_ports = NULL;
 
+    for (node = netj->capture_srcs; node; node = jack_slist_next (node))
+    {
+#if HAVE_CELT
+        if( netj->bitdepth == CELT_MODE )
+        {
+            CELTDecoder * decoder = node->data;
+//          CELTMode * mode = CELT_GET_MODE(decoder);
+            celt_decoder_destroy(decoder);
+//          celt_mode_destroy((CELTMode*) mode);
+        }
+        else
+#endif
+        {
+#if HAVE_SAMPLERATE
+            SRC_STATE * src = node->data;
+            src_delete(src);
+#endif
+        }
+    }
+    jack_slist_free (netj->capture_srcs);
+    netj->playback_srcs = NULL;
+
     for (node = netj->playback_ports; node; node = jack_slist_next (node))
         jack_port_unregister (netj->client,
                               ((jack_port_t *) node->data));
 
     jack_slist_free (netj->playback_ports);
     netj->playback_ports = NULL;
+
+    for (node = netj->playback_srcs; node; node = jack_slist_next (node))
+    {
+#if HAVE_CELT
+        if( netj->bitdepth == CELT_MODE )
+        {
+            CELTEncoder * encoder = node->data;
+//          CELTMode * mode = CELT_GET_MODE(encoder);
+            celt_encoder_destroy(encoder);
+//          celt_mode_destroy(mode);
+        }
+        else
+#endif
+        {
+#if HAVE_SAMPLERATE
+            SRC_STATE * src = node->data;
+            src_delete(src);
+#endif
+        }
+    }
+    jack_slist_free (netj->playback_srcs);
+    netj->playback_srcs = NULL;
 }
 
 
