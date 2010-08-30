@@ -1,7 +1,7 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
 if HAVE_SNDFILE
-JACKREC = jackrec
+JACKREC = jack_rec
 dist-check-sndfile:
 else
 JACKREC =
@@ -63,9 +63,9 @@ jack_midisine_LDFLAGS = @OS_LDFLAGS@
 jack_midisine_LDADD = $(top_builddir)/libjack/libjack.la
 
 if HAVE_SNDFILE
-jackrec_SOURCES = capture_client.c
-jackrec_LDFLAGS = @SNDFILE_LIBS@ @OS_LDFLAGS@
-jackrec_LDADD = $(top_builddir)/libjack/libjack.la
+jack_rec_SOURCES = capture_client.c
+jack_rec_LDFLAGS = @SNDFILE_LIBS@ @OS_LDFLAGS@
+jack_rec_LDADD = $(top_builddir)/libjack/libjack.la
 endif
 
 #
