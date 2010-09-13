@@ -384,7 +384,7 @@ typedef void (*JackInfoShutdownCallback)(jack_status_t code, const char* reason,
 typedef float jack_default_audio_sample_t;
 
 /**
- *  A port has a set of flags that are formed by OR-ing together the
+ *  A port has a set of flags that are formed by AND-ing together the
  *  desired values from the list below. The flags "JackPortIsInput" and
  *  "JackPortIsOutput" are mutually exclusive and it is an error to use
  *  them both.

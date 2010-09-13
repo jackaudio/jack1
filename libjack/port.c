@@ -577,6 +577,7 @@ jack_port_type_buffer_size (jack_port_type_info_t* port_type_info, jack_nframes_
 		* sizeof (jack_default_audio_sample_t)
 		* nframes;
 }
+
 int
 jack_port_tie (jack_port_t *src, jack_port_t *dst)
 
