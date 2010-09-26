@@ -545,5 +545,12 @@ extern size_t jack_midi_internal_event_size ();
 #  define unlikely(x)	(x)
 #endif
 
+#ifdef  VALGRIND_CLEAN
+#include <string.h>
+#define VALGRIND_MEMSET(ptr,val,size) memset ((ptr),(val),(size))
+#else
+#define VALGRIND_MEMSET(ptr,val,size) 
+#endif
+
 #endif /* __jack_internal_h__ */
 

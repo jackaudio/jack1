@@ -227,6 +227,8 @@ jack_port_register (jack_client_t *client,
 	jack_port_t *port = 0;
 	int length ;
 
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
+
 	req.type = RegisterPort;
 
 	length = strlen ((const char *) client->control->name)
@@ -271,6 +273,9 @@ int
 jack_port_unregister (jack_client_t *client, jack_port_t *port)
 {
 	jack_request_t req;
+        
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
+
 
 	req.type = UnRegisterPort;
 	req.x.port_info.port_id = port->shared->id;
@@ -369,6 +374,8 @@ jack_port_get_all_connections (const jack_client_t *client,
 		return NULL;
 	}
 
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
+		
 	req.type = GetPortConnections;
 
 	req.x.port_info.name[0] = '\0';

@@ -1313,6 +1313,7 @@ int
 jack_recompute_total_latencies (jack_client_t* client)
 {
 	jack_request_t request;
+        VALGRIND_MEMSET (&request, 0, sizeof (request));
 
 	request.type = RecomputeTotalLatencies;
 	return jack_client_deliver_request (client, &request);
@@ -1322,6 +1323,7 @@ int
 jack_recompute_total_latency (jack_client_t* client, jack_port_t* port)
 {
 	jack_request_t request;
+        VALGRIND_MEMSET (&request, 0, sizeof (request));
 
 	request.type = RecomputeTotalLatency;
 	request.x.port_info.port_id = port->shared->id;
@@ -1332,6 +1334,7 @@ int
 jack_set_freewheel (jack_client_t* client, int onoff)
 {
 	jack_request_t request;
+        VALGRIND_MEMSET (&request, 0, sizeof (request));
 
 	request.type = onoff ? FreeWheel : StopFreeWheel;
 	request.x.client_id = client->control->id;
@@ -1357,6 +1360,8 @@ jack_session_reply (jack_client_t *client, jack_session_event_t *event )
 		client->session_cb_immediate_reply = 1;
 	} else {
 		jack_request_t request;
+                VALGRIND_MEMSET (&request, 0, sizeof (request));
+
 		request.type = SessionReply;
 		request.x.client_id = client->control->id;
 
@@ -1401,9 +1406,11 @@ jack_session_command_t *
 jack_session_notify (jack_client_t* client, const char *target, jack_session_event_type_t code, const char *path )
 {
 	jack_request_t request;
-
 	jack_session_command_t *retval = NULL;
 	int num_replies = 0;
+
+        VALGRIND_MEMSET (&request, 0, sizeof (request));
+
 	request.type = SessionNotify;
 	if( path ) 
 		snprintf( request.x.session.path, sizeof( request.x.session.path ), "%s", path );
@@ -2198,6 +2205,8 @@ jack_activate (jack_client_t *client)
 		   before trying to start the realtime thread
 		*/
 
+                VALGRIND_MEMSET (&req, 0, sizeof (req));
+
 		req.type = SetClientCapabilities;
 		req.x.client_id = client->control->id;
 		req.x.cap_pid = client->control->pid;
@@ -2261,6 +2270,7 @@ jack_deactivate_aux (jack_client_t *client)
 	if (client && client->control) { /* not shut down? */
 		rc = 0;
 		if (client->control->active) { /* still active? */
+                        VALGRIND_MEMSET (&req, 0, sizeof (req));
 			req.type = DeactivateClient;
 			req.x.client_id = client->control->id;
 			rc = jack_client_deliver_request (client, &req);
@@ -2384,6 +2394,8 @@ jack_set_buffer_size (jack_client_t *client, jack_nframes_t nframes)
 #ifdef DO_BUFFER_RESIZE
 	jack_request_t req;
 
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
+
 	req.type = SetBufferSize;
 	req.x.nframes = nframes;
 
@@ -2399,6 +2411,8 @@ jack_connect (jack_client_t *client, const char *source_port,
 	      const char *destination_port)
 {
 	jack_request_t req;
+
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
 
 	req.type = ConnectPorts;
 
@@ -2425,6 +2439,8 @@ jack_port_disconnect (jack_client_t *client, jack_port_t *port)
 
 	pthread_mutex_unlock (&port->connection_lock);
 
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
+
 	req.type = DisconnectPort;
 	req.x.port_info.port_id = port->shared->id;
 
@@ -2436,6 +2452,8 @@ jack_disconnect (jack_client_t *client, const char *source_port,
 		 const char *destination_port)
 {
 	jack_request_t req;
+
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
 
 	req.type = DisconnectPorts;
 
@@ -2655,11 +2673,15 @@ char *
 jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
 { 
 	jack_request_t request;
-
 	char *end_ptr;
 	jack_client_id_t uuid_int = strtol( uuid, &end_ptr, 10 );
-	if( *end_ptr != '\0' )
+
+	if( *end_ptr != '\0' ) {
 		return NULL;
+        }
+
+        VALGRIND_MEMSET (&request, 0, sizeof (request));
+
 	request.type = GetClientByUUID;
 	request.x.client_id = uuid_int;
 	if( jack_client_deliver_request( client, &request ) )
@@ -2682,11 +2704,15 @@ int
 jack_reserve_client_name( jack_client_t *client, const char *name, const char *uuid )
 { 
 	jack_request_t request;
-
 	char *end_ptr;
 	jack_client_id_t uuid_int = strtol( uuid, &end_ptr, 10 );
-	if( *end_ptr != '\0' )
+
+	if( *end_ptr != '\0' ) {
 		return -1;
+        }
+
+        VALGRIND_MEMSET (&request, 0, sizeof (request));
+
 	request.type = ReserveName;
 	snprintf( request.x.reservename.name, sizeof( request.x.reservename.name ),
 			"%s", name );

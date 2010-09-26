@@ -65,13 +65,15 @@ maybe_get_capabilities (jack_client_t* client)
 	if (client != 0) {
 		
 		jack_request_t req;
-		
+
 		if (client->engine->has_capabilities != 0) {
 			
 			/* we need to ask the engine for realtime capabilities
 			   before trying to run the thread work function
 			*/
 			
+                        VALGRIND_MEMSET (&req, 0, sizeof (req));
+		
 			req.type = SetClientCapabilities;
 			req.x.cap_pid = getpid();
 			

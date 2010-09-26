@@ -550,6 +550,14 @@ if test x$buffer_resizing != xno; then
    AC_DEFINE(DO_BUFFER_RESIZE,,[Enable buffer resizing])
 fi
 
+AC_ARG_ENABLE(valgrind-clean,
+	AC_HELP_STRING([--enable-valgrind-clean],[spend a few extra CPU cycles avoiding unnecessary valgrind warnings (default=no)]),
+        [ 
+	  if test x$enable_valgrind_clean != xno ; then
+	     AC_DEFINE(VALGRIND_CLEAN,,[clean up for valgrind])
+          fi
+        ]
+)
 
 AC_ARG_ENABLE(ensure-mlock,
 	AC_HELP_STRING([--enable-ensure-mlock], [server should fail if unable to lock memory (default=no)]),

@@ -327,6 +327,8 @@ jack_release_timebase (jack_client_t *client)
 	jack_request_t req;
 	jack_client_control_t *ctl = client->control;
 
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
+		
 	req.type = ResetTimeBaseClient;
 	req.x.client_id = ctl->id;
 
@@ -348,6 +350,8 @@ jack_set_sync_callback (jack_client_t *client,
 	jack_request_t req;
 	int rc;
 
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
+		
 	if (sync_callback)
 		req.type = SetSyncClient;
 	else
@@ -368,6 +372,8 @@ jack_set_sync_timeout (jack_client_t *client, jack_time_t usecs)
 {
 	jack_request_t req;
 
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
+		
 	req.type = SetSyncTimeout;
 	req.x.timeout = usecs;
 
@@ -382,6 +388,8 @@ jack_set_timebase_callback (jack_client_t *client, int conditional,
 	jack_request_t req;
 	jack_client_control_t *ctl = client->control;
 
+        VALGRIND_MEMSET (&req, 0, sizeof (req));
+		
 	req.type = SetTimeBaseClient;
 	req.x.timebase.client_id = ctl->id;
 	req.x.timebase.conditional = conditional;
