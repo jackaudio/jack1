@@ -1138,7 +1138,9 @@ jack_client_open_aux (const char *client_name,
 		client->port_segment[ptid].index =
 			client->engine->port_types[ptid].shm_registry_index;
 		client->port_segment[ptid].attached_at = MAP_FAILED;
-		jack_attach_port_segment (client, ptid);
+
+		/* the server will send attach events during jack_activate
+		 */
 	}
 
 	/* set up the client so that it does the right thing for an
