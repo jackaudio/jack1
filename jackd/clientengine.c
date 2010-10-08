@@ -903,6 +903,8 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 	jack_client_internal_t *client;
 	JSList *node, *node2;
 	int ret = -1;
+	int i;
+	jack_event_t event;
 
 	jack_lock_graph (engine);
 
@@ -930,6 +932,12 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 			for (node2 = client->ports; node2; node2 = jack_slist_next (node2)) {
 				jack_port_internal_t *port = (jack_port_internal_t *) node2->data;
 				jack_port_registration_notify (engine, port->shared->id, TRUE);
+			}
+
+			for (i = 0; i < engine->control->n_port_types; ++i) {
+				event.type = AttachPortSegment;
+				event.y.ptid = i;
+				jack_deliver_event (engine, client, &event);
 			}
 
 			ret = 0;
