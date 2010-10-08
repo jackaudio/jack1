@@ -908,44 +908,38 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 
 	jack_lock_graph (engine);
 
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
+	if (client = jack_client_internal_by_id (engine, id))
+	{
+		client->control->active = TRUE;
 
-		if (((jack_client_internal_t *) node->data)->control->id
-		    == id) {
-		       
-			client = (jack_client_internal_t *) node->data;
-			client->control->active = TRUE;
+		jack_transport_activate(engine, client);
 
-			jack_transport_activate(engine, client);
+		/* we call this to make sure the FIFO is
+		 * built+ready by the time the client needs
+		 * it. we don't care about the return value at
+		 * this point.
+		 */
 
-			/* we call this to make sure the FIFO is
-			 * built+ready by the time the client needs
-			 * it. we don't care about the return value at
-			 * this point.
-			 */
+		jack_get_fifo_fd (engine,
+				++engine->external_client_cnt);
+		jack_sort_graph (engine);
 
-			jack_get_fifo_fd (engine,
-					  ++engine->external_client_cnt);
-			jack_sort_graph (engine);
-
-			// send delayed notifications for ports.
-			for (node2 = client->ports; node2; node2 = jack_slist_next (node2)) {
-				jack_port_internal_t *port = (jack_port_internal_t *) node2->data;
-				jack_port_registration_notify (engine, port->shared->id, TRUE);
-			}
-
-			for (i = 0; i < engine->control->n_port_types; ++i) {
-				event.type = AttachPortSegment;
-				event.y.ptid = i;
-				jack_deliver_event (engine, client, &event);
-			}
-
-			event.type = BufferSizeChange;
-			jack_deliver_event (engine, client, &event);
-
-			ret = 0;
-			break;
+		// send delayed notifications for ports.
+		for (node2 = client->ports; node2; node2 = jack_slist_next (node2)) {
+			jack_port_internal_t *port = (jack_port_internal_t *) node2->data;
+			jack_port_registration_notify (engine, port->shared->id, TRUE);
 		}
+
+		for (i = 0; i < engine->control->n_port_types; ++i) {
+			event.type = AttachPortSegment;
+			event.y.ptid = i;
+			jack_deliver_event (engine, client, &event);
+		}
+
+		event.type = BufferSizeChange;
+		jack_deliver_event (engine, client, &event);
+
+		ret = 0;
 	}
 
 
