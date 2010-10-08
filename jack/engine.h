@@ -249,4 +249,5 @@ int     jack_stop_freewheeling (jack_engine_t* engine, int engine_exiting);
 jack_client_internal_t *
 jack_client_by_name (jack_engine_t *engine, const char *name);
 
+int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_event_t *);
 #endif /* __jack_engine_h__ */
