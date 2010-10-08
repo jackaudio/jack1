@@ -940,6 +940,9 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 				jack_deliver_event (engine, client, &event);
 			}
 
+			event.type = BufferSizeChange;
+			jack_deliver_event (engine, client, &event);
+
 			ret = 0;
 			break;
 		}
