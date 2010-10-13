@@ -924,11 +924,6 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 				++engine->external_client_cnt);
 		jack_sort_graph (engine);
 
-		// send delayed notifications for ports.
-		for (node2 = client->ports; node2; node2 = jack_slist_next (node2)) {
-			jack_port_internal_t *port = (jack_port_internal_t *) node2->data;
-			jack_port_registration_notify (engine, port->shared->id, TRUE);
-		}
 
 		for (i = 0; i < engine->control->n_port_types; ++i) {
 			event.type = AttachPortSegment;
@@ -938,6 +933,12 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 
 		event.type = BufferSizeChange;
 		jack_deliver_event (engine, client, &event);
+
+		// send delayed notifications for ports.
+		for (node2 = client->ports; node2; node2 = jack_slist_next (node2)) {
+			jack_port_internal_t *port = (jack_port_internal_t *) node2->data;
+			jack_port_registration_notify (engine, port->shared->id, TRUE);
+		}
 
 		ret = 0;
 	}
