@@ -137,7 +137,7 @@ main (int argc, char *argv[])
 
 	ports = jack_get_ports (client, NULL, NULL, 0);
 
-	for (i = 0; ports[i]; ++i) {
+	for (i = 0; ports && ports[i]; ++i) {
 		// skip over any that don't match ALL of the strings presented at command line
 		skip_port = 0;
 		for(k=optind; k < argc; k++){
