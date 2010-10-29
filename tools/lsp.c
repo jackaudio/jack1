@@ -211,6 +211,10 @@ main (int argc, char *argv[])
 			}
 		}
 	}
+
+	if (ports)
+		jack_free (ports);
+
 	jack_client_close (client);
 	exit (0);
 }
