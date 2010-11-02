@@ -127,6 +127,7 @@ dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
 			jack_error("**** dummy: xrun of %ju usec",
 				(uintmax_t)(ts_to_nsec(now) - ts_to_nsec(driver->next_wakeup))/1000LL);
 			nframes = 0;
+			driver->next_wakeup.tv_sec = 0;
 		} else {
 			/* late, but handled by our "buffer"; try to
 			 * get back on track */
