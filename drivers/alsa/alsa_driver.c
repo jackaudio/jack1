@@ -1151,6 +1151,22 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 		}
 	}
 
+	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_SUSPENDED)
+	{
+		MESSAGE("\n\n**** alsa_pcm: pcm in suspended state, resuming it \n\n" );
+		if (driver->capture_handle) {
+			if ((res = snd_pcm_prepare(driver->capture_handle))
+			    < 0) {
+				jack_error("error preparing after suspend: %s", snd_strerror(res));
+			}
+		} else {
+			if ((res = snd_pcm_prepare(driver->playback_handle))
+			    < 0) {
+				jack_error("error preparing after suspend: %s", snd_strerror(res));
+			}
+		}
+	}
+			
 	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_XRUN
 	    && driver->process_count > XRUN_REPORT_DELAY) {
 		struct timeval now, diff, tstamp;
