@@ -86,6 +86,11 @@ When running \fB\-\-realtime\fR, set the scheduler priority to
 \fB\-\-silent\fR
 Silence any output during operation.
 .TP
+\fB\-S, \-\-sync\fR
+.br
+This option does nothing in this implementation of JACK, but exists
+for command-line compatibility with JACK2 and possibly other versions.
+.TP
 \fB\-T, \-\-temporary\fR
 Exit once all clients have closed their connections.
 .TP
