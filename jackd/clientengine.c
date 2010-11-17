@@ -236,15 +236,6 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	}
 }
 
-static void
-jack_wake_server_thread (jack_engine_t* engine)
-{
-	char c = 0;
-	/* we don't actually care if this fails */
-	VERBOSE (engine, "waking server thread");
-	write (engine->cleanup_fifo[1], &c, 1);
-}
-
 void
 jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 {
@@ -287,10 +278,7 @@ jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 	}
 		
 	if (errs) {
-		jack_lock_problems (engine);
-		engine->problems++;
-		jack_unlock_problems (engine);
-		jack_wake_server_thread (engine);
+		jack_engine_signal_problems (engine);
 	}
 }
 

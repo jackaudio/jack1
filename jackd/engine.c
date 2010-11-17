@@ -131,7 +131,6 @@ static int jack_client_sort (jack_client_internal_t *a,
 static void jack_check_acyclic (jack_engine_t* engine);
 static void jack_compute_all_port_total_latencies (jack_engine_t *engine);
 static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_shared_t*);
-static void jack_engine_signal_problems (jack_engine_t* engine);
 static int jack_check_client_status (jack_engine_t* engine);
 static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd );
 static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *req);
@@ -4482,10 +4481,20 @@ jack_send_connection_notification (jack_engine_t *engine,
 	return 0;
 }
 
+static void
+jack_wake_server_thread (jack_engine_t* engine)
+{
+	char c = 0;
+	/* we don't actually care if this fails */
+	VERBOSE (engine, "waking server thread");
+	write (engine->cleanup_fifo[1], &c, 1);
+}
+
 void
 jack_engine_signal_problems (jack_engine_t* engine)
 {
 	jack_lock_problems (engine);
 	engine->problems++;
 	jack_unlock_problems (engine);
+	jack_wake_server_thread (engine);
 }
