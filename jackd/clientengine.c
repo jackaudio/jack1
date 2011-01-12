@@ -889,14 +889,14 @@ int
 jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 {
 	jack_client_internal_t *client;
-	JSList *node, *node2;
+	JSList *node;
 	int ret = -1;
 	int i;
 	jack_event_t event;
 
 	jack_lock_graph (engine);
 
-	if (client = jack_client_internal_by_id (engine, id))
+	if ((client = jack_client_internal_by_id (engine, id)))
 	{
 		client->control->active = TRUE;
 
@@ -923,8 +923,8 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 		jack_deliver_event (engine, client, &event);
 
 		// send delayed notifications for ports.
-		for (node2 = client->ports; node2; node2 = jack_slist_next (node2)) {
-			jack_port_internal_t *port = (jack_port_internal_t *) node2->data;
+		for (node = client->ports; node; node = jack_slist_next (node)) {
+			jack_port_internal_t *port = (jack_port_internal_t *) node->data;
 			jack_port_registration_notify (engine, port->shared->id, TRUE);
 		}
 
