@@ -469,7 +469,7 @@ again:
  * sets up the latencies on the ports.
  */
 
-int
+void
 latency_cb (jack_latency_callback_mode_t mode, void *arg)
 {
 	jack_latency_range_t range;
@@ -488,8 +488,6 @@ latency_cb (jack_latency_callback_mode_t mode, void *arg)
 			jack_port_set_latency_range (port, mode, &range);
 		}
 	}
-
-	return 0;
 }
 
 

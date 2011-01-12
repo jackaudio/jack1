@@ -254,7 +254,7 @@ typedef enum JackLatencyCallbackMode jack_latency_callback_mode_t;
  *
  * @return zero on success, non-zero on error
  */ 
-typedef int  (*JackLatencyCallback)(jack_latency_callback_mode_t mode, void *arg);
+typedef void (*JackLatencyCallback)(jack_latency_callback_mode_t mode, void *arg);
 
 /**
  * the new latency API operates on Ranges.

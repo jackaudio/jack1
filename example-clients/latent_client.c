@@ -46,7 +46,7 @@ process (jack_nframes_t nframes, void *arg)
 	return 0;      
 }
 
-int
+void
 latency_cb (jack_latency_callback_mode_t mode, void *arg)
 {
 	jack_latency_range_t range;
@@ -61,8 +61,6 @@ latency_cb (jack_latency_callback_mode_t mode, void *arg)
 		range.max += latency;
 		jack_port_set_latency_range (input_port, mode, &range);
 	}
-
-	return 0;
 }
 
 /**

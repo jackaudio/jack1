@@ -668,7 +668,8 @@ jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *event,
 	/* we have a latency callback setup by the client,
 	 * lets use it...
 	 */
-	return client->latency_cb ( mode, client->latency_cb_arg);
+	client->latency_cb ( mode, client->latency_cb_arg);
+	return 0;
 }
 
 #if JACK_USE_MACH_THREADS
