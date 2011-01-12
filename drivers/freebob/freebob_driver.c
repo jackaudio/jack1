@@ -70,6 +70,7 @@ freebob_driver_attach (freebob_driver_t *driver)
 	jack_port_t *port=NULL;
 	int port_flags;
 	int error=0;
+	jack_latency_range_t range;
 
 	g_verbose=driver->engine->verbose;
 	driver->device_options.verbose=g_verbose;
@@ -174,7 +175,8 @@ freebob_driver_attach (freebob_driver_t *driver)
 
 		if(error) break;
 
-		jack_port_set_latency (port, driver->period_size + driver->capture_frame_latency);
+		range.min = range.max = driver->period_size + driver->capture_frame_latency;
+		jack_port_set_latency_range (port, JackCaptureLatency, &range);
 	}
 	
 	port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
@@ -231,7 +233,8 @@ freebob_driver_attach (freebob_driver_t *driver)
 
 		if(error) break;
 
-		jack_port_set_latency (port, (driver->period_size * (driver->device_options.nb_buffers - 1)) + driver->playback_frame_latency); 
+		range.min = range.max = (driver->period_size * (driver->device_options.nb_buffers - 1)) + driver->playback_frame_latency;
+		jack_port_set_latency_range (port, JackPlaybackLatency, &range);
 	}
 
 	return jack_activate (driver->client);

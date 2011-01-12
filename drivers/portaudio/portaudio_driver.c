@@ -132,6 +132,7 @@ portaudio_driver_attach (portaudio_driver_t *driver, jack_engine_t *engine)
 	int port_flags;
 	channel_t chn;
 	char buf[JACK_PORT_NAME_SIZE];
+	jack_latency_range_t range;
 		
 	driver->engine = engine;
 	
@@ -161,7 +162,8 @@ portaudio_driver_attach (portaudio_driver_t *driver, jack_engine_t *engine)
 			/* XXX fix this so that it can handle: systemic (external) latency
 			*/
 
-			jack_port_set_latency (port, driver->frames_per_cycle);
+			range.min = range.max = driver->frames_per_cycle;
+			jack_port_set_latency_range (port, JackCaptureLatency, &range);
 			driver->capture_ports = jack_slist_append (driver->capture_ports, port);
 	}
 	
@@ -179,7 +181,8 @@ portaudio_driver_attach (portaudio_driver_t *driver, jack_engine_t *engine)
 			/* XXX fix this so that it can handle: systemic (external) latency
 			*/
 	
-			jack_port_set_latency (port, driver->frames_per_cycle);
+			range.min = range.max = driver->frames_per_cycle;
+			jack_port_set_latency_range (port, JackPlaybackLatency, &range);
 			driver->playback_ports = jack_slist_append (driver->playback_ports, port);
 	}
 

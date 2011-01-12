@@ -564,6 +564,7 @@ sun_driver_attach (sun_driver_t *driver)
 	int channel;
 	char channel_name[64];
 	jack_port_t *port;
+	jack_latency_range_t range;
 
 	if (driver->engine->set_buffer_size(driver->engine, driver->period_size)) {
 		jack_error ("sun_driver: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
@@ -585,8 +586,9 @@ sun_driver_attach (sun_driver_t *driver)
 				"%s@%i", channel_name, __FILE__, __LINE__);
 			break;
 		}
-		jack_port_set_latency(port,
-			driver->period_size + driver->sys_in_latency);
+
+		range.min = range.max = driver->period_size + driver->sys_in_latency;
+		jack_port_set_latency_range(port, JackCaptureLatency, &range);
 		driver->capture_ports = 
 			jack_slist_append(driver->capture_ports, port);
 	}
@@ -604,8 +606,8 @@ sun_driver_attach (sun_driver_t *driver)
 				"%s: %s@%i", channel_name, __FILE__, __LINE__);
 			break;
 		}
-		jack_port_set_latency(port,
-			driver->period_size + driver->sys_out_latency);
+		range.min = range.max = driver->period_size + driver->sys_out_latency;
+		jack_port_set_latency_range(port, JackPlaybackLatency, &range);
 		driver->playback_ports =
 			jack_slist_append(driver->playback_ports, port);
 	}

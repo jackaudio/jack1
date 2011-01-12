@@ -63,6 +63,7 @@ ffado_driver_attach (ffado_driver_t *driver)
 	channel_t chn;
 	jack_port_t *port=NULL;
 	int port_flags;
+	jack_latency_range_t range;
 
 	g_verbose=driver->engine->verbose;
 
@@ -180,7 +181,8 @@ ffado_driver_attach (ffado_driver_t *driver)
 			driver->capture_ports =
 				jack_slist_append (driver->capture_ports, NULL);
 		}
-		jack_port_set_latency (port, driver->period_size + driver->capture_frame_latency);
+		range.min = range.max = driver->period_size + driver->capture_frame_latency;
+		jack_port_set_latency_range (port, JackCaptureLatency, &range);
 	}
 	
 	port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
@@ -245,7 +247,8 @@ ffado_driver_attach (ffado_driver_t *driver)
 			driver->playback_ports =
 				jack_slist_append (driver->playback_ports, NULL);
 		}
-		jack_port_set_latency (port, (driver->period_size * (driver->device_options.nb_buffers - 1)) + driver->playback_frame_latency);
+		range.min = range.max = (driver->period_size * (driver->device_options.nb_buffers - 1)) + driver->playback_frame_latency;
+		jack_port_set_latency_range (port, JackPlaybackLatency, &range);
 	}
 
 	if(ffado_streaming_prepare(driver->dev)) {

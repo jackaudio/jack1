@@ -353,6 +353,7 @@ static int oss_driver_attach (oss_driver_t *driver, jack_engine_t *engine)
 	unsigned int channel;
 	char channel_name[64];
 	jack_port_t *port;
+	jack_latency_range_t range;
 
 	driver->engine = engine;
 
@@ -375,8 +376,9 @@ static int oss_driver_attach (oss_driver_t *driver, jack_engine_t *engine)
 				channel_name, __FILE__, __LINE__);
 			break;
 		}
-		jack_port_set_latency(port,
-			driver->period_size + driver->sys_in_latency);
+
+		range.min = range.max = driver->period_size + driver->sys_in_latency;
+		jack_port_set_latency_range(port, JackCaptureLatency, &range);
 		driver->capture_ports = 
 			jack_slist_append(driver->capture_ports, port);
 	}
@@ -394,8 +396,8 @@ static int oss_driver_attach (oss_driver_t *driver, jack_engine_t *engine)
 				channel_name, __FILE__, __LINE__);
 			break;
 		}
-		jack_port_set_latency(port,
-			driver->period_size + driver->sys_out_latency);
+		range.min = range.max = driver->period_size + driver->sys_out_latency;
+		jack_port_set_latency_range(port, JackPlaybackLatency, &range);
 		driver->playback_ports =
 			jack_slist_append(driver->playback_ports, port);
 	}

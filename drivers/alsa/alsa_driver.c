@@ -1745,6 +1745,7 @@ alsa_driver_attach (alsa_driver_t *driver)
 	channel_t chn;
 	jack_port_t *port;
 	int port_flags;
+	jack_latency_range_t range;
 
 	if (driver->engine->set_buffer_size (driver->engine, driver->frames_per_cycle)) {
 		jack_error ("ALSA: cannot set engine buffer size for %d (check MIDI)", driver->frames_per_cycle);
@@ -1769,7 +1770,8 @@ alsa_driver_attach (alsa_driver_t *driver)
 			break;
 		}
 
-		jack_port_set_latency (port, driver->frames_per_cycle + driver->capture_frame_latency);
+		range.min = range.max = driver->frames_per_cycle + driver->capture_frame_latency;
+		jack_port_set_latency_range (port, JackCaptureLatency, &range);
 
 		driver->capture_ports =
 			jack_slist_append (driver->capture_ports, port);
@@ -1789,7 +1791,8 @@ alsa_driver_attach (alsa_driver_t *driver)
 			break;
 		}
 		
-		jack_port_set_latency (port, (driver->frames_per_cycle * (driver->user_nperiods - 1)) + driver->playback_frame_latency);
+		range.min = range.max = (driver->frames_per_cycle * (driver->user_nperiods - 1)) + driver->playback_frame_latency;
+		jack_port_set_latency_range (port, JackPlaybackLatency, &range);
 
 		driver->playback_ports =
 			jack_slist_append (driver->playback_ports, port);
@@ -1805,7 +1808,8 @@ alsa_driver_attach (alsa_driver_t *driver)
 					    "port for %s", buf);
 			} else {
 
-				jack_port_set_latency (monitor_port, driver->frames_per_cycle);
+				range.min = range.max = driver->frames_per_cycle;
+				jack_port_set_latency_range (port, JackCaptureLatency, &range);
 				
 				driver->monitor_ports =
 					jack_slist_append (driver->monitor_ports, monitor_port);

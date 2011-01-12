@@ -437,6 +437,7 @@ coreaudio_driver_attach(coreaudio_driver_t * driver, jack_engine_t * engine)
 	UInt32 size;
 	UInt32 value1,value2;
     Boolean isWritable;
+    jack_latency_range_t range;
 	
     driver->engine = engine;
 
@@ -481,7 +482,9 @@ coreaudio_driver_attach(coreaudio_driver_t * driver, jack_engine_t * engine)
 		if (err != noErr) 
 			JCALog("AudioDeviceGetProperty kAudioDevicePropertySafetyOffset error \n");
 		
-		jack_port_set_latency(port, driver->frames_per_cycle + value1 + value2 + driver->capture_frame_latency);
+		range.min = range.max = driver->frames_per_cycle + value1 + value2 + driver->capture_frame_latency;
+		jack_port_set_latency_range(port, JackCaptureLatency, &range);
+
 		driver->capture_ports =
 			jack_slist_append(driver->capture_ports, port);
     }
@@ -515,7 +518,9 @@ coreaudio_driver_attach(coreaudio_driver_t * driver, jack_engine_t * engine)
 		if (err != noErr) 
 			JCALog("AudioDeviceGetProperty kAudioDevicePropertySafetyOffset error \n");
 	
-		jack_port_set_latency(port, driver->frames_per_cycle + value1 + value2 + driver->playback_frame_latency);
+		range.min = range.max = driver->frames_per_cycle + value1 + value2 + driver->playback_frame_latency;
+		jack_port_set_latency_range(port, JackCaptureLatency, &range);
+
 		driver->playback_ports =
 			jack_slist_append(driver->playback_ports, port);
 	}
