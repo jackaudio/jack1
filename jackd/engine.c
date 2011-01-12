@@ -4196,6 +4196,8 @@ next:
 	shared->client_id = req->x.port_info.client_id;
 	shared->flags = req->x.port_info.flags;
 	shared->latency = 0;
+	shared->capture_latency.min = shared->capture_latency.max = 0;
+	shared->playback_latency.min = shared->playback_latency.max = 0;
 	shared->monitor_requests = 0;
 
 	port = &engine->internal_ports[port_id];
