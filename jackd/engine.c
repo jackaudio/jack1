@@ -3268,6 +3268,39 @@ jack_compute_all_port_total_latencies (jack_engine_t *engine)
  	}
 }
 
+static void
+jack_compute_new_latency (jack_engine_t *engine)
+{
+	JSList *node;
+	JSList *reverse_list = NULL;
+
+	jack_event_t event;
+	event.type = LatencyCallback;
+	event.x.n  = 0;
+
+	/* iterate over all clients in graph order, and emit
+	 * capture latency callback.
+	 * also builds up list in reverse graph order.
+	 */
+	for (node = engine->clients; node; node = jack_slist_next(node)) {
+
+                jack_client_internal_t* client = (jack_client_internal_t *) node->data;
+		reverse_list = jack_slist_prepend (reverse_list, client);
+		jack_deliver_event (engine, client, &event);
+	}
+
+	/* now issue playback latency callbacks in reverse graphorder
+	 */
+	event.x.n  = 1;
+	for (node = reverse_list; node; node = jack_slist_next(node)) {
+                jack_client_internal_t* client = (jack_client_internal_t *) node->data;
+		jack_deliver_event (engine, client, &event);
+	}
+
+	jack_slist_free (reverse_list);
+}
+
+
 /* How the sort works:
  *
  * Each client has a "sortfeeds" list of clients indicating which clients
@@ -3294,7 +3327,7 @@ jack_compute_all_port_total_latencies (jack_engine_t *engine)
  * This is used to detect whether the graph has become acyclic.
  *
  */ 
- 
+
 void
 jack_sort_graph (jack_engine_t *engine)
 {
@@ -3305,6 +3338,7 @@ jack_sort_graph (jack_engine_t *engine)
 					   (JCompareFunc) jack_client_sort);
 	jack_compute_all_port_total_latencies (engine);
 	jack_rechain_graph (engine);
+	jack_compute_new_latency (engine);
 	VERBOSE (engine, "-- jack_sort_graph");
 }
 

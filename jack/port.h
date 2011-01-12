@@ -121,6 +121,8 @@ typedef struct _jack_port_shared {
 
     volatile jack_nframes_t  latency;
     volatile jack_nframes_t  total_latency;
+    volatile jack_latency_range_t  playback_latency;
+    volatile jack_latency_range_t  capture_latency;
     volatile uint8_t	     monitor_requests;
 
     char		     has_mixdown; /* port has a mixdown function */

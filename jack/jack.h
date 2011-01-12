@@ -406,6 +406,16 @@ int jack_set_graph_order_callback (jack_client_t *,
  */
 int jack_set_xrun_callback (jack_client_t *,
 			    JackXRunCallback xrun_callback, void *arg) JACK_OPTIONAL_WEAK_EXPORT;
+
+/**
+ * Tell the JACK server to call @a latency_callback whenever the
+ * port latencies need to be recalculated.
+ *
+ * @return 0 on success, otherwise a non-zero error code
+ */
+int jack_set_latency_callback (jack_client_t *,
+				   JackLatencyCallback latency_callback,
+				   void *) JACK_WEAK_EXPORT;
 /*@}*/
 
 /**
@@ -690,6 +700,18 @@ jack_nframes_t jack_port_get_total_latency (jack_client_t *,
  */
 void jack_port_set_latency (jack_port_t *, jack_nframes_t) JACK_OPTIONAL_WEAK_EXPORT;
 	
+/**
+ * get the new latency, either capture latency or playback latency.
+ * this is normally used in the LatencyCallback.
+ * and therefor safe to execute from callbacks.
+ */
+void jack_port_get_latency_range (jack_port_t *port, jack_latency_callback_mode_t mode, jack_latency_range_t *range) JACK_WEAK_EXPORT;
+
+/**
+ * set the new latency, either capture latency or playback latency.
+ */
+void jack_port_set_latency_range (jack_port_t *port, jack_latency_callback_mode_t mode, jack_latency_range_t *range) JACK_WEAK_EXPORT;
+
 /**
  * Request a complete recomputation of a port's total latency. This
  * can be called by a client that has just changed the internal

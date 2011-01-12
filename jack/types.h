@@ -220,6 +220,60 @@ enum JackStatus {
 typedef enum JackStatus jack_status_t;
 
 /**
+ *  @ref jack_latency_callback_mode_t
+ */
+enum JackLatencyCallbackMode {
+
+     /**
+      * Latency Callback for Capture Latency.
+      * Input Ports have their latency value setup.
+      * In the Callback the client needs to set the latency of the output ports
+      */
+     JackCaptureLatency,
+
+     /**
+      * Latency Callback for Playback Latency.
+      * Output Ports have their latency value setup.
+      * In the Callback the client needs to set the latency of the input ports
+      */
+     JackPlaybackLatency
+
+};
+
+/**
+ *  Type of Latency Callback (Capture or Playback)
+ */
+typedef enum JackLatencyCallbackMode jack_latency_callback_mode_t;
+
+/**
+ * Prototype for the client supplied function that is called 
+ * by the engine when port latencies need to be recalculated
+ *
+ * @param mode playback or capture latency
+ * @param arg pointer to a client supplied data
+ *
+ * @return zero on success, non-zero on error
+ */ 
+typedef int  (*JackLatencyCallback)(jack_latency_callback_mode_t mode, void *arg);
+
+/**
+ * the new latency API operates on Ranges.
+ */
+struct _jack_latency_range
+{
+    /**
+     * minimum latency
+     */
+    jack_nframes_t min;
+    /**
+     * maximum latency
+     */
+    jack_nframes_t max;
+};
+
+typedef struct _jack_latency_range jack_latency_range_t;
+
+/**
  * Prototype for the client supplied function that is called 
  * by the engine anytime there is work to be done.
  *

@@ -75,6 +75,8 @@ struct _jack_client {
     void *thread_cb_arg;
     JackSessionCallback session_cb;	
     void *session_cb_arg;
+    JackLatencyCallback latency_cb;	
+    void *latency_cb_arg;
 
     /* external clients: set by libjack
      * internal clients: set by engine */

@@ -522,6 +522,18 @@ void
 jack_port_set_latency (jack_port_t *port, jack_nframes_t nframes)
 {
 	port->shared->latency = nframes;
+	
+	/* setup the new latency values here,
+	 * so we dont need to change the backend codes.
+	 */
+	if (port->shared->flags & JackPortIsOutput) {
+		port->shared->capture_latency.min = nframes;
+		port->shared->capture_latency.max = nframes;
+	}
+	if (port->shared->flags & JackPortIsInput) {
+		port->shared->playback_latency.min = nframes;
+		port->shared->playback_latency.max = nframes;
+	}
 }
 
 void *
@@ -794,6 +806,23 @@ jack_port_unset_alias (jack_port_t *port, const char *alias)
 	return 0;
 }
 
+void 
+jack_port_set_latency_range (jack_port_t *port, jack_latency_callback_mode_t mode, jack_latency_range_t *range)
+{
+	if (mode == JackCaptureLatency)
+		port->shared->capture_latency = *range;
+	else
+		port->shared->playback_latency = *range;
+}
+
+void 
+jack_port_get_latency_range (jack_port_t *port, jack_latency_callback_mode_t mode, jack_latency_range_t *range)
+{
+	if (mode == JackCaptureLatency)
+		*range = port->shared->capture_latency;
+	else
+		*range = port->shared->playback_latency;
+}
 
 /* AUDIO PORT SUPPORT */
 
