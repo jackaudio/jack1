@@ -20,6 +20,7 @@ bin_PROGRAMS = jack_simple_client \
 	       jack_showtime \
 	       jack_midisine \
 	       jack_midiseq \
+	       jack_latent_client \
 	       $(JACKREC)
 
 if HAVE_SNDFILE
@@ -61,6 +62,10 @@ jack_midiseq_LDADD = $(top_builddir)/libjack/libjack.la
 jack_midisine_SOURCES = midisine.c
 jack_midisine_LDFLAGS = @OS_LDFLAGS@
 jack_midisine_LDADD = $(top_builddir)/libjack/libjack.la
+
+jack_latent_client_SOURCES = latent_client.c
+jack_latent_client_LDFLAGS = @OS_LDFLAGS@
+jack_latent_client_LDADD = $(top_builddir)/libjack/libjack.la
 
 if HAVE_SNDFILE
 jack_rec_SOURCES = capture_client.c
