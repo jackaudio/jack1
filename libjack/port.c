@@ -809,10 +809,24 @@ jack_port_unset_alias (jack_port_t *port, const char *alias)
 void 
 jack_port_set_latency_range (jack_port_t *port, jack_latency_callback_mode_t mode, jack_latency_range_t *range)
 {
-	if (mode == JackCaptureLatency)
+	if (mode == JackCaptureLatency) {
 		port->shared->capture_latency = *range;
-	else
+
+		/* hack to set port->shared->latency up for 
+		 * backend ports
+		 */
+		if ((port->shared->flags & JackPortIsOutput) && (port->shared->flags & JackPortIsPhysical))
+			port->shared->latency = (range->min + range->max) / 2;
+	} else {
 		port->shared->playback_latency = *range;
+
+		/* hack to set port->shared->latency up for 
+		 * backend ports
+		 */
+		if ((port->shared->flags & JackPortIsInput) && (port->shared->flags & JackPortIsPhysical))
+			port->shared->latency = (range->min + range->max) / 2;
+
+	}
 }
 
 void 
