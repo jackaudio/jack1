@@ -462,6 +462,34 @@ again:
     return 0;      
 }
 
+/**
+ * the latency callback.
+ * sets up the latencies on the ports.
+ */
+
+int
+latency_cb (jack_latency_callback_mode_t mode, void *arg)
+{
+	jack_latency_range_t range;
+	JSList *node;
+
+	range.min = range.max = target_delay;
+
+	if (mode == JackCaptureLatency) {
+		for (node = capture_ports; node; node = jack_slist_next (node)) {
+			jack_port_t *port = node->data;
+			jack_port_set_latency_range (port, mode, &range);
+		}
+	} else {
+		for (node = playback_ports; node; node = jack_slist_next (node)) {
+			jack_port_t *port = node->data;
+			jack_port_set_latency_range (port, mode, &range);
+		}
+	}
+
+	return 0;
+}
+
 
 /**
  * Allocate the necessary jack ports...
@@ -658,6 +686,8 @@ int main (int argc, char *argv[]) {
 
     jack_on_shutdown (client, jack_shutdown, 0);
 
+    if (jack_set_latency_callback)
+	    jack_set_latency_callback (client, latency_cb, 0);
 
     // get jack sample_rate
     
