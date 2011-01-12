@@ -124,7 +124,8 @@ main (int argc, char *argv[])
 	/* tell the JACK server to call `latency()' whenever
 	   the latency needs to be recalculated.
 	*/
-	jack_set_latency_callback (client, latency_cb, 0);
+	if (jack_set_latency_callback)
+		jack_set_latency_callback (client, latency_cb, 0);
 
 	/* tell the JACK server to call `jack_shutdown()' if
 	   it ever shuts down, either entirely, or if it
