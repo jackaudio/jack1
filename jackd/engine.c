@@ -136,7 +136,7 @@ static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, i
 static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req );
-
+static void jack_compute_new_latency (jack_engine_t *engine);
 
 static inline int 
 jack_rolling_interval (jack_time_t period_usecs)
@@ -1346,6 +1346,7 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 	case RecomputeTotalLatencies:
 		jack_lock_graph (engine);
 		jack_compute_all_port_total_latencies (engine);
+		jack_compute_new_latency (engine);
 		jack_unlock_graph (engine);
 		req->status = 0;
 		break;
