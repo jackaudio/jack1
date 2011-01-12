@@ -570,7 +570,7 @@ jack_port_recalculate_latency (jack_port_t *port, jack_latency_callback_mode_t m
 }
 
 int
-jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *event)
+jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *event, int is_driver)
 {
 	jack_latency_callback_mode_t mode = (event->x.n==0) ? JackCaptureLatency : JackPlaybackLatency;
 	JSList *node;
@@ -589,6 +589,12 @@ jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *event)
 			jack_port_recalculate_latency (port, mode);
 		}
 	}
+
+	/* for a driver invocation, this is enough.
+	 * input and output ports do not depend on each other.
+	 */
+	if (is_driver)
+		return 0;
 	
 	if (! client->control->latency_cbset) {
 		/*
@@ -1786,7 +1792,7 @@ jack_client_process_events (jack_client_t* client)
 			status = jack_client_handle_session_callback (client, &event );
 			break;
 		case LatencyCallback:
-			status = jack_client_handle_latency_callback (client, &event );
+			status = jack_client_handle_latency_callback (client, &event, 0 );
 			break;
 		}
 		

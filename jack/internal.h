@@ -539,6 +539,8 @@ extern int jack_port_name_equals (jack_port_shared_t* port, const char* target);
  */
 extern size_t jack_midi_internal_event_size ();
 
+extern int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *event, int is_driver);
+
 #ifdef __GNUC__
 #  define likely(x)	__builtin_expect((x),1)
 #  define unlikely(x)	__builtin_expect((x),0)
