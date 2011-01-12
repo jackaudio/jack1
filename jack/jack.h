@@ -678,7 +678,7 @@ int  jack_port_untie (jack_port_t *port) JACK_OPTIONAL_WEAK_DEPRECATED_EXPORT;
  * connector and the corresponding frames being readable from the
  * port.
  */
-jack_nframes_t jack_port_get_latency (jack_port_t *port) JACK_OPTIONAL_WEAK_EXPORT;
+jack_nframes_t jack_port_get_latency (jack_port_t *port) JACK_OPTIONAL_WEAK_DEPRECATED_EXPORT;
 
 /**
  * The maximum of the sum of the latencies in every
@@ -686,7 +686,7 @@ jack_nframes_t jack_port_get_latency (jack_port_t *port) JACK_OPTIONAL_WEAK_EXPO
  * ports with the @ref JackPortIsTerminal flag set.
  */
 jack_nframes_t jack_port_get_total_latency (jack_client_t *,
-					    jack_port_t *port) JACK_OPTIONAL_WEAK_EXPORT;
+					    jack_port_t *port) JACK_OPTIONAL_WEAK_DEPRECATED_EXPORT;
 
 /**
  * The port latency is zero by default. Clients that control
@@ -698,7 +698,7 @@ jack_nframes_t jack_port_get_total_latency (jack_client_t *,
  * to an external digital converter, the latency setting should
  * include both buffering by the audio interface *and* the converter. 
  */
-void jack_port_set_latency (jack_port_t *, jack_nframes_t) JACK_OPTIONAL_WEAK_EXPORT;
+void jack_port_set_latency (jack_port_t *, jack_nframes_t) JACK_OPTIONAL_WEAK_DEPRECATED_EXPORT;
 	
 /**
  * get the new latency, either capture latency or playback latency.
@@ -723,7 +723,7 @@ void jack_port_set_latency_range (jack_port_t *port, jack_latency_callback_mode_
  * @return zero for successful execution of the request. non-zero
  *         otherwise.
  */
-int jack_recompute_total_latency (jack_client_t*, jack_port_t* port) JACK_OPTIONAL_WEAK_EXPORT;
+int jack_recompute_total_latency (jack_client_t*, jack_port_t* port) JACK_OPTIONAL_WEAK_DEPRECATED_EXPORT;
 
 /**
  * Request a complete recomputation of all port latencies. This
