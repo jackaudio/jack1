@@ -90,6 +90,7 @@ little clearer:
     - @ref ServerControl
     - @ref PortFunctions
     - @ref PortSearching
+    - @ref LatencyFunctions
     - @ref TimeFunctions
     - @ref TransportControl
     - @ref ErrorOutput
