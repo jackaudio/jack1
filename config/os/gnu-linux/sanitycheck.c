@@ -39,7 +39,7 @@ int sanitycheck (int care_about_realtime,
 		  relogin++;
 		  fprintf (stderr, "Please check your /etc/security/limits.conf for the following line\n");
 		  fprintf (stderr, "and correct/add it if necessary:\n\n");
-		  fprintf(stderr, "  @audio          -       rtprio          100\n");
+		  fprintf(stderr, "  @audio          -       rtprio          99\n");
 	  } else if (!system_has_audiogroup()) {
 		  errors++;
 		  relogin++;
