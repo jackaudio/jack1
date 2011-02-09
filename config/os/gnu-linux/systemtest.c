@@ -110,8 +110,8 @@ int system_uses_frequencyscaling() {
   while (!done) {
     (void) snprintf(filename, 256, "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_governor", cpu);
     if (0<read_string(filename, buf, 256)) {
-      if ((0!=strcmp("performance", buf)) && 
-					(0!=strcmp("powersafe", buf))) {
+            if ((0!=strncmp("performance", buf,11)) && 
+                (0!=strncmp("powersafe", buf,9))) {
 				// So it's neither the "performance" nor the "powersafe" governor
 				(void) snprintf(filename, 256, "/sys/devices/system/cpu/cpu%d/cpufreq/scaling_min_freq", cpu);
 				if (read_int(filename, &min)) {
