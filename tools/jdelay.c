@@ -158,6 +158,34 @@ static jack_client_t  *jack_handle;
 static jack_port_t    *jack_capt;
 static jack_port_t    *jack_play;
 
+jack_latency_range_t   capture_latency = {-1, -1};
+jack_latency_range_t   playback_latency = {-1, -1};
+
+void
+latency_cb (jack_latency_callback_mode_t mode, void *arg)
+{
+	jack_latency_range_t range;
+
+	range.min = range.max = 0;
+
+	if (mode == JackCaptureLatency) {
+		jack_port_set_latency_range (jack_play, mode, &range);
+		jack_port_get_latency_range (jack_capt, mode, &range);
+		if ((range.min != capture_latency.min) || (range.max != capture_latency.max)) {
+			capture_latency = range;
+			printf ("new capture latency: [%d, %d]\n", range.min, range.max);
+		}
+	} else {
+		jack_port_set_latency_range (jack_capt, mode, &range);
+		jack_port_get_latency_range (jack_play, mode, &range);
+		if ((range.min != playback_latency.min) || (range.max != playback_latency.max)) {
+			playback_latency = range;
+			printf ("new playback latency: [%d, %d]\n", range.min, range.max);
+		}
+	}
+
+}
+
 int jack_callback (jack_nframes_t nframes, void *arg)
 {
     float *ip, *op;
@@ -184,13 +212,11 @@ int main (int ac, char *av [])
 
     jack_set_process_callback (jack_handle, jack_callback, 0);
 
+    if (jack_set_latency_callback)
+	    jack_set_latency_callback (jack_handle, latency_cb, 0);
+
     jack_capt = jack_port_register (jack_handle, "in",  JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
     jack_play = jack_port_register (jack_handle, "out", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
-
-    printf ("capture latency  = %d\n",
-            jack_port_get_latency (jack_port_by_name (jack_handle, "system:capture_1")));
-    printf ("playback_latency = %d\n",
-            jack_port_get_latency (jack_port_by_name (jack_handle, "system:playback_1")));
 
     t = 1000.0f / jack_get_sample_rate (jack_handle);
 
