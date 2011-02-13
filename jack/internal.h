@@ -383,7 +383,8 @@ typedef enum {
 	SessionNotify = 25,
 	GetClientByUUID = 26,
 	ReserveName = 30,
-	SessionReply = 31
+	SessionReply = 31,
+	SessionHasCallback = 32
 } RequestType;
 
 struct _jack_request {
@@ -441,6 +442,7 @@ struct _jack_request {
 	jack_nframes_t nframes;
 	jack_time_t timeout;
         pid_t cap_pid;
+	char name[JACK_CLIENT_NAME_SIZE];
     } POST_PACKED_STRUCTURE x;
     int32_t status;
 } POST_PACKED_STRUCTURE;

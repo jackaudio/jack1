@@ -241,6 +241,15 @@ char *jack_get_client_name_by_uuid( jack_client_t *client, const char *client_uu
 int
 jack_reserve_client_name( jack_client_t *client, const char *name, const char *uuid ) JACK_WEAK_EXPORT;
 
+/**
+ * find out whether a client has setup a session callback.
+ *
+ * @return 0 when the client has no session callback, 1 when it has one.
+ *         -1 on error.
+ */
+int
+jack_client_has_session_callback (jack_client_t *client, const char *client_name) JACK_WEAK_EXPORT;
+
 #ifdef __cplusplus
 }
 #endif

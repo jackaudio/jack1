@@ -137,6 +137,7 @@ static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *
 static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req );
 static void jack_compute_new_latency (jack_engine_t *engine);
+static int jack_do_has_session_cb (jack_engine_t *engine, jack_request_t *req);
 
 static inline int 
 jack_rolling_interval (jack_time_t period_usecs)
@@ -1383,6 +1384,10 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		}
 		jack_unlock_graph (engine);
 		break;
+	case SessionHasCallback:
+		jack_rdlock_graph (engine);
+		req->status = jack_do_has_session_cb (engine, req);
+		jack_unlock_graph (engine);
 	default:
 		/* some requests are handled entirely on the client
 		 * side, by adjusting the shared memory area(s) */
@@ -2705,6 +2710,21 @@ send_final:
 	return 0;
 error_out:
 	return -3;
+}
+
+static int
+jack_do_has_session_cb (jack_engine_t *engine, jack_request_t *req)
+{
+	jack_client_internal_t *client;
+	int retval = -1;
+
+	client = jack_client_by_name (engine, req->x.name);
+	if (client == NULL)
+		goto out;
+
+	retval = client->control->session_cbset ? 1 : 0;
+out:
+	return retval;
 }
 
 static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req )
