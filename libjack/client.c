@@ -1773,7 +1773,7 @@ jack_client_process_events (jack_client_t* client)
 			jack_client_fix_port_buffers (client);
 			if (control->bufsize_cbset) {
 				status = client->bufsize
-					(control->nframes,
+					(client->engine->buffer_size,
 					 client->bufsize_arg);
 			} 
 			break;
