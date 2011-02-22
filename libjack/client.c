@@ -2547,6 +2547,10 @@ jack_set_buffer_size (jack_client_t *client, jack_nframes_t nframes)
 
         VALGRIND_MEMSET (&req, 0, sizeof (req));
 
+        if (nframes < 1 || nframes > 16384) {
+                return ERANGE;
+        }
+
 	req.type = SetBufferSize;
 	req.x.nframes = nframes;
 

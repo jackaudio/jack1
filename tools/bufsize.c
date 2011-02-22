@@ -64,12 +64,23 @@ void parse_arguments(int argc, char *argv[])
 		exit(9);
 	}
 
+        if (strspn (argv[1], "0123456789") != strlen (argv[1])) {
+		fprintf(stderr, "usage: %s <bufsize>\n", package);
+		exit(8);
+        }
+
 	nframes = strtoul(argv[1], NULL, 0);
 	if (errno == ERANGE) {
-		fprintf(stderr, "%s: invalid buffer size: %s\n",
+		fprintf(stderr, "%s: invalid buffer size: %s (range is 1-16384)\n",
 			package, argv[1]);
 		exit(2);
 	}
+        if (nframes < 1 || nframes > 16384) {
+		fprintf(stderr, "%s: invalid buffer size: %s (range is 1-16384)\n",
+			package, argv[1]);
+		exit(3);
+        }
+                
 }
 
 void silent_function( const char *ignore )
