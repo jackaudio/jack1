@@ -22,6 +22,7 @@
 #define __jack_types_h__
 
 #include <inttypes.h>
+#include <pthread.h>
 
 typedef int32_t jack_shmsize_t;
 
@@ -73,6 +74,12 @@ typedef struct _jack_client  jack_client_t;
  */
 typedef uint32_t	     jack_port_id_t;
 
+/**
+ *  to make jack API independent of different thread implementations,
+ *  we define jack_native_thread_t to pthread_t here.
+ *  (all platforms that jack1 runs on, have pthread)
+ */
+typedef pthread_t            jack_native_thread_t;
 
 /**
  *  @ref jack_options_t bits

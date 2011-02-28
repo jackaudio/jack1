@@ -69,7 +69,7 @@ int jack_client_max_real_time_priority (jack_client_t*) JACK_OPTIONAL_WEAK_EXPOR
  * @returns 0, if successful; EPERM, if the calling process lacks
  * required realtime privileges; otherwise some other error number.
  */
-int jack_acquire_real_time_scheduling (pthread_t thread, int priority) JACK_OPTIONAL_WEAK_EXPORT;
+int jack_acquire_real_time_scheduling (jack_native_thread_t thread, int priority) JACK_OPTIONAL_WEAK_EXPORT;
 
 /**
  * Create a thread for JACK or one of its clients.  The thread is
@@ -88,7 +88,7 @@ int jack_acquire_real_time_scheduling (pthread_t thread, int priority) JACK_OPTI
  * @returns 0, if successful; otherwise some error number.
  */
 int jack_client_create_thread (jack_client_t* client,
-			       pthread_t *thread,
+			       jack_native_thread_t *thread,
 			       int priority,
 			       int realtime,	/* boolean */
 			       void *(*start_routine)(void*),
@@ -101,9 +101,9 @@ int jack_client_create_thread (jack_client_t* client,
  *
  * @returns 0, if successful; otherwise an error number.
  */
-int jack_drop_real_time_scheduling (pthread_t thread) JACK_OPTIONAL_WEAK_EXPORT;
+int jack_drop_real_time_scheduling (jack_native_thread_t thread) JACK_OPTIONAL_WEAK_EXPORT;
 
-typedef int (*jack_thread_creator_t)(pthread_t*,
+typedef int (*jack_thread_creator_t)(jack_native_thread_t*,
 				     const pthread_attr_t*,
 				     void* (*function)(void*),
 				     void* arg) JACK_OPTIONAL_WEAK_EXPORT;

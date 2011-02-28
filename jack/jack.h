@@ -25,8 +25,6 @@
 extern "C" {
 #endif
 
-#include <pthread.h>
-
 #include <jack/types.h>
 #include <jack/transport.h>
 
@@ -172,7 +170,7 @@ int jack_deactivate (jack_client_t *client) JACK_OPTIONAL_WEAK_EXPORT;
  * @return the pthread ID of the thread running the JACK client side
  * code.
  */
-pthread_t jack_client_thread_id (jack_client_t *) JACK_OPTIONAL_WEAK_EXPORT;
+jack_native_thread_t jack_client_thread_id (jack_client_t *) JACK_OPTIONAL_WEAK_EXPORT;
 
 /*@}*/
 
