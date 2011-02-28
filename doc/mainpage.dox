@@ -97,6 +97,7 @@ little clearer:
     - @ref NonCallbackAPI
     - @ref MIDIAPI
     - @ref SessionClientFunctions
+    - @ref WeakLinkage
 
 The full API is described in:
 

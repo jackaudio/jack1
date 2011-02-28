@@ -526,7 +526,8 @@ INPUT                  = @top_srcdir@/doc/mainpage.dox \
                          @top_srcdir@/jack/transport.h \
                          @top_srcdir@/jack/types.h \
                          @top_srcdir@/jack/midiport.h \
-                         @top_srcdir@/jack/session.h
+                         @top_srcdir@/jack/session.h \
+                         @top_srcdir@/jack/weakjack.h \
 
 # This tag can be used to specify the character encoding of the source files 
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding, which is 
