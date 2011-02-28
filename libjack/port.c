@@ -216,6 +216,22 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	return port;
 }
 
+size_t 
+jack_port_type_get_buffer_size (jack_client_t *client, const char *port_type)
+{
+	int i;
+
+	for (i=0; i<client->engine->n_port_types; i++) {
+		if (!strcmp(port_type, client->engine->port_types[i].type_name))
+			break;
+	}
+
+	if (i==client->engine->n_port_types)
+		return 0;
+
+	return jack_port_type_buffer_size (&(client->engine->port_types[i]), client->control->nframes);
+}
+
 jack_port_t *
 jack_port_register (jack_client_t *client, 
 		    const char *port_name,

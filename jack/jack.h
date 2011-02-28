@@ -849,6 +849,14 @@ int jack_port_name_size(void) JACK_OPTIONAL_WEAK_EXPORT;
  * including the final NULL character.  This value is a constant.
  */
 int jack_port_type_size(void) JACK_OPTIONAL_WEAK_EXPORT;
+
+/**
+ * @return the buffersize of a port of type @arg port_type.
+ *
+ * this function may only be called in a buffer_size callback.
+ */
+size_t jack_port_type_get_buffer_size (jack_client_t *client, const char *port_type) JACK_WEAK_EXPORT;
+
 /*@}*/
 
 /**
