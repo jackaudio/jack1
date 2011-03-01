@@ -34,6 +34,7 @@ snd_pcm_t *alsa_handle;
 int jack_sample_rate;
 int jack_buffer_size;
 
+int quit = 0;
 double resample_mean = 1.0;
 double static_resample_factor = 1.0;
 double resample_lower_limit = 0.25;
@@ -44,7 +45,6 @@ double *window_array;
 int offset_differential_index = 0;
 
 double offset_integral = 0;
-int quit = 0;
 
 // ------------------------------------------------------ commandline parameters
 
