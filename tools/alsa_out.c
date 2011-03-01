@@ -324,7 +324,6 @@ int process (jack_nframes_t nframes, void *arg) {
     delay = (num_periods*period_size)-snd_pcm_avail( alsa_handle ) ;
 
     delay -= jack_frames_since_cycle_start( client );
-    delay += jack_get_buffer_size( client ) / 2;
     // Do it the hard way.
     // this is for compensating xruns etc...
 
