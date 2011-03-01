@@ -76,6 +76,12 @@ volatile float output_diff = 0.0;
 snd_pcm_uframes_t real_buffer_size;
 snd_pcm_uframes_t real_period_size;
 
+// buffers
+
+char *tmpbuf;
+char *outbuf;
+float *resampbuf;
+
 // format selection, and corresponding functions from memops in a nice set of structs.
 
 typedef struct alsa_format {
@@ -310,8 +316,6 @@ double hann( double x )
  */
 int process (jack_nframes_t nframes, void *arg) {
 
-    char *outbuf;
-    float *resampbuf;
     int rlen;
     int err;
     snd_pcm_sframes_t delay = target_delay;
@@ -339,11 +343,14 @@ int process (jack_nframes_t nframes, void *arg) {
 		offset_array[i] = 0.0;
     }
     if( delay < (target_delay-max_diff) ) {
-	char *tmp = alloca( (target_delay-delay) * formats[format].sample_size * num_channels ); 
-	memset( tmp, 0,  formats[format].sample_size * num_channels * (target_delay-delay) );
-	snd_pcm_writei( alsa_handle, tmp, target_delay-delay );
 
 	output_new_delay = (int) delay;
+
+	while ((target_delay-delay) > 0) {
+	    snd_pcm_uframes_t to_write = ((target_delay-delay) > 512) ? 512 : (target_delay-delay);
+	    snd_pcm_writei( alsa_handle, tmpbuf, to_write );
+	    delay += to_write;
+	}
 
 	delay = target_delay;
 
@@ -740,6 +747,16 @@ int main (int argc, char *argv[]) {
 
     // alloc input ports, which are blasted out to alsa...
     alloc_ports( 0, num_channels );
+
+    outbuf = malloc( num_periods * period_size * formats[format].sample_size * num_channels );
+    resampbuf = malloc( num_periods * period_size * sizeof( float ) );
+    tmpbuf = malloc( 512 * formats[format].sample_size * num_channels );
+
+    if ((outbuf == NULL) || (resampbuf == NULL) || (tmpbuf == NULL))
+    {
+	    fprintf( stderr, "no memory for buffers.\n" );
+	    exit(20);
+    }
 
 
     /* tell the JACK server that we are ready to roll */

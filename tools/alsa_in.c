@@ -76,6 +76,12 @@ volatile float output_diff = 0.0;
 snd_pcm_uframes_t real_buffer_size;
 snd_pcm_uframes_t real_period_size;
 
+// buffers
+
+char *tmpbuf;
+char *outbuf;
+float *resampbuf;
+
 // format selection, and corresponding functions from memops in a nice set of structs.
 
 typedef struct alsa_format {
@@ -306,8 +312,6 @@ double hann( double x )
  */
 int process (jack_nframes_t nframes, void *arg) {
 
-    char *outbuf;
-    float *resampbuf;
     int rlen;
     int err;
     snd_pcm_sframes_t delay = target_delay;
@@ -321,9 +325,14 @@ int process (jack_nframes_t nframes, void *arg) {
     // this is for compensating xruns etc...
 
     if( delay > (target_delay+max_diff) ) {
-	char *tmp = alloca( (delay-target_delay) * formats[format].sample_size * num_channels ); 
-	snd_pcm_readi( alsa_handle, tmp, delay-target_delay );
+
 	output_new_delay = (int) delay;
+
+	while ((delay-target_delay) > 0) {
+	    snd_pcm_uframes_t to_read = ((delay-target_delay) > 512) ? 512 : (delay-target_delay);
+	    snd_pcm_readi( alsa_handle, tmpbuf, to_read );
+	    delay -= to_read;
+	}
 
 	delay = target_delay;
 
@@ -398,13 +407,6 @@ int process (jack_nframes_t nframes, void *arg) {
 
     // Calculate resample_mean so we can init ourselves to saner values.
     resample_mean = 0.9999 * resample_mean + 0.0001 * current_resample_factor;
-    /*
-     * now this should do it...
-     */
-
-    outbuf = alloca( rlen * formats[format].sample_size * num_channels );
-
-    resampbuf = alloca( rlen * sizeof( float ) );
 
     // get the data...
 again:
@@ -743,6 +745,17 @@ int main (int argc, char *argv[]) {
     // alloc input ports, which are blasted out to alsa...
     alloc_ports( num_channels, 0 );
 
+    outbuf = malloc( num_periods * period_size * formats[format].sample_size * num_channels );
+    resampbuf = malloc( num_periods * period_size * sizeof( float ) );
+    tmpbuf = malloc( 512 * formats[format].sample_size * num_channels );
+
+    if ((outbuf == NULL) || (resampbuf == NULL) || (tmpbuf == NULL))
+    {
+	    fprintf( stderr, "no memory for buffers.\n" );
+	    exit(20);
+    }
+
+    memset( tmpbuf, 0, 512 * formats[format].sample_size * num_channels);
 
     /* tell the JACK server that we are ready to roll */
 
