@@ -49,17 +49,23 @@
  *    someone tries to run Jill with the "old" version of JACK. However, functions
  *    added to JACK after version 0.116.2 are all declared to have "weak" linkage
  *    which means that their abscence doesn't cause an error during program
- *    startup. Instead, Jill can test whether or not the symbol jack_set_latency_callback()
+ *    startup. Instead, Jill can test whether or not the symbol jack_set_latency_callback
  *    is null or not. If its null, it means that the JACK installed on this machine
  *    is too old to support this function. If its not null, then Jill can use it
- *    just like any other function in the API.
+ *    just like any other function in the API. For example:
+ *
+ * \code
+ * if (jack_set_latency_callback) {
+ *       jack_set_latency_callback (jill_client, jill_latency_callback, arg);
+ * }
+ * \endcode
  *
  *    However, there are clients that may want to use this approach to parts of the
  *    the JACK API that predate 0.116.2. For example, they might want to see if even
  *    really old basic parts of the API like jack_client_open() exist at runtime.
  *
  *    Such clients should include <jack/weakjack.h> before any other JACK header. 
- *    This will make the ENTIRE JACK API be subject to weak linkage, so that any
+ *    This will make the \b entire JACK API be subject to weak linkage, so that any
  *    and all functions can be checked for existence at runtime. It is important
  *    to understand that very few clients need to do this - if you use this
  *    feature you should have a clear reason to do so.
@@ -96,6 +102,6 @@
 #endif
 #endif
 
-x1/*@}*/
+/*@}*/
 
 #endif /* weakjack */
