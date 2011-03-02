@@ -23,6 +23,7 @@
 #include <math.h>
 
 #include <config.h>
+#include <sys/mman.h>
 
 #include <jack/jack.h>
 #include <jack/types.h>
@@ -564,6 +565,10 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 		if (port->tied) {
 			return jack_port_get_buffer (port->tied, nframes);
 		}
+                
+                if (port->client_segment_base == NULL || *port->client_segment_base == MAP_FAILED) {
+                        return NULL;
+                }
 
 		return jack_output_port_buffer (port);
 	}
@@ -575,6 +580,10 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 	*/
 	if ((node = port->connections) == NULL) {
 		
+                if (port->client_segment_base == NULL || *port->client_segment_base == MAP_FAILED) {
+                        return NULL;
+                }
+
 		/* no connections; return a zero-filled buffer */
 		return (void *) (*(port->client_segment_base) + port->type_info->zero_buffer_offset);
 	}
