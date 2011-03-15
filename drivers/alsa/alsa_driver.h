@@ -47,11 +47,6 @@ typedef void (*WriteCopyFunction) (char *dst, jack_default_audio_sample_t *src,
 				   unsigned long src_bytes,
 				   unsigned long dst_skip_bytes,
 				   dither_state_t *state);
-typedef void (*CopyCopyFunction)  (char *dst, char *src,
-				   unsigned long src_bytes,
-				   unsigned long dst_skip_bytes,
-				   unsigned long src_skip_byte);
-
 typedef struct _alsa_driver {
 
     JACK_DRIVER_NT_DECL
@@ -125,7 +120,6 @@ typedef struct _alsa_driver {
 
     ReadCopyFunction read_via_copy;
     WriteCopyFunction write_via_copy;
-    CopyCopyFunction channel_copy;
 
     int             dither;
     dither_state_t *dither_state;
@@ -208,20 +202,6 @@ alsa_driver_write_to_channel (alsa_driver_t *driver,
 				driver->playback_interleave_skip[channel],
 				driver->dither_state+channel);
 	alsa_driver_mark_channel_done (driver, channel);
-}
-
-static inline void 
-alsa_driver_copy_channel (alsa_driver_t *driver, 
-			  channel_t input_channel, 
-			  channel_t output_channel,
-			  jack_nframes_t nsamples) {
-
-	driver->channel_copy (driver->playback_addr[output_channel],
-			      driver->capture_addr[input_channel],
-			      nsamples * driver->playback_sample_bytes,
-			      driver->playback_interleave_skip[output_channel],
-			      driver->capture_interleave_skip[input_channel]);
-	alsa_driver_mark_channel_done (driver, output_channel);
 }
 
 void  alsa_driver_silence_untouched_channels (alsa_driver_t *driver,
