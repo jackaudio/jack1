@@ -233,6 +233,7 @@ alsa_driver_hw_specific (alsa_driver_t *driver, int hw_monitoring,
 static void
 alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 {
+	if (driver->playback_handle) {
 	if (SND_PCM_FORMAT_FLOAT_LE == driver->playback_sample_format) {
 		if (driver->playback_interleaved) {
 			driver->channel_copy = memcpy_interleave_d32_s32;
@@ -312,7 +313,9 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 			exit (1);
 		}
 	}
+	}
 	
+	if (driver->capture_handle) {
 	switch (driver->capture_sample_bytes) {
 	case 2:
 		driver->read_via_copy = driver->quirk_bswap?
@@ -329,6 +332,7 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 		 	sample_move_dS_s32u24s: 
 		        sample_move_dS_s32u24;
 		break;
+	}
 	}
 }
 
