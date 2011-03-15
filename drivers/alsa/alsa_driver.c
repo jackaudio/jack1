@@ -235,7 +235,6 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 {
 	if (driver->playback_handle) {
 	if (SND_PCM_FORMAT_FLOAT_LE == driver->playback_sample_format) {
-		driver->read_via_copy = sample_move_floatLE_sSs;
 		driver->write_via_copy = sample_move_dS_floatLE;
 	} else {
 
@@ -293,6 +292,9 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 	}
 	
 	if (driver->capture_handle) {
+	if (SND_PCM_FORMAT_FLOAT_LE == driver->capture_sample_format) {
+		driver->read_via_copy = sample_move_floatLE_sSs;
+	} else {
 	switch (driver->capture_sample_bytes) {
 	case 2:
 		driver->read_via_copy = driver->quirk_bswap?
@@ -309,6 +311,7 @@ alsa_driver_setup_io_function_pointers (alsa_driver_t *driver)
 		 	sample_move_dS_s32u24s: 
 		        sample_move_dS_s32u24;
 		break;
+	}
 	}
 	}
 }
