@@ -99,6 +99,20 @@ maybe_get_capabilities (jack_client_t* client)
 #endif /* USE_CAPABILITIES */
 }	
 
+static void
+jack_thread_touch_stack()
+{
+	char buf[JACK_THREAD_STACK_TOUCH];
+	int i;
+	volatile char *buf_ptr = buf;
+
+	for (i = 0; i < JACK_THREAD_STACK_TOUCH; i++) {
+		buf_ptr[i] = (char) (i & 0xff);
+	}
+}
+
+static volatile void (* ptr_jack_thread_touch_stack )() = jack_thread_touch_stack;
+
 static void*
 jack_thread_proxy (void* varg)
 {
@@ -107,14 +121,8 @@ jack_thread_proxy (void* varg)
 	void* warg;
 	jack_client_t* client = arg->client;
 
-	char buf[JACK_THREAD_STACK_TOUCH];
-	int i;
-
-	for (i = 0; i < JACK_THREAD_STACK_TOUCH; i++) {
-                buf[i] = (char) (i & 0xff);
-	}
-
 	if (arg->realtime) {
+		ptr_jack_thread_touch_stack();
 		maybe_get_capabilities (client);
 		jack_acquire_real_time_scheduling (pthread_self(), arg->priority);
 	}
