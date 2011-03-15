@@ -111,7 +111,8 @@ jack_thread_touch_stack()
 	}
 }
 
-static volatile void (* ptr_jack_thread_touch_stack )() = jack_thread_touch_stack;
+typedef void (* stack_touch_t)();
+static volatile stack_touch_t ptr_jack_thread_touch_stack = jack_thread_touch_stack;
 
 static void*
 jack_thread_proxy (void* varg)
