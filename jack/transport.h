@@ -80,31 +80,86 @@ typedef enum {
  */
 typedef struct {
     
-    /* these four cannot be set from clients: the server sets them */
+    /*@{*/
+    /** @name Server-set fields
+     * these cannot be set from clients; the server sets them */
     jack_unique_t	unique_1;	/**< unique ID */
-    jack_time_t		usecs;		/**< monotonic, free-rolling */
-    jack_nframes_t	frame_rate;	/**< current frame rate (per second) */
-    jack_nframes_t	frame;		/**< frame number, always present */
+    jack_time_t		usecs;		/**< microsecond timestamp that is guaranteed to be 
+                                             monotonic, but not neccessarily 
+                                             linear. 
 
-    jack_position_bits_t valid;		/**< which other fields are valid */
+                                             The absolute value is 
+                                             implementation-dependent (i.e. it
+                                             could be wall-clock, time since 
+                                             jack started, uptime, etc). */
+    jack_nframes_t	frame_rate;	/**< current frame rate, in frames per second */
+    /*}@*/
 
-    /* JackPositionBBT fields: */
-    int32_t		bar;		/**< current bar */
-    int32_t		beat;		/**< current beat-within-bar */
-    int32_t		tick;		/**< current tick-within-beat */
-    double		bar_start_tick;            
+    /*@{*/
+    /** @name Mandatory fields 
+      */
+    jack_nframes_t	frame;		/**< frame number, always present/required. 
+                                             
+                                             This is the frame number on the 
+                                             transport timeline, which is not 
+                                             the same as what @ref 
+                                             jack_frame_time returns. */
+    jack_position_bits_t valid;		/**< which other fields are valid, as a
+                                             bitmask constructed from values in 
+                                             \ref jack_position_bits_t */
+    /*}@*/
+
+    /*@{*/
+    /** @name JackPositionBBT fields 
+     * Bar:Beat.Tick-related information. 
+     *
+     * Applications that support 
+     * JackPositionBBT are encouraged to also fill the JackBBTFrameOffset
+     */
+    int32_t		bar;		/**< current bar 
+
+                                             Should be >0: the first bar is 
+                                             bar '1'. */
+    int32_t		beat;		/**< current beat-within-bar 
+
+                                             Should be >0 and <=beats_per_bar:
+                                             the first beat is beat '1'.
+                                             */
+    int32_t		tick;		/**< current tick-within-beat 
+
+                                             Should be >0 and <=ticks_per_beat:
+                                             the first tick is tick '0'. */
+    double		bar_start_tick; /**< number of ticks that have elapsed 
+                                             between frame 0 and the first beat
+                                             of the current measure. */
 
     float		beats_per_bar;	/**< time signature "numerator" */
     float		beat_type;	/**< time signature "denominator" */
-    double		ticks_per_beat;
-    double		beats_per_minute;
+    double		ticks_per_beat; /**< number of ticks within a bar. 
 
-    /* JackPositionTimecode fields:	(EXPERIMENTAL: could change) */
+                                             Usually a moderately large integer
+                                             with many denominators, such as 
+                                             1920.0 */
+    double		beats_per_minute; /**< BPM, quantized to block size. This
+                                             means when the tempo is not constant
+                                             within this block, the BPM value should
+                                             adapted to compensate for this. This
+                                             is different from most fields in this
+                                             struct, which specify the value at 
+                                             the beginning of the block rather 
+                                             than an average.*/
+    /*}@*/
+
+    /*@{*/
+    /** @name JackPositionTimecode fields	
+     * EXPERIMENTAL: could change */
     double		frame_time;	/**< current time in seconds */
     double		next_time;	/**< next sequential frame_time
 					     (unless repositioned) */
+    /*}@*/
   
-    /* JackBBTFrameOffset fields: */
+    /*@{*/
+    /* JackBBTFrameOffset fields */
     jack_nframes_t	bbt_offset;	/**< frame offset for the BBT fields
 					     (the given bar, beat, and tick
 					     values actually refer to a time
@@ -119,9 +174,11 @@ typedef struct {
 					     the BBT time refers to a frame that
 					     many frames before the start of the
 					     cycle. */
+    /*}@*/
 
-    /* JACK video positional data (experimental) */
-
+    /*@{*/
+    /* JACK video positional data
+     * EXPERIMENTAL: could change */
     float               audio_frames_per_video_frame; /**< number of audio frames
 					     per video frame. Should be assumed
 					     zero if JackAudioVideoRatio is not
@@ -135,11 +192,15 @@ typedef struct {
 					     is not set. If JackVideoFrameOffset is
 					     set, but the value is zero, there is
 					     no video frame within this cycle. */
+    /*}@*/
 
+    /*@{*/
+    /** @name Other fields */
     /* For binary compatibility, new fields should be allocated from
      * this padding area with new valid bits controlling access, so
      * the existing structure size and offsets are preserved. */
     int32_t		padding[7];
+    /*}@*/
 
     /* When (unique_1 == unique_2) the contents are consistent. */
     jack_unique_t	unique_2;	/**< unique ID */
@@ -170,12 +231,12 @@ typedef struct {
 int  jack_release_timebase (jack_client_t *client) JACK_OPTIONAL_WEAK_EXPORT;
 
 /**
- * Prototype for the @a sync_callback defined by slow-sync clients.
- * When the client is active, this callback is invoked just before
- * process() in the same thread.  This occurs once after registration,
- * then subsequently whenever some client requests a new position, or
- * the transport enters the ::JackTransportStarting state.  This
- * realtime function must not wait.
+ * Prototype for the @a sync_callback defined by @ref slowsyncclients 
+ * "slow-sync clients". When the client is active, this callback is 
+ * invoked just before process() in the same thread.  This occurs once 
+ * after registration, then subsequently whenever some client requests 
+ * a new position, or the transport enters the ::JackTransportStarting 
+ * state.  This realtime function must not wait.
  *
  * The transport @a state will be:
  *
@@ -195,7 +256,7 @@ typedef int  (*JackSyncCallback)(jack_transport_state_t state,
 				 void *arg);
 
 /**
- * Register (or unregister) as a slow-sync client, one that cannot
+ * Register (or unregister) as a @ref slowsyncclients "slow-sync client", that cannot
  * respond immediately to transport position changes.
  *
  * The @a sync_callback will be invoked at the first available
@@ -219,7 +280,7 @@ int  jack_set_sync_callback (jack_client_t *client,
 			     void *arg) JACK_OPTIONAL_WEAK_EXPORT;
 
 /**
- * Set the timeout value for slow-sync clients.
+ * Set the timeout value for @ref slowsyncclients "slow-sync clients".
  *
  * This timeout prevents unresponsive slow-sync clients from
  * completely halting the transport mechanism.  The default is two
@@ -286,6 +347,8 @@ typedef void (*JackTimebaseCallback)(jack_transport_state_t state,
  * Taking over the timebase may be done conditionally, so it fails if
  * there was a master already.
  *
+ * The method may be called whether the client has been activated or not.
+ *
  * @param client the JACK client structure.
  * @param conditional non-zero for a conditional request.
  * @param timebase_callback is a realtime function that returns
@@ -307,9 +370,9 @@ int  jack_set_timebase_callback (jack_client_t *client,
  * Reposition the transport to a new frame number.
  *
  * May be called at any time by any client.  The new position takes
- * effect in two process cycles.  If there are slow-sync clients and
- * the transport is already rolling, it will enter the
- * ::JackTransportStarting state and begin invoking their @a
+ * effect in two process cycles.  If there are @ref slowsyncclients 
+ * "slow-sync clients" and the transport is already rolling, it will 
+ * enter the ::JackTransportStarting state and begin invoking their @a
  * sync_callbacks until ready.  This function is realtime-safe.
  *
  * @see jack_transport_reposition, jack_set_sync_callback
@@ -353,15 +416,17 @@ jack_nframes_t jack_get_current_transport_frame (const jack_client_t *client) JA
  * Request a new transport position.
  *
  * May be called at any time by any client.  The new position takes
- * effect in two process cycles.  If there are slow-sync clients and
- * the transport is already rolling, it will enter the
- * ::JackTransportStarting state and begin invoking their @a
+ * effect in two process cycles.  If there are @ref slowsyncclients 
+ * "slow-sync clients" and the transport is already rolling, it will 
+ * enter the ::JackTransportStarting state and begin invoking their @a
  * sync_callbacks until ready.  This function is realtime-safe.
  *
  * @see jack_transport_locate, jack_set_sync_callback
  * 
  * @param client the JACK client structure.
- * @param pos requested new transport position.
+ * @param pos requested new transport position. Fill pos->valid to specify 
+ *   which fields should be taken into account. If you mark a set of fields
+ *   as valid, you are expected to fill them all.
  *
  * @return 0 if valid request, EINVAL if position structure rejected.
  */
@@ -373,7 +438,7 @@ int  jack_transport_reposition (jack_client_t *client,
  *
  * Any client can make this request at any time.  It takes effect no
  * sooner than the next process cycle, perhaps later if there are
- * slow-sync clients.  This function is realtime-safe.
+ * @ref slowsyncclients "slow-sync clients".  This function is realtime-safe.
  *
  * @see jack_set_sync_callback
  *

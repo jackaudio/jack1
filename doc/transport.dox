@@ -115,6 +115,8 @@ later.  The transport state is always valid, initially it is
   void jack_transport_stop (jack_client_t *client);
 @endcode
 
+@subsection slowsyncclients Slow-sync clients
+
 The engine handles polling of slow-sync clients.  When someone calls
 jack_transport_start(), the engine resets the poll bits and changes to
 a new state, ::JackTransportStarting.  The @a sync_callback function
@@ -155,6 +157,8 @@ rolling, even if some slow-sync clients are still unready.  The @a
 sync_callback for these clients continues being invoked, giving them
 an opportunity to catch up.
 
+@subsection repositioning Repositioning
+
 @code
   int  jack_transport_reposition (jack_client_t *client,
                                   jack_position_t *pos);
@@ -169,6 +173,7 @@ are slow-sync clients and the transport is already rolling, it will
 enter the ::JackTransportStarting state and begin invoking their @a
 sync_callbacks until ready.
 
+@subsection transportstatetransitiondiagram Transport State Transition Diagram
 
 @image html	fsm.png "Transport State Transition Diagram"
 @image latex    fsm.eps "Transport State Transition Diagram"
