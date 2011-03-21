@@ -4158,7 +4158,7 @@ jack_port_do_register (jack_engine_t *engine, jack_request_t *req, int internal)
 	}
 
 	if ((port = jack_get_port_by_name(engine, req->x.port_info.name)) != NULL) {
-		jack_error ("duplicate port name in port registration request");
+		jack_error ("duplicate port name (%s) in port registration request", req->x.port_info.name);
 		jack_unlock_graph (engine);
 		return -1;
 	}
