@@ -1826,10 +1826,65 @@ jack_client_process_events (jack_client_t* client)
 	return 0;
 }
 
+
+static int
+jack_wake_next_client (jack_client_t* client)
+{
+#ifndef JACK_USE_MACH_THREADS
+	struct pollfd pfds[1];
+	int pret = 0;
+	char c = 0;
+
+	if (write (client->graph_next_fd, &c, sizeof (c))
+	    != sizeof (c)) {
+		DEBUG("cannot write byte to fd %d", client->graph_next_fd);
+		jack_error ("cannot continue execution of the "
+			    "processing graph (%s)",
+			    strerror(errno));
+		return -1;
+	}
+	
+	DEBUG ("client sent message to next stage by %" PRIu64 "",
+	       jack_get_microseconds());
+	
+	DEBUG("reading cleanup byte from pipe %d\n", client->graph_wait_fd);
+
+	/* "upstream client went away?  readability is checked in
+	 * jack_client_core_wait(), but that's almost a whole cycle
+	 * before we get here.
+	 */
+
+	if (client->graph_wait_fd >= 0) {
+		pfds[0].fd = client->graph_wait_fd;
+		pfds[0].events = POLLIN;
+
+		/* 0 timeout, don't actually wait */
+		pret = poll(pfds, 1, 0);
+	}
+
+	if (pret > 0 && (pfds[0].revents & POLLIN)) {
+		if (read (client->graph_wait_fd, &c, sizeof (c))
+		    != sizeof (c)) {
+			jack_error ("cannot complete execution of the "
+				"processing graph (%s)", strerror(errno));
+			return -1;
+		}
+	} else {
+		DEBUG("cleanup byte from pipe %d not available?\n",
+			client->graph_wait_fd);
+	}
+#endif	
+	return 0;
+}
+
+#ifdef JACK_USE_MACH_THREADS
+
 static int
 jack_client_core_wait (jack_client_t* client)
 {
 	jack_client_control_t *control = client->control;
+
+        /* this is OS X - we're only waiting on events */
 
 	DEBUG ("client polling on %s", client->pollmax == 2 ?
 	       "event_fd and graph_wait_fd..." :
@@ -1847,8 +1902,45 @@ jack_client_core_wait (jack_client_t* client)
 
 		pthread_testcancel();
 
-#ifndef JACK_USE_MACH_THREADS 
-		
+		if (jack_client_process_events (client)) {
+			DEBUG ("event processing failed\n");
+			return 0;
+		}
+	}
+
+	if (control->dead || client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
+		DEBUG ("client appears dead or event pollfd has error status\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+#else /* !JACK_USE_MACH_THREADS */
+
+static int
+jack_client_core_wait (jack_client_t* client)
+{
+	jack_client_control_t *control = client->control;
+
+        /* this is not OS X - we're waiting on events & process wakeups */
+
+	DEBUG ("client polling on %s", client->pollmax == 2 ?
+	       "event_fd and graph_wait_fd..." :
+	       "event_fd only");
+	
+	while (1) {
+		if (poll (client->pollfd, client->pollmax, 1000) < 0) {
+			if (errno == EINTR) {
+				continue;
+			}
+			jack_error ("poll failed in client (%s)",
+				    strerror (errno));
+			return -1;
+		}
+
+		pthread_testcancel();
+
 		/* get an accurate timestamp on waking from poll for a
 		 * process() cycle. 
 		 */
@@ -1894,20 +1986,17 @@ jack_client_core_wait (jack_client_t* client)
 				client->pollmax = 1;
 			}
 		}
-#endif
 		
 		if (jack_client_process_events (client)) {
 			DEBUG ("event processing failed\n");
 			return 0;
 		}
 
-#ifndef JACK_USE_MACH_THREADS		
 		if (client->graph_wait_fd >= 0 &&
 		    (client->pollfd[WAIT_POLL_INDEX].revents & POLLIN)) {
 			DEBUG ("time to run process()\n");
 			break;
 		}
-#endif
 	}
 
 	if (control->dead || client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
@@ -1918,54 +2007,7 @@ jack_client_core_wait (jack_client_t* client)
 	return 0;
 }
 
-static int
-jack_wake_next_client (jack_client_t* client)
-{
-	struct pollfd pfds[1];
-	int pret = 0;
-	char c = 0;
-
-	if (write (client->graph_next_fd, &c, sizeof (c))
-	    != sizeof (c)) {
-		DEBUG("cannot write byte to fd %d", client->graph_next_fd);
-		jack_error ("cannot continue execution of the "
-			    "processing graph (%s)",
-			    strerror(errno));
-		return -1;
-	}
-	
-	DEBUG ("client sent message to next stage by %" PRIu64 "",
-	       jack_get_microseconds());
-	
-	DEBUG("reading cleanup byte from pipe %d\n", client->graph_wait_fd);
-
-	/* "upstream client went away?  readability is checked in
-	 * jack_client_core_wait(), but that's almost a whole cycle
-	 * before we get here.
-	 */
-
-	if (client->graph_wait_fd >= 0) {
-		pfds[0].fd = client->graph_wait_fd;
-		pfds[0].events = POLLIN;
-
-		/* 0 timeout, don't actually wait */
-		pret = poll(pfds, 1, 0);
-	}
-
-	if (pret > 0 && (pfds[0].revents & POLLIN)) {
-		if (read (client->graph_wait_fd, &c, sizeof (c))
-		    != sizeof (c)) {
-			jack_error ("cannot complete execution of the "
-				"processing graph (%s)", strerror(errno));
-			return -1;
-		}
-	} else {
-		DEBUG("cleanup byte from pipe %d not available?\n",
-			client->graph_wait_fd);
-	}
-	
-	return 0;
-}
+#endif
 
 static jack_nframes_t 
 jack_thread_first_wait (jack_client_t* client)
@@ -1976,116 +2018,6 @@ jack_thread_first_wait (jack_client_t* client)
 	return client->control->nframes;
 }
 		
-jack_nframes_t
-jack_thread_wait (jack_client_t* client, int status)
-{
-	client->control->last_status = status;
-
-   /* SECTION ONE: HOUSEKEEPING/CLEANUP FROM LAST DATA PROCESSING */
-
-	/* housekeeping/cleanup after data processing */
-
-	if (status == 0 && client->control->timebase_cb_cbset) {
-		jack_call_timebase_master (client);
-	}
-	
-	/* end preemption checking */
-	CHECK_PREEMPTION (client->engine, FALSE);
-	
-	client->control->finished_at = jack_get_microseconds();
-	
-	/* wake the next client in the chain (could be the server), 
-	   and check if we were killed during the process
-	   cycle.
-	*/
-	
-	if (jack_wake_next_client (client)) {
-		DEBUG("client cannot wake next, or is dead\n");
-		return 0;
-	}
-
-	if (status || client->control->dead || !client->engine->engine_ok) {
-		return 0;
-	}
-	
-   /* SECTION TWO: WAIT FOR NEXT DATA PROCESSING TIME */
-
-	if (jack_client_core_wait (client)) {
-		return 0;
-	}
-
-   /* SECTION THREE: START NEXT DATA PROCESSING TIME */
-
-	/* Time to do data processing */
-
-	client->control->state = Running;
-	
-	/* begin preemption checking */
-	CHECK_PREEMPTION (client->engine, TRUE);
-	
-	if (client->control->sync_cb_cbset)
-		jack_call_sync_client (client);
-
-	return client->control->nframes;
-}
-
-jack_nframes_t jack_cycle_wait (jack_client_t* client)
-{
-	/* SECTION TWO: WAIT FOR NEXT DATA PROCESSING TIME */
-
-	if (jack_client_core_wait (client)) {
-		return 0;
-	}
-
-   /* SECTION THREE: START NEXT DATA PROCESSING TIME */
-
-	/* Time to do data processing */
-
-	client->control->state = Running;
-	
-	/* begin preemption checking */
-	CHECK_PREEMPTION (client->engine, TRUE);
-	
-	if (client->control->sync_cb_cbset)
-		jack_call_sync_client (client);
-
-	return client->control->nframes;
-}
-
-void jack_cycle_signal(jack_client_t* client, int status)
-{
-	client->control->last_status = status;
-
-   /* SECTION ONE: HOUSEKEEPING/CLEANUP FROM LAST DATA PROCESSING */
-
-	/* housekeeping/cleanup after data processing */
-
-	if (status == 0 && client->control->timebase_cb_cbset) {
-		jack_call_timebase_master (client);
-	}
-	
-	/* end preemption checking */
-	CHECK_PREEMPTION (client->engine, FALSE);
-	
-	client->control->finished_at = jack_get_microseconds();
-	
-	/* wake the next client in the chain (could be the server), 
-	   and check if we were killed during the process
-	   cycle.
-	*/
-	
-	if (jack_wake_next_client (client)) {
-		DEBUG("client cannot wake next, or is dead\n");
-		jack_client_thread_suicide (client);
-		/*NOTREACHED*/
-	}
-
-	if (status || client->control->dead || !client->engine->engine_ok) {
-		jack_client_thread_suicide (client);
-		/*NOTREACHED*/
-	}
-}
-
 static void
 jack_client_thread_aux (void *arg)
 {
@@ -2141,70 +2073,217 @@ jack_client_thread_aux (void *arg)
 	jack_client_thread_suicide (client);
 }
 
+static void
+jack_run_client_provided_process_thread (jack_client_t* client)
+{
+	jack_client_control_t *control = client->control;
+
+        pthread_mutex_lock (&client_lock);
+        client->thread_ok = TRUE;
+        client->thread_id = pthread_self();
+        pthread_cond_signal (&client_ready);
+        pthread_mutex_unlock (&client_lock);
+        
+        control->pid = getpid();
+        control->pgrp = getpgrp();
+        
+        client->thread_cb(client->thread_cb_arg);
+        jack_client_thread_suicide(client);
+}
+
+#ifdef JACK_USE_MACH_THREADS
+
+static void* 
+jack_client_thread (void *arg)
+{
+        /* On OS X, the secondary client thread that we create will
+           always just handle server events, whether or not the
+           client has called jack_set_process_thread().
+        */
+        jack_client_thread_aux(arg);
+	/*NOTREACHED*/
+	return (void *) 0;
+}
+
+#else /* !JACK_USE_MACH_THREADS */
+
 static void* 
 jack_client_thread (void *arg)
 {
 	jack_client_t *client = (jack_client_t *) arg;
-	jack_client_control_t *control = client->control;
+
+        /* On non-OSX systems, the client thread should run the supplied
+           callback if jack_set_process_thread() was called, otherwise
+           it will just wait in a loop for events and/or process wakeups.
+        */
 	
 	if (client->control->thread_cb_cbset) {
-	
-		pthread_mutex_lock (&client_lock);
-		client->thread_ok = TRUE;
-		client->thread_id = pthread_self();
-		pthread_cond_signal (&client_ready);
-		pthread_mutex_unlock (&client_lock);
-
-		control->pid = getpid();
-		control->pgrp = getpgrp();
-
-		client->thread_cb(client->thread_cb_arg);
-		jack_client_thread_suicide(client);
+                jack_run_client_provided_process_thread (client);
 	} else {
-		jack_client_thread_aux(arg);
+		jack_client_thread_aux (arg);
 	}
 	
 	/*NOTREACHED*/
 	return (void *) 0;
 }
 
+#endif
+
+jack_nframes_t
+jack_thread_wait (jack_client_t* client, int status)
+{
+	client->control->last_status = status;
+
+        /* SECTION ONE: HOUSEKEEPING/CLEANUP FROM LAST DATA PROCESSING */
+
+	/* housekeeping/cleanup after data processing */
+
+	if (status == 0 && client->control->timebase_cb_cbset) {
+		jack_call_timebase_master (client);
+	}
+	
+	/* end preemption checking */
+	CHECK_PREEMPTION (client->engine, FALSE);
+	
+	client->control->finished_at = jack_get_microseconds();
+	
+	/* wake the next client in the chain (could be the server), 
+	   and check if we were killed during the process
+	   cycle.
+	*/
+	
+	if (jack_wake_next_client (client)) {
+		DEBUG("client cannot wake next, or is dead\n");
+		return 0;
+	}
+
+	if (status || client->control->dead || !client->engine->engine_ok) {
+		return 0;
+	}
+	
+        /* SECTION TWO: WAIT FOR NEXT DATA PROCESSING TIME */
+        
+	if (jack_client_core_wait (client)) {
+		return 0;
+	}
+        
+        /* SECTION THREE: START NEXT DATA PROCESSING TIME */
+
+	/* Time to do data processing */
+
+	client->control->state = Running;
+	
+	/* begin preemption checking */
+	CHECK_PREEMPTION (client->engine, TRUE);
+	
+	if (client->control->sync_cb_cbset)
+		jack_call_sync_client (client);
+
+	return client->control->nframes;
+}
+
+jack_nframes_t jack_cycle_wait (jack_client_t* client)
+{
+	jack_client_control_t *control = client->control;
+
+	/* SECTION TWO: WAIT FOR NEXT DATA PROCESSING TIME */
+        
 #ifdef JACK_USE_MACH_THREADS
+        /* on OS X systems, this thread is running a callback provided
+           by the client that has called this function in order to wait
+           for the next process callback. This is how we do that ...
+        */
+        jack_client_suspend (client);
+#else
+        /* on non-OSX systems, this thread is running a callback provided
+           by the client that has called this function in order to wait
+           for the next process() callback or the next event from the
+           server.
+        */
+	if (jack_client_core_wait (client)) {
+		return 0;
+	}
+#endif
+        
+        /* SECTION THREE: START NEXT DATA PROCESSING TIME */
+        
+	/* Time to do data processing */
+        
+        control->awake_at = jack_get_microseconds();
+	client->control->state = Running;
+	
+	/* begin preemption checking */
+	CHECK_PREEMPTION (client->engine, TRUE);
+	
+	if (client->control->sync_cb_cbset) {
+		jack_call_sync_client (client);
+        }
+        
+	return client->control->nframes;
+}
+
+void jack_cycle_signal (jack_client_t* client, int status)
+{
+	client->control->last_status = status;
+
+        /* SECTION ONE: HOUSEKEEPING/CLEANUP FROM LAST DATA PROCESSING */
+        
+	/* housekeeping/cleanup after data processing */
+        
+	if (status == 0 && client->control->timebase_cb_cbset) {
+		jack_call_timebase_master (client);
+	}
+	
+	/* end preemption checking */
+	CHECK_PREEMPTION (client->engine, FALSE);
+	
+	client->control->finished_at = jack_get_microseconds();
+        client->control->state = Finished;
+	
+	/* wake the next client in the chain (could be the server), 
+	   and check if we were killed during the process
+	   cycle.
+	*/
+	
+	if (jack_wake_next_client (client)) {
+		DEBUG("client cannot wake next, or is dead\n");
+		jack_client_thread_suicide (client);
+		/*NOTREACHED*/
+	}
+        
+	if (status || client->control->dead || !client->engine->engine_ok) {
+		jack_client_thread_suicide (client);
+		/*NOTREACHED*/
+	}
+}
+
+#ifdef JACK_USE_MACH_THREADS
+
 /* real-time thread : separated from the normal client thread, it will
  * communicate with the server using fast mach RPC mechanism */
 
-static void *
-jack_client_process_thread (void *arg)
+static void
+jack_osx_process_thread (jack_client_t* client) 
 {
-	jack_client_t *client = (jack_client_t *) arg;
-	jack_client_control_t *control = client->control;
+        jack_client_control_t *control = client->control; 
 	int err = 0;
 
-	if (client->control->thread_init_cbset) {
-	/* this means that the init callback will be called twice -taybin*/
-		DEBUG ("calling client thread init callback");
-		client->thread_init (client->thread_init_arg);
-	}
-
-	client->control->pid = getpid();
-	DEBUG ("client process thread is now running");
-        
-	client->rt_thread_ok = TRUE;
-            
    	while (err == 0) {
 	
 		if (jack_client_suspend(client) < 0) {
-				jack_error ("jack_client_process_thread :resume error");
-				goto zombie;
+                        jack_error ("jack_client_process_thread :resume error");
+                        goto zombie;
 		}
 		
 		control->awake_at = jack_get_microseconds();
 		
 		DEBUG ("client resumed");
-		 
+		
 		control->state = Running;
 
-		if (control->sync_cb_cbset)
+		if (control->sync_cb_cbset) {
 			jack_call_sync_client (client);
+                }
 
 		if (control->process_cbset) {
 			if (client->process (control->nframes,
@@ -2215,9 +2294,10 @@ jack_client_process_thread (void *arg)
 			control->state = Finished;
 		}
 
-		if (control->timebase_cb_cbset)
+		if (control->timebase_cb_cbset) {
 			jack_call_timebase_master (client);
-                
+                }
+
 		control->finished_at = jack_get_microseconds();
                 
 		DEBUG ("client finished processing at %Lu (elapsed = %f usecs)",
@@ -2228,16 +2308,15 @@ jack_client_process_thread (void *arg)
 		 * (or whatever) */
 		
 		if (client->control->dead) {
-				jack_error ("jack_client_process_thread: "
-						"client->control->dead");
-				goto zombie;
+                        jack_error ("jack_client_process_thread: "
+                                    "client->control->dead");
+                        goto zombie;
 		}
-
+                
 		DEBUG("process cycle fully complete\n");
-
 	}
-        
- 	return (void *) ((intptr_t)err);
+
+ 	return;
 
   zombie:
         
@@ -2257,11 +2336,36 @@ jack_client_process_thread (void *arg)
 		 * zombified without shutdown handler */
 		jack_client_close_aux (client); 
 	}
+}
+
+static void *
+jack_client_process_thread (void *arg)
+{
+	jack_client_t *client = (jack_client_t *) arg;
+	jack_client_control_t *control = client->control;
+
+	if (client->control->thread_init_cbset) {
+                /* this means that the init callback will be called twice -taybin*/
+		DEBUG ("calling client thread init callback");
+		client->thread_init (client->thread_init_arg);
+	}
+        
+	client->control->pid = getpid();
+	DEBUG ("client process thread is now running");
+        
+	client->rt_thread_ok = TRUE;
+        
+	if (client->control->thread_cb_cbset) {
+                jack_run_client_provided_process_thread (client);
+        } else {
+                jack_osx_process_thread (client);
+        }
 
 	pthread_exit (0);
 	/*NOTREACHED*/
 	return 0;
 }
+
 #endif /* JACK_USE_MACH_THREADS */
 
 static int
