@@ -2294,17 +2294,15 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	
 	DEBUG("run process\n");
 
-	if (jack_engine_process (engine, nframes) == 0) {
-		if (!engine->freewheeling) {
-			if (driver->write (driver, nframes)) {
-				goto unlock;
-			}
-		}
-
-	} else {
+	if (jack_engine_process (engine, nframes) != 0) {
 		DEBUG ("engine process cycle failed");
 		jack_check_client_status (engine);
+	}
 		
+	if (!engine->freewheeling) {
+		if (driver->write (driver, nframes)) {
+			goto unlock;
+		}
 	}
 
 	jack_engine_post_process (engine);
