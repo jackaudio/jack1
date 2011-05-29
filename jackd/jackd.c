@@ -70,6 +70,9 @@ static int nozombies = 0;
 
 extern int sanitycheck (int, int);
 
+static jack_driver_desc_t *
+jack_find_driver_descriptor (const char * name);
+
 static void 
 do_nothing_handler (int sig)
 {
@@ -84,13 +87,14 @@ do_nothing_handler (int sig)
 }
 
 static int
-jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
+jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * slave_names)
 {
 	int sig;
 	int i;
 	sigset_t allsignals;
 	struct sigaction action;
 	int waiting;
+	JSList * node;
 
 	/* ensure that we are in our own process group so that
 	   kill (SIG, -pgrp) does the right thing.
@@ -163,7 +167,16 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params)
 		goto error;
 	}
 
-	if (engine->driver->start (engine->driver) != 0) {
+	for (node=slave_names; node; node=jack_slist_next(node)) {
+		char *sl_name = node->data;
+		jack_driver_desc_t *sl_desc = jack_find_driver_descriptor(sl_name);
+		if (sl_desc) {
+			jack_engine_load_slave_driver(engine, sl_desc, NULL);
+		}
+	}
+
+
+	if (jack_drivers_start (engine) != 0) {
 		jack_error ("cannot start driver");
 		goto error;
 	}
@@ -522,7 +535,7 @@ main (int argc, char *argv[])
 	int do_sanity_checks = 1;
 	int show_version = 0;
 
-	const char *options = "-d:P:uvshVrRZTFlt:mM:n:Np:c:";
+	const char *options = "-d:P:uvshVrRZTFlt:mM:n:Np:c:X:";
 	struct option long_options[] = 
 	{ 
 		/* keep ordered by single-letter option code */
@@ -547,6 +560,7 @@ main (int argc, char *argv[])
 		{ "unlock", 0, 0, 'u' },
 		{ "version", 0, 0, 'V' },
 		{ "verbose", 0, 0, 'v' },
+		{ "slave-driver", 1, 0, 'X' },
 		{ "nozombies", 0, 0, 'Z' },
 		{ 0, 0, 0, 0 }
 	};
@@ -556,6 +570,7 @@ main (int argc, char *argv[])
 	char *driver_name = NULL;
 	char **driver_args = NULL;
 	JSList * driver_params;
+	JSList * slave_drivers = NULL;
 	size_t midi_buffer_size = 0;
 	int driver_nargs = 1;
 	int i;
@@ -659,6 +674,9 @@ main (int argc, char *argv[])
 			show_version = 1;
 			break;
 
+		case 'X':
+			slave_drivers = jack_slist_append(slave_drivers, optarg);
+			break;
 		case 'Z':
 			nozombies = 1;
 			break;
@@ -769,7 +787,7 @@ main (int argc, char *argv[])
 	jack_cleanup_files (server_name);
 
 	/* run the server engine until it terminates */
-	jack_main (desc, driver_params);
+	jack_main (desc, driver_params, slave_drivers);
 
 	/* clean up shared memory and files from this server instance */
 	if (verbose)
