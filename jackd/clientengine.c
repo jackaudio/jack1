@@ -33,6 +33,7 @@
 #include <jack/engine.h>
 #include <jack/messagebuffer.h>
 #include <jack/version.h>
+#include <jack/driver.h>
 #include <sysdeps/poll.h>
 #include <sysdeps/ipc.h>
 
@@ -269,9 +270,23 @@ jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 			
 			if (client->control->awake_at > 0) {
 				if (client->control->finished_at == 0) {
-					client->control->timed_out++;
-					client->error++;
-					VERBOSE (engine, "client %s has timed out", client->control->name);
+					jack_time_t now = jack_get_microseconds();
+
+					if ((now - client->control->awake_at) < engine->driver->period_usecs) {
+						/* we give the client a bit of time, to finish the cycle
+						 * we assume here, that we dont get signals delivered to this thread.
+						 */
+						struct timespec wait_time;
+						wait_time.tv_sec = 0;
+						wait_time.tv_nsec = engine->driver->period_usecs - (now - client->control->awake_at);
+						nanosleep (&wait_time, NULL);
+					}
+
+					if (client->control->finished_at == 0) {
+						client->control->timed_out++;
+						client->error++;
+						VERBOSE (engine, "client %s has timed out", client->control->name);
+					}
 				}
 			}
 		}
