@@ -950,6 +950,16 @@ jack_start_watchdog (jack_engine_t *engine)
 	return 0;
 }
 
+void
+jack_stop_watchdog (jack_engine_t *engine)
+{
+	/* Stephane Letz : letz@grame.fr Watch dog thread is
+	 * not needed on MacOSX since CoreAudio drivers
+	 * already contains a similar mechanism.
+	 */
+	return;
+}
+
 #else
 
 static void *
@@ -1004,6 +1014,23 @@ jack_start_watchdog (jack_engine_t *engine)
 	}
 
 	return 0;
+}
+
+void
+jack_stop_watchdog (jack_engine_t *engine)
+{
+	/* Cancel the watchdog thread and wait for it to terminate.
+	 *
+	 * The watchdog thread is not used on MacOSX since CoreAudio
+	 * drivers already contain a similar mechanism.
+	 */	
+	if (engine->control->real_time && engine->watchdog_thread) {
+		VERBOSE (engine, "stopping watchdog thread");
+		pthread_cancel (engine->watchdog_thread);
+		pthread_join (engine->watchdog_thread, NULL);
+	}
+
+	return;
 }
 #endif /* !JACK_USE_MACH_THREADS */
 
@@ -2587,18 +2614,8 @@ jack_engine_delete (jack_engine_t *engine)
 	pthread_join (engine->server_thread, NULL);
 #endif	
 
-#ifndef JACK_USE_MACH_THREADS 
-	/* Cancel the watchdog thread and wait for it to terminate.
-	 *
-	 * The watchdog thread is not used on MacOSX since CoreAudio
-	 * drivers already contain a similar mechanism.
-	 */	
-	if (engine->control->real_time && engine->watchdog_thread) {
-		VERBOSE (engine, "stopping watchdog thread");
-		pthread_cancel (engine->watchdog_thread);
-		pthread_join (engine->watchdog_thread, NULL);
-	}
-#endif
+	jack_stop_watchdog (engine);
+
 
 	VERBOSE (engine, "last xrun delay: %.3f usecs",
 		engine->control->xrun_delayed_usecs);

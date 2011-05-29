@@ -1503,6 +1503,7 @@ bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_
 	    jack_unlock_graph (server_ptr->engine);
 	    pthread_mutex_unlock( &server_ptr->engine->request_lock );
 
+	    jack_stop_watchdog (server_ptr->engine);
 	    server_ptr->engine->driver = NULL;
 
 	    jack_driver_unload( old_driver );
