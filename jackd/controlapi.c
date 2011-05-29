@@ -1453,12 +1453,34 @@ bool jackctl_server_remove_slave(jackctl_server_t * server_ptr, jackctl_driver_t
 
 bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_t * driver_ptr)
 {
-#if 0
-    if (server_ptr->engine != NULL) {
-        return (server_ptr->engine->SwitchMaster(driver_ptr->desc_ptr, driver_ptr->set_parameters) == 0);
-    } else {
-        return false;
+    if (server_ptr->engine == NULL)
+	    goto fail_nostart;
+
+    server_ptr->engine->driver->stop( server_ptr->engine->driver );
+
+
+    if (jack_engine_load_driver (server_ptr->engine, driver_ptr->desc_ptr, driver_ptr->set_parameters))
+    {
+	    jack_error ("cannot load driver module %s", driver_ptr->desc_ptr->name);
+	    goto fail_nodriver;
     }
-#endif
+
+    if (server_ptr->engine->driver->start (server_ptr->engine->driver) != 0) {
+	    jack_error ("cannot start driver");
+	    goto fail_nostart;
+    }
+
+    return true;
+
+fail_nodriver:
+    jack_error ("could not initialise new driver, trying to reactivate the old one");
+
+    if (server_ptr->engine->driver->start (server_ptr->engine->driver) != 0) {
+	    jack_error ("cannot restart driver");
+	    goto fail_nostart;
+    }
+
+fail_nostart:
+    return false;
 }
 
