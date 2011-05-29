@@ -103,6 +103,10 @@ jackctl_parameter_get_value = libjs.jackctl_parameter_get_value
 jackctl_parameter_get_value.argtypes = [ POINTER(jackctl_parameter_t) ]
 jackctl_parameter_get_value.restype  = jackctl_parameter_value
 
+jackctl_parameter_get_id = libjs.jackctl_parameter_get_id
+jackctl_parameter_get_id.argtypes = [ POINTER(jackctl_parameter_t) ]
+jackctl_parameter_get_id.restype  = c_char
+
 jackctl_server_switch_master = libjs.jackctl_server_switch_master
 jackctl_server_switch_master.argtypes = [ POINTER(jackctl_server_t), POINTER(jackctl_driver_t) ]
 jackctl_server_switch_master.restype  = c_bool
@@ -123,16 +127,19 @@ class Parameter(object):
 
     name = property( get_name )
 
+    def get_id( self ):
+	return jackctl_parameter_get_id( self.param_ptr )
+
+    id = property( get_id )
+
     def set_value( self, val ):
 	param_v = jackctl_parameter_value()
 	if self.param_type == 1:
 	    # int
-	    assert( type(val) == int )
-	    param_v.i = val
+	    param_v.i = int(val)
 	elif self.param_type == 2:
 	    # uint
-	    assert( type(val) == int )
-	    param_v.ui = val
+	    param_v.ui = int(val)
 	elif self.param_type == 3:
 	    # char
 	    assert( (type(val) == str) and len(val)==1 )
@@ -140,7 +147,7 @@ class Parameter(object):
 	elif self.param_type == 4:
 	    # string
 	    assert( type(val) == str )
-	    param_v.str = val
+	    param_v.ss = val
 	elif self.param_type == 5:
 	    # bool
 	    assert( type(val) == bool )
@@ -162,7 +169,7 @@ class Parameter(object):
 	    return param_v.c
 	elif self.param_type == 4:
 	    # string
-	    return param_v.ss.value
+	    return param_v.ss
 	elif self.param_type == 5:
 	    # bool
 	    return param_v.b
@@ -179,6 +186,10 @@ class Driver(object):
 	for i in JSIter( params_jslist, POINTER(jackctl_parameter_t) ):
 	    self.params[ jackctl_parameter_get_name( i ) ] = Parameter(i)
 
+    def get_name( self ):
+	return jackctl_driver_get_name( self.drv_ptr )
+
+    name = property( get_name )
 
 class Server(object):
     def __init__( self ):
