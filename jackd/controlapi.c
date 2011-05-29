@@ -156,6 +156,7 @@ static
 struct jackctl_parameter *
 jackctl_add_parameter(
     JSList ** parameters_list_ptr_ptr,
+    char id,
     const char * name,
     const char * short_description,
     const char * long_description,
@@ -277,6 +278,7 @@ jackctl_add_driver_parameters(
 
         parameter_ptr = jackctl_add_parameter(
             &driver_ptr->parameters,
+	    descriptor_ptr->character,
             descriptor_ptr->name,
             descriptor_ptr->short_desc,
             descriptor_ptr->long_desc,
@@ -292,7 +294,6 @@ jackctl_add_driver_parameters(
         }
 
         parameter_ptr->driver_ptr = driver_ptr;
-        parameter_ptr->id = descriptor_ptr->character;
     }
 
     return true;
@@ -892,6 +893,7 @@ jackctl_server_t * jackctl_server_create(
     strcpy(value.str, jack_default_server_name() );
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    'n',
             "name",
             "Server name to use.",
             "",
@@ -906,6 +908,7 @@ jackctl_server_t * jackctl_server_create(
     value.b = false;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    'R',
             "realtime",
             "Whether to use realtime mode.",
             "Use realtime scheduling. This is needed for reliable low-latency performance. On most systems, it requires JACK to run with special scheduler and memory allocation privileges, which may be obtained in several ways. On Linux you should use PAM.",
@@ -920,6 +923,7 @@ jackctl_server_t * jackctl_server_create(
     value.i = 10;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    'P',
             "realtime-priority",
             "Scheduler priority when running in realtime mode.",
             "",
@@ -936,6 +940,7 @@ jackctl_server_t * jackctl_server_create(
     value.b = false;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    'T',
             "temporary",
             "Exit once all clients have closed their connections.",
             "",
@@ -950,6 +955,7 @@ jackctl_server_t * jackctl_server_create(
     value.b = false;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    'v',
             "verbose",
             "Verbose mode.",
             "",
@@ -964,6 +970,7 @@ jackctl_server_t * jackctl_server_create(
     value.i = 0;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    't',
             "client-timeout",
             "Client timeout limit in milliseconds.",
             "",
@@ -978,6 +985,7 @@ jackctl_server_t * jackctl_server_create(
     value.ui = 0;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    'c',
             "clock-source",
             "Clocksource type : c(ycle) | h(pet) | s(ystem).",
             "",
@@ -992,6 +1000,7 @@ jackctl_server_t * jackctl_server_create(
     value.ui = 128;
     if (jackctl_add_parameter(
           &server_ptr->parameters,
+	  'p',
           "port-max",
           "Maximum number of ports.",
           "",
@@ -1006,6 +1015,7 @@ jackctl_server_t * jackctl_server_create(
     value.b = false;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    '\0',
             "replace-registry",
             "Replace shared memory registry.",
             "",
@@ -1020,6 +1030,7 @@ jackctl_server_t * jackctl_server_create(
     value.b = false;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    'm',
             "mlock",
             "Use mlock.",
             "",
@@ -1034,6 +1045,7 @@ jackctl_server_t * jackctl_server_create(
     value.b = false;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    'u',
             "unlock",
             "munlock memory for big libraries",
             "",
@@ -1048,6 +1060,7 @@ jackctl_server_t * jackctl_server_create(
     value.b = false;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    'Z',
             "nozombies",
             "dont zombifiy offending clients",
             "",
@@ -1062,6 +1075,7 @@ jackctl_server_t * jackctl_server_create(
     value.ui = 0;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
+	    'C',
             "timeout-threshold",
             "threshold for suspending processing",
             "",
