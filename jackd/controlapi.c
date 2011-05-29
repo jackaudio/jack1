@@ -117,7 +117,6 @@ struct jackctl_driver
     jack_driver_desc_t * desc_ptr;
     JSList * parameters;
     JSList * set_parameters;
-    //JackDriverInfo* info;
 };
 
 struct jackctl_internal
