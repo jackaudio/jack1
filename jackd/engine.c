@@ -1118,6 +1118,46 @@ jack_engine_load_driver (jack_engine_t *engine,
 	return 0;
 }
 
+int
+jack_engine_load_slave_driver (jack_engine_t *engine,
+			       jack_driver_desc_t * driver_desc,
+			       JSList * driver_params)
+{
+	jack_client_internal_t *client;
+	jack_driver_t *driver;
+	jack_driver_info_t *info;
+
+	if ((info = jack_load_driver (engine, driver_desc)) == NULL) {
+		return -1;
+	}
+
+	if ((client = jack_create_driver_client (engine, info->client_name)
+		    ) == NULL) {
+		return -1;
+	}
+
+	if ((driver = info->initialize (client->private_client,
+					driver_params)) == NULL) {
+		free (info);
+		return -1;
+	}
+
+	driver->handle = info->handle;
+	driver->finish = info->finish;
+	driver->internal_client = client;
+	free (info);
+
+	if (jack_add_slave_driver (engine, driver) < 0) {
+		jack_client_delete (engine, client);
+		return -1;
+	}
+
+	//engine->driver_desc   = driver_desc;
+	//engine->driver_params = driver_params;
+
+	return 0;
+}
+
 #ifdef USE_CAPABILITIES
 
 static int check_capabilities (jack_engine_t *engine)
@@ -1766,6 +1806,8 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->driver_desc = NULL;
 	engine->driver_params = NULL;
 
+	engine->slave_drivers = NULL;
+
 	engine->set_sample_rate = jack_set_sample_rate;
 	engine->set_buffer_size = jack_driver_buffer_size;
 	engine->run_cycle = jack_run_cycle;
@@ -2078,6 +2120,75 @@ jack_engine_freewheel (void *arg)
 	return 0;
 }
 
+int
+jack_drivers_start (jack_engine_t *engine)
+{
+	JSList *node;
+	/* first start the slave drivers */
+	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
+	{
+		jack_driver_t *sdriver = node->data;
+		sdriver->start( sdriver );
+
+		//XXX: need to remove driver which fail to start
+	}
+
+	/* now the master driver is started */
+	return engine->driver->start(engine->driver);
+}
+
+static int
+jack_drivers_stop (jack_engine_t *engine)
+{
+	JSList *node;
+	/* first stop the master driver */
+	int retval = engine->driver->stop(engine->driver);
+
+	/* now the slave drivers are stopped */
+	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
+	{
+		jack_driver_t *sdriver = node->data;
+		sdriver->stop( sdriver );
+
+		//XXX: need to remove driver which fail to start
+	}
+
+	return retval;
+}
+
+static int
+jack_drivers_read (jack_engine_t *engine, jack_nframes_t nframes)
+{
+	JSList *node;
+	/* first start the slave drivers */
+	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
+	{
+		jack_driver_t *sdriver = node->data;
+		sdriver->read (sdriver, nframes);
+
+		//XXX: need to remove driver which fail to start
+	}
+
+	/* now the master driver is started */
+	return engine->driver->read(engine->driver, nframes);
+}
+
+static int
+jack_drivers_write (jack_engine_t *engine, jack_nframes_t nframes)
+{
+	JSList *node;
+	/* first start the slave drivers */
+	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
+	{
+		jack_driver_t *sdriver = node->data;
+		sdriver->write (sdriver, nframes);
+
+		//XXX: need to remove driver which fail to start
+	}
+
+	/* now the master driver is started */
+	return engine->driver->write(engine->driver, nframes);
+}
 static int
 jack_start_freewheeling (jack_engine_t* engine, jack_client_id_t client_id)
 {
@@ -2097,7 +2208,7 @@ jack_start_freewheeling (jack_engine_t* engine, jack_client_id_t client_id)
 	   there are no more process() calls being handled.
 	*/
 
-	if (engine->driver->stop (engine->driver)) {
+	if (jack_drivers_stop (engine)) {
 		jack_error ("could not stop driver for freewheeling");
 		return -1;
 	}
@@ -2164,7 +2275,7 @@ jack_stop_freewheeling (jack_engine_t* engine, int engine_exiting)
 		
 		/* restart the driver */
 		
-		if (engine->driver->start (engine->driver)) {
+		if (jack_drivers_start (engine)) {
 			jack_error ("could not restart driver after freewheeling");
 			return -1;
 		}
@@ -2287,7 +2398,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		
 	if (!engine->freewheeling) {
 		DEBUG("waiting for driver read\n");
-		if (driver->read (driver, nframes)) {
+		if (jack_drivers_read (engine, nframes)) {
 			goto unlock;
 		}
 	}
@@ -2300,7 +2411,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	}
 		
 	if (!engine->freewheeling) {
-		if (driver->write (driver, nframes)) {
+		if (jack_drivers_write (engine, nframes)) {
 			goto unlock;
 		}
 	}
@@ -4051,6 +4162,19 @@ jack_use_driver (jack_engine_t *engine, jack_driver_t *driver)
 	return 0;
 }
 
+int
+jack_add_slave_driver (jack_engine_t *engine, jack_driver_t *driver)
+{
+	if (driver) {
+		if (driver->attach (driver, engine)) {
+			return -1;
+		}
+
+		engine->slave_drivers = jack_slist_append (engine->slave_drivers, driver);
+	}
+
+	return 0;
+}
 
 /* PORT RELATED FUNCTIONS */
 

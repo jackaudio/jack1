@@ -68,6 +68,8 @@ struct _jack_engine {
     jack_driver_desc_t    *driver_desc;
     JSList                *driver_params;
 
+    JSList                *slave_drivers;
+
     /* these are "callbacks" made by the driver backend */
     int  (*set_buffer_size) (struct _jack_engine *, jack_nframes_t frames);
     int  (*set_sample_rate) (struct _jack_engine *, jack_nframes_t frames);
@@ -188,6 +190,9 @@ int		jack_wait (jack_engine_t *engine);
 int		jack_engine_load_driver (jack_engine_t *engine,
 					 jack_driver_desc_t * driver_desc,
 					 JSList * driver_params);
+int		jack_engine_load_slave_driver (jack_engine_t *engine,
+					       jack_driver_desc_t * driver_desc,
+					       JSList * driver_params);
 void		jack_dump_configuration(jack_engine_t *engine, int take_lock);
 
 /* private engine functions */
@@ -252,4 +257,8 @@ jack_client_by_name (jack_engine_t *engine, const char *name);
 int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_event_t *);
 void
 jack_engine_signal_problems (jack_engine_t* engine);
+
+int
+jack_drivers_start (jack_engine_t *engine);
+
 #endif /* __jack_engine_h__ */
