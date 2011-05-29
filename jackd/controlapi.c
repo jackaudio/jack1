@@ -809,6 +809,33 @@ jackctl_wait_signals(sigset_t signals)
 }
 #endif
 
+static sigset_t
+jackctl_block_signals()
+{
+    sigset_t signals;
+    sigset_t oldsignals;
+
+    sigemptyset(&signals);
+    sigaddset(&signals, SIGHUP);
+    sigaddset(&signals, SIGINT);
+    sigaddset(&signals, SIGQUIT);
+    sigaddset(&signals, SIGPIPE);
+    sigaddset(&signals, SIGTERM);
+    sigaddset(&signals, SIGUSR1);
+    sigaddset(&signals, SIGUSR2);
+
+    pthread_sigmask(SIG_BLOCK, &signals, &oldsignals);
+
+    return oldsignals;
+}
+
+static void
+jackctl_unblock_signals(sigset_t oldsignals)
+{
+    pthread_sigmask(SIG_SETMASK, &oldsignals, 0);
+}
+
+
 static
 jack_driver_param_constraint_desc_t *
 get_realtime_priority_constraint()
@@ -1097,6 +1124,8 @@ jackctl_server_start(
     jackctl_driver_t *driver_ptr)
 {
     int rc;
+    sigmask_t oldsignals;
+
 
     // TODO:
     int frame_time_offset = 0;
@@ -1125,6 +1154,8 @@ jackctl_server_start(
     if (!server_ptr->realtime.b && server_ptr->client_timeout.i == 0)
         server_ptr->client_timeout.i = 500; /* 0.5 sec; usable when non realtime. */
     
+    oldsignals = jackctl_block_signals();
+
     if ((server_ptr->engine = jack_engine_new (server_ptr->realtime.b, server_ptr->realtime_priority.i, 
 				    server_ptr->do_mlock.b, server_ptr->do_unlock.b, server_ptr->name.str,
 				    server_ptr->temporary.b, server_ptr->verbose.b, server_ptr->client_timeout.i,
@@ -1145,6 +1176,7 @@ jackctl_server_start(
 	    goto fail_close;
     }
 
+    jackctl_unblock_signals( oldsignals );
     return true;
 
 fail_close:
@@ -1165,6 +1197,7 @@ fail_unregister:
     //jack_log("unregistering server `%s'", server_ptr->name.str);
 
     jack_unregister_server(server_ptr->name.str);
+    jackctl_unblock_signals( oldsignals );
 
 fail:
     return false;
