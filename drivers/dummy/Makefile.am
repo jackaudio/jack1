@@ -11,4 +11,4 @@ jack_dummy_la_SOURCES = dummy_driver.c dummy_driver.h
 
 noinst_HEADERS = dummy_driver.h
 
-# jack_alsa_la_LIBADD = 
+jack_dummy_la_LIBADD = $(top_builddir)/libjack/libjack.la  $(top_builddir)/jackd/libjackserver.la

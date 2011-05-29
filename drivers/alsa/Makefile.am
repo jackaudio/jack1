@@ -20,4 +20,4 @@ noinst_HEADERS = alsa_driver.h \
 		ice1712.h \
 		usx2y.h
 
-jack_alsa_la_LIBADD = $(ALSA_LIBS) 
+jack_alsa_la_LIBADD = $(ALSA_LIBS) $(top_builddir)/libjack/libjack.la $(top_builddir)/jackd/libjackserver.la
