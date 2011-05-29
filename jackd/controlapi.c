@@ -198,7 +198,7 @@ jackctl_add_parameter(
 
     parameter_ptr->driver_ptr = NULL;
     parameter_ptr->driver_parameter_ptr = NULL;
-    parameter_ptr->id = 0;
+    parameter_ptr->id = id;
     parameter_ptr->constraint_ptr = constraint_ptr;
 
     *parameters_list_ptr_ptr = jack_slist_append(*parameters_list_ptr_ptr, parameter_ptr);
