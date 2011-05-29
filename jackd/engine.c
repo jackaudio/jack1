@@ -2120,17 +2120,33 @@ jack_engine_freewheel (void *arg)
 	return 0;
 }
 
+static void
+jack_slave_driver_remove(jack_engine_t *engine, jack_driver_t *sdriver)
+{
+	sdriver->detach (sdriver, engine);
+	engine->slave_drivers = jack_slist_remove(engine->slave_drivers, sdriver);
+
+	jack_driver_unload(sdriver);
+}
 int
 jack_drivers_start (jack_engine_t *engine)
 {
 	JSList *node;
+	JSList *failed_drivers = NULL;
 	/* first start the slave drivers */
 	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
 	{
 		jack_driver_t *sdriver = node->data;
-		sdriver->start( sdriver );
+		if (sdriver->start( sdriver ))
+			failed_drivers = jack_slist_append(failed_drivers, sdriver);
+	}
 
-		//XXX: need to remove driver which fail to start
+	// Clean up drivers which failed to start.
+	for (node=failed_drivers; node; node=jack_slist_next(node))
+	{
+		jack_driver_t *sdriver = node->data;
+		jack_error( "slave driver %s failed to start, removing it", sdriver->internal_client->control->name );
+		jack_slave_driver_remove(engine, sdriver);
 	}
 
 	/* now the master driver is started */
@@ -2149,8 +2165,6 @@ jack_drivers_stop (jack_engine_t *engine)
 	{
 		jack_driver_t *sdriver = node->data;
 		sdriver->stop( sdriver );
-
-		//XXX: need to remove driver which fail to start
 	}
 
 	return retval;
@@ -2160,16 +2174,14 @@ static int
 jack_drivers_read (jack_engine_t *engine, jack_nframes_t nframes)
 {
 	JSList *node;
-	/* first start the slave drivers */
+	/* first read the slave drivers */
 	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
 	{
 		jack_driver_t *sdriver = node->data;
 		sdriver->read (sdriver, nframes);
-
-		//XXX: need to remove driver which fail to start
 	}
 
-	/* now the master driver is started */
+	/* now the master driver is read */
 	return engine->driver->read(engine->driver, nframes);
 }
 
@@ -2182,11 +2194,9 @@ jack_drivers_write (jack_engine_t *engine, jack_nframes_t nframes)
 	{
 		jack_driver_t *sdriver = node->data;
 		sdriver->write (sdriver, nframes);
-
-		//XXX: need to remove driver which fail to start
 	}
 
-	/* now the master driver is started */
+	/* now the master driver is written */
 	return engine->driver->write(engine->driver, nframes);
 }
 static int

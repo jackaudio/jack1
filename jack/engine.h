@@ -260,5 +260,7 @@ jack_engine_signal_problems (jack_engine_t* engine);
 
 int
 jack_drivers_start (jack_engine_t *engine);
+int
+jack_add_slave_driver (jack_engine_t *engine, struct _jack_driver *driver);
 
 #endif /* __jack_engine_h__ */
