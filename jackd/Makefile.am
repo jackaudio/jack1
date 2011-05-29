@@ -44,7 +44,7 @@ lib_LTLIBRARIES	= libjackserver.la
 
 libjackserver_la_CFLAGS = $(AM_CFLAGS)
 
-libjackserver_la_SOURCES = engine.c clientengine.c transengine.c \
+libjackserver_la_SOURCES = engine.c clientengine.c transengine.c controlapi.c \
 	../libjack/systemtest.c ../libjack/sanitycheck.c \
 	../libjack/client.c ../libjack/driver.c ../libjack/intclient.c \
         ../libjack/messagebuffer.c ../libjack/pool.c ../libjack/port.c \
