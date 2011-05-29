@@ -418,6 +418,71 @@ jack_drivers_load ()
 	return driver_list;
 }
 
+static void
+jack_cleanup_files (const char *server_name)
+{
+	DIR *dir;
+	struct dirent *dirent;
+	char dir_name[PATH_MAX+1] = "";
+        jack_server_dir (server_name, dir_name);
+
+	/* On termination, we remove all files that jackd creates so
+	 * subsequent attempts to start jackd will not believe that an
+	 * instance is already running.  If the server crashes or is
+	 * terminated with SIGKILL, this is not possible.  So, cleanup
+	 * is also attempted when jackd starts.
+	 *
+	 * There are several tricky issues.  First, the previous JACK
+	 * server may have run for a different user ID, so its files
+	 * may be inaccessible.  This is handled by using a separate
+	 * JACK_TMP_DIR subdirectory for each user.  Second, there may
+	 * be other servers running with different names.  Each gets
+	 * its own subdirectory within the per-user directory.  The
+	 * current process has already registered as `server_name', so
+	 * we know there is no other server actively using that name.
+	 */
+
+	/* nothing to do if the server directory does not exist */
+	if ((dir = opendir (dir_name)) == NULL) {
+		return;
+	}
+
+	/* unlink all the files in this directory, they are mine */
+	while ((dirent = readdir (dir)) != NULL) {
+
+		char fullpath[PATH_MAX+1];
+
+		if ((strcmp (dirent->d_name, ".") == 0)
+		    || (strcmp (dirent->d_name, "..") == 0)) {
+			continue;
+		}
+
+		snprintf (fullpath, sizeof (fullpath), "%s/%s",
+			  dir_name, dirent->d_name);
+
+		if (unlink (fullpath)) {
+			jack_error ("cannot unlink `%s' (%s)", fullpath,
+				    strerror (errno));
+		}
+	} 
+
+	closedir (dir);
+
+	/* now, delete the per-server subdirectory, itself */
+	if (rmdir (dir_name)) {
+ 		jack_error ("cannot remove `%s' (%s)", dir_name,
+			    strerror (errno));
+	}
+
+	/* finally, delete the per-user subdirectory, if empty */
+	if (rmdir (jack_user_dir ())) {
+		if (errno != ENOTEMPTY) {
+			jack_error ("cannot remove `%s' (%s)",
+				    jack_user_dir (), strerror (errno));
+		}
+	}
+}
+
 static int
 jackctl_drivers_load(
     struct jackctl_server * server_ptr)
