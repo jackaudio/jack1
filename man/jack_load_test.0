@@ -1,0 +1,11 @@
+.TH JACK_LOAD_TEST "1" "!DATE!" "!VERSION!"
+.SH NAME
+jack_load_test \- JACK toolkit client which occupies the cpu for some time in process.
+.SH SYNOPSIS
+.B jack_load_test -t \fItime\fR
+.SH DESCRIPTION
+.B jack_load_test
+jack_load_test is a client without ports, which just occupies the cpu for \fItime\fR
+miliseconds. It is quite useful to test jackd behaviour under load.
+
+
