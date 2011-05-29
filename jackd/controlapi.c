@@ -99,9 +99,17 @@ struct jackctl_server
     union jackctl_parameter_value replace_registry;
     union jackctl_parameter_value default_replace_registry;
 
-    /* bool, synchronous or asynchronous engine mode */
-    union jackctl_parameter_value sync;
-    union jackctl_parameter_value default_sync;
+    /* bool, use mlock */
+    union jackctl_parameter_value do_mlock;
+    union jackctl_parameter_value default_do_mlock;
+
+    /* bool, munlock gui libraries */
+    union jackctl_parameter_value do_unlock;
+    union jackctl_parameter_value default_do_unlock;
+
+    /* bool, dont zombify... */
+    union jackctl_parameter_value nozombies;
+    union jackctl_parameter_value default_nozombies;
 };
 
 struct jackctl_driver
@@ -981,12 +989,40 @@ jackctl_server_t * jackctl_server_create(
     value.b = false;
     if (jackctl_add_parameter(
             &server_ptr->parameters,
-            "sync",
-            "Use server synchronous mode.",
+            "mlock",
+            "Use mlock.",
             "",
             JackParamBool,
-            &server_ptr->sync,
-            &server_ptr->default_sync,
+            &server_ptr->do_mlock,
+            &server_ptr->default_do_mlock,
+            value, NULL) == NULL)
+    {
+        goto fail_free_parameters;
+    }
+
+    value.b = false;
+    if (jackctl_add_parameter(
+            &server_ptr->parameters,
+            "unlock",
+            "munlock memory for big libraries",
+            "",
+            JackParamBool,
+            &server_ptr->do_unlock,
+            &server_ptr->default_do_unlock,
+            value, NULL) == NULL)
+    {
+        goto fail_free_parameters;
+    }
+
+    value.b = false;
+    if (jackctl_add_parameter(
+            &server_ptr->parameters,
+            "nozombies",
+            "dont zombifiy offending clients",
+            "",
+            JackParamBool,
+            &server_ptr->nozombies,
+            &server_ptr->default_nozombies,
             value, NULL) == NULL)
     {
         goto fail_free_parameters;
