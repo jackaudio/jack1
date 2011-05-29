@@ -1331,7 +1331,7 @@ bool jackctl_parameter_is_set(jackctl_parameter_t *parameter_ptr)
 
 union jackctl_parameter_value jackctl_parameter_get_value(jackctl_parameter_t *parameter_ptr)
 {
-    return *parameter_ptr->value_ptr;
+    return *(parameter_ptr->value_ptr);
 }
 
 bool jackctl_parameter_reset(jackctl_parameter_t *parameter_ptr)
@@ -1409,7 +1409,7 @@ bool jackctl_parameter_set_value(jackctl_parameter_t *parameter_ptr, const union
 
 union jackctl_parameter_value jackctl_parameter_get_default_value(jackctl_parameter_t *parameter_ptr)
 {
-    return *parameter_ptr->default_value_ptr;
+    return *(parameter_ptr->default_value_ptr);
 }
 
 // Internals clients
