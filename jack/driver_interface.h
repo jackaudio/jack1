@@ -33,6 +33,10 @@ extern "C" {
 #define JACK_DRIVER_PARAM_NAME_MAX    15
 #define JACK_DRIVER_PARAM_STRING_MAX  63
 
+#define JACK_CONSTRAINT_FLAG_RANGE       ((uint32_t)1) /**< if set, constraint is a range (min-max) */
+#define JACK_CONSTRAINT_FLAG_STRICT      ((uint32_t)2) /**< if set, constraint is strict, i.e. supplying non-matching value will not work */
+#define JACK_CONSTRAINT_FLAG_FAKE_VALUE  ((uint32_t)4) /**< if set, values have no user meaningful meaning */
+
 
 /** Driver parameter types */
 typedef enum
@@ -54,6 +58,27 @@ typedef union
   char      str[JACK_DRIVER_PARAM_STRING_MAX+1];
 } jack_driver_param_value_t;
 
+typedef struct {
+    jack_driver_param_value_t value;
+    char short_desc[64];               /**< A short (~30 chars) description for the user */
+} jack_driver_param_value_enum_t;
+
+typedef struct {
+    uint32_t flags;         /**< JACK_CONSTRAINT_FLAG_XXX */
+
+    union {
+	struct {
+	    jack_driver_param_value_t min;
+	    jack_driver_param_value_t max;
+	} range;            /**< valid when JACK_CONSTRAINT_FLAG_RANGE flag is set */
+
+	struct {
+	    uint32_t count;
+	    jack_driver_param_value_enum_t * possible_values_array;
+	} enumeration;      /**< valid when JACK_CONSTRAINT_FLAG_RANGE flag is not set */
+    } constraint;
+} jack_driver_param_constraint_desc_t;
+
 
 /** A driver parameter descriptor */
 typedef struct
@@ -62,6 +87,7 @@ typedef struct
   char character;                    /**< The parameter's character (for getopt, etc) */
   jack_driver_param_type_t type;     /**< The parameter's type */
   jack_driver_param_value_t value;   /**< The parameter's (default) value */
+  jack_driver_param_constraint_desc_t * constraint; /**< Pointer to parameter constraint descriptor. NULL if there is no constraint */
   char short_desc[64];               /**< A short (~30 chars) description for the user */
   char long_desc[1024];              /**< A longer description for the user */
 
