@@ -262,7 +262,8 @@ void jack_stop_watchdog (jack_engine_t * );
 
 void
 jack_engine_signal_problems (jack_engine_t* engine);
-
+int
+jack_use_driver (jack_engine_t *engine, struct _jack_driver *driver);
 int
 jack_drivers_start (jack_engine_t *engine);
 int

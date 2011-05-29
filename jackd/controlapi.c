@@ -1522,7 +1522,8 @@ bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_
 
     if (server_ptr->engine->driver->start (server_ptr->engine->driver) != 0) {
 	    jack_error ("cannot start driver");
-	    goto fail_nostart;
+	    jack_use_driver(server_ptr->engine, NULL);
+	    goto fail_nodriver;
     }
 
     return true;

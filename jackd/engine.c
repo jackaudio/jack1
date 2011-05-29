@@ -115,7 +115,6 @@ static void jack_notify_all_port_interested_clients (jack_engine_t *engine,
 						     jack_port_id_t b,
 						     int connect);
 static void jack_engine_post_process (jack_engine_t *);
-static int  jack_use_driver (jack_engine_t *engine, jack_driver_t *driver);
 static int  jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 			    float delayed_usecs);
 static int   jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
@@ -1131,7 +1130,7 @@ jack_engine_load_driver (jack_engine_t *engine,
 	free (info);
 
 	if (jack_use_driver (engine, driver) < 0) {
-		jack_client_delete (engine, client);
+		jack_remove_client (engine, client);
 		return -1;
 	}
 
@@ -4172,7 +4171,7 @@ jack_clear_fifos (jack_engine_t *engine)
 	}
 }
 
-static int
+int
 jack_use_driver (jack_engine_t *engine, jack_driver_t *driver)
 {
 	if (engine->driver) {
