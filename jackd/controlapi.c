@@ -148,8 +148,8 @@ jackctl_add_parameter(
     jackctl_param_type_t type,
     union jackctl_parameter_value * value_ptr,
     union jackctl_parameter_value * default_value_ptr,
-    union jackctl_parameter_value value )
-//    jack_driver_param_constraint_desc_t * constraint_ptr = NULL)
+    union jackctl_parameter_value value,
+    jack_driver_param_constraint_desc_t * constraint_ptr)
 {
     struct jackctl_parameter * parameter_ptr;
 
@@ -271,8 +271,8 @@ jackctl_add_driver_parameters(
             jackctl_type,
             NULL,
             NULL,
-            jackctl_value );
-//            descriptor_ptr->constraint);
+            jackctl_value,
+            descriptor_ptr->constraint);
 
         if (parameter_ptr == NULL)
         {
@@ -737,18 +737,15 @@ jackctl_wait_signals(sigset_t signals)
 }
 #endif
 
-/*
 static
 jack_driver_param_constraint_desc_t *
 get_realtime_priority_constraint()
 {
+#ifndef __OpenBSD__
     jack_driver_param_constraint_desc_t * constraint_ptr;
-    int min, max;
 
-    if (!jack_get_thread_realtime_priority_range(&min, &max))
-    {
-        return NULL;
-    }
+    int max = sched_get_priority_max (SCHED_FIFO);
+    int min = sched_get_priority_min (SCHED_FIFO);
 
     //jack_info("realtime priority range is (%d,%d)", min, max);
 
@@ -764,8 +761,10 @@ get_realtime_priority_constraint()
     constraint_ptr->constraint.range.max.i = max;
 
     return constraint_ptr;
+#else
+    return NULL
+#endif
 }
-*/
 
 jackctl_server_t * jackctl_server_create(
     bool (* on_device_acquire)(const char * device_name),
@@ -795,7 +794,7 @@ jackctl_server_t * jackctl_server_create(
             JackParamString,
             &server_ptr->name,
             &server_ptr->default_name,
-            value) == NULL)
+            value, NULL) == NULL)
     {
         goto fail_free_parameters;
     }
@@ -809,7 +808,7 @@ jackctl_server_t * jackctl_server_create(
             JackParamBool,
             &server_ptr->realtime,
             &server_ptr->default_realtime,
-            value) == NULL)
+            value, NULL) == NULL)
     {
         goto fail_free_parameters;
     }
@@ -823,8 +822,8 @@ jackctl_server_t * jackctl_server_create(
             JackParamInt,
             &server_ptr->realtime_priority,
             &server_ptr->default_realtime_priority,
-            value
-            //get_realtime_priority_constraint()
+            value,
+            get_realtime_priority_constraint()
 	    ) == NULL)
     {
         goto fail_free_parameters;
@@ -839,7 +838,7 @@ jackctl_server_t * jackctl_server_create(
             JackParamBool,
             &server_ptr->temporary,
             &server_ptr->default_temporary,
-            value) == NULL)
+            value, NULL) == NULL)
     {
         goto fail_free_parameters;
     }
@@ -853,7 +852,7 @@ jackctl_server_t * jackctl_server_create(
             JackParamBool,
             &server_ptr->verbose,
             &server_ptr->default_verbose,
-            value) == NULL)
+            value, NULL) == NULL)
     {
         goto fail_free_parameters;
     }
@@ -867,7 +866,7 @@ jackctl_server_t * jackctl_server_create(
             JackParamInt,
             &server_ptr->client_timeout,
             &server_ptr->default_client_timeout,
-            value) == NULL)
+            value, NULL) == NULL)
     {
         goto fail_free_parameters;
     }
@@ -881,7 +880,7 @@ jackctl_server_t * jackctl_server_create(
             JackParamUInt,
             &server_ptr->clock_source,
             &server_ptr->default_clock_source,
-            value) == NULL)
+            value, NULL) == NULL)
     {
         goto fail_free_parameters;
     }
@@ -895,7 +894,7 @@ jackctl_server_t * jackctl_server_create(
           JackParamUInt,
           &server_ptr->port_max,
           &server_ptr->default_port_max,
-          value) == NULL)
+          value, NULL) == NULL)
     {
         goto fail_free_parameters;
     }
@@ -909,7 +908,7 @@ jackctl_server_t * jackctl_server_create(
             JackParamBool,
             &server_ptr->replace_registry,
             &server_ptr->default_replace_registry,
-            value) == NULL)
+            value, NULL) == NULL)
     {
         goto fail_free_parameters;
     }
@@ -923,7 +922,7 @@ jackctl_server_t * jackctl_server_create(
             JackParamBool,
             &server_ptr->sync,
             &server_ptr->default_sync,
-            value) == NULL)
+            value, NULL) == NULL)
     {
         goto fail_free_parameters;
     }
