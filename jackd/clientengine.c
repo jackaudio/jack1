@@ -157,7 +157,7 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 	jack_client_do_deactivate (engine, client, FALSE);
 }
 
-static void
+void
 jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
 	JSList *node;
