@@ -30,7 +30,7 @@
 #define JACKCTL_H__2EEDAD78_DF4C_4B26_83B7_4FF1A446A47E__INCLUDED
 
 #include <jack/jslist.h>
-#include <jack/systemdeps.h>
+
 #if !defined (__sun__)
 #include <stdbool.h>
 #endif
