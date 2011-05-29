@@ -20,6 +20,7 @@
 #define __jack_alsa_midi_h__
 
 #include <jack/jack.h>
+#include <jack/driver.h>
 
 typedef struct alsa_midi_t alsa_midi_t;
 struct alsa_midi_t {
@@ -34,5 +35,14 @@ struct alsa_midi_t {
 
 alsa_midi_t* alsa_rawmidi_new(jack_client_t *jack);
 alsa_midi_t* alsa_seqmidi_new(jack_client_t *jack, const char* alsa_name);
+
+typedef struct _alsa_midi_driver {
+
+    JACK_DRIVER_DECL;
+
+    alsa_midi_t *midi;
+    jack_client_t *client;
+
+} alsa_midi_driver_t;
 
 #endif /* __jack_alsa_midi_h__ */
