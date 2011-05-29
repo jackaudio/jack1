@@ -1842,6 +1842,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->driver_exit = jack_engine_driver_exit;
 	engine->transport_cycle_start = jack_transport_cycle_start;
 	engine->client_timeout_msecs = client_timeout;
+	engine->continuous_stream = 0;
 	engine->problems = 0;
 
 	engine->next_client_id = 1;	/* 0 is a NULL client ID */
@@ -2419,7 +2420,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		return 0;
 	}
 
-	if (engine->problems) {
+	if (engine->problems || (engine->continuous_stream > 10)) {
 		VERBOSE (engine, "problem-driven null cycle problems=%d", engine->problems);
 		jack_unlock_problems (engine);
 		jack_unlock_graph (engine);
@@ -2444,6 +2445,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	DEBUG("run process\n");
 
 	if (jack_engine_process (engine, nframes) != 0) {
+		engine->continuous_stream = 0;
 		DEBUG ("engine process cycle failed");
 		jack_check_client_status (engine);
 	}
@@ -3505,6 +3507,7 @@ jack_sort_graph (jack_engine_t *engine)
 	jack_compute_all_port_total_latencies (engine);
 	jack_rechain_graph (engine);
 	jack_compute_new_latency (engine);
+	engine->continuous_stream = 0;
 	VERBOSE (engine, "-- jack_sort_graph");
 }
 

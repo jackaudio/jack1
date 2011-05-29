@@ -138,6 +138,7 @@ struct _jack_engine {
     pid_t           wait_pid;
     int             nozombies;
     volatile int    problems;
+    volatile int    continuous_stream;
     volatile int    new_clients_allowed;    
 
     /* these lists are protected by `client_lock' */
