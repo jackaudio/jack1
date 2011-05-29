@@ -1494,19 +1494,19 @@ bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_
 
     if (old_driver)
     {
-	    old_driver->stop( old_driver );
-	    old_driver->detach( old_driver, server_ptr->engine );
+	    old_driver->stop (old_driver );
+	    old_driver->detach (old_driver, server_ptr->engine);
 
-	    pthread_mutex_lock( &server_ptr->engine->request_lock );
+	    pthread_mutex_lock (&server_ptr->engine->request_lock);
 	    jack_lock_graph (server_ptr->engine);
-	    jack_remove_client( server_ptr->engine, old_driver->internal_client );
+	    jack_remove_client (server_ptr->engine, old_driver->internal_client);
 	    jack_unlock_graph (server_ptr->engine);
-	    pthread_mutex_unlock( &server_ptr->engine->request_lock );
+	    pthread_mutex_unlock (&server_ptr->engine->request_lock);
 
 	    jack_stop_watchdog (server_ptr->engine);
 	    server_ptr->engine->driver = NULL;
 
-	    jack_driver_unload( old_driver );
+	    jack_driver_unload (old_driver);
     }
 
     if (jack_engine_load_driver (server_ptr->engine, driver_ptr->desc_ptr, driver_ptr->set_parameters))
