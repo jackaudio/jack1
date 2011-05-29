@@ -805,7 +805,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 			return NULL;		/* will stop the loop */
 		}
 	} else {
-		engine->continuous_stream = 0;
+		engine->timeout_count = 0;
 	}
 
 
@@ -1787,7 +1787,7 @@ jack_engine_t *
 jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 		 const char *server_name, int temporary, int verbose,
 		 int client_timeout, unsigned int port_max, pid_t wait_pid,
-		 jack_nframes_t frame_time_offset, int nozombies, JSList *drivers)
+		 jack_nframes_t frame_time_offset, int nozombies, int timeout_count_threshold, JSList *drivers)
 {
 	jack_engine_t *engine;
 	unsigned int i;
@@ -1844,7 +1844,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->driver_exit = jack_engine_driver_exit;
 	engine->transport_cycle_start = jack_transport_cycle_start;
 	engine->client_timeout_msecs = client_timeout;
-	engine->continuous_stream = 0;
+	engine->timeout_count = 0;
 	engine->problems = 0;
 
 	engine->next_client_id = 1;	/* 0 is a NULL client ID */
@@ -1862,6 +1862,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->feedbackcount = 0;
 	engine->wait_pid = wait_pid;
 	engine->nozombies = nozombies;
+	engine->timeout_count_threshold = timeout_count_threshold;
 	engine->removing_clients = 0;
         engine->new_clients_allowed = 1;
 
@@ -2422,7 +2423,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		return 0;
 	}
 
-	if (engine->problems || (engine->continuous_stream > 10)) {
+	if (engine->problems || (engine->timeout_count_threshold && (engine->timeout_count > engine->timeout_count_threshold))) {
 		VERBOSE (engine, "problem-driven null cycle problems=%d", engine->problems);
 		jack_unlock_problems (engine);
 		jack_unlock_graph (engine);
@@ -3508,7 +3509,7 @@ jack_sort_graph (jack_engine_t *engine)
 	jack_compute_all_port_total_latencies (engine);
 	jack_rechain_graph (engine);
 	jack_compute_new_latency (engine);
-	engine->continuous_stream = 0;
+	engine->timeout_count = 0;
 	VERBOSE (engine, "-- jack_sort_graph");
 }
 

@@ -294,7 +294,7 @@ jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 						 * however, we increase the continuous_stream flag.
 						 */
 
-						engine->continuous_stream += 1;
+						engine->timeout_count += 1;
 					}
 				}
 			}
