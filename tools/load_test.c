@@ -48,10 +48,6 @@ void signal_handler(int sig)
 	exit(0);
 }
 
-void silent_function( const char *ignore )
-{
-}
-
 int
 process_cb (jack_nframes_t nframes, void *arg)
 {
@@ -104,8 +100,6 @@ main (int argc, char *argv[])
 	}
 
 	/* try to open server in a loop. breaking under certein conditions */
-
-        jack_set_info_function( silent_function );
 
 	client = jack_client_open( "load_test", JackNullOption, NULL );
 
