@@ -237,7 +237,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	}
 }
 
-void
+int
 jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 {
 	/* CALLER MUST HOLD graph read lock */
@@ -278,13 +278,15 @@ jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 						 */
 						struct timespec wait_time;
 						wait_time.tv_sec = 0;
-						wait_time.tv_nsec = engine->driver->period_usecs - (now - client->control->awake_at);
+						wait_time.tv_nsec = (engine->driver->period_usecs - (now - client->control->awake_at)) * 1000;
+						VERBOSE (engine, "client %s seems to have timed out. we may have mercy of %d ns."  , client->control->name, (int) wait_time.tv_nsec );
 						nanosleep (&wait_time, NULL);
 					}
 
 					if (client->control->finished_at == 0) {
 						client->control->timed_out++;
 						client->error++;
+						errs++;
 						VERBOSE (engine, "client %s has timed out", client->control->name);
 					} else {
 						/*
@@ -302,6 +304,8 @@ jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 	if (errs) {
 		jack_engine_signal_problems (engine);
 	}
+
+	return errs;
 }
 
 void

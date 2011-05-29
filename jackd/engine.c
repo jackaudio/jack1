@@ -799,23 +799,25 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 			 ctl->finished_at? (ctl->finished_at -
 					    ctl->signalled_at): 0);
 
-		jack_check_clients (engine, 1);
+		if (jack_check_clients (engine, 1)) {
 
-		engine->process_errors++;
-		return NULL;		/* will stop the loop */
-
-	} else {
-
-		DEBUG ("reading byte from subgraph_wait_fd==%d",
-		       client->subgraph_wait_fd);
-
-		if (read (client->subgraph_wait_fd, &c, sizeof(c))
-		    != sizeof (c)) {
-			jack_error ("pp: cannot clean up byte from graph wait "
-				    "fd (%s)", strerror (errno));
-			client->error++;
-			return NULL;	/* will stop the loop */
+			engine->process_errors++;
+			return NULL;		/* will stop the loop */
 		}
+	} else {
+		engine->continuous_stream = 0;
+	}
+
+
+	DEBUG ("reading byte from subgraph_wait_fd==%d",
+	       client->subgraph_wait_fd);
+
+	if (read (client->subgraph_wait_fd, &c, sizeof(c))
+	    != sizeof (c)) {
+		jack_error ("pp: cannot clean up byte from graph wait "
+			    "fd (%s)", strerror (errno));
+		client->error++;
+		return NULL;	/* will stop the loop */
 	}
 
 	/* Move to next internal client (or end of client list) */
@@ -2445,7 +2447,6 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	DEBUG("run process\n");
 
 	if (jack_engine_process (engine, nframes) != 0) {
-		engine->continuous_stream = 0;
 		DEBUG ("engine process cycle failed");
 		jack_check_client_status (engine);
 	}
