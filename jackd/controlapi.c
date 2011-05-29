@@ -38,6 +38,8 @@
 #include "jack/jslist.h"
 #include "jack/driver_interface.h"
 #include "jack/driver.h"
+
+#include "jack/engine.h"
 //#include "JackError.h"
 //#include "JackServer.h"
 //#include "shm.h"
@@ -1063,28 +1065,25 @@ const JSList * jackctl_server_get_drivers_list(jackctl_server_t *server_ptr)
 
 bool jackctl_server_stop(jackctl_server_t *server_ptr)
 {
-#if 0
-    server_ptr->engine->Stop();
-    server_ptr->engine->Close();
-    delete server_ptr->engine;
+	//jack_engine_driver_exit (server_ptr->engine);
+	jack_engine_delete (server_ptr->engine);
 
     /* clean up shared memory and files from this server instance */
-    jack_log("cleaning up shared memory");
+    //jack_log("cleaning up shared memory");
 
     jack_cleanup_shm();
 
-    jack_log("cleaning up files");
+    //jack_log("cleaning up files");
 
-    JackTools::CleanupFiles(server_ptr->name.str);
+    jack_cleanup_files (server_ptr->name.str);
 
-    jack_log("unregistering server `%s'", server_ptr->name.str);
+    //jack_log("unregistering server `%s'", server_ptr->name.str);
 
     jack_unregister_server(server_ptr->name.str);
 
     server_ptr->engine = NULL;
 
     return true;
-#endif
 }
 
 const JSList * jackctl_server_get_parameters(jackctl_server_t *server_ptr)
@@ -1097,10 +1096,12 @@ jackctl_server_start(
     jackctl_server_t *server_ptr,
     jackctl_driver_t *driver_ptr)
 {
-#if 0
     int rc;
 
-    rc = jack_register_server(server_ptr->name.str, server_ptr->replace_registry.b);
+    // TODO:
+    int frame_time_offset = 0;
+
+    rc = jack_register_server (server_ptr->name.str, server_ptr->replace_registry.b);
     switch (rc)
     {
     case EEXIST:
@@ -1114,78 +1115,59 @@ jackctl_server_start(
         goto fail;
     }
 
-    jack_log("server `%s' registered", server_ptr->name.str);
+    //jack_log("server `%s' registered", server_ptr->name.str);
 
     /* clean up shared memory and files from any previous
      * instance of this server name */
-    jack_cleanup_shm();
-    //JackTools::CleanupFiles(server_ptr->name.str);
+    jack_cleanup_shm ();
+    jack_cleanup_files (server_ptr->name.str);
 
     if (!server_ptr->realtime.b && server_ptr->client_timeout.i == 0)
         server_ptr->client_timeout.i = 500; /* 0.5 sec; usable when non realtime. */
     
-    /* check port max value before allocating server */
-    if (server_ptr->port_max.ui > PORT_NUM_MAX) {
-        jack_error("JACK server started with too much ports %d (when port max can be %d)", server_ptr->port_max.ui, PORT_NUM_MAX);
-        goto fail;
+    if ((server_ptr->engine = jack_engine_new (server_ptr->realtime.b, server_ptr->realtime_priority.i, 
+				    server_ptr->do_mlock.b, server_ptr->do_unlock.b, server_ptr->name.str,
+				    server_ptr->temporary.b, server_ptr->verbose.b, server_ptr->client_timeout.i,
+				    server_ptr->port_max.i, getpid(), frame_time_offset, 
+				    server_ptr->nozombies.b, drivers)) == 0) {
+	    jack_error ("cannot create engine");
+	    goto fail_unregister;
     }
 
-    /* get the engine/driver started */
-    server_ptr->engine = new JackServer(
-        server_ptr->sync.b,
-        server_ptr->temporary.b,
-        server_ptr->client_timeout.i,
-        server_ptr->realtime.b,
-        server_ptr->realtime_priority.i,
-        server_ptr->port_max.ui,                                
-        server_ptr->verbose.b,
-        (jack_timer_type_t)server_ptr->clock_source.ui,
-        server_ptr->name.str);
-    if (server_ptr->engine == NULL)
+    if (jack_engine_load_driver (server_ptr->engine, driver_ptr->desc_ptr, driver_ptr->set_parameters))
     {
-        jack_error("Failed to create new JackServer object");
-        goto fail_unregister;
+		jack_error ("cannot load driver module %s", driver_ptr->desc_ptr->name);
+		goto fail_delete;
     }
 
-    rc = server_ptr->engine->Open(driver_ptr->desc_ptr, driver_ptr->set_parameters);
-    if (rc < 0)
-    {
-        jack_error("JackServer::Open() failed with %d", rc);
-        goto fail_delete;
-    }
-
-    rc = server_ptr->engine->Start();
-    if (rc < 0)
-    {
-        jack_error("JackServer::Start() failed with %d", rc);
-        goto fail_close;
+    if (server_ptr->engine->driver->start (server_ptr->engine->driver) != 0) {
+	    jack_error ("cannot start driver");
+	    goto fail_close;
     }
 
     return true;
 
 fail_close:
-    server_ptr->engine->Close();
 
 fail_delete:
-    delete server_ptr->engine;
+    jack_engine_delete (server_ptr->engine);
     server_ptr->engine = NULL;
 
 fail_unregister:
-    jack_log("cleaning up shared memory");
+    //jack_log("cleaning up shared memory");
 
     jack_cleanup_shm();
 
-    jack_log("cleaning up files");
+    //jack_log("cleaning up files");
 
-    JackTools::CleanupFiles(server_ptr->name.str);
+    jack_cleanup_files(server_ptr->name.str);
 
-    jack_log("unregistering server `%s'", server_ptr->name.str);
+    //jack_log("unregistering server `%s'", server_ptr->name.str);
 
     jack_unregister_server(server_ptr->name.str);
 
 fail:
     return false;
-#endif
 }
 
 const char * jackctl_driver_get_name(jackctl_driver_t *driver_ptr)
