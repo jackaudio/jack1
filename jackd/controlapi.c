@@ -1485,17 +1485,35 @@ bool jackctl_server_remove_slave(jackctl_server_t * server_ptr, jackctl_driver_t
 
 bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_t * driver_ptr)
 {
+    jack_driver_t *old_driver;
+
     if (server_ptr->engine == NULL)
 	    goto fail_nostart;
 
-    server_ptr->engine->driver->stop( server_ptr->engine->driver );
+    old_driver = server_ptr->engine->driver;
 
+    if (old_driver)
+    {
+	    old_driver->stop( old_driver );
+	    old_driver->detach( old_driver, server_ptr->engine );
+
+	    pthread_mutex_lock( &server_ptr->engine->request_lock );
+	    jack_lock_graph (server_ptr->engine);
+	    jack_remove_client( server_ptr->engine, old_driver->internal_client );
+	    jack_unlock_graph (server_ptr->engine);
+	    pthread_mutex_unlock( &server_ptr->engine->request_lock );
+
+	    server_ptr->engine->driver = NULL;
+
+	    jack_driver_unload( old_driver );
+    }
 
     if (jack_engine_load_driver (server_ptr->engine, driver_ptr->desc_ptr, driver_ptr->set_parameters))
     {
 	    jack_error ("cannot load driver module %s", driver_ptr->desc_ptr->name);
 	    goto fail_nodriver;
     }
+
 
     if (server_ptr->engine->driver->start (server_ptr->engine->driver) != 0) {
 	    jack_error ("cannot start driver");
@@ -1505,12 +1523,7 @@ bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_
     return true;
 
 fail_nodriver:
-    jack_error ("could not initialise new driver, trying to reactivate the old one");
-
-    if (server_ptr->engine->driver->start (server_ptr->engine->driver) != 0) {
-	    jack_error ("cannot restart driver");
-	    goto fail_nostart;
-    }
+    jack_error ("could not initialise new driver, leaving without driver");
 
 fail_nostart:
     return false;
