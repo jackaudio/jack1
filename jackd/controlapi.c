@@ -1124,7 +1124,7 @@ jackctl_server_start(
     jackctl_driver_t *driver_ptr)
 {
     int rc;
-    sigmask_t oldsignals;
+    sigset_t oldsignals;
 
 
     // TODO:
