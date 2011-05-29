@@ -88,7 +88,7 @@ net_driver_sync_cb(jack_transport_state_t state, jack_position_t *pos, void *dat
     return retval;
 }
 
-int netjack_wait( netjack_driver_state_t *netj )
+int netjack_wait( netjack_driver_state_t *netj, jack_time_t (*get_microseconds)(void) )
 {
     int we_have_the_expected_frame = 0;
     jack_nframes_t next_frame_avail;
@@ -96,7 +96,7 @@ int netjack_wait( netjack_driver_state_t *netj )
     jacknet_packet_header *pkthdr;
 
     if( !netj->next_deadline_valid ) {
-	    netj->next_deadline = jack_get_time() + netj->period_usecs;
+	    netj->next_deadline = get_microseconds() + netj->period_usecs;
 	    netj->next_deadline_valid = 1;
     }
 
@@ -106,7 +106,7 @@ int netjack_wait( netjack_driver_state_t *netj )
 	netj->expected_framecnt += 1;
     } else {
 	// starting up.... lets look into the packetcache, and fetch the highest packet.
-	packet_cache_drain_socket( netj->packcache, netj->sockfd );
+	packet_cache_drain_socket( netj->packcache, netj->sockfd, get_microseconds );
 	if( packet_cache_get_highest_available_framecnt( netj->packcache, &next_frame_avail ) ) {
 	    netj->expected_framecnt = next_frame_avail;
 	    netj->expected_framecnt_valid = 1;
@@ -130,11 +130,11 @@ int netjack_wait( netjack_driver_state_t *netj )
 			break;
 	    }
 	}
-	if( ! netjack_poll_deadline( netj->sockfd, netj->next_deadline ) ) {
+	if( ! netjack_poll_deadline( netj->sockfd, netj->next_deadline, get_microseconds ) ) {
 	    break;
 	}
 
-	packet_cache_drain_socket( netj->packcache, netj->sockfd );
+	packet_cache_drain_socket( netj->packcache, netj->sockfd, get_microseconds );
     }
 
     // check if we know who to send our packets too.
@@ -156,7 +156,7 @@ int netjack_wait( netjack_driver_state_t *netj )
 
     if( we_have_the_expected_frame ) {
 
-	jack_time_t now =  jack_get_time();
+	jack_time_t now =  get_microseconds();
 	if( now < netj->next_deadline )
 		netj->time_to_deadline = netj->next_deadline - now;
 	else

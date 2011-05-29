@@ -352,10 +352,10 @@ process (jack_nframes_t nframes, void *arg)
 	// Now loop until we get the right packet.
 	while(1) {
 	    jack_nframes_t got_frame;
-	    if ( ! netjack_poll_deadline( input_fd, deadline ) )
+	    if ( ! netjack_poll_deadline( input_fd, deadline, jack_get_time ) )
 		break;
 
-	    packet_cache_drain_socket(packcache, input_fd);
+	    packet_cache_drain_socket(packcache, input_fd, jack_get_time);
 
 	    if (packet_cache_get_next_available_framecnt( packcache, framecnt - latency, &got_frame ))
 		if( got_frame == (framecnt - latency) )
@@ -364,7 +364,7 @@ process (jack_nframes_t nframes, void *arg)
     } else {
 	// normally:
 	// only drain socket.
-	packet_cache_drain_socket(packcache, input_fd);
+	packet_cache_drain_socket(packcache, input_fd, jack_get_time);
     }
 
     size = packet_cache_retreive_packet_pointer( packcache, framecnt - latency, (char**)&rx_packet_ptr, rx_bufsize, &packet_recv_timestamp );

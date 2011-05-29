@@ -121,7 +121,7 @@ void	cache_packet_set_framecnt(cache_packet *pack, jack_nframes_t framecnt);
 void	cache_packet_add_fragment(cache_packet *pack, char *packet_buf, int rcv_len);
 int	cache_packet_is_complete(cache_packet *pack);
 
-void packet_cache_drain_socket( packet_cache *pcache, int sockfd );
+void packet_cache_drain_socket( packet_cache *pcache, int sockfd, jack_time_t (*get_microseconds)(void) );
 void packet_cache_reset_master_address( packet_cache *pcache );
 float packet_cache_get_fill( packet_cache *pcache, jack_nframes_t expected_framecnt );
 int packet_cache_retreive_packet_pointer( packet_cache *pcache, jack_nframes_t framecnt, char **packet_buf, int pkt_size, jack_time_t *timestamp );
@@ -131,7 +131,7 @@ int packet_cache_get_highest_available_framecnt( packet_cache *pcache, jack_nfra
 int packet_cache_find_latency( packet_cache *pcache, jack_nframes_t expected_framecnt, jack_nframes_t *framecnt );
 // Function Prototypes
 
-int netjack_poll_deadline (int sockfd, jack_time_t deadline);
+int netjack_poll_deadline (int sockfd, jack_time_t deadline, jack_time_t (*get_microseconds)(void));
 
 void netjack_sendto(int sockfd, char *packet_buf, int pkt_size, int flags, struct sockaddr *addr, int addr_size, int mtu);
 

@@ -363,7 +363,7 @@ cache_packet_is_complete (cache_packet *pack)
 // new poll using nanoseconds resolution and
 // not waiting forever.
 int
-netjack_poll_deadline (int sockfd, jack_time_t deadline)
+netjack_poll_deadline (int sockfd, jack_time_t deadline, jack_time_t (*get_microseconds)(void))
 {
     struct pollfd fds;
     int poll_err = 0;
@@ -374,7 +374,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
 #endif
 
 
-    jack_time_t now = jack_get_time();
+    jack_time_t now = get_microseconds();
     if( now >= deadline )
 	return 0;
 
@@ -490,7 +490,7 @@ netjack_poll (int sockfd, int timeout)
     return 0;
 }
 int
-netjack_poll_deadline (int sockfd, jack_time_t deadline)
+netjack_poll_deadline (int sockfd, jack_time_t deadline, jack_time_t (*get_microseconds)(void))
 {
     fd_set fds;
     FD_ZERO( &fds );
@@ -498,7 +498,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
 
     struct timeval timeout;
     while( 1 ) {
-        jack_time_t now = jack_get_time();
+        jack_time_t now = get_microseconds();
         if( now >= deadline )
                 return 0;
 
@@ -520,7 +520,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline)
 // replacing netjack_recv functions.
 
 void
-packet_cache_drain_socket( packet_cache *pcache, int sockfd )
+packet_cache_drain_socket( packet_cache *pcache, int sockfd, jack_time_t (*get_microseconds)(void) )
 {
     char *rx_packet = alloca (pcache->mtu);
     jacknet_packet_header *pkthdr = (jacknet_packet_header *) rx_packet;
@@ -564,7 +564,7 @@ packet_cache_drain_socket( packet_cache *pcache, int sockfd )
 
         cpack = packet_cache_get_packet (pcache, framecnt);
         cache_packet_add_fragment (cpack, rx_packet, rcv_len);
-	cpack->recv_timestamp = jack_get_time();
+	cpack->recv_timestamp = get_microseconds();
     }
 }
 
