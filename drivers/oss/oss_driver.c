@@ -181,7 +181,7 @@ static void set_period_size (oss_driver_t *driver,
 		((double) driver->period_size /
 		(double) driver->sample_rate) * 1e6;
 	driver->last_wait_ust = 0;
-	driver->last_periodtime = jack_get_microseconds();
+	driver->last_periodtime = driver->engine->get_microseconds();
 	driver->next_periodtime = 0;
 	driver->iodelay = 0.0F;
 }
@@ -189,7 +189,7 @@ static void set_period_size (oss_driver_t *driver,
 
 static inline void update_times (oss_driver_t *driver)
 {
-	driver->last_periodtime = jack_get_microseconds();
+	driver->last_periodtime = driver->engine->get_microseconds();
 	if (driver->next_periodtime > 0)
 	{
 		driver->iodelay = (float)
@@ -759,7 +759,7 @@ static int oss_driver_start (oss_driver_t *driver)
 	if (driver->threads & 1) sem_post(&driver->sem_start);
 	if (driver->threads & 2) sem_post(&driver->sem_start);
 
-	driver->last_periodtime = jack_get_microseconds();
+	driver->last_periodtime = driver->engine->get_microseconds();
 	driver->next_periodtime = 0;
 	driver->iodelay = 0.0F;
 

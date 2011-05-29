@@ -297,16 +297,16 @@ static OSStatus render(void *inRefCon,
 	AudioUnitRender(ca_driver->au_hal, ioActionFlags, inTimeStamp, 1, inNumberFrames, ca_driver->input_list);
 	
 	if (ca_driver->xrun_detected > 0) { /* XRun was detected */
-		jack_time_t current_time = jack_get_microseconds();
+		jack_time_t current_time = ca_driver->engine->get_microseconds();
 		ca_driver->engine->delay(ca_driver->engine, current_time - 
 			(ca_driver->last_wait_ust + ca_driver->period_usecs));
 		ca_driver->last_wait_ust = current_time;
 		ca_driver->xrun_detected = 0;
 		return 0;
     } else {
-		ca_driver->last_wait_ust = jack_get_microseconds();
+		ca_driver->last_wait_ust = ca_driver->engine->get_microseconds();
 		ca_driver->engine->transport_cycle_start(ca_driver->engine,
-					  jack_get_microseconds());
+					  ca_driver->engine->get_microseconds());
 		res = ca_driver->engine->run_cycle(ca_driver->engine, inNumberFrames, 0);
 	}
 	
@@ -337,16 +337,16 @@ static OSStatus render_input(void *inRefCon,
 	coreaudio_driver_t* ca_driver = (coreaudio_driver_t*)inRefCon;
 	AudioUnitRender(ca_driver->au_hal, ioActionFlags, inTimeStamp, 1, inNumberFrames, ca_driver->input_list);
 	if (ca_driver->xrun_detected > 0) { /* XRun was detected */
-		jack_time_t current_time = jack_get_microseconds();
+		jack_time_t current_time = ca_driver->engine->get_microseconds();
 		ca_driver->engine->delay(ca_driver->engine, current_time - 
 			(ca_driver->last_wait_ust + ca_driver->period_usecs));
 		ca_driver->last_wait_ust = current_time;
 		ca_driver->xrun_detected = 0;
 		return 0;
     } else {
-		ca_driver->last_wait_ust = jack_get_microseconds();
+		ca_driver->last_wait_ust = ca_driver->engine->get_microseconds();
 		ca_driver->engine->transport_cycle_start(ca_driver->engine,
-					  jack_get_microseconds());
+					  ca_driver->engine->get_microseconds());
 		return ca_driver->engine->run_cycle(ca_driver->engine, inNumberFrames, 0);
 	}
 }

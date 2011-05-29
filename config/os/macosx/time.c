@@ -38,4 +38,9 @@ void jack_set_clock_source (jack_timer_type_t clocksrc)
 	/* only one clock source for os x */
 }
 
+static jack_time_t 
+jack_get_microseconds_symbol(void) 
+{  
+        return  (jack_time_t) mach_absolute_time () * __jack_time_ratio;
+}
 #endif /* __jack_time_c__ */

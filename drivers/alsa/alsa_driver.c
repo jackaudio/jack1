@@ -1262,7 +1262,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			nfds++;
 		}
 
-		poll_enter = jack_get_microseconds ();
+		poll_enter = driver->engine->get_microseconds ();
 
 		if (poll_enter > driver->poll_next) {
 			/*
@@ -1296,7 +1296,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			
 		}
 
-		poll_ret = jack_get_microseconds ();
+		poll_ret = driver->engine->get_microseconds ();
 
 		if (extra_fd < 0) {
 			if (driver->poll_next && poll_ret > driver->poll_next) {

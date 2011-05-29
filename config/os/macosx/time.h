@@ -31,4 +31,12 @@ jack_get_microseconds(void)
         return  (jack_time_t) mach_absolute_time () * __jack_time_ratio;
 }
 
+extern jack_time_t jack_get_microseconds_symbol(void);
+
+typedef jack_time_t (*jack_get_microseconds_t)(void);
+static inline  jack_get_microseconds_t jack_get_microseconds_pointer(void)
+{
+	return jack_get_microseconds_symbol;
+}
+
 #endif /* __jack_time_h__ */

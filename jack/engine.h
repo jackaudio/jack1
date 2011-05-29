@@ -78,7 +78,7 @@ struct _jack_engine {
     void (*delay)	    (struct _jack_engine *, float delayed_usecs);
     void (*transport_cycle_start) (struct _jack_engine *, jack_time_t time);
     void (*driver_exit)     (struct _jack_engine *);
-
+    jack_time_t (*get_microseconds)(void);
     /* "private" sections starts here */
 
     /* engine serialization -- use precedence for deadlock avoidance */

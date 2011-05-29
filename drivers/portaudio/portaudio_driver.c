@@ -121,7 +121,7 @@ paCallback(void *inputBuffer, void *outputBuffer,
 
 	driver->inPortAudio = (float*)inputBuffer;
 	driver->outPortAudio = (float*)outputBuffer;
-	driver->last_wait_ust = jack_get_microseconds();
+	driver->last_wait_ust = driver->engine->get_microseconds();
 	return driver->engine->run_cycle(driver->engine, framesPerBuffer, 0);
 }
 
@@ -247,7 +247,7 @@ portaudio_driver_read (portaudio_driver_t *driver, jack_nframes_t nframes)
 	}
    
 	driver->engine->transport_cycle_start (driver->engine,
-					   jack_get_microseconds ());
+					   driver->engine->get_microseconds ());
 	return 0;
 }          
 

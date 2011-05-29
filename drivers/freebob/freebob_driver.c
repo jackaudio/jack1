@@ -452,7 +452,7 @@ freebob_driver_wait (freebob_driver_t *driver, int extra_fd, int *status,
 	
 	printEnter();
 
-	wait_enter = jack_get_microseconds ();
+	wait_enter = driver->engine->get_microseconds ();
 	if (wait_enter > driver->wait_next) {
 		/*
 			* This processing cycle was delayed past the
@@ -468,7 +468,7 @@ freebob_driver_wait (freebob_driver_t *driver, int extra_fd, int *status,
 
 	nframes=freebob_streaming_wait(driver->dev);
 	
-	wait_ret = jack_get_microseconds ();
+	wait_ret = driver->engine->get_microseconds ();
 	
 	if (driver->wait_next && wait_ret > driver->wait_next) {
 		*delayed_usecs = wait_ret - driver->wait_next;

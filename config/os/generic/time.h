@@ -30,4 +30,10 @@ jack_get_microseconds (void) {
 	return jack_get_microseconds_from_system ();
 }
 
+typedef jack_time_t (*jack_get_microseconds_t)(void);
+static inline  jack_get_microseconds_t jack_get_microseconds_pointer(void)
+{
+	return jack_get_microseconds_from_system;
+}
+
 #endif /* __jack_time_h__ */

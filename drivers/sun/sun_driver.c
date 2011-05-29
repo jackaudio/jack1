@@ -243,7 +243,7 @@ sun_driver_wait (sun_driver_t *driver, int *status, float *iodelay)
 	if (driver->outfd >= 0)
 		need_playback = 1;
 
-	poll_enter = jack_get_microseconds();
+	poll_enter = driver->engine->get_microseconds();
 	if (poll_enter > driver->poll_next)
 	{
 		/* late. don't count as wakeup delay. */
@@ -284,7 +284,7 @@ sun_driver_wait (sun_driver_t *driver, int *status, float *iodelay)
 		}
 	}
 
-	poll_ret = jack_get_microseconds();
+	poll_ret = driver->engine->get_microseconds();
 
 	if (driver->poll_next && poll_ret > driver->poll_next)
 		*iodelay = poll_ret - driver->poll_next;
@@ -425,7 +425,7 @@ sun_driver_run_cycle (sun_driver_t *driver)
 			return -1;
 		case -5:
 			/* poll() timeout */
-			now = jack_get_microseconds();
+			now = driver->engine->get_microseconds();
 			if (now > driver->poll_next)
 			{
 				iodelay = now - driver->poll_next;
