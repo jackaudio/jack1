@@ -2423,7 +2423,7 @@ jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		return 0;
 	}
 
-	if (engine->problems || (engine->timeout_count_threshold && (engine->timeout_count > engine->timeout_count_threshold))) {
+	if (engine->problems || (engine->timeout_count_threshold && (engine->timeout_count > (1 + engine->timeout_count_threshold*1000/engine->driver->period_usecs) ))) {
 		VERBOSE (engine, "problem-driven null cycle problems=%d", engine->problems);
 		jack_unlock_problems (engine);
 		jack_unlock_graph (engine);

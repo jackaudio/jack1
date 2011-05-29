@@ -536,7 +536,6 @@ main (int argc, char *argv[])
 	int do_sanity_checks = 1;
 	int show_version = 0;
 
-	const char *options = "-d:P:uvshVrRZTFlt:mM:n:Np:c:X:";
 	const char *options = "-d:P:uvshVrRZTFlt:mM:n:Np:c:X:C:";
 	struct option long_options[] = 
 	{ 
@@ -564,7 +563,7 @@ main (int argc, char *argv[])
 		{ "verbose", 0, 0, 'v' },
 		{ "slave-driver", 1, 0, 'X' },
 		{ "nozombies", 0, 0, 'Z' },
-		{ "timeout-thres", 1, 0, 'C' },
+		{ "timeout-thres", 2, 0, 'C' },
 		{ 0, 0, 0, 0 }
 	};
 	int opt = 0;
@@ -603,7 +602,10 @@ main (int argc, char *argv[])
 			break;
 
 		case 'C':
-			timeout_count_threshold = atoi (optarg);
+			if (optarg)
+				timeout_count_threshold = atoi (optarg);
+			else
+				timeout_count_threshold = 250;
 			break;
 
 		case 'd':

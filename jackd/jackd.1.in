@@ -105,10 +105,10 @@ Prevent JACK from ever kicking out clients because they were too slow.
 This cancels the effect any specified timeout value, but JACK and its clients are
 still subject to the supervision of the watchdog thread or its equivalent.
 .TP
-\fB\-C, \-\-timeout-thres \fItries\fR
+\fB\-C, \-\-timeout-thres \fItime\fR
 .br
-Stop processing clients if JACK cannot complete the process cycle in time (typically caused by CPU overloading or misbehaved clients). The optional \fItries\fR 
-argument specifies the number of consectutive process cycles that must fail before JACK gives up (default is 10). Processing will resume on the next change to the port 
+Stop processing clients if JACK cannot complete the process cycle in time (typically caused by CPU overloading or misbehaved clients). The optional \fItime\fR 
+argument specifies the number of miliseconds, during which consectutive process cycles must fail before JACK gives up (if the argument is not given, it defaults to 250). Processing will resume on the next change to the port 
 graph (i.e. a port is added, removed, connected or disconnected)
 .TP
 \fB\-u, \-\-unlock\fR
