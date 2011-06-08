@@ -3022,7 +3022,7 @@ jack_get_ports (jack_client_t *client,
 	psp = engine->ports;
 	match_cnt = 0;
 
-	if ((matching_ports = (const char **) malloc (sizeof (char *) * engine->port_max)) == NULL) {
+	if ((matching_ports = (const char **) malloc (sizeof (char *) * (engine->port_max + 1))) == NULL) {
 		return NULL;
 	}
 
@@ -3065,12 +3065,12 @@ jack_get_ports (jack_client_t *client,
 		regfree (&type_regex);
 	}
 
-	matching_ports[match_cnt] = 0;
-
 	if (match_cnt == 0) {
 		free (matching_ports);
 		matching_ports = 0;
-	}
+	} else {
+                matching_ports[match_cnt] = 0;
+        }
 
 	return matching_ports;
 }
