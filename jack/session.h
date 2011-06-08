@@ -279,6 +279,10 @@ jack_reserve_client_name (jack_client_t *client,
 int
 jack_client_has_session_callback (jack_client_t *client, const char *client_name) JACK_WEAK_EXPORT;
 
+/**
+ * @}
+ */
+
 #ifdef __cplusplus
 }
 #endif
