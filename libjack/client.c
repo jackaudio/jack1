@@ -1781,7 +1781,7 @@ jack_client_process_events (jack_client_t* client)
 		case SampleRateChange:
 			if (control->srate_cbset) {
 				status = client->srate
-					(control->nframes,
+					(client->engine->current_time.frame_rate,
 					 client->srate_arg);
 			}
 			break;
@@ -2015,7 +2015,7 @@ jack_thread_first_wait (jack_client_t* client)
 	if (jack_client_core_wait (client)) {
 		return 0;
 	}
-	return client->control->nframes;
+	return client->engine->buffer_size;
 }
 		
 static void
@@ -2042,7 +2042,7 @@ jack_client_thread_aux (void *arg)
 
 	/* wait for first wakeup from server */
 
-	if (jack_thread_first_wait (client) == control->nframes) {
+	if (jack_thread_first_wait (client) == client->engine->buffer_size) {
 
 		/* now run till we're done */
 
@@ -2052,9 +2052,9 @@ jack_client_thread_aux (void *arg)
 
 			while (1) {
 				DEBUG("client calls process()");
-				int status = (client->process (control->nframes, 
+				int status = (client->process (client->engine->buffer_size, 
 								client->process_arg) ==
-					      control->nframes);
+					      client->engine->buffer_size);
 				control->state = Finished;
 				DEBUG("client leaves process(), re-enters wait");
 				if (!jack_thread_wait (client, status)) {
@@ -2065,7 +2065,7 @@ jack_client_thread_aux (void *arg)
 
 		} else {
 			/* no process handling but still need to process events */
-			while (jack_thread_wait (client, 0) == control->nframes)
+			while (jack_thread_wait (client, 0) == client->engine->buffer_size)
 				;
 		}
 	}
@@ -2179,7 +2179,7 @@ jack_thread_wait (jack_client_t* client, int status)
 	if (client->control->sync_cb_cbset)
 		jack_call_sync_client (client);
 
-	return client->control->nframes;
+	return client->engine->buffer_size;
 }
 
 jack_nframes_t jack_cycle_wait (jack_client_t* client)
@@ -2219,7 +2219,7 @@ jack_nframes_t jack_cycle_wait (jack_client_t* client)
 		jack_call_sync_client (client);
         }
         
-	return client->control->nframes;
+	return client->engine->buffer_size;
 }
 
 void jack_cycle_signal (jack_client_t* client, int status)

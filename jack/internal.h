@@ -256,7 +256,6 @@ typedef volatile struct {
 
     volatile jack_client_id_t id;         /* w: engine r: engine and client */
     volatile jack_client_id_t uid;        /* w: engine r: engine and client */
-    volatile jack_nframes_t  nframes;     /* w: engine r: client */
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
     volatile char	name[JACK_CLIENT_NAME_SIZE];
     volatile char	session_command[JACK_PORT_NAME_SIZE];

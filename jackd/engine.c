@@ -530,14 +530,6 @@ jack_driver_buffer_size (jack_engine_t *engine, jack_nframes_t nframes)
 		}
 	}
 
-	/* update shared client copy of nframes */
-	jack_lock_graph (engine);
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		jack_client_internal_t *client = node->data;
-		client->control->nframes = nframes;
-	}
-	jack_unlock_graph (engine);
-
 	event.type = BufferSizeChange;
 	jack_deliver_event_to_all (engine, &event);
 
@@ -847,7 +839,6 @@ jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
 		jack_client_control_t *ctl =
 			((jack_client_internal_t *) node->data)->control;
 		ctl->state = NotTriggered;
-		ctl->nframes = nframes;
 		ctl->timed_out = 0;
 		ctl->awake_at = 0;
 		ctl->finished_at = 0;

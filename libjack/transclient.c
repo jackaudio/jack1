@@ -170,7 +170,7 @@ jack_call_timebase_master (jack_client_t *client)
 		    new_pos) {
 
 			client->timebase_cb (ectl->transport_state,
-					      control->nframes,
+					      ectl->buffer_size,
 					      &ectl->pending_time,
 					      new_pos,
 					      client->timebase_arg);

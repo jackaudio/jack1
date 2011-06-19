@@ -230,7 +230,7 @@ jack_port_type_get_buffer_size (jack_client_t *client, const char *port_type)
 	if (i==client->engine->n_port_types)
 		return 0;
 
-	return jack_port_type_buffer_size (&(client->engine->port_types[i]), client->control->nframes);
+	return jack_port_type_buffer_size (&(client->engine->port_types[i]), client->engine->buffer_size);
 }
 
 jack_port_t *
