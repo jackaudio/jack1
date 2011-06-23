@@ -1255,7 +1255,7 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	{
 #		ifndef OSS_ENDIAN
 #		ifdef __GNUC__
-#		if (defined(__i386__) || defined(__alpha__) || defined(__arm__) || defined(__x86_64__))
+#		if (defined(__i386__) || defined(__alpha__) || defined(__arm__) || defined(__x86_64__) || (defined(__sh__) && !defined(__LITTLE_ENDIAN__)))
 #		define OSS_LITTLE_ENDIAN 1234
 #		define OSS_ENDIAN OSS_LITTLE_ENDIAN
 #		else
