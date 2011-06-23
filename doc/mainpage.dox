@@ -98,6 +98,7 @@ little clearer:
     - @ref MIDIAPI
     - @ref SessionClientFunctions
     - @ref WeakLinkage
+    - @ref ControlAPI
 
 The full API is described in:
 
@@ -120,6 +121,8 @@ The full API is described in:
   and writing of MIDI data to a port
   - @ref session.h "<jack/session.h>" functions that form the JACK
   session API
+  - @ref control.h "<jack/control.h>" the API for starting and
+controlling a JACK server
 
 In addition, the tools directory provides numerous examples
 of simple JACK clients that nevertheless use the API to do something

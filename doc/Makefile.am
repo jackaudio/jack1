@@ -16,7 +16,8 @@ DOXSOURCES=mainpage.dox transport.dox porting.dox fsm.png fsm.eps \
 	../jack/types.h \
 	../jack/midiport.h \
 	../jack/session.h \
-	../jack/weakjack.h
+	../jack/weakjack.h \
+	../jack/control.h
 
 EXTRA_DIST=mainpage.dox transport.dox fsm.png fsm.eps porting.dox
 
