@@ -54,6 +54,8 @@ class JSIter:
 
 	return cast( retval, self.typ )
 
+DeviceAcquireFunc = CFUNCTYPE( c_int, c_char_p )
+DeviceReleaseFunc = CFUNCTYPE( None, c_char_p )
 
 jackctl_server_start = libjs.jackctl_server_start
 jackctl_server_start.argtypes = [ POINTER(jackctl_server_t), POINTER(jackctl_driver_t) ]
@@ -64,7 +66,7 @@ jackctl_server_stop.argtypes = [ POINTER(jackctl_server_t) ]
 jackctl_server_stop.restype  = c_bool
 
 jackctl_server_create = libjs.jackctl_server_create
-jackctl_server_create.argtypes = [ POINTER(jackctl_server_t), POINTER(jackctl_driver_t) ]
+jackctl_server_create.argtypes = [ DeviceAcquireFunc, DeviceReleaseFunc ]
 jackctl_server_create.restype  = POINTER(jackctl_server_t)
 
 jackctl_server_get_drivers_list = libjs.jackctl_server_get_drivers_list
@@ -191,9 +193,15 @@ class Driver(object):
 
     name = property( get_name )
 
+
 class Server(object):
     def __init__( self ):
-	self.srv_ptr = jackctl_server_create( None, None )
+	self.dacqd = DeviceAcquireFunc(self.acquire_card)
+	self.reled = DeviceReleaseFunc(self.release_card)
+	self.srv_ptr = jackctl_server_create( self.dacqd, self.reled )
+
+	self.acquire_card_cb = None
+	self.release_card_cb = None
 
 	driver_jslist = jackctl_server_get_drivers_list( self.srv_ptr )
 
@@ -218,3 +226,17 @@ class Server(object):
 
     def stop( self ):
 	return jackctl_server_stop( self.srv_ptr )
+
+
+    def acquire_card( self, cardname ):
+	if self.acquire_card_cb:
+	    return self.acquire_card_cb(cardname)
+	else:
+	    return True
+
+    def release_card( self, cardname ):
+	if self.release_card_cb:
+	    self.release_card_cb(cardname)
+
+
+

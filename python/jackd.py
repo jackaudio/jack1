@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
 import sys
-from mygetopt import my_getopt
-import jackctl
+from pyjackd.mygetopt import my_getopt
+from pyjackd import jackctl
 import readline
+import time
 
+import reserve_audio
 
 argv = sys.argv[1:]
 
@@ -75,8 +77,18 @@ def driver_parse_args( drv, argv ):
 		else:
 		    p.value = optarg
 
+def acquire_dev(cardname):
+    reserve_audio.reserve_dev(cardname,20,None)
+    time.sleep(0.1)
+    return True
+
+def release_dev(cardname):
+    reserve_audio.rr.unreserve()
+    reserve_audio.rr = None
 
 srv = jackctl.Server()
+srv.acquire_card_cb = acquire_dev
+srv.release_card_cb = release_dev
 
 drv, argv = server_parse_ags( srv, argv )
 driver_parse_args( drv, argv )
@@ -90,7 +102,16 @@ driver_parse_args( drv, argv )
 #for p in drv.params.values():
 #    print p.name, "-> ", p.value
 
-srv.start( drv )
+started = srv.start( drv )
+
+if not started:
+    print "failed to start with driver " + drv.name
+    print "trying to start with dummy driver, switch to the right master yourself"
+
+    started = srv.start( srv.drivers["dummy"] )
+
+    if not started:
+	sys.exit(20)
 
 quit = False
 while not quit:

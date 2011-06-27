@@ -31,6 +31,10 @@ class reservation_t( dbus.service.Object ):
 	return False
 
 
+    def unreserve (self):
+	self.connection.release_name( 'org.freedesktop.ReserveDevice1.' + self.dev_name )
+	rr.remove_from_connection()
+
 
 def reserve_dev( dev_name, prio, override_cb ):
     global rr
@@ -43,6 +47,7 @@ def reserve_dev( dev_name, prio, override_cb ):
 	r_proxy = session_bus.get_object( "org.freedesktop.ReserveDevice1." + dev_name, "/org/freedesktop/ReserveDevice1/" + dev_name )
 	r_iface = dbus.Interface( r_proxy, "org.freedesktop.ReserveDevice1" )
     except Exception:
+	print "no other reservation exists. taking the name"
 	rr = reservation_t( dev_name, prio, override_cb )
 	return
 
