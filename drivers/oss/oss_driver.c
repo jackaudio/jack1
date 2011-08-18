@@ -367,6 +367,7 @@ static int oss_driver_attach (oss_driver_t *driver, jack_engine_t *engine)
 	jack_latency_range_t range;
 
 	driver->engine = engine;
+	set_period_size(driver, driver->period_size);
 
 	if (engine->set_buffer_size(engine, driver->period_size)) {
 		jack_error ("OSS: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
@@ -1171,6 +1172,7 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 			__FILE__, __LINE__, errno);
 		return NULL;
 	}
+	memset(driver, 0x00, sizeof(oss_driver_t));
 	jack_driver_init((jack_driver_t *) driver);
 
 	driver->attach = (JackDriverAttachFunction) oss_driver_attach;
@@ -1240,9 +1242,8 @@ jack_driver_t * driver_initialize (jack_client_t *client,
 	driver->playback_channels = playback_channels;
 	driver->sys_in_latency = in_latency;
 	driver->sys_out_latency = out_latency;
+	/* setting driver->period_usecs & co is delayed until attach */
 
-	set_period_size(driver, period_size);
-	
 	driver->finish = driver_finish;
 
 	if (driver->indev == NULL)
