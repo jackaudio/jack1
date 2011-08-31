@@ -90,11 +90,11 @@ init_cpu ()
 {
 	cpu_type = ((have_3dnow() << 8) | have_sse());
 	if (ARCH_X86_HAVE_3DNOW(cpu_type))
-		jack_info("Enhanced3DNow! detected");
+		jack_log("Enhanced3DNow! detected");
 	if (ARCH_X86_HAVE_SSE2(cpu_type))
-		jack_info("SSE2 detected");
+		jack_log("SSE2 detected");
 	if ((!ARCH_X86_HAVE_3DNOW(cpu_type)) && (!ARCH_X86_HAVE_SSE2(cpu_type)))
-		jack_info("No supported SIMD instruction sets detected");
+		jack_log("No supported SIMD instruction sets detected");
 	jack_port_set_funcs();
 }
 
