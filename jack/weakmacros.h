@@ -32,6 +32,12 @@
  * <jack/weakjack.h> before jack.h.
  *************************************************************/
 
+#ifdef __APPLE__
+#define WEAK_ATTRIBUTE weak_import
+#else
+#define WEAK_ATTRIBUTE __weak__
+#endif
+
 #ifndef JACK_WEAK_EXPORT
 #ifdef __GNUC__
 /* JACK_WEAK_EXPORT needs to be a macro which
@@ -40,7 +46,7 @@
    the symbol it used with. For this to work full may
    require linker arguments in the client as well.
 */
-#define JACK_WEAK_EXPORT __attribute__((weak))
+#define JACK_WEAK_EXPORT __attribute__((WEAK_ATTRIBUTE))
 #else
 /* Add other things here for non-gcc platforms */
 #endif
