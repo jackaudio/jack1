@@ -89,12 +89,14 @@ static void
 init_cpu ()
 {
 	cpu_type = ((have_3dnow() << 8) | have_sse());
+#if 0
 	if (ARCH_X86_HAVE_3DNOW(cpu_type))
-		jack_log("Enhanced3DNow! detected");
+		jack_debug("Enhanced3DNow! detected");
 	if (ARCH_X86_HAVE_SSE2(cpu_type))
-		jack_log("SSE2 detected");
+		jack_debug("SSE2 detected");
 	if ((!ARCH_X86_HAVE_3DNOW(cpu_type)) && (!ARCH_X86_HAVE_SSE2(cpu_type)))
-		jack_log("No supported SIMD instruction sets detected");
+		jack_debug("No supported SIMD instruction sets detected");
+#endif
 	jack_port_set_funcs();
 }
 
