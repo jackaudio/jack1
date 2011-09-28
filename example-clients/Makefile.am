@@ -70,7 +70,7 @@ jack_latent_client_LDADD = $(top_builddir)/libjack/libjack.la
 
 jack_server_control_SOURCES = server_control.c
 jack_server_control_LDFLAGS = @OS_LDFLAGS@
-jack_server_control_LDADD = $(top_builddir)/libjack/libjack.la $(top_builddir)/jackd/libjackserver.la
+jack_server_control_LDADD = $(top_builddir)/jackd/libjackserver.la
 
 if HAVE_SNDFILE
 jack_rec_SOURCES = capture_client.c

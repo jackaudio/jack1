@@ -49,7 +49,7 @@ if test $not_overwriting -gt 0 ; then
 fi
 
 AC_CONFIG_AUX_DIR(config)
-AC_CANONICAL_TARGET
+AC_CANONICAL_BUILD
 
 dnl ---
 dnl HOWTO: updating the JACK version number
@@ -304,6 +304,11 @@ AC_ARG_ENABLE(ancient_libc,
 	 
 JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS $JACK_LIBC_HELPER_FLAGS"   
 
+case $build_os in
+     # we need weak linkage which appeared in 10.2, but lets ask for 10.4 anyway
+     darwin*) JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS -mmacosx-version-min=10.4" ;;
+esac    
+
 AC_ARG_WITH(cpu-target,
             [  --with-cpu-target=cpu-type    explicit, overriding argument for gcc -march= flag])
 
@@ -315,7 +320,7 @@ dnl
 
 dnl ----------------------------------------------------------------------
 
-if test "$target_cpu" = "powerpc64" ; then
+if test "$build_cpu" = "powerpc64" ; then
 
     AC_ARG_ENABLE(cell,
 	AC_HELP_STRING([--enable-cell],[enable Cell BE support (default=no)]),,
@@ -327,7 +332,7 @@ if test "$target_cpu" = "powerpc64" ; then
 
 fi
 
-if test "$target_cpu" = "powerpc" -o "$target_cpu" = "powerpc64" ; then
+if test "build_cpu" = "powerpc" -o "$build_cpu" = "powerpc64" ; then
 
     AC_DEFINE(POWERPC, 1, "Are we running a ppc CPU?")
     
@@ -360,11 +365,11 @@ if test "$target_cpu" = "powerpc" -o "$target_cpu" = "powerpc64" ; then
     
     JACK_OPT_CFLAGS="-O2 -mcpu=7400 $ALTIVEC_OPT_FLAGS -mhard-float -mpowerpc-gfxopt"
 
-    if test "$target_cpu" = "powerpc64"; then
+    if test "$build_cpu" = "powerpc64"; then
 	JACK_OPT_CFLAGS="-O2 -mcpu=powerpc64 $ALTIVEC_OPT_FLAGS -mhard-float" 
     fi
 
-elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
+elif echo $build_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 
     dnl Check for MMX/SSE assembly
     
@@ -459,7 +464,7 @@ elif echo $target_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 
 dnl
 dnl its a little sad that OS X doesn't make it possible to identify 
-dnl the target_cpu a little more precisely. on os x we always get "i386"
+dnl the build_cpu a little more precisely. on os x we always get "i386"
 dnl as the CPU type. we miss out on some possible optimizations as 
 dnl a result. oh well.
 dnl     
@@ -467,11 +472,11 @@ dnl
     if test x$with_cpu_target != x ; then
         JACK_OPT_CFLAGS="-march=$with_cpu_target"
     else
-        if test "$target_cpu" = "i586"; then
+        if test "$build_cpu" = "i586"; then
 	   JACK_OPT_CFLAGS="-march=i586 "
-	elif test "$target_cpu" = "i686"; then
+	elif test "$build_cpu" = "i686"; then
 	    JACK_OPT_CFLAGS="-march=i686"
-	elif test "$target_cpu" = "x86_64"; then
+	elif test "$build_cpu" = "x86_64"; then
 	    JACK_OPT_CFLAGS="-march=k8"
 	else
 	    :

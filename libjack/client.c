@@ -2286,7 +2286,7 @@ jack_osx_process_thread (jack_client_t* client)
                 }
 
 		if (control->process_cbset) {
-			if (client->process (control->nframes,
+			if (client->process (client->engine->buffer_size,
 					     client->process_arg) == 0) {
 				control->state = Finished;
 			}
