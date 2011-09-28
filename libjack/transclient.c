@@ -429,7 +429,7 @@ jack_transport_query (const jack_client_t *client, jack_position_t *pos)
 }
 
 int
-jack_transport_reposition (jack_client_t *client, jack_position_t *pos)
+jack_transport_reposition (jack_client_t *client, const jack_position_t *pos)
 {
 	/* copy the input, to avoid modifying its contents */
 	jack_position_t tmp = *pos;

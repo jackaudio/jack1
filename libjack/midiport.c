@@ -30,10 +30,10 @@ enum { MIDI_INLINE_MAX = 4 }; /* 4 bytes for default event size */
 
 typedef struct _jack_midi_port_info_private {
 	jack_nframes_t        nframes; /**< Number of frames in buffer */
- 	uint32_t                buffer_size; /**< Size of buffer in bytes */
-	jack_nframes_t        event_count; /**< Number of events stored in this buffer */
+ 	uint32_t              buffer_size; /**< Size of buffer in bytes */
+        uint32_t              event_count; /**< Number of events stored in this buffer */
 	jack_nframes_t        last_write_loc; /**< Used for both writing and mixdown */
-	jack_nframes_t        events_lost;	  /**< Number of events lost in this buffer */
+	uint32_t              events_lost;	  /**< Number of events lost in this buffer */
 } POST_PACKED_STRUCTURE jack_midi_port_info_private_t;
 
 typedef struct _jack_midi_port_internal_event {
@@ -79,7 +79,7 @@ jack_midi_buffer_init(void  *port_buffer,
 }
 
 
-jack_nframes_t
+uint32_t
 jack_midi_get_event_count(void           *port_buffer)
 {
 	jack_midi_port_info_private_t *info =
@@ -91,7 +91,7 @@ jack_midi_get_event_count(void           *port_buffer)
 int
 jack_midi_event_get(jack_midi_event_t *event,
                     void              *port_buffer,
-                    jack_nframes_t     event_idx)
+                    uint32_t           event_idx)
 {
 	jack_midi_port_internal_event_t *port_event;
 	jack_midi_port_info_private_t *info =
@@ -314,7 +314,7 @@ jack_midi_port_mixdown(jack_port_t    *port, jack_nframes_t nframes)
 }
 
 
-jack_nframes_t
+uint32_t
 jack_midi_get_lost_event_count(void           *port_buffer)
 {
 	return ((jack_midi_port_info_private_t *) port_buffer)->events_lost;

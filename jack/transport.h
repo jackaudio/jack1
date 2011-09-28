@@ -431,7 +431,7 @@ jack_nframes_t jack_get_current_transport_frame (const jack_client_t *client) JA
  * @return 0 if valid request, EINVAL if position structure rejected.
  */
 int  jack_transport_reposition (jack_client_t *client,
-				jack_position_t *pos) JACK_OPTIONAL_WEAK_EXPORT;
+				const jack_position_t *pos) JACK_OPTIONAL_WEAK_EXPORT;
 
 /**
  * Start the JACK transport rolling.

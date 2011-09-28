@@ -71,7 +71,7 @@ jack_midi_get_event_count(void*          port_buffer) JACK_OPTIONAL_WEAK_EXPORT;
 int
 jack_midi_event_get(jack_midi_event_t *event,
                     void              *port_buffer,
-                    jack_nframes_t     event_index) JACK_OPTIONAL_WEAK_EXPORT;
+                    uint32_t           event_index) JACK_OPTIONAL_WEAK_EXPORT;
 
 
 /** Clear an event buffer.
@@ -158,7 +158,7 @@ jack_midi_event_write(void                   *port_buffer,
  * @param port_buffer Port to receive count for.
  * @returns Number of events that could not be written to @a port_buffer.
  */
-jack_nframes_t
+uint32_t
 jack_midi_get_lost_event_count(void           *port_buffer) JACK_OPTIONAL_WEAK_EXPORT;
 
 /*@}*/
