@@ -219,8 +219,8 @@ void jack_cycle_signal (jack_client_t* client, int status) JACK_OPTIONAL_WEAK_EX
  * Typical use are in conjunction with @a jack_cycle_wait and @ jack_cycle_signal functions.
  * The code in the supplied function must be suitable for real-time
  * execution. That means that it cannot call functions that might
- * block for a long time. This includes malloc, free, printf,
- * pthread_mutex_lock, sleep, wait, poll, select, pthread_join,
+ * block for a long time. This includes all I/O functions (disk, TTY, network),
+ * malloc, free, printf, pthread_mutex_lock, sleep, wait, poll, select, pthread_join,
  * pthread_cond_wait, etc, etc. 
  *
  * @return 0 on success, otherwise a non-zero error code.
@@ -307,8 +307,8 @@ void jack_on_info_shutdown (jack_client_t *client,
  *
  * The code in the supplied function must be suitable for real-time
  * execution. That means that it cannot call functions that might
- * block for a long time. This includes malloc, free, printf,
- * pthread_mutex_lock, sleep, wait, poll, select, pthread_join,
+ * block for a long time. This includes all I/O functions (disk, TTY, network),
+ * malloc, free, printf, pthread_mutex_lock, sleep, wait, poll, select, pthread_join,
  * pthread_cond_wait, etc, etc. 
  *
  * @return 0 on success, otherwise a non-zero error code, causing JACK

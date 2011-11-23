@@ -15,7 +15,8 @@ libjackinclude_HEADERS = 	\
 	midiport.h              \
 	weakmacros.h            \
 	weakjack.h              \
-	control.h
+	control.h		\
+	jslist.h
 
 noinst_HEADERS =		\
 	atomicity.h		\
@@ -27,7 +28,6 @@ noinst_HEADERS =		\
 	hardware.h 		\
 	internal.h 		\
 	intsimd.h 		\
-	jslist.h		\
 	memops.h		\
 	messagebuffer.h		\
 	pool.h			\
