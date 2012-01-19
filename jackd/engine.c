@@ -515,7 +515,6 @@ jack_driver_buffer_size (jack_engine_t *engine, jack_nframes_t nframes)
 {
 	int i;
 	jack_event_t event;
-	JSList *node;
 
 	VERBOSE (engine, "new buffer size %" PRIu32, nframes);
 
@@ -3445,7 +3444,9 @@ jack_compute_new_latency (jack_engine_t *engine)
 		jack_deliver_event (engine, client, &event);
 	}
 
-	jack_deliver_event (engine, engine->driver->internal_client, &event);
+        if (engine->driver) {
+                jack_deliver_event (engine, engine->driver->internal_client, &event);
+        }
 
 	/* now issue playback latency callbacks in reverse graphorder
 	 */
@@ -3455,7 +3456,9 @@ jack_compute_new_latency (jack_engine_t *engine)
 		jack_deliver_event (engine, client, &event);
 	}
 
-	jack_deliver_event (engine, engine->driver->internal_client, &event);
+        if (engine->driver) {
+                jack_deliver_event (engine, engine->driver->internal_client, &event);
+        }
 
 	jack_slist_free (reverse_list);
 }
