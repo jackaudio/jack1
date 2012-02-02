@@ -2035,6 +2035,8 @@ jack_client_thread_work (jack_client_t* client)
                         DEBUG("client calls process()");
                         status = client->process (client->engine->buffer_size, client->process_arg);
                         control->state = Finished;
+		} else {
+			status = 0;
 		}
 
                 /* if status was non-zero, this will not return (it will call 
@@ -2098,19 +2100,19 @@ jack_client_process_thread (void *arg)
 
 	jack_client_t *client = (jack_client_t *) arg;
 	jack_client_control_t *control = client->control;
-
-	if (client->control->thread_init_cbset) {
+	
+	if (control->thread_init_cbset) {
                 /* this means that the init callback will be called twice -taybin*/
 		DEBUG ("calling client thread init callback");
 		client->thread_init (client->thread_init_arg);
 	}
         
-	client->control->pid = getpid();
+	control->pid = getpid();
 	DEBUG ("client process thread is now running");
         
 	client->rt_thread_ok = TRUE;
         
-	if (client->control->thread_cb_cbset) {
+	if (control->thread_cb_cbset) {
                 jack_run_client_provided_process_thread (client);
         } else {
                 jack_client_thread_work (client);
@@ -2257,7 +2259,6 @@ static int
 jack_start_thread (jack_client_t *client)
 {
 #ifdef USE_MLOCK
-
  	if (client->engine->real_time) {
 		if (client->engine->do_mlock
 		    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
@@ -2268,8 +2269,8 @@ jack_start_thread (jack_client_t *client)
 		 if (client->engine->do_munlock) {
 			 cleanup_mlock ();
 		 }
-#endif /* USE_MLOCK */
 	}
+#endif /* USE_MLOCK */
 
 #ifdef JACK_USE_MACH_THREADS
 /* Stephane Letz : letz@grame.fr
