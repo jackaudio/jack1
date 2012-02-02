@@ -437,7 +437,12 @@ dnl
     if test x$with_cpu_target != x ; then
         JACK_OPT_CFLAGS="-march=$with_cpu_target -mtune=$with_cpu_target"
     else
-        JACK_OPT_CFLAGS="-march=native -mtune=native"
+        case ${host_os} in
+	    darwin*) # apple gcc, not GNU
+	             JACK_OPT_CFLAGS="-mtune=generic" ;;
+	          *) # any other gcc
+		     JACK_OPT_CFLAGS="-march=native -mtune=native" ;;
+	esac
     fi
 
 dnl
@@ -657,7 +662,7 @@ fi
 
 # NetJack backend and internal client need libsamplerate
 HAVE_SAMPLERATE=false
-PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 0.1.2,[HAVE_SAMPLERATE=true], [true])
+#PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 0.1.2,[HAVE_SAMPLERATE=true], [true])
 if test x$HAVE_SAMPLERATE = xfalse; then
         AC_MSG_WARN([*** the NetJack backend and internal client will not be built])
     	AC_DEFINE(HAVE_SAMPLERATE,0,"Whether libsamplerate is available")
