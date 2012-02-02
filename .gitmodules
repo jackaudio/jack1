@@ -1,0 +1,9 @@
+[submodule "jack"]
+	path = jack
+	url = git://github.com/jackaudio/headers.git
+[submodule "tools"]
+	path = tools
+	url = git://github.com/jackaudio/tools.git
+[submodule "example-clients"]
+	path = example-clients
+	url = git://github.com/jackaudio/example-clients.git
