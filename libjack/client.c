@@ -1881,40 +1881,61 @@ jack_wake_next_client (jack_client_t* client)
 
 #ifdef JACK_USE_MACH_THREADS
 
-static int
-jack_client_core_wait (jack_client_t* client)
+static void*
+jack_osx_event_thread_work (void* arg)
 {
+	/* this is OS X: this is NOT the process() thread, but instead
+	   just waits for events/callbacks from the server and processes them.
+
+	   All we do here is to poll() for callbacks from the server,
+	   and then process any callbacks that arrive.
+	*/
+
+
+	jack_client_t* client = (jack_client_t*) arg;
 	jack_client_control_t *control = client->control;
 
-        /* this is OS X - we're only waiting on events */
+	if (control->thread_init_cbset) {
+		DEBUG ("calling OSX event thread init callback");
+		client->thread_init (client->thread_init_arg);
+	}
 
-	DEBUG ("client polling on %s", client->pollmax == 2 ?
-	       "event_fd and graph_wait_fd..." :
-	       "event_fd only");
-	
-	while (1) {
-		if (poll (client->pollfd, client->pollmax, 1000) < 0) {
-			if (errno == EINTR) {
-				continue;
+        while (1) {
+
+		/* this is OS X - we're only waiting on events */
+		
+		DEBUG ("client polling on %s", client->pollmax == 2 ?
+		       "event_fd and graph_wait_fd..." :
+		       "event_fd only");
+		
+		while (1) {
+			if (poll (client->pollfd, client->pollmax, 1000) < 0) {
+				if (errno == EINTR) {
+					continue;
+				}
+				jack_error ("poll failed in client (%s)",
+					    strerror (errno));
+				break;
 			}
-			jack_error ("poll failed in client (%s)",
-				    strerror (errno));
-			return -1;
+			
+			pthread_testcancel();
+			
+			if (jack_client_process_events (client)) {
+				DEBUG ("event processing failed\n");
+				break;
+			}
+		}
+		
+		if (control->dead || client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
+			DEBUG ("client appears dead or event pollfd has error status\n");
+			break;
 		}
 
-		pthread_testcancel();
-
-		if (jack_client_process_events (client)) {
-			DEBUG ("event processing failed\n");
-			return 0;
-		}
+		/* go back and wait for the next one */
 	}
 
-	if (control->dead || client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
-		DEBUG ("client appears dead or event pollfd has error status\n");
-		return -1;
-	}
-
+	jack_client_thread_suicide (client, "logic error");
+	/*NOTREACHED*/
 	return 0;
 }
 
@@ -2011,49 +2032,20 @@ jack_client_core_wait (jack_client_t* client)
 
 #endif
 
-static void 
-jack_client_thread_work (jack_client_t* client)
+static void* 
+jack_process_thread_work (void* arg)
 {
+	/* this is the RT process thread used to handle process()
+	   callbacks, and on non-OSX systems, server events/callbacks
+	   as well.
+	*/
+
+	jack_client_t* client = (jack_client_t*) arg;
 	jack_client_control_t *control = client->control;
 
-	if (control->thread_init_cbset) {
-		DEBUG ("calling client thread init callback");
-		client->thread_init (client->thread_init_arg);
-	}
-
-        while (1) {
-                int status;
-
-                if (jack_cycle_wait (client) != client->engine->buffer_size) {
-                        break;
-                }
-
-		if (control->process_cbset) {
-                        
-			/* run process callback, then wait... ad-infinitum */
-
-                        DEBUG("client calls process()");
-                        status = client->process (client->engine->buffer_size, client->process_arg);
-                        control->state = Finished;
-		} else {
-			status = 0;
-		}
-
-                /* if status was non-zero, this will not return (it will call 
-                   jack_client_thread_suicide()
-                */
-
-                jack_cycle_signal (client, status);
-	}
-
-	jack_client_thread_suicide (client, "logic error");
-}
-
-static void
-jack_client_thread_aux (void *arg)
-{
-	jack_client_t *client = (jack_client_t *) arg;
-	jack_client_control_t *control = client->control;
+	/* notify the waiting client that this thread
+	   is up and running.
+	*/
 
 	pthread_mutex_lock (&client_lock);
 	client->thread_ok = TRUE;
@@ -2061,103 +2053,58 @@ jack_client_thread_aux (void *arg)
 	pthread_cond_signal (&client_ready);
 	pthread_mutex_unlock (&client_lock);
 
-	control->pid = getpid();
-	control->pgrp = getpgrp();
-
-	DEBUG ("client thread is now running");
-
-        jack_client_thread_work (client);
-
-}
-
-static void
-jack_run_client_provided_process_thread (jack_client_t* client)
-{
-	jack_client_control_t *control = client->control;
-
-        pthread_mutex_lock (&client_lock);
-        client->thread_ok = TRUE;
-        client->thread_id = pthread_self();
-        pthread_cond_signal (&client_ready);
-        pthread_mutex_unlock (&client_lock);
-        
         control->pid = getpid();
         control->pgrp = getpgrp();
-        
-        client->thread_cb (client->thread_cb_arg);
-
-        jack_client_thread_suicide (client, "logic error");
-}
 
 #ifdef JACK_USE_MACH_THREADS
-
-static void *
-jack_client_process_thread (void *arg)
-{
-        /* real-time thread : separated from the normal client thread, it will
-         * communicate with the server using fast mach RPC mechanism.
-         */
-
-	jack_client_t *client = (jack_client_t *) arg;
-	jack_client_control_t *control = client->control;
-	
-	if (control->thread_init_cbset) {
-                /* this means that the init callback will be called twice -taybin*/
-		DEBUG ("calling client thread init callback");
-		client->thread_init (client->thread_init_arg);
-	}
-        
-	control->pid = getpid();
-	DEBUG ("client process thread is now running");
-        
 	client->rt_thread_ok = TRUE;
-        
-	if (control->thread_cb_cbset) {
-                jack_run_client_provided_process_thread (client);
-        } else {
-                jack_client_thread_work (client);
-        }
+#endif        
 
-	pthread_exit (0);
+	if (control->thread_cb_cbset) {
+
+		/* client provided a thread function to run, 
+		   so just do that.
+		*/
+
+		client->thread_cb (client->thread_cb_arg);
+
+	} else {
+
+		if (control->thread_init_cbset) {
+			DEBUG ("calling process thread init callback");
+			client->thread_init (client->thread_init_arg);
+		}
+		
+		while (1) {
+			int status;
+			
+			if (jack_cycle_wait (client) != client->engine->buffer_size) {
+				break;
+			}
+			
+			if (control->process_cbset) {
+				
+				/* run process callback, then wait... ad-infinitum */
+				
+				DEBUG("client calls process()");
+				status = client->process (client->engine->buffer_size, client->process_arg);
+				control->state = Finished;
+			} else {
+				status = 0;
+			}
+			
+			/* if status was non-zero, this will not return (it will call 
+			   jack_client_thread_suicide()
+			*/
+			
+			jack_cycle_signal (client, status);
+		}
+	}
+
+	jack_client_thread_suicide (client, "logic error");
 	/*NOTREACHED*/
 	return 0;
 }
-
-static void* 
-jack_client_thread (void *arg)
-{
-        /* On OS X, the secondary client thread that we create will
-           always just handle server events, whether or not the
-           client has called jack_set_process_thread().
-        */
-        jack_client_thread_aux (arg);
-	/*NOTREACHED*/
-	return (void *) 0;
-}
-
-#else /* !JACK_USE_MACH_THREADS */
-
-static void* 
-jack_client_thread (void *arg)
-{
-	jack_client_t *client = (jack_client_t *) arg;
-
-        /* On non-OSX systems, the client thread should run the supplied
-           callback if jack_set_process_thread() was called, otherwise
-           it will just wait in a loop for events and/or process wakeups.
-        */
-	
-	if (client->control->thread_cb_cbset) {
-                jack_run_client_provided_process_thread (client);
-	} else {
-		jack_client_thread_aux (arg);
-	}
-	
-	/*NOTREACHED*/
-	return (void *) 0;
-}
-
-#endif
 
 jack_nframes_t
 jack_thread_wait (jack_client_t* client, int status)
@@ -2274,13 +2221,13 @@ jack_start_thread (jack_client_t *client)
 
 #ifdef JACK_USE_MACH_THREADS
 /* Stephane Letz : letz@grame.fr
-   On MacOSX, the normal thread does not need to be real-time.
+   On MacOSX, the event/callback-handling thread does not need to be real-time.
 */
 	if (jack_client_create_thread (client, 
 				       &client->thread,
 				       client->engine->client_priority,
 				       FALSE,
-				       jack_client_thread, client)) {
+				       jack_osx_event_thread_work, client)) {
 		return -1;
 	}
 #else
@@ -2288,7 +2235,7 @@ jack_start_thread (jack_client_t *client)
                                        &client->thread,
                                        client->engine->client_priority,
                                        client->engine->real_time,
-                                       jack_client_thread, client)) {
+                                       jack_process_thread_work, client)) {
 		return -1;
 	}
 
@@ -2310,7 +2257,7 @@ jack_start_thread (jack_client_t *client)
 				      &client->process_thread,
 				      client->engine->client_priority,
 				      client->engine->real_time,
-				      jack_client_process_thread, client)) {
+				      jack_process_thread_work, client)) {
 		return -1;
 	}
 #endif /* JACK_USE_MACH_THREADS */
