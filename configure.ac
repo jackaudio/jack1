@@ -371,23 +371,18 @@ if test "build_cpu" = "powerpc" -o "$build_cpu" = "powerpc64" ; then
 
 elif echo $build_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 
-    dnl Check for MMX/SSE assembly
+    dnl Check for SSE usability
     
     if test -r /proc/cpuinfo ; then
 	procflags=`grep '^flags' /proc/cpuinfo`
-	if echo $procflags | grep -s mmx ; then
-	    cpu_supports_mmx=yes
-	fi
 	if echo $procflags | grep -s sse ; then
 	    cpu_supports_sse=yes
 	fi
     else
 	# this is not linux, but assume that if the processor
-	# is x86 then is supports SSE and not MMX
+	# is x86 then is supports SSE
         cpu_supports_sse=yes
 	AC_MSG_WARN([Assuming your x86/x86_64 system can support SSE. Use --disable-sse if this is not the case])
-        cpu_supports_mmx=no
-	AC_MSG_WARN([Assuming your x86/x86_64 system does not need to use MMX. Use --enable-mmx if this is not the case])
     fi
     
     AC_ARG_ENABLE(optimization-by-compiler,
@@ -401,38 +396,10 @@ elif echo $build_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 	optimization_by_cpu=yes
     )
     
-    AC_ARG_ENABLE(mmx,
-	AC_HELP_STRING([--enable-mmx],[enable MMX support (default=auto)]),,
-	enable_mmx=yes)
-    
     AC_ARG_ENABLE(sse,
 	AC_HELP_STRING([--enable-sse],[enable SSE support (default=auto)]),,
-	enable_sse=$enable_mmx)
+	enable_sse=yes)
     
-    if test "x$enable_mmx" = xyes; then
-	
-	AC_MSG_CHECKING(whether we can compile MMX code)
-	
-	AC_COMPILE_IFELSE([asm ("movq 0, %mm0");],
-	    
-	    AC_DEFINE(USE_MMX, 1, [Define to 1 if MMX assembly is available.])
-	    AC_MSG_RESULT(yes)
-	    
-	    if test x$optimization_by_cpu = xyes ; then
-		if test x$cpu_supports_mmx = xyes ; then
-		    MMX_FLAGS="-mmmx"
-		fi
-	    else 
-		MMX_FLAGS="-mmmx"
-	    fi
-	    
-	    AC_MSG_RESULT(yes)
-	    ,
-	    enable_mmx=no
-	    AC_MSG_RESULT(no)
-	    AC_MSG_WARN([The assembler does not support the MMX command set.])
-	)
-    fi
 
     if test "x$enable_sse" = xyes; then
 	
@@ -443,11 +410,9 @@ elif echo $build_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 		if test x$optimization_by_cpu = xyes ; then
 		    if test x$cpu_supports_sse = xyes ; then
 			SSE_FLAGS="-msse -mfpmath=sse"
-			MMX_FLAGS=""
 		    fi
 		else 
 		    SSE_FLAGS="-msse -mfpmath=sse"
-		    MMX_FLAGS=""
 		fi
 		
 		AC_MSG_RESULT(yes)
@@ -470,17 +435,9 @@ dnl a result. oh well.
 dnl     
     
     if test x$with_cpu_target != x ; then
-        JACK_OPT_CFLAGS="-march=$with_cpu_target"
+        JACK_OPT_CFLAGS="-march=$with_cpu_target -mtune=$with_cpu_target"
     else
-        if test "$build_cpu" = "i586"; then
-	   JACK_OPT_CFLAGS="-march=i586 "
-	elif test "$build_cpu" = "i686"; then
-	    JACK_OPT_CFLAGS="-march=i686"
-	elif test "$build_cpu" = "x86_64"; then
-	    JACK_OPT_CFLAGS="-march=k8"
-	else
-	    :
-	fi
+        JACK_OPT_CFLAGS="-march=native -mtune=native"
     fi
 
 dnl
@@ -489,7 +446,7 @@ dnl to the optimization
 dnl    
 
     if test x$optimization_by_compiler != xyes ; then
-        JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS $JACK_OPT_CFLAGS $MMX_FLAGS $SSE_FLAGS"
+        JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS $JACK_OPT_CFLAGS $SSE_FLAGS"
     else
        JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS"
     fi
@@ -562,15 +519,6 @@ AC_ARG_ENABLE(valgrind-clean,
 	     AC_DEFINE(VALGRIND_CLEAN,,[clean up for valgrind])
           fi
         ]
-)
-
-AC_ARG_ENABLE(ensure-mlock,
-	AC_HELP_STRING([--enable-ensure-mlock], [server should fail if unable to lock memory (default=no)]),
-        [ 
-	  if test x$enable_ensure_mlock != xno ; then
-	  	AC_DEFINE(ENSURE_MLOCK,,[Ensure that memory locking succeeds])
-	  fi
-	]
 )
 
 AC_ARG_ENABLE(debug,
