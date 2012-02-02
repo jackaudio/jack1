@@ -195,7 +195,7 @@ int jack_is_realtime (jack_client_t *client) JACK_OPTIONAL_WEAK_EXPORT;
  * It should be replace by use of @ jack_cycle_wait and @ jack_cycle_signal functions.
  *
  */
-jack_nframes_t jack_thread_wait (jack_client_t*, int status) JACK_OPTIONAL_WEAK_EXPORT;
+jack_nframes_t jack_thread_wait (jack_client_t*, int status) JACK_OPTIONAL_WEAK_DEPRECATED_EXPORT;
 
 /**
  * Wait until this JACK client should process data.

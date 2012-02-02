@@ -1670,16 +1670,20 @@ jack_stop_freewheel (jack_client_t* client)
 }
 
 static void
-jack_client_thread_suicide (jack_client_t* client)
+jack_client_thread_suicide (jack_client_t* client, const char* reason)
 {
+#ifdef JACK_USE_MACH_THREADS
+        client->rt_thread_ok = FALSE;
+#endif
+
 	if (client->on_info_shutdown) {
-		jack_error ("zombified - calling shutdown handler");
-		client->on_info_shutdown (JackClientZombie, "Zombified", client->on_info_shutdown_arg);
+		jack_error ("%s - calling shutdown handler", reason);
+		client->on_info_shutdown (JackClientZombie, reason, client->on_info_shutdown_arg);
 	} else if (client->on_shutdown) {
-		jack_error ("zombified - calling shutdown handler");
+		jack_error ("%s - calling shutdown handler", reason);
 		client->on_shutdown (client->on_shutdown_arg);
 	} else {
-		jack_error ("jack_client_thread zombified - exiting from JACK");
+		jack_error ("jack_client_thread: %s - exiting from JACK", reason);
 		jack_client_close_aux (client);
 		/* Need a fix : possibly make client crash if
 		 * zombified without shutdown handler 
@@ -2007,15 +2011,42 @@ jack_client_core_wait (jack_client_t* client)
 
 #endif
 
-static jack_nframes_t 
-jack_thread_first_wait (jack_client_t* client)
+static void 
+jack_client_thread_work (jack_client_t* client)
 {
-	if (jack_client_core_wait (client)) {
-		return 0;
+	jack_client_control_t *control = client->control;
+
+	if (control->thread_init_cbset) {
+		DEBUG ("calling client thread init callback");
+		client->thread_init (client->thread_init_arg);
 	}
-	return client->engine->buffer_size;
+
+        while (1) {
+                int status;
+
+                if (jack_cycle_wait (client) != client->engine->buffer_size) {
+                        break;
+                }
+
+		if (control->process_cbset) {
+                        
+			/* run process callback, then wait... ad-infinitum */
+
+                        DEBUG("client calls process()");
+                        status = client->process (client->engine->buffer_size, client->process_arg);
+                        control->state = Finished;
+		}
+
+                /* if status was non-zero, this will not return (it will call 
+                   jack_client_thread_suicide()
+                */
+
+                jack_cycle_signal (client, status);
+	}
+
+	jack_client_thread_suicide (client, "logic error");
 }
-		
+
 static void
 jack_client_thread_aux (void *arg)
 {
@@ -2033,42 +2064,8 @@ jack_client_thread_aux (void *arg)
 
 	DEBUG ("client thread is now running");
 
-	if (control->thread_init_cbset) {
-		DEBUG ("calling client thread init callback");
-		client->thread_init (client->thread_init_arg);
-	}
+        jack_client_thread_work (client);
 
-	/* wait for first wakeup from server */
-
-	if (jack_thread_first_wait (client) == client->engine->buffer_size) {
-
-		/* now run till we're done */
-
-		if (control->process_cbset) {
-
-			/* run process callback, then wait... ad-infinitum */
-
-			while (1) {
-				DEBUG("client calls process()");
-				int status = (client->process (client->engine->buffer_size, 
-								client->process_arg) ==
-					      client->engine->buffer_size);
-				control->state = Finished;
-				DEBUG("client leaves process(), re-enters wait");
-				if (!jack_thread_wait (client, status)) {
-					break;
-				}
-				DEBUG("client done with wait");
-			}
-
-		} else {
-			/* no process handling but still need to process events */
-			while (jack_thread_wait (client, 0) == client->engine->buffer_size)
-				;
-		}
-	}
-
-	jack_client_thread_suicide (client);
 }
 
 static void
@@ -2085,11 +2082,44 @@ jack_run_client_provided_process_thread (jack_client_t* client)
         control->pid = getpid();
         control->pgrp = getpgrp();
         
-        client->thread_cb(client->thread_cb_arg);
-        jack_client_thread_suicide(client);
+        client->thread_cb (client->thread_cb_arg);
+
+        jack_client_thread_suicide (client, "logic error");
 }
 
 #ifdef JACK_USE_MACH_THREADS
+
+static void *
+jack_client_process_thread (void *arg)
+{
+        /* real-time thread : separated from the normal client thread, it will
+         * communicate with the server using fast mach RPC mechanism.
+         */
+
+	jack_client_t *client = (jack_client_t *) arg;
+	jack_client_control_t *control = client->control;
+
+	if (client->control->thread_init_cbset) {
+                /* this means that the init callback will be called twice -taybin*/
+		DEBUG ("calling client thread init callback");
+		client->thread_init (client->thread_init_arg);
+	}
+        
+	client->control->pid = getpid();
+	DEBUG ("client process thread is now running");
+        
+	client->rt_thread_ok = TRUE;
+        
+	if (client->control->thread_cb_cbset) {
+                jack_run_client_provided_process_thread (client);
+        } else {
+                jack_client_thread_work (client);
+        }
+
+	pthread_exit (0);
+	/*NOTREACHED*/
+	return 0;
+}
 
 static void* 
 jack_client_thread (void *arg)
@@ -2098,7 +2128,7 @@ jack_client_thread (void *arg)
            always just handle server events, whether or not the
            client has called jack_set_process_thread().
         */
-        jack_client_thread_aux(arg);
+        jack_client_thread_aux (arg);
 	/*NOTREACHED*/
 	return (void *) 0;
 }
@@ -2130,54 +2160,12 @@ jack_client_thread (void *arg)
 jack_nframes_t
 jack_thread_wait (jack_client_t* client, int status)
 {
-	client->control->last_status = status;
-
-        /* SECTION ONE: HOUSEKEEPING/CLEANUP FROM LAST DATA PROCESSING */
-
-	/* housekeeping/cleanup after data processing */
-
-	if (status == 0 && client->control->timebase_cb_cbset) {
-		jack_call_timebase_master (client);
-	}
-	
-	/* end preemption checking */
-	CHECK_PREEMPTION (client->engine, FALSE);
-	
-	client->control->finished_at = jack_get_microseconds();
-	
-	/* wake the next client in the chain (could be the server), 
-	   and check if we were killed during the process
-	   cycle.
-	*/
-	
-	if (jack_wake_next_client (client)) {
-		DEBUG("client cannot wake next, or is dead\n");
-		return 0;
-	}
-
-	if (status || client->control->dead || !client->engine->engine_ok) {
-		return 0;
-	}
-	
-        /* SECTION TWO: WAIT FOR NEXT DATA PROCESSING TIME */
-        
-	if (jack_client_core_wait (client)) {
-		return 0;
-	}
-        
-        /* SECTION THREE: START NEXT DATA PROCESSING TIME */
-
-	/* Time to do data processing */
-
-	client->control->state = Running;
-	
-	/* begin preemption checking */
-	CHECK_PREEMPTION (client->engine, TRUE);
-	
-	if (client->control->sync_cb_cbset)
-		jack_call_sync_client (client);
-
-	return client->engine->buffer_size;
+        static int msg_delivered = 0;
+        if (!msg_delivered) {
+                jack_error("jack_thread_wait(): deprecated, use jack_cycle_wait/jack_cycle_signal");
+                msg_delivered = 1;
+        }
+        return 0;
 }
 
 jack_nframes_t jack_cycle_wait (jack_client_t* client)
@@ -2245,141 +2233,36 @@ void jack_cycle_signal (jack_client_t* client, int status)
 	
 	if (jack_wake_next_client (client)) {
 		DEBUG("client cannot wake next, or is dead\n");
-		jack_client_thread_suicide (client);
+		jack_client_thread_suicide (client, "graph error");
 		/*NOTREACHED*/
 	}
         
-	if (status || client->control->dead || !client->engine->engine_ok) {
-		jack_client_thread_suicide (client);
+        if (client->control->dead) {
+		jack_client_thread_suicide (client, "zombified");
 		/*NOTREACHED*/
-	}
-}
-
-#ifdef JACK_USE_MACH_THREADS
-
-/* real-time thread : separated from the normal client thread, it will
- * communicate with the server using fast mach RPC mechanism */
-
-static void
-jack_osx_process_thread (jack_client_t* client) 
-{
-        jack_client_control_t *control = client->control; 
-	int err = 0;
-
-   	while (err == 0) {
-	
-		if (jack_client_suspend(client) < 0) {
-                        jack_error ("jack_client_process_thread :resume error");
-                        goto zombie;
-		}
-		
-		control->awake_at = jack_get_microseconds();
-		
-		DEBUG ("client resumed");
-		
-		control->state = Running;
-
-		if (control->sync_cb_cbset) {
-			jack_call_sync_client (client);
-                }
-
-		if (control->process_cbset) {
-			if (client->process (client->engine->buffer_size,
-					     client->process_arg) == 0) {
-				control->state = Finished;
-			}
-		} else {
-			control->state = Finished;
-		}
-
-		if (control->timebase_cb_cbset) {
-			jack_call_timebase_master (client);
-                }
-
-		control->finished_at = jack_get_microseconds();
-                
-		DEBUG ("client finished processing at %Lu (elapsed = %f usecs)",
-			control->finished_at,
-			((float)(control->finished_at - control->awake_at)));
-                  
- 		/* check if we were killed during the process cycle
-		 * (or whatever) */
-		
-		if (client->control->dead) {
-                        jack_error ("jack_client_process_thread: "
-                                    "client->control->dead");
-                        goto zombie;
-		}
-                
-		DEBUG("process cycle fully complete\n");
-	}
-
- 	return;
-
-  zombie:
-        
-        jack_error ("jack_client_process_thread : zombified");
-        
-        client->rt_thread_ok = FALSE;
-
-	if (client->on_info_shutdown) {
-		jack_error ("zombified - calling shutdown handler");
-		client->on_info_shutdown (JackClientZombie, "Zombified", client->on_info_shutdown_arg);
-	} else if (client->on_shutdown) {
-		jack_error ("zombified - calling shutdown handler");
-		client->on_shutdown (client->on_shutdown_arg);
-	} else {
-		jack_error ("jack_client_process_thread zombified - exiting from JACK");
-		/* Need a fix : possibly make client crash if
-		 * zombified without shutdown handler */
-		jack_client_close_aux (client); 
-	}
-}
-
-static void *
-jack_client_process_thread (void *arg)
-{
-	jack_client_t *client = (jack_client_t *) arg;
-	jack_client_control_t *control = client->control;
-
-	if (client->control->thread_init_cbset) {
-                /* this means that the init callback will be called twice -taybin*/
-		DEBUG ("calling client thread init callback");
-		client->thread_init (client->thread_init_arg);
-	}
-        
-	client->control->pid = getpid();
-	DEBUG ("client process thread is now running");
-        
-	client->rt_thread_ok = TRUE;
-        
-	if (client->control->thread_cb_cbset) {
-                jack_run_client_provided_process_thread (client);
-        } else {
-                jack_osx_process_thread (client);
         }
 
-	pthread_exit (0);
-	/*NOTREACHED*/
-	return 0;
-}
+	if (status) {
+		jack_client_thread_suicide (client, "process error");
+		/*NOTREACHED*/
+	}
 
-#endif /* JACK_USE_MACH_THREADS */
+        if (!client->engine->engine_ok) {
+		jack_client_thread_suicide (client, "JACK died");
+		/*NOTREACHED*/
+        }
+}
 
 static int
 jack_start_thread (jack_client_t *client)
 {
- 	if (client->engine->real_time) {
-
 #ifdef USE_MLOCK
+
+ 	if (client->engine->real_time) {
 		if (client->engine->do_mlock
 		    && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
 			jack_error ("cannot lock down memory for RT thread "
 				    "(%s)", strerror (errno));
-			 
-#ifdef ENSURE_MLOCK
-			 return -1;
-#endif /* ENSURE_MLOCK */
 		 }
 		 
 		 if (client->engine->do_munlock) {
@@ -2401,10 +2284,10 @@ jack_start_thread (jack_client_t *client)
 	}
 #else
 	if (jack_client_create_thread (client,
-				&client->thread,
-				client->engine->client_priority,
-				client->engine->real_time,
-				jack_client_thread, client)) {
+                                       &client->thread,
+                                       client->engine->client_priority,
+                                       client->engine->real_time,
+                                       jack_client_thread, client)) {
 		return -1;
 	}
 
