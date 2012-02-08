@@ -36,7 +36,7 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 
 #include <jack/types.h>
 // for jack_error in jack1
-#include <jack/internal.h>
+#include "internal.h"
 
 #include "jack/jslist.h"
 

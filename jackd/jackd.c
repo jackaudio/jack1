@@ -33,13 +33,14 @@
 #include <dirent.h>
 #include <dlfcn.h>
 
-#include <jack/engine.h>
-#include <jack/internal.h>
-#include <jack/driver.h>
-#include <jack/shm.h>
-#include <jack/driver_parse.h>
-#include <jack/messagebuffer.h>
 #include <jack/midiport.h>
+
+#include "engine.h"
+#include "internal.h"
+#include "driver.h"
+#include "shm.h"
+#include "driver_parse.h"
+#include "messagebuffer.h"
 
 #ifdef USE_CAPABILITIES
 
@@ -47,7 +48,7 @@
 /* capgetp and capsetp are linux only extensions, not posix */
 #undef _POSIX_SOURCE
 #include <sys/capability.h>
-#include <jack/start.h>
+#include "start.h"
 
 static struct stat pipe_stat;
 

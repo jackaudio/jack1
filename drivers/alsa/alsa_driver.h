@@ -22,7 +22,7 @@
 
 #include <alsa/asoundlib.h>
 #include <alsa/pcm.h>
-#include <jack/bitset.h>
+#include "bitset.h"
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 #define IS_LE 0
@@ -32,11 +32,11 @@
 #define IS_BE 0
 #endif
 
-#include <jack/types.h>
-#include <jack/hardware.h>
-#include <jack/driver.h>
 #include <jack/jack.h>
-#include <jack/memops.h>
+#include <jack/types.h>
+#include "hardware.h"
+#include "driver.h"
+#include "memops.h"
 
 #include "../alsa-midi/alsa_midi.h"
 

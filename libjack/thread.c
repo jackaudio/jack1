@@ -25,7 +25,8 @@
 
 #include <jack/jack.h>
 #include <jack/thread.h>
-#include <jack/internal.h>
+
+#include "internal.h"
 
 #include <pthread.h>
 #include <sched.h>

@@ -21,10 +21,10 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#include <jack/hardware.h>
+#include "hardware.h"
 #include "alsa_driver.h"
 #include "ice1712.h"
-#include <jack/internal.h>
+#include "internal.h"
 
 static int
 ice1712_hw_monitor_toggle(jack_hardware_t *hw, int idx, int onoff)

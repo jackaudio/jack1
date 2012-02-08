@@ -20,7 +20,7 @@
 #define __jack_midi_pack_h__
 
 #include <jack/midiport.h>
-#include <jack/engine.h>
+#include "engine.h"
 
 typedef struct {
 	int running_status;

@@ -34,9 +34,9 @@
 
 #include <jack/types.h>
 #include <jack/jslist.h>
-#include <jack/driver.h>
 #include <jack/jack.h>
 
+#include "driver.h"
 
 #define SUN_DRIVER_DEF_DEV	"/dev/audio"
 #define SUN_DRIVER_DEF_FS	48000

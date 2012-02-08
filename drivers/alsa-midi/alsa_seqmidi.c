@@ -62,7 +62,7 @@
 #ifdef STANDALONE
 #define MESSAGE(...) fprintf(stderr, __VA_ARGS__)
 #else
-#include <jack/messagebuffer.h>
+#include "messagebuffer.h"
 #endif
 
 #define info_log(...)  MESSAGE(__VA_ARGS__)

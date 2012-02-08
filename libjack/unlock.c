@@ -24,8 +24,8 @@
 #include <limits.h>
 #include <sys/mman.h>
 
-#include "jack/unlock.h"
-#include "jack/internal.h"
+#include "unlock.h"
+#include "internal.h"
 
 static char* blacklist[] = {
 	"/libgtk",

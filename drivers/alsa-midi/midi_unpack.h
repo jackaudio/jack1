@@ -20,7 +20,7 @@
 #define __jack_midi_unpack_h__
 
 #include <jack/midiport.h>
-#include <jack/engine.h>
+#include "engine.h"
 
 enum {
 	MIDI_UNPACK_MAX_MSG = 1024

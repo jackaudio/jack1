@@ -30,9 +30,9 @@
 #include <regex.h>
 #include <string.h>
  
-#include <jack/internal.h>
-#include <jack/engine.h>
-#include <jack/messagebuffer.h>
+#include "internal.h"
+#include "engine.h"
+#include "messagebuffer.h"
 
 #include <sysdeps/time.h>
 

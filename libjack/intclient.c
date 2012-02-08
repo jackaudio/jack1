@@ -25,9 +25,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <jack/internal.h>
 #include <jack/intclient.h>
-#include <jack/varargs.h>
+
+#include "internal.h"
+#include "varargs.h"
 
 #include "local.h"
 

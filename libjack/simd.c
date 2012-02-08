@@ -20,7 +20,7 @@
 
 
 #include <config.h>
-#include <jack/intsimd.h>
+#include "intsimd.h"
 
 #ifdef USE_DYNSIMD
 

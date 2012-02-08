@@ -19,8 +19,8 @@
  **/
 
 #include <stdio.h>
-#include <jack/systemtest.h>
-#include <jack/sanitycheck.h>
+#include "systemtest.h"
+#include "sanitycheck.h"
 
 int sanitycheck (int care_about_realtime, 
 		 int care_about_freqscaling) 

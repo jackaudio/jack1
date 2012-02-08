@@ -18,10 +18,10 @@
 
 */
 
-#include <jack/hardware.h>
+#include "hardware.h"
 #include "alsa_driver.h"
 #include "hdsp.h"
-#include <jack/internal.h>
+#include "internal.h"
 
 /* Constants to make working with the hdsp matrix mixer easier */
 static const int HDSP_MINUS_INFINITY_GAIN = 0;

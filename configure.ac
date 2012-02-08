@@ -293,7 +293,8 @@ AC_DEFINE_UNQUOTED(JACK_SHM_TYPE, [$JACK_SHM_TYPE],
 AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
 
 JACK_CORE_CFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
--I\$(top_srcdir) -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
+-I\$(top_srcdir) -I\$(top_srcdir)/include \ 
+-D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
 
 JACK_LIBC_HELPER_FLAGS=
 AC_ARG_ENABLE(ancient_libc,

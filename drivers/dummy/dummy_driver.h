@@ -24,8 +24,8 @@
 
 #include <jack/types.h>
 #include <jack/jslist.h>
-#include <jack/driver.h>
 #include <jack/jack.h>
+#include "driver.h"
 #include <config.h>
 
 // needed for clock_nanosleep

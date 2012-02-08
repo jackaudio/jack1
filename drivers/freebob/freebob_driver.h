@@ -60,9 +60,10 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-#include <jack/driver.h>
-#include <jack/engine.h>
 #include <jack/types.h>
+
+#include "driver.h"
+#include "engine.h"
 
 // debug print control flags
 #define DEBUG_LEVEL_BUFFERS           	(1<<0)

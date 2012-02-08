@@ -24,7 +24,6 @@
 #include <unistd.h>
 
 #include <jack/types.h>
-//#include <jack/driver.h>
 #include <jack/jack.h>
 #include <jack/transport.h>
 

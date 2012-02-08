@@ -31,9 +31,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include <jack/messagebuffer.h>
-#include <jack/atomicity.h>
-#include <jack/internal.h>
+#include "messagebuffer.h"
+#include "atomicity.h"
+#include "internal.h"
 
 /* MB_NEXT() relies on the fact that MB_BUFFERS is a power of two */
 #define MB_BUFFERS	128

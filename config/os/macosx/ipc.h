@@ -24,9 +24,9 @@
 
 #include <mach/mach_error.h>
 #include <servers/bootstrap.h>
-#include <jack/internal.h>
-#include <jack/engine.h>
-#include <libjack/local.h>		/* JOQ: fix me */
+#include "internal.h"
+#include "engine.h"
+#include "libjack/local.h"		/* JOQ: fix me */
 
 /*
     RPC without time out can put the jack server in a blocked state

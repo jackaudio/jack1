@@ -31,9 +31,10 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 
-#include <jack/internal.h>
+#include "internal.h"
+#include "engine.h"
+
 #include <jack/jack.h>
-#include <jack/engine.h>
 
 #include <sysdeps/time.h>
 #include <sysdeps/cycles.h>

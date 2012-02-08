@@ -58,9 +58,11 @@
 #include <sys/soundcard.h>
 
 #include <jack/types.h>
-#include <jack/internal.h>
-#include <jack/engine.h>
 #include <jack/thread.h>
+
+#include "internal.h"
+#include "engine.h"
+
 #include <sysdeps/time.h>
 
 #include "oss_driver.h"

@@ -17,10 +17,10 @@
 
 */
 
-#include <jack/hardware.h>
+#include "hardware.h"
 #include "alsa_driver.h"
 #include "hammerfall.h"
-#include <jack/internal.h>
+#include "internal.h"
 
 /* Set this to 1 if you want this compile error:
  *   warning: `hammerfall_monitor_controls' defined but not used */

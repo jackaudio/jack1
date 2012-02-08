@@ -24,7 +24,8 @@
 #endif
 #include <stdlib.h>
 #include <config.h>
-#include <jack/pool.h>
+
+#include "pool.h"
 
 /* XXX need RT-pool based allocator here */
 void *

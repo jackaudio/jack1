@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <jack/timestamps.h>
-#include <jack/internal.h>
+#include "internal.h"
 #include <sysdeps/time.h>
 
 typedef struct {

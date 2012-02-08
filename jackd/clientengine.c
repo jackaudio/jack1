@@ -29,11 +29,11 @@
 #include <string.h>
 #include <signal.h>
 
-#include <jack/internal.h>
-#include <jack/engine.h>
-#include <jack/messagebuffer.h>
-#include <jack/version.h>
-#include <jack/driver.h>
+#include "internal.h"
+#include "engine.h"
+#include "messagebuffer.h"
+#include "version.h"
+#include "driver.h"
 #include <sysdeps/poll.h>
 #include <sysdeps/ipc.h>
 

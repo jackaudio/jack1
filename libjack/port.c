@@ -27,13 +27,15 @@
 
 #include <jack/jack.h>
 #include <jack/types.h>
-#include <jack/internal.h>
-#include <jack/engine.h>
-#include <jack/pool.h>
-#include <jack/port.h>
 #include <jack/midiport.h>
+
 #include <jack/jslist.h>
-#include <jack/intsimd.h>
+
+#include "internal.h"
+#include "engine.h"
+#include "pool.h"
+#include "port.h"
+#include "intsimd.h"
 
 #include "local.h"
 

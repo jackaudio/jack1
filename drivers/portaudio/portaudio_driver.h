@@ -25,12 +25,13 @@
 
 #include <portaudio.h>
 
-#include <jack/types.h>
-#include <jack/hardware.h>
-#include <jack/driver.h>
 #include <jack/jack.h>
-#include <jack/internal.h>
-#include <jack/memops.h>
+#include <jack/types.h>
+
+#include "hardware.h"
+#include "driver.h"
+#include "internal.h"
+#include "memops.h"
 
 typedef struct {
 

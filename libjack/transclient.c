@@ -24,8 +24,9 @@
 #include <errno.h>
 #include <math.h>
 #include <stdio.h>
-#include <jack/atomicity.h>
-#include <jack/internal.h>
+
+#include "atomicity.h"
+#include "internal.h"
 #include "local.h"
 
 

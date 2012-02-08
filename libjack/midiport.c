@@ -24,7 +24,8 @@
 
 #include <jack/jack.h>
 #include <jack/midiport.h>
-#include <jack/port.h>
+
+#include "port.h"
 
 enum { MIDI_INLINE_MAX = 4 }; /* 4 bytes for default event size */
 

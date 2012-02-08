@@ -40,7 +40,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include <jack/systemtest.h>
+#include "systemtest.h"
 
 /**
  * This function checks for the existence of known frequency scaling mechanisms 

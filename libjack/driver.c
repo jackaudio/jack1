@@ -26,10 +26,11 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include <jack/internal.h>
-#include <jack/driver.h>
-#include <jack/engine.h>
 #include <jack/thread.h>
+
+#include "internal.h"
+#include "driver.h"
+#include "engine.h"
 
 #ifdef USE_MLOCK
 #include <sys/mman.h>

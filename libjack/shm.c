@@ -47,9 +47,9 @@
 #include <sys/sem.h>
 #include <sysdeps/ipc.h>
 
-#include <jack/shm.h>
-#include <jack/internal.h>
-#include <jack/version.h>
+#include "shm.h"
+#include "internal.h"
+#include "version.h"
 
 #ifdef USE_POSIX_SHM
 static jack_shmtype_t jack_shmtype = shm_POSIX;

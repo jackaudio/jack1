@@ -37,18 +37,19 @@
 #include <sys/un.h>
 #include <sys/mman.h>
 
-#include <jack/internal.h>
 #include <jack/jack.h>
-#include <jack/engine.h>
-#include <jack/pool.h>
 #include <jack/jslist.h>
-#include <jack/version.h>
-#include <jack/shm.h>
-#include <jack/unlock.h>
 #include <jack/thread.h>
-#include <jack/varargs.h>
-#include <jack/intsimd.h>
-#include <jack/messagebuffer.h>
+
+#include "internal.h"
+#include "engine.h"
+#include "pool.h"
+#include "version.h"
+#include "shm.h"
+#include "unlock.h"
+#include "varargs.h"
+#include "intsimd.h"
+#include "messagebuffer.h"
 
 #include <sysdeps/time.h>
 

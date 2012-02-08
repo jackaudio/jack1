@@ -51,7 +51,8 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <jack/engine.h>
+
+#include "engine.h"
 #include "coreaudio_driver.h"
 
 const int CAVersion = 3;

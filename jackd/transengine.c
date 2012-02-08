@@ -24,9 +24,10 @@
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
-#include <jack/internal.h>
-#include <jack/engine.h>
-#include <jack/messagebuffer.h>
+
+#include "internal.h"
+#include "engine.h"
+#include "messagebuffer.h"
 #include "transengine.h"
 
 /********************** internal functions **********************/

@@ -28,7 +28,7 @@
 
 #include "config.h"
 
-#include "jack/internal.h"
+#include "internal.h"
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
@@ -36,11 +36,13 @@
 #include <signal.h>
 
 #include "jack/jslist.h"
-#include "jack/driver_interface.h"
-#include "jack/driver.h"
+#include "jack/control.h"
 
-#include "jack/engine.h"
+#include "driver_interface.h"
+#include "driver.h"
+#include "engine.h"
 #include "clientengine.h"
+
 //#include "JackError.h"
 //#include "JackServer.h"
 //#include "shm.h"
@@ -50,8 +52,6 @@
 //#include "JackConstants.h"
 //#include "JackDriverLoader.h"
 //#include "JackServerGlobals.h"
-
-#include "jack/control.h"
 
 /*
  * XXX: dont like statics here.

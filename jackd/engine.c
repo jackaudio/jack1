@@ -39,12 +39,14 @@
 #include <string.h>
 #include <limits.h>
 
-#include <jack/internal.h>
-#include <jack/engine.h>
-#include <jack/messagebuffer.h>
-#include <jack/driver.h>
-#include <jack/shm.h>
 #include <jack/thread.h>
+
+#include "internal.h"
+#include "engine.h"
+#include "messagebuffer.h"
+#include "driver.h"
+#include "shm.h"
+
 #include <sysdeps/poll.h>
 #include <sysdeps/ipc.h>
 

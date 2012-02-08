@@ -38,8 +38,8 @@
 #include <sys/mman.h>
 
 #include <jack/types.h>
-#include <jack/internal.h>
-#include <jack/engine.h>
+#include "internal.h"
+#include "engine.h"
 #include <sysdeps/time.h>
 #include <assert.h>
 

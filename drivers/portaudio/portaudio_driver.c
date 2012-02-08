@@ -42,7 +42,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include <jack/engine.h>
+#include "engine.h"
 #include "portaudio_driver.h"
 
 #ifdef JACK_USE_MACH_THREADS

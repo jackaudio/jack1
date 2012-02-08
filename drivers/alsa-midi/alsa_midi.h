@@ -20,7 +20,7 @@
 #define __jack_alsa_midi_h__
 
 #include <jack/jack.h>
-#include <jack/driver.h>
+#include "driver.h"
 
 typedef struct alsa_midi_t alsa_midi_t;
 struct alsa_midi_t {

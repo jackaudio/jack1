@@ -18,12 +18,12 @@
 
 */
 
-#include <jack/hardware.h>
+#include "hardware.h"
 #include "alsa_driver.h"
 #include "usx2y.h"
-#include <jack/internal.h>
-#include <jack/engine.h>
-#include <jack/messagebuffer.h>
+#include "internal.h"
+#include "engine.h"
+#include "messagebuffer.h"
 #include <sys/mman.h>
 
 #ifndef ARRAY_SIZE
