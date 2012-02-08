@@ -37,7 +37,6 @@ libjackinclude_HEADERS =   \
 	jack/statistics.h  \
 	jack/session.h     \
 	jack/thread.h      \
-	jack/timestamps.h  \
 	jack/transport.h   \
 	jack/types.h       \
 	jack/midiport.h    \
