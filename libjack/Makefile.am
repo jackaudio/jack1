@@ -20,7 +20,6 @@ SOURCE_FILES = \
 	     shm.c \
 	     thread.c \
              time.c \
-	     timestamps.c \
 	     transclient.c \
 	     unlock.c
 
