@@ -1,7 +1,7 @@
 /*
     Copyright (C) 2003 Paul Davis
 
-    jack/version.h.  Generated from version.h.in by configure.
+    @configure_input@
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,4 +17,4 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
-#define jack_protocol_version 24
+#define jack_protocol_version @JACK_PROTOCOL_VERSION@
