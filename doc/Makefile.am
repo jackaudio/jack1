@@ -9,7 +9,6 @@ DOXSOURCES=mainpage.dox transport.dox porting.dox fsm.png fsm.eps \
 	../example-clients/simple_client.c \
 	../jack/intclient.h \
 	../jack/jack.h \
-	../jack/port.h \
 	../jack/ringbuffer.h \
 	../jack/thread.h \
 	../jack/transport.h \
