@@ -13,8 +13,8 @@ dist-check-doxygen:
 	@false
 endif
 
-SUBDIRS =      jack libjack jackd drivers example-clients tools config $(DOC_DIR) man python
-DIST_SUBDIRS = config jack libjack jackd drivers example-clients tools doc man python
+SUBDIRS =      libjack jackd drivers example-clients tools config $(DOC_DIR) man python
+DIST_SUBDIRS = config libjack jackd drivers example-clients tools doc man python
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = jack.pc
@@ -27,3 +27,22 @@ rpm: dist
 	rpm -ta $(distdir).tar.gz
 
 dist-hook: dist-check-doxygen
+
+libjackincludedir = $(includedir)/jack
+
+libjackinclude_HEADERS =   \
+	jack/intclient.h   \
+	jack/jack.h        \
+	jack/ringbuffer.h  \
+	jack/statistics.h  \
+	jack/session.h     \
+	jack/thread.h      \
+	jack/timestamps.h  \
+	jack/transport.h   \
+	jack/types.h       \
+	jack/midiport.h    \
+	jack/weakmacros.h  \
+	jack/weakjack.h    \
+	jack/control.h     \
+	jack/jslist.h
+
