@@ -922,7 +922,6 @@ man/Makefile
 jack.pc
 jack.spec
 jack/Makefile
-jack/version.h
 jackd/Makefile
 jackd/jackd.1
 libjack/Makefile
