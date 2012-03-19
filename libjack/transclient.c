@@ -233,6 +233,26 @@ jack_frames_since_cycle_start (const jack_client_t *client)
 					/ 1000000.0f) * usecs);
 }
 
+int
+jack_get_cycle_times (const jack_client_t *client,
+		      jack_nframes_t *current_frames,
+                      jack_time_t    *current_usecs,
+                      jack_time_t    *next_usecs,
+		      float          *period_usecs)
+{
+	jack_frame_timer_t time;
+
+	jack_read_frame_time (client, &time);
+	if (time.initialized) {
+	    *current_frames  = time.frames;
+	    *current_usecs   = time.current_wakeup;
+	    *next_usecs      = time.next_wakeup;
+	    *period_usecs    = time.period_usecs;
+	    return 0;
+	}
+	return 1;
+}
+
 jack_time_t
 jack_get_time()
 {
@@ -240,28 +260,27 @@ jack_get_time()
 }
 
 jack_nframes_t
-jack_time_to_frames(const jack_client_t *client, jack_time_t now)
+jack_time_to_frames(const jack_client_t *client, jack_time_t usecs)
 {
 	jack_frame_timer_t time;
 	jack_control_t *ectl = client->engine;
 
 	jack_read_frame_time (client, &time);
-
 	if (time.initialized) {
-#if 0
-		jack_info ("now = %Lu current wakeup = %Lu next = %Lu frames = %lu + %f => %lu FC = %f SOI = %f", 
-			 now, time.current_wakeup, time.next_wakeup, time.frames,
-			 (double) (now - time.current_wakeup)/ (time.next_wakeup - time.current_wakeup),
-			 time.frames + 
-			   (long) rint (((double) ((long long) now - time.current_wakeup)/ 
-					 (long long) (time.next_wakeup - time.current_wakeup)) * ectl->buffer_size),
-			   time.filter_coefficient,  
-			   time.second_order_integrator);
-#endif
-
-		return time.frames + 
-			(long) rint (((double) ((long long) (now - time.current_wakeup))/ 
-						((long long) (time.next_wakeup - time.current_wakeup))) * ectl->buffer_size);
+	        /*
+		Make sure we have signed differences. It would make a lot  of sense
+		to use the standard signed intNN_t types everywhere  instead of e.g.
+		jack_nframes_t and jack_time_t. This would at least ensure that the
+		types used below are the correct ones. There is no way to get a type
+		that would be 'a signed version of jack_time_t' for example - the
+		types below are inherently fragile and there is no automatic way to
+	        check they are the correct ones. The only way is to check manually
+                against jack/types.h.  FA - 16/02/2012
+		*/
+	        int64_t du = usecs - time.current_wakeup;
+                int64_t dp = time.next_wakeup - time.current_wakeup;
+		return time.frames + (int32_t) rint ((double) du / (double) dp
+						     * ectl->buffer_size);
 	}
 	return 0;
 }
@@ -286,13 +305,22 @@ jack_frames_to_time(const jack_client_t *client, jack_nframes_t frames)
 	jack_control_t *ectl = client->engine;
 
 	jack_read_frame_time (client, &time);
-
 	if (time.initialized) {
-		return time.current_wakeup +
-			(long) rint (((double) ((long long) (frames - time.frames)) *
-						((long long) (time.next_wakeup - time.current_wakeup)) / ectl->buffer_size) );
+	        /*
+                Make sure we have signed differences. It would make a lot  of sense
+	        to use the standard signed intNN_t types everywhere  instead of e.g.
+	        jack_nframes_t and jack_time_t. This would at least ensure that the
+	        types used below are the correct ones. There is no way to get a type
+	        that would be 'a signed version of jack_time_t' for example - the
+	        types below are inherently fragile and there is no automatic way to
+	        check they are the correct ones. The only way is to check manually
+                against jack/types.h.  FA - 16/02/2012
+	        */
+	        int32_t df = frames - time.frames;
+                int64_t dp = time.next_wakeup - time.current_wakeup;
+	        return time.current_wakeup + (int64_t) rint ((double) df * (double) dp
+							     / ectl->buffer_size);
 	} 
-
 	return 0;
 }
 

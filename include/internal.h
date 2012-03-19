@@ -155,14 +155,14 @@ typedef struct {
 	volatile jack_nframes_t frames;  
 	volatile jack_time_t    current_wakeup;
 	volatile jack_time_t    next_wakeup;
-	volatile float          second_order_integrator;
+	volatile float          period_usecs;
 	volatile int32_t        initialized;
 	volatile uint32_t       guard2;
 	
 	/* not accessed by clients */
 
 	int32_t  reset_pending;      /* xrun happened, deal with it */
-	float    filter_coefficient; /* set once, never altered */
+	float    filter_omega;       /* set once, never altered */
 
 } POST_PACKED_STRUCTURE jack_frame_timer_t;
 

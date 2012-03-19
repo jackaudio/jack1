@@ -2009,8 +2009,8 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->control->frame_timer.current_wakeup = 0;
 	engine->control->frame_timer.next_wakeup = 0;
 	engine->control->frame_timer.initialized = 0;
-	engine->control->frame_timer.filter_coefficient = 0.01;
-	engine->control->frame_timer.second_order_integrator = 0;
+	engine->control->frame_timer.filter_omega = 0; /* Initialised later */
+	engine->control->frame_timer.period_usecs = 0;
 
 	engine->first_wakeup = 1;
 
@@ -2096,16 +2096,35 @@ jack_inc_frame_time (jack_engine_t *engine, jack_nframes_t nframes)
 	// really need a memory barrier here
 	timer->guard1++;
 
-	delta = (int64_t) now - (int64_t) timer->next_wakeup;
+	/* Modified implementation (the actual result is the same).
 
-	timer->current_wakeup = timer->next_wakeup;
+	   'second_order_integrator' is renamed to 'period_usecs'
+           and now represents the DLL's best estimate of the 
+           period time in microseconds (before it was a scaled
+           version of the difference w.r.t. the nominal value).
+	   This allows this value to be made available to clients
+           that are interested in it (see libjack/transclient.c).
+           This change also means that 'period_usecs'  must be
+           initialised to the nominal period time instead of zero.
+           This is done in the first cycle in jack_run_cycle().
+
+	   'filter_coefficient' is renamed to 'filter_omega'. It
+           is now equal to the 'omega' value as defined in the
+           'Using a DLL to filter time' paper (before it was a
+           scaled version of this value). It is computed once in
+           jack_run_cycle() rather than set to a fixed value. This
+           makes the DLL bandwidth independent of the period time.
+
+           FA 13/02/2012
+        */
+
+	delta = (float)((int64_t) now - (int64_t) timer->next_wakeup);
+	delta *= timer->filter_omega;
+ 	timer->current_wakeup = timer->next_wakeup;
 	timer->frames += nframes;
-	timer->second_order_integrator += 0.5f * 
-		timer->filter_coefficient * delta;	
-	timer->next_wakeup = timer->current_wakeup + 
-		engine->driver->period_usecs + 
-		(int64_t) floorf ((timer->filter_coefficient * 
-				   (delta + timer->second_order_integrator)));
+	timer->period_usecs += timer->filter_omega * delta;	
+	timer->next_wakeup += (int64_t) floorf (timer->period_usecs + 1.41f * delta + 0.5f);
+
 	timer->initialized = 1;
 
 	// might need a memory barrier here
@@ -2299,6 +2318,7 @@ jack_stop_freewheeling (jack_engine_t* engine, int engine_exiting)
 
 	engine->fwclient = 0;
 	engine->freewheeling = 0;
+	engine->first_wakeup = 1;
 
 	if (!engine_exiting) {
 		/* tell everyone we've stopped */
@@ -2486,50 +2506,49 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	jack_nframes_t left;
 	jack_nframes_t b_size = engine->control->buffer_size;
 	jack_frame_timer_t* timer = &engine->control->frame_timer;
-	int no_increment = 0;
 
-	if (engine->first_wakeup) {
+	if (engine->first_wakeup || timer->reset_pending) {
+		/* the first wakeup or post-freewheeling or post-xrun */
 
-		/* the first wakeup */
+		/* There seems to be no significant difference between
+                   the two conditions OR-ed above. Incrementing the
+                   frame_time after an xrun shouldn't harm, as there 
+                   will be a discontinuity anyway. So the two are
+                   combined in this version.
+                   FA 16/03/2012 
+                */
+		/* Since the DLL *will* be run, next_wakeup should be the
+                   current wakeup time *without* adding the period time, as
+                   if it were computed in the previous period.
+                   FA 16/03/2012 
+                */
+                /* Added initialisation of timer->period_usecs, required
+                   due to the modified implementation of the DLL itself. 
+                   OTOH, this should maybe not be repeated after e.g.
+                   freewheeling or an xrun, as the current value would be
+                   more accurate than the nominal one. But it doesn't really
+                   harm either. Implementing this would require a new flag
+		   in the engine structure, to be used after freewheeling 
+                   or an xrun instead of first_wakeup. I don't know if this
+                   can be done without breaking compatibility, so I did not
+                   add this
+                   FA 13/02/2012
+                */
+                /* Added initialisation of timer->filter_omega. This makes 
+		   the DLL bandwidth independent of the actual period time.
+                   The bandwidth is now 1/8 Hz in all cases. The value of
+                   timer->filter_omega is 2 * pi * BW * Tperiod.
+                   FA 13/02/2012
+                */
+		timer->next_wakeup = engine->driver->last_wait_ust;
+		timer->period_usecs = (float) engine->driver->period_usecs;
+		timer->filter_omega = timer->period_usecs * 7.854e-7f;
 
-		timer->next_wakeup = 
-			engine->driver->last_wait_ust +
-			engine->driver->period_usecs;
 		engine->first_wakeup = 0;
-		
-		/* if we got an xrun/delayed wakeup on the first cycle,
-		   reset the pending flag (we have no predicted wakeups
-		   to use), but avoid incrementing the frame timer.
-		*/
-
-		if (timer->reset_pending) {
-			timer->reset_pending = 0;
-			no_increment = 1;
-		}
-	}
-
-	if (timer->reset_pending) {
-
-		/* post xrun-handling */
-
-		/* don't bother to increment the frame counter, because we missed 1 or more 
-		   deadlines in the backend anyway.
-		 */
-
-		timer->current_wakeup = engine->driver->last_wait_ust;
-		timer->next_wakeup = engine->driver->last_wait_ust +
-			engine->driver->period_usecs;
-
 		timer->reset_pending = 0;
-
-	} else {
-		
-		/* normal condition */
-
-		if (!no_increment) {
-			jack_inc_frame_time (engine, nframes);
-		}
 	}
+
+        jack_inc_frame_time (engine, nframes);
 
 	if (engine->verbose) {
 		if (nframes != b_size) { 
@@ -2540,6 +2559,17 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 	}
 
 	/* run as many cycles as it takes to consume nframes */
+
+	/* This should run the DLL as many times as well, to ensure that
+           timing info (including basic frame_time !) is valid in each
+           cycle. So maybe the call to jack_inc_frame_time() should be
+           within this loop. In that case, if there is more than one
+           iteration, the DLL should probably ignore the loop error.
+           This would require a new argument to jack_inc_frame_time().
+           OTOH, does this actually happen ?
+           FA 16/02/2012
+	*/
+
 	for (left = nframes; left >= b_size; left -= b_size) {
 		if (jack_run_one_cycle (engine, b_size, delayed_usecs)) {
 			jack_error ("cycle execution failure, exiting");
