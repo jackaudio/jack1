@@ -684,6 +684,30 @@ ffado_driver_stop (ffado_driver_t *driver)
 	return 0;
 }
 
+static void update_port_latencies(ffado_driver_t *driver)
+{
+	JSList *node;
+	jack_latency_range_t range;
+
+	range.min = range.max = (driver->period_size * (driver->device_options.nb_buffers - 1));
+	for (node = driver->playback_ports; node;
+	     node = jack_slist_next (node)) {
+		if (node->data != NULL) {
+			jack_port_t *port = (jack_port_t *) node->data;
+			jack_port_set_latency_range (port, JackPlaybackLatency, &range);
+		}
+	}
+
+	range.min = range.max = driver->period_size + driver->capture_frame_latency;
+	for (node = driver->capture_ports; node;
+	     node = jack_slist_next (node)) {
+		if (node->data != NULL) {
+			jack_port_t *port = (jack_port_t *) node->data;
+			jack_port_set_latency_range (port, JackCaptureLatency, &range);
+		}
+
+	}
+}
 
 static int
 ffado_driver_bufsize (ffado_driver_t* driver, jack_nframes_t nframes)
@@ -748,9 +772,7 @@ ffado_driver_bufsize (ffado_driver_t* driver, jack_nframes_t nframes)
 		return -1;
 	}
 
-	// Other drivers (eg: ALSA) don't seem to adjust latencies via
-	// jack_port_set_latency_range() from the bufsize() callback, so we
-	// won't either.  Is this right?
+	update_port_latencies(driver);
 
         return 0;
 }
