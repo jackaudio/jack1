@@ -56,6 +56,15 @@ static int ffado_driver_stop (ffado_driver_t *driver);
 #define FIREWIRE_REQUIRED_FFADO_API_VERSION 8
 #define FIREWIRE_REQUIRED_FFADO_API_VERSION_FOR_SETBUFSIZE 9
 
+/* FFADO_API_VERSION was first defined with API_VERSION 9, so all previous
+ * headers do not provide this define.
+ */
+#ifndef FFADO_API_VERSION
+extern int ffado_streaming_set_period_size(ffado_device_t *dev,
+		unsigned int period) __attribute__((__weak__));
+#endif
+
+
 // enable verbose messages
 static int g_verbose=0;
 
