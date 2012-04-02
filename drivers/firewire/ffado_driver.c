@@ -68,6 +68,31 @@ extern int ffado_streaming_set_period_size(ffado_device_t *dev,
 // enable verbose messages
 static int g_verbose=0;
 
+static void update_port_latencies(ffado_driver_t *driver)
+{
+	JSList *node;
+	jack_latency_range_t range;
+
+	range.min = range.max = (driver->period_size * (driver->device_options.nb_buffers - 1));
+	for (node = driver->playback_ports; node;
+	     node = jack_slist_next (node)) {
+		if (node->data != NULL) {
+			jack_port_t *port = (jack_port_t *) node->data;
+			jack_port_set_latency_range (port, JackPlaybackLatency, &range);
+		}
+	}
+
+	range.min = range.max = driver->period_size + driver->capture_frame_latency;
+	for (node = driver->capture_ports; node;
+	     node = jack_slist_next (node)) {
+		if (node->data != NULL) {
+			jack_port_t *port = (jack_port_t *) node->data;
+			jack_port_set_latency_range (port, JackCaptureLatency, &range);
+		}
+
+	}
+}
+
 static int
 ffado_driver_attach (ffado_driver_t *driver)
 {
@@ -682,31 +707,6 @@ ffado_driver_stop (ffado_driver_t *driver)
 	}
 
 	return 0;
-}
-
-static void update_port_latencies(ffado_driver_t *driver)
-{
-	JSList *node;
-	jack_latency_range_t range;
-
-	range.min = range.max = (driver->period_size * (driver->device_options.nb_buffers - 1));
-	for (node = driver->playback_ports; node;
-	     node = jack_slist_next (node)) {
-		if (node->data != NULL) {
-			jack_port_t *port = (jack_port_t *) node->data;
-			jack_port_set_latency_range (port, JackPlaybackLatency, &range);
-		}
-	}
-
-	range.min = range.max = driver->period_size + driver->capture_frame_latency;
-	for (node = driver->capture_ports; node;
-	     node = jack_slist_next (node)) {
-		if (node->data != NULL) {
-			jack_port_t *port = (jack_port_t *) node->data;
-			jack_port_set_latency_range (port, JackCaptureLatency, &range);
-		}
-
-	}
 }
 
 static int
