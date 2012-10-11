@@ -224,6 +224,8 @@ typedef enum  {
   LatencyCallback
 } JackEventType;
 
+const char* jack_event_type_name (JackEventType);
+
 typedef struct {
     JackEventType type;
     union {

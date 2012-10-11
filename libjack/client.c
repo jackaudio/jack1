@@ -2958,3 +2958,44 @@ jack_free (void* ptr)
 {
 	free (ptr);
 }
+
+const char*
+jack_event_type_name (JackEventType type)
+{
+        switch (type) {
+        case BufferSizeChange:
+                return "buffer size change";
+        case SampleRateChange:
+                return "sample rate change";
+        case AttachPortSegment:
+                return "port segment attached";
+        case PortConnected:
+                return "ports connected";
+        case PortDisconnected:
+                return "ports disconnected";
+        case GraphReordered:
+                return "graph reordered";
+        case PortRegistered:
+                return "port registered";
+        case PortUnregistered:
+                return "port unregistered";
+        case XRun:
+                return "xrun";
+        case StartFreewheel:
+                return "freewheel started";
+        case StopFreewheel:
+                return "freewheel stopped";
+        case ClientRegistered:
+                return "client registered";
+        case ClientUnregistered:
+                return "client unregistered";
+        case SaveSession:
+                return "save session";
+        case LatencyCallback:
+                return "latency callback";
+        default:
+                break;
+        }
+
+        return "unknown";
+}
