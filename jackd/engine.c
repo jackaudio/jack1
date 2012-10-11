@@ -3056,6 +3056,15 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 				jack_time_t then = jack_get_microseconds ();
 				jack_time_t now;
 				
+                                /* if we're not running realtime and there is a client timeout set
+                                   that exceeds the default client event timeout (which is not
+                                   bound by RT limits, then use the larger timeout.
+                                */
+
+                                if (!engine->control->real_time && (engine->client_timeout_msecs > poll_timeout)) {
+                                        poll_timeout = engine->client_timeout_msecs;
+                                }
+
 #ifdef __linux
 			again:
 #endif
@@ -3116,7 +3125,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
  					}
  				}
   			}
-
+                        
  			if (status == 0) {
  				if (read (client->event_fd, &status, sizeof (status)) != sizeof (status)) {
  					jack_error ("cannot read event response from "
@@ -3127,11 +3136,23 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
  				} 
 
  			} else {
- 				jack_error ("bad status (%d) for client %s "
-					    "handling event (type = %d)",
- 					    status,
-					    client->control->name,
-					    event->type);
+                                switch (status) {
+                                case -1:
+                                        jack_error ("internal poll failure reading response from client %s to a %s event",
+                                                    client->control->name,
+                                                    jack_event_type_name (event->type));
+                                        break;
+                                case -2:
+                                        jack_error ("timeout waiting for client %s to handle a %s event",
+                                                    client->control->name,
+                                                    jack_event_type_name (event->type));
+                                        break;
+                                default:
+                                        jack_error ("bad status (%d) from client %s while handling a %s event",
+                                                    (int) status, 
+                                                    client->control->name,
+                                                    jack_event_type_name (event->type));
+                                }
   			}
 
 			if (status<0) {
