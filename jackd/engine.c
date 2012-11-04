@@ -3556,8 +3556,8 @@ jack_sort_graph (jack_engine_t *engine)
 	engine->clients = jack_slist_sort (engine->clients,
 					   (JCompareFunc) jack_client_sort);
 	jack_compute_all_port_total_latencies (engine);
-	jack_rechain_graph (engine);
 	jack_compute_new_latency (engine);
+	jack_rechain_graph (engine);
 	engine->timeout_count = 0;
 	VERBOSE (engine, "-- jack_sort_graph");
 }
