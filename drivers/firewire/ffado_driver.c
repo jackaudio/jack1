@@ -41,6 +41,7 @@
 #include <jack/types.h>
 #include "internal.h"
 #include "engine.h"
+#include "libjack/local.h"
 #include <sysdeps/time.h>
 #include <assert.h>
 
