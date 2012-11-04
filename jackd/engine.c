@@ -1385,7 +1385,10 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 
 	case SetBufferSize:
 		req->status = jack_set_buffer_size_request (engine,
-							   req->x.nframes);
+                                                            req->x.nframes);
+                jack_lock_graph (engine);
+                jack_compute_new_latency (engine);
+                jack_unlock_graph (engine);
 		break;
 
 	case IntClientHandle:
@@ -2959,7 +2962,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 
 	/* caller must hold the graph lock */
 
-	DEBUG ("delivering event (type %d)", event->type);
+	DEBUG ("delivering event (type %s)", jack_event_type_name (event->type));
 
 	/* we are not RT-constrained here, so use kill(2) to beef up
 	   our check on a client's continued well-being

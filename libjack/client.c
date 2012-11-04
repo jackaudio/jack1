@@ -589,13 +589,14 @@ jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *event,
 		}
 	}
 
-	/* for a driver invocation, this is enough.
+	/* for a driver invocation without its own latency callback, this is enough.
 	 * input and output ports do not depend on each other.
 	 */
-	if (is_driver)
+	if (is_driver && !client->control->latency_cbset) {
 		return 0;
-	
-	if (! client->control->latency_cbset) {
+        }
+
+	if (!client->control->latency_cbset) {
 		/*
 		 * default action is to assume all ports depend on each other.
 		 * then always take the maximum latency.

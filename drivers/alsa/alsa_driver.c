@@ -33,6 +33,7 @@
 #include "internal.h"
 #include "engine.h"
 #include "messagebuffer.h"
+#include "libjack/local.h"
 
 #include <sysdeps/time.h>
 
@@ -1721,6 +1722,33 @@ alsa_driver_run_cycle (alsa_driver_t *driver)
 	return engine->run_cycle (engine, nframes, delayed_usecs);
 }
 
+static void
+alsa_driver_latency_callback (jack_latency_callback_mode_t mode, void* arg)
+{
+        alsa_driver_t* driver = (alsa_driver_t*) arg;
+        jack_client_t* client = driver->client;
+        jack_latency_range_t range;
+        JSList* node;
+
+        if (mode == JackPlaybackLatency) {
+                range.min = range.max = driver->frames_per_cycle + driver->playback_frame_latency;
+        } else {
+                range.min = range.max = driver->frames_per_cycle + driver->capture_frame_latency;
+        }
+
+	for (node = client->ports; node; node = jack_slist_next (node)) {
+		jack_port_t *port = node->data;
+
+		if ((jack_port_flags (port) & JackPortIsOutput) && (mode == JackPlaybackLatency)) {
+                        jack_port_set_latency_range (port, JackPlaybackLatency, &range);
+		}                
+
+		if ((jack_port_flags (port) & JackPortIsInput) && (mode == JackCaptureLatency)) {
+                        jack_port_set_latency_range (port, JackCaptureLatency, &range);
+		}
+	}
+}
+
 static int
 alsa_driver_attach (alsa_driver_t *driver)
 {
@@ -2367,7 +2395,9 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 			driver->capture_and_playback_not_synced = TRUE;
 		} 
 	}
-
+        
+        jack_set_latency_callback (client, alsa_driver_latency_callback, driver);
+        
 	driver->client = client;
 
 	return (jack_driver_t *) driver;
