@@ -38,10 +38,11 @@
 
 #include <assert.h>
 
-#include <jack/types.h>
-#include <jack/internal.h>
+#include <jack/types.h"
 #include <jack/engine.h>
 #include <sysdeps/time.h>
+
+#include "include/internal.h"
 
 #include "freebob_driver.h"
 
