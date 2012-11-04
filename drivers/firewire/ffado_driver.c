@@ -74,7 +74,7 @@ ffado_latency_callback (jack_latency_callback_mode_t mode, void* arg)
 	JSList *node;
 	jack_latency_range_t range;
 
-        alsa_driver_t* driver = (alsa_driver_t*) arg;
+        ffado_driver_t* driver = (ffado_driver_t*) arg;
         jack_client_t* client = driver->client;
         jack_latency_range_t range;
         JSList* node;
