@@ -68,28 +68,30 @@ extern int ffado_streaming_set_period_size(ffado_device_t *dev,
 // enable verbose messages
 static int g_verbose=0;
 
-static void update_port_latencies(ffado_driver_t *driver)
+static void 
+ffado_latency_callback (jack_latency_callback_mode_t mode, void* arg)
 {
 	JSList *node;
 	jack_latency_range_t range;
 
-	range.min = range.max = (driver->period_size * (driver->device_options.nb_buffers - 1));
-	for (node = driver->playback_ports; node;
-	     node = jack_slist_next (node)) {
-		if (node->data != NULL) {
-			jack_port_t *port = (jack_port_t *) node->data;
-			jack_port_set_latency_range (port, JackPlaybackLatency, &range);
-		}
-	}
-
-	range.min = range.max = driver->period_size + driver->capture_frame_latency;
-	for (node = driver->capture_ports; node;
-	     node = jack_slist_next (node)) {
-		if (node->data != NULL) {
-			jack_port_t *port = (jack_port_t *) node->data;
-			jack_port_set_latency_range (port, JackCaptureLatency, &range);
-		}
-
+        if (mode == JackPlaybackLatency) {
+                range.min = range.max = (driver->period_size * (driver->device_options.nb_buffers - 1));
+                for (node = driver->playback_ports; node;
+                     node = jack_slist_next (node)) {
+                        if (node->data != NULL) {
+                                jack_port_t *port = (jack_port_t *) node->data;
+                                jack_port_set_latency_range (port, JackPlaybackLatency, &range);
+                        }
+                }
+        } else {
+                range.min = range.max = driver->period_size + driver->capture_frame_latency;
+                for (node = driver->capture_ports; node;
+                     node = jack_slist_next (node)) {
+                        if (node->data != NULL) {
+                                jack_port_t *port = (jack_port_t *) node->data;
+                                jack_port_set_latency_range (port, JackCaptureLatency, &range);
+                        }
+                }
 	}
 }
 
@@ -283,8 +285,6 @@ ffado_driver_attach (ffado_driver_t *driver)
 				jack_slist_append (driver->playback_ports, NULL);
 		}
 	}
-
-	update_port_latencies(driver);
 
 	if(ffado_streaming_prepare(driver->dev)) {
 		printError("Could not prepare streaming device!");
@@ -769,8 +769,6 @@ ffado_driver_bufsize (ffado_driver_t* driver, jack_nframes_t nframes)
 		return -1;
 	}
 
-	update_port_latencies(driver);
-
         return 0;
 }
 
@@ -818,6 +816,8 @@ ffado_driver_new (jack_client_t * client,
 
 	driver->client = client;
 	driver->engine = NULL;
+
+        jack_set_latency_callback (client, ffado_latency_callback, driver);
 
 	memset(&driver->device_options,0,sizeof(driver->device_options));	
 	driver->device_options.sample_rate=params->sample_rate;
