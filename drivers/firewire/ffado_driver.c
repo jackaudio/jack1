@@ -74,24 +74,19 @@ ffado_latency_callback (jack_latency_callback_mode_t mode, void* arg)
 	JSList *node;
 	jack_latency_range_t range;
 
+        alsa_driver_t* driver = (alsa_driver_t*) arg;
+        jack_client_t* client = driver->client;
+        jack_latency_range_t range;
+        JSList* node;
+
         if (mode == JackPlaybackLatency) {
                 range.min = range.max = (driver->period_size * (driver->device_options.nb_buffers - 1));
-                for (node = driver->playback_ports; node;
-                     node = jack_slist_next (node)) {
-                        if (node->data != NULL) {
-                                jack_port_t *port = (jack_port_t *) node->data;
-                                jack_port_set_latency_range (port, JackPlaybackLatency, &range);
-                        }
-                }
         } else {
                 range.min = range.max = driver->period_size + driver->capture_frame_latency;
-                for (node = driver->capture_ports; node;
-                     node = jack_slist_next (node)) {
-                        if (node->data != NULL) {
-                                jack_port_t *port = (jack_port_t *) node->data;
-                                jack_port_set_latency_range (port, JackCaptureLatency, &range);
-                        }
-                }
+        }
+
+	for (node = client->ports; node; node = jack_slist_next (node)) {
+                jack_port_set_latency_range ((jack_port_t*) node->data, mode, &range);
 	}
 }
 

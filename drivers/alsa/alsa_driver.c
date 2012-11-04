@@ -1737,15 +1737,7 @@ alsa_driver_latency_callback (jack_latency_callback_mode_t mode, void* arg)
         }
 
 	for (node = client->ports; node; node = jack_slist_next (node)) {
-		jack_port_t *port = node->data;
-
-		if ((jack_port_flags (port) & JackPortIsOutput) && (mode == JackPlaybackLatency)) {
-                        jack_port_set_latency_range (port, JackPlaybackLatency, &range);
-		}                
-
-		if ((jack_port_flags (port) & JackPortIsInput) && (mode == JackCaptureLatency)) {
-                        jack_port_set_latency_range (port, JackCaptureLatency, &range);
-		}
+                jack_port_set_latency_range ((jack_port_t*) node->data, mode, &range);
 	}
 }
 
