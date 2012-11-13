@@ -1598,7 +1598,26 @@ jack_server_thread (void *arg)
 			if (engine->pfd) {
 				free (engine->pfd);
 			}
-			engine->pfd = (struct pollfd *) malloc (sizeof(struct pollfd) * (fixed_fd_cnt + clients));
+                        
+                        engine->pfd = (struct pollfd *) malloc(sizeof(struct pollfd) *
+                                                               (fixed_fd_cnt + clients));
+				
+			if (engine->pfd == NULL) {
+                                /*
+				 * this can happen if limits.conf was changed
+				 * but the user hasn't logged out and back in yet
+				 */
+				if (errno == EAGAIN)
+					jack_error("malloc failed (%s) - make" 
+                                                   "sure you log out and back"
+                                                   "in after changing limits"
+                                                   ".conf!", strerror(errno));
+				else
+					jack_error("malloc failed (%s)",
+						   strerror(errno));
+
+				break;
+			}
 		}
 
 		engine->pfd[0].fd = engine->fds[0];
