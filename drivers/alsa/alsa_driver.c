@@ -2013,7 +2013,7 @@ discover_alsa_using_apps ()
         while (dir) {
                 char maybe[PATH_MAX+1];
                 snprintf (maybe, sizeof(maybe), "%s/lsof", dir);
-                if (access (maybe, X_OK)) {
+                if (access (maybe, X_OK) == 0) {
                         break;
                 }
                 dir = strtok (NULL, ":");
