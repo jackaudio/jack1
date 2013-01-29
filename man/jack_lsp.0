@@ -36,6 +36,10 @@ Display port properties. Output may include input|output, can-monitor, physical,
 .br
 Display port type
 .TP
+\fB-u\fR, \fB--uuid\fR
+.br
+Display client UUIDs instead of names
+.TP
 \fB-h\fR, \fB--help\fR
 .br
 Display help/usage message
