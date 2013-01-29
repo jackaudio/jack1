@@ -2779,15 +2779,31 @@ jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
 	jack_request_t request;
 	char *end_ptr;
 	jack_client_id_t uuid_int = strtol( uuid, &end_ptr, 10 );
-
-	if( *end_ptr != '\0' ) {
-		return NULL;
-        }
+	if ( *end_ptr != '\0' ) return NULL;
 
         VALGRIND_MEMSET (&request, 0, sizeof (request));
 
 	request.type = GetClientByUUID;
 	request.x.client_id = uuid_int;
+	if( jack_client_deliver_request( client, &request ) )
+		return NULL;
+
+	return strdup( request.x.port_info.name );
+}
+
+char*
+jack_get_uuid_for_client_name ( jack_client_t *client, const char *client_name )
+{
+	jack_request_t request;
+	size_t len = strlen(client_name) + 1;
+	if ( len > sizeof(request.x.name) )
+		return NULL;
+
+        VALGRIND_MEMSET (&request, 0, sizeof (request));
+
+	request.type = GetUUIDByClientName;
+	memcpy(request.x.name, client_name, len);
+
 	if( jack_client_deliver_request( client, &request ) )
 		return NULL;
 

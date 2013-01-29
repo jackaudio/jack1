@@ -135,6 +135,7 @@ static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_sh
 static int jack_check_client_status (jack_engine_t* engine);
 static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd );
 static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *req);
+static void jack_do_get_uuid_by_client_name ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_reserve_name ( jack_engine_t *engine, jack_request_t *req);
 static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req );
 static void jack_compute_new_latency (jack_engine_t *engine);
@@ -1425,6 +1426,11 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 	case GetClientByUUID:
 		jack_rdlock_graph (engine);
 		jack_do_get_client_by_uuid (engine, req);
+		jack_unlock_graph (engine);
+		break;
+	case GetUUIDByClientName:
+		jack_rdlock_graph (engine);
+		jack_do_get_uuid_by_client_name (engine, req);
 		jack_unlock_graph (engine);
 		break;
 	case ReserveName:
@@ -2736,6 +2742,20 @@ static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if( client->control->uid == req->x.client_id ) {
 			snprintf( req->x.port_info.name, sizeof(req->x.port_info.name), "%s", client->control->name );
+			req->status = 0;
+			return;
+		}
+	}
+}
+
+static void jack_do_get_uuid_by_client_name ( jack_engine_t *engine, jack_request_t *req)
+{
+	JSList *node;
+	req->status = -1;
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+		if( strcmp( client->control->name, req->x.name ) == 0 ) {
+			snprintf( req->x.port_info.name, sizeof(req->x.port_info.name), "%d", client->control->uid );
 			req->status = 0;
 			return;
 		}

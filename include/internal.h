@@ -384,6 +384,7 @@ typedef enum {
 	RecomputeTotalLatency = 24,
 	SessionNotify = 25,
 	GetClientByUUID = 26,
+	GetUUIDByClientName = 27,
 	ReserveName = 30,
 	SessionReply = 31,
 	SessionHasCallback = 32
