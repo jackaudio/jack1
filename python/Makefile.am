@@ -1,3 +1,3 @@
 noinst_SCRIPTS = jackd.py
-EXTRA_DIST = jackd.py jackctl.pyc mygetopt.pyc reserve_audio.py
+EXTRA_DIST = jackd.py jackctl.py mygetopt.py reserve_audio.py
 

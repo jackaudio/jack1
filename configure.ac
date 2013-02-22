@@ -924,6 +924,7 @@ jack.spec
 jackd/Makefile
 jackd/jackd.1
 include/version.h
+include/Makefile
 libjack/Makefile
 python/Makefile
 )

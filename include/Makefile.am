@@ -14,7 +14,6 @@ noinst_HEADERS =		\
 	messagebuffer.h		\
 	pool.h			\
 	port.h			\
-	ringbuffer.h	        \
 	sanitycheck.h           \
 	shm.h			\
 	start.h			\
