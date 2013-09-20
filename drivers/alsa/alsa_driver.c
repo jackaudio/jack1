@@ -591,6 +591,9 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	unsigned int pr = 0;
 	unsigned int cr = 0;
 	int err;
+        jack_nframes_t old_frames_per_cycle = driver->frames_per_cycle;
+        jack_nframes_t old_rate = driver->frame_rate;
+        jack_nframes_t old_user_nperiods = driver->user_nperiods;
 
 	driver->frame_rate = rate;
 	driver->frames_per_cycle = frames_per_cycle;
@@ -612,7 +615,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 			    &driver->capture_nchannels,
 			    driver->capture_sample_bytes)) {
 			jack_error ("ALSA: cannot configure capture channel");
-			return -1;
+			goto errout;
 		}
 	}
 
@@ -628,7 +631,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 			    &driver->playback_nchannels,
 			    driver->playback_sample_bytes)) {
 			jack_error ("ALSA: cannot configure playback channel");
-			return -1;
+			goto errout;
 		}
 	}
 	
@@ -698,7 +701,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 				    PRIu32
 				    " frames but got %u frames for playback",
 				    driver->frames_per_cycle, p_period_size);
-			return -1;
+			goto errout;
 		}
 	}
 
@@ -721,7 +724,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 				    PRIu32
 				    " frames but got %uc frames for capture",
 				    driver->frames_per_cycle, p_period_size);
-			return -1;
+                        goto errout;
 		}
 	}
 
@@ -775,7 +778,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 				       &my_areas, &offset, &frames) < 0) {
 			jack_error ("ALSA: %s: mmap areas info error",
 				    driver->alsa_name_playback);
-			return -1;
+			goto errout;
 		}
 		driver->interleave_unit =
 			snd_pcm_format_physical_width (
@@ -791,7 +794,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 				       &my_areas, &offset, &frames) < 0) {
 			jack_error ("ALSA: %s: mmap areas info error",
 				    driver->alsa_name_capture);
-			return -1;
+			goto errout;
 		}
 	}
 
@@ -866,11 +869,23 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 		if (driver->engine->set_buffer_size (driver->engine,
 						     driver->frames_per_cycle)) {
 			jack_error ("ALSA: Cannot set engine buffer size to %d", driver->frames_per_cycle);
-			return -1;
+			goto errout;
 		}
 	}
 
+        driver->previously_successfully_configured = TRUE;
 	return 0;
+        
+    errout:
+        if (driver->previously_successfully_configured) {
+                /* attempt to restore previous configuration */
+                jack_info ("ALSA: falling back to old configuration");
+                if (alsa_driver_set_parameters (driver, old_frames_per_cycle, old_user_nperiods, old_rate) == 0) {
+                        jack_error ("ALSA: reverted to previous parameters after failure");
+                        return 0;
+                }
+        }
+        return -1;
 }	
 
 static int
@@ -2178,7 +2193,7 @@ alsa_driver_new (char *name, char *playback_alsa_device,
 	driver->capture_addr = 0;
 	driver->playback_interleave_skip = NULL;
 	driver->capture_interleave_skip = NULL;
-
+        driver->previously_successfully_configured = FALSE;
 
 	driver->silent = 0;
 	driver->all_monitor_in = FALSE;

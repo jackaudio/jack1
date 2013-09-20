@@ -138,6 +138,7 @@ typedef struct _alsa_driver {
 
     alsa_midi_t *midi;
     int xrun_recovery;
+    int previously_successfully_configured;
 
 } alsa_driver_t;
 
