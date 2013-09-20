@@ -865,7 +865,7 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 	if (driver->engine) {
 		if (driver->engine->set_buffer_size (driver->engine,
 						     driver->frames_per_cycle)) {
-			jack_error ("ALSA: Cannot set engine buffer size to %d (check MIDI)", driver->frames_per_cycle);
+			jack_error ("ALSA: Cannot set engine buffer size to %d", driver->frames_per_cycle);
 			return -1;
 		}
 	}
