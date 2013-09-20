@@ -105,7 +105,6 @@ struct _jack_engine {
 
     unsigned int    port_max;
     pthread_t	    server_thread;
-    pthread_t	    watchdog_thread;
 
     int		    fds[2];
     int		    cleanup_fifo[2];
@@ -132,7 +131,6 @@ struct _jack_engine {
     const char	   *server_name;
     char	    temporary;
     int		    reordered;
-    int		    watchdog_check;
     int		    feedbackcount;
     int             removing_clients;
     pid_t           wait_pid;
@@ -258,7 +256,6 @@ jack_client_internal_t *
 jack_client_by_name (jack_engine_t *engine, const char *name);
 
 int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_event_t *);
-void jack_stop_watchdog (jack_engine_t * );
 
 void
 jack_engine_signal_problems (jack_engine_t* engine);

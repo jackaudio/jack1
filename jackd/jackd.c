@@ -715,12 +715,6 @@ main (int argc, char *argv[])
 		return -1;
 	}
 
-	if (realtime && (client_timeout >= JACKD_WATCHDOG_TIMEOUT)) {
-		usage (stderr);
-		fprintf (stderr, "In realtime mode (-R) the client timeout must be smaller than the watchdog timeout (%ims).\n", JACKD_WATCHDOG_TIMEOUT);
-		exit (1);
-	}
-
 	if (!seen_driver) {
 		usage (stderr);
 		exit (1);

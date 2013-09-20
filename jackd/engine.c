@@ -835,7 +835,6 @@ jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
 	JSList *node;
 
 	engine->process_errors = 0;
-	engine->watchdog_check = 1;
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_control_t *ctl =
@@ -931,102 +930,6 @@ jack_engine_post_process (jack_engine_t *engine)
 	jack_calc_cpu_load (engine);
 	jack_check_clients (engine, 0);
 }
-
-#ifdef JACK_USE_MACH_THREADS
-
-static int
-jack_start_watchdog (jack_engine_t *engine)
-{
-	/* Stephane Letz : letz@grame.fr Watch dog thread is
-	 * not needed on MacOSX since CoreAudio drivers
-	 * already contains a similar mechanism.
-	 */
-	return 0;
-}
-
-void
-jack_stop_watchdog (jack_engine_t *engine)
-{
-	/* Stephane Letz : letz@grame.fr Watch dog thread is
-	 * not needed on MacOSX since CoreAudio drivers
-	 * already contains a similar mechanism.
-	 */
-	return;
-}
-
-#else
-
-static void *
-jack_watchdog_thread (void *arg)
-{
-	jack_engine_t *engine = (jack_engine_t *) arg;
-	struct timespec timo;
-
-	timo.tv_sec = JACKD_WATCHDOG_TIMEOUT / 1000;
-	timo.tv_nsec = (JACKD_WATCHDOG_TIMEOUT - (timo.tv_sec * 1000)) * 1000;
-	engine->watchdog_check = 0;
-
-	while (1) {
-        nanosleep (&timo, NULL);
-		if (!engine->freewheeling && engine->watchdog_check == 0) {
-
-			jack_error ("jackd watchdog: timeout - killing jackd");
-
-			/* Kill the current client (guilt by association). */
-			if (engine->current_client) {
-					kill (engine->current_client->
-					      control->pid, SIGKILL);
-			}
-
-			/* kill our process group, try to get a dump */
-			kill (-getpgrp(), SIGABRT);
-			/*NOTREACHED*/
-			exit (1);
-		}
-		engine->watchdog_check = 0;
-	}
-}
-
-static int
-jack_start_watchdog (jack_engine_t *engine)
-{
-	int watchdog_priority = engine->rtpriority + 10;
-#ifndef __OpenBSD__
-	int max_priority = sched_get_priority_max (SCHED_FIFO);
-#else
-	int max_priority = -1;
-#endif
-
-	if ((max_priority != -1) &&
-	    (max_priority < watchdog_priority))
-		watchdog_priority = max_priority;
-	
-	if (jack_client_create_thread (NULL, &engine->watchdog_thread, watchdog_priority,
-				       TRUE, jack_watchdog_thread, engine)) {
-		jack_error ("cannot start watchdog thread");
-		return -1;
-	}
-
-	return 0;
-}
-
-void
-jack_stop_watchdog (jack_engine_t *engine)
-{
-	/* Cancel the watchdog thread and wait for it to terminate.
-	 *
-	 * The watchdog thread is not used on MacOSX since CoreAudio
-	 * drivers already contain a similar mechanism.
-	 */	
-	if (engine->control->real_time && engine->watchdog_thread) {
-		VERBOSE (engine, "stopping watchdog thread");
-		pthread_cancel (engine->watchdog_thread);
-		pthread_join (engine->watchdog_thread, NULL);
-	}
-
-	return;
-}
-#endif /* !JACK_USE_MACH_THREADS */
 
 
 static jack_driver_info_t *
@@ -1130,12 +1033,6 @@ jack_engine_load_driver (jack_engine_t *engine,
 	engine->driver_desc   = driver_desc;
 	engine->driver_params = driver_params;
 
-	if (engine->control->real_time) {
-		if (jack_start_watchdog (engine)) {
-			return -1;
-		}
-		engine->watchdog_check = 1;
-	}
 	return 0;
 }
 
@@ -1869,7 +1766,6 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->next_client_id = 1;	/* 0 is a NULL client ID */
 	engine->port_max = port_max;
 	engine->server_thread = 0;
-	engine->watchdog_thread = 0;
 	engine->rtpriority = rtpriority;
 	engine->silent_buffer = 0;
 	engine->verbose = verbose;
@@ -2666,8 +2562,6 @@ jack_engine_delete (jack_engine_t *engine)
 	pthread_cancel (engine->server_thread);
 	pthread_join (engine->server_thread, NULL);
 #endif	
-
-	jack_stop_watchdog (engine);
 
 
 	VERBOSE (engine, "last xrun delay: %.3f usecs",
