@@ -24,6 +24,7 @@
 
 #include <config.h>
 #include <sys/mman.h>
+#include <uuid/uuid.h>
 
 #include <jack/jack.h>
 #include <jack/types.h>
@@ -192,6 +193,7 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	pthread_mutex_init (&port->connection_lock, NULL);
 	port->connections = 0;
 	port->tied = NULL;
+        uuid_generate (port->shared->uuid);
 
 	if (client->control->id == port->shared->client_id) {
 			
@@ -743,6 +745,12 @@ const char *
 jack_port_name (const jack_port_t *port)
 {
 	return port->shared->name;
+}
+
+void
+jack_port_uuid (const jack_port_t *port, jack_uuid_t uuid)
+{
+	return uuid_copy (uuid, port->shared->uuid);
 }
 
 int
