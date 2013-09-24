@@ -654,6 +654,15 @@ if test "x$USE_BARRIER" = "xyes"; then
 		AC_DEFINE(USE_BARRIER, 1, [Use pthread barrier functions]))
 fi
 
+HAVE_UUID=false
+PKG_CHECK_MODULES(UUID,uuid > 1.0,[HAVE_UUID=true], [true])
+if test x$HAVE_UUID = xfalse ; then
+      AC_MSG_ERROR([*** You do not have libuuid installed])
+else
+        CFLAGS="$CFLAGS $UUID_CFLAGS"
+        LIBS="$LIBS $UUID_LIBS"
+fi
+
 # some example-clients need libsndfile
 HAVE_SNDFILE=false
 PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
