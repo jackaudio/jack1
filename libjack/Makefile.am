@@ -21,7 +21,8 @@ SOURCE_FILES = \
 	     thread.c \
              time.c \
 	     transclient.c \
-	     unlock.c
+	     unlock.c \
+	     uuid.c
 
 simd.lo: $(srcdir)/simd.c
 	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/simd.c

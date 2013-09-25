@@ -20,9 +20,9 @@
 
 int	jack_set_sample_rate (jack_engine_t *engine, jack_nframes_t nframes);
 int	jack_timebase_reset (jack_engine_t *engine,
-			     jack_client_id_t client_id);
+			     jack_uuid_t client_id);
 int	jack_timebase_set (jack_engine_t *engine,
-			   jack_client_id_t client_id, int conditional);
+			   jack_uuid_t client_id, int conditional);
 void	jack_transport_activate (jack_engine_t *engine,
 				 jack_client_internal_t *client);
 void	jack_transport_init (jack_engine_t *engine);
@@ -30,9 +30,9 @@ void	jack_transport_client_exit (jack_engine_t *engine,
 				    jack_client_internal_t *client);
 void	jack_transport_client_new (jack_client_internal_t *client);
 int	jack_transport_client_reset_sync (jack_engine_t *engine,
-					  jack_client_id_t client_id);
+					  jack_uuid_t client_id);
 int	jack_transport_client_set_sync (jack_engine_t *engine,
-					jack_client_id_t client_id);
+					jack_uuid_t client_id);
 void	jack_transport_cycle_end (jack_engine_t *engine);
 void	jack_transport_cycle_start(jack_engine_t *engine, jack_time_t time);
 int	jack_transport_set_sync_timeout (jack_engine_t *engine,

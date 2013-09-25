@@ -29,6 +29,7 @@
 #include <jack/jack.h>
 #include <jack/types.h>
 #include <jack/midiport.h>
+#include <jack/uuid.h>
 
 #include <jack/jslist.h>
 
@@ -195,7 +196,7 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	port->tied = NULL;
         uuid_generate (port->shared->uuid);
 
-	if (client->control->id == port->shared->client_id) {
+	if (jack_uuid_compare (client->control->uuid, port->shared->client_id) == 0) {
 			
 		/* It's our port, so initialize the pointers to port
 		 * functions within this address space.  These builtin
@@ -272,7 +273,7 @@ jack_port_register (jack_client_t *client,
 		  "%s", port_type);
 	req.x.port_info.flags = flags;
 	req.x.port_info.buffer_size = buffer_size;
-	req.x.port_info.client_id = client->control->id;
+	jack_uuid_copy (req.x.port_info.client_id, client->control->uuid);
 
 	if (jack_client_deliver_request (client, &req)) {
 		jack_error ("cannot deliver port registration request");
@@ -300,7 +301,7 @@ jack_port_unregister (jack_client_t *client, jack_port_t *port)
 
 	req.type = UnRegisterPort;
 	req.x.port_info.port_id = port->shared->id;
-	req.x.port_info.client_id = client->control->id;
+	jack_uuid_copy (req.x.port_info.client_id, client->control->uuid);
 
 	return jack_client_deliver_request (client, &req);
 }
@@ -403,7 +404,7 @@ jack_port_get_all_connections (const jack_client_t *client,
 	req.x.port_info.type[0] = '\0';
 	req.x.port_info.flags = 0;
 	req.x.port_info.buffer_size = 0;
-	req.x.port_info.client_id = 0;
+	jack_uuid_clear (req.x.port_info.client_id);
 	req.x.port_info.port_id = port->shared->id;
 
 	jack_client_deliver_request (client, &req);
@@ -750,7 +751,7 @@ jack_port_name (const jack_port_t *port)
 void
 jack_port_uuid (const jack_port_t *port, jack_uuid_t uuid)
 {
-	return uuid_copy (uuid, port->shared->uuid);
+	return jack_uuid_copy (uuid, port->shared->uuid);
 }
 
 int
@@ -784,7 +785,7 @@ jack_port_short_name (const jack_port_t *port)
 int 
 jack_port_is_mine (const jack_client_t *client, const jack_port_t *port)
 {
-	return port->shared->client_id == client->control->id;
+	return jack_uuid_compare (port->shared->client_id, client->control->uuid) == 0;
 }
 
 int

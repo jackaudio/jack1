@@ -26,16 +26,17 @@
 #include <string.h>
 
 #include <jack/intclient.h>
+#include <jack/uuid.h>
 
 #include "internal.h"
 #include "varargs.h"
 
 #include "local.h"
 
-static jack_intclient_t
+static int
 jack_intclient_request(RequestType type, jack_client_t *client,
-		  const char* client_name, jack_options_t options,
-		  jack_status_t *status, jack_varargs_t *va)
+                       const char* client_name, jack_options_t options,
+                       jack_status_t *status, jack_intclient_t uuid, jack_varargs_t *va)
 {
 	jack_request_t req;
 
@@ -45,7 +46,7 @@ jack_intclient_request(RequestType type, jack_client_t *client,
 		jack_error ("\"%s\" is too long for a JACK client name.\n"
 			    "Please use %lu characters or less.",
 			    client_name, sizeof (req.x.intclient.name));
-		return 0;
+		return -1;
 	}
 
 	if (va->load_name
@@ -54,7 +55,7 @@ jack_intclient_request(RequestType type, jack_client_t *client,
 			     "Please use %lu characters or less.",
 			    va->load_name, sizeof (req.x.intclient.path) - 1);
 		*status |= (JackFailure|JackInvalidOption);
-		return 0;
+		return -1;
 	}
 
 	if (va->load_init
@@ -63,7 +64,7 @@ jack_intclient_request(RequestType type, jack_client_t *client,
 			    "string.\nPlease use %lu characters or less.",
 			    va->load_init, sizeof (req.x.intclient.init) - 1);
 		*status |= (JackFailure|JackInvalidOption);
-		return 0;
+		return -1;
 	}
 
 	req.type = type;
@@ -82,9 +83,10 @@ jack_intclient_request(RequestType type, jack_client_t *client,
 	*status |= req.status;
 
 	if (*status & JackFailure)
-		return 0;
+		return -1;
 
-	return req.x.intclient.id;
+	jack_uuid_copy (uuid, req.x.intclient.uuid);
+        return 0;
 }
 
 char *
@@ -97,7 +99,7 @@ jack_get_internal_client_name (jack_client_t *client,
 	memset (&req, 0, sizeof (req));
 	req.type = IntClientName;
 	req.x.intclient.options = JackNullOption;
-	req.x.intclient.id = intclient;
+	jack_uuid_copy (req.x.intclient.uuid, intclient);
 
 	jack_client_deliver_request (client, &req);
 
@@ -113,10 +115,11 @@ jack_get_internal_client_name (jack_client_t *client,
 	return name;
 }
 
-jack_intclient_t
+int
 jack_internal_client_handle (jack_client_t *client,
 			     const char *client_name,
-			     jack_status_t *status)
+			     jack_status_t *status,
+                             jack_intclient_t handle)
 {
 	jack_request_t req;
 	jack_status_t my_status;
@@ -133,14 +136,20 @@ jack_internal_client_handle (jack_client_t *client,
 
 	*status = jack_client_deliver_request (client, &req);
 
-	return req.x.intclient.id;
+        if (!jack_uuid_empty (req.x.intclient.uuid)) {
+                jack_uuid_copy (handle, req.x.intclient.uuid);
+                return 0;
+        }
+
+        return -1;
 }
 
-jack_intclient_t
+int
 jack_internal_client_load_aux (jack_client_t *client,
-		  const char *client_name,
-		  jack_options_t options,
-		  jack_status_t *status, va_list ap)
+                               const char *client_name,
+                               jack_options_t options,
+                               jack_status_t *status, 
+                               jack_intclient_t handle, va_list ap)
 {
 	jack_varargs_t va;
 	jack_status_t my_status;
@@ -152,25 +161,26 @@ jack_internal_client_load_aux (jack_client_t *client,
 	/* validate parameters */
 	if ((options & ~JackLoadOptions)) {
 		*status |= (JackFailure|JackInvalidOption);
-		return 0;
+		return -1;
 	}
 
 	/* parse variable arguments */
 	jack_varargs_parse (options, ap, &va);
 
 	return jack_intclient_request (IntClientLoad, client, client_name,
-				       options, status, &va);
+				       options, status, handle, &va);
 }
 
-jack_intclient_t
+int
 jack_internal_client_load (jack_client_t *client,
 			   const char *client_name,
 			   jack_options_t options,
-			   jack_status_t *status, ...)
+			   jack_status_t *status, 
+                           jack_intclient_t handle, ...)
 {
     va_list ap;
     va_start(ap, status);
-    jack_intclient_t res = jack_internal_client_load_aux(client, client_name, options, status, ap);
+    int res = jack_internal_client_load_aux(client, client_name, options, status, handle, ap);
     va_end(ap);
     return res;
 }
@@ -187,7 +197,7 @@ jack_internal_client_unload (jack_client_t *client,
 		memset (&req, 0, sizeof (req));
 		req.type = IntClientUnload;
 		req.x.intclient.options = JackNullOption;
-		req.x.intclient.id = intclient;
+		jack_uuid_copy (req.x.intclient.uuid, intclient);
 		jack_client_deliver_request (client, &req);
 		status = req.status;
 
