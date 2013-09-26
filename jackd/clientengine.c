@@ -702,7 +702,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 
         jack_uuid_unparse (client->control->uuid, bufx);
                 
-	VERBOSE (engine, "new client: %s, id = %" PRIu32
+	VERBOSE (engine, "new client: %s, uuid = %s" 
 		 " type %d @ %p fd = %d", 
 		 client->control->name, bufx,
 		 type, client->control, client_fd);
@@ -841,12 +841,12 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 
         VALGRIND_MEMSET(&res, 0, sizeof (res));
 
-	nbytes = read (client_fd, &req, sizeof (req));
-
-	if (nbytes == 0) {		/* EOF? */
-		jack_error ("cannot read connection request from client");
-		return -1;
-	}
+        nbytes = read (client_fd, &req, sizeof (req));
+        
+        if (nbytes == 0) {		/* EOF? */
+                jack_error ("cannot read connection request from client (%s)", strerror(errno));
+                return -1;
+        }
 
 	/* First verify protocol version (first field of request), if
 	 * present, then make sure request has the expected length. */
