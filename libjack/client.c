@@ -773,9 +773,9 @@ server_connect (const char *server_name)
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		close (fd);
+                jack_error ("connect(2) call to %s failed (err=%s)", addr.sun_path, strerror (errno));
 		return -1;
 	}
-
 	return fd;
 }
 
@@ -1033,8 +1033,9 @@ jack_request_client (ClientType type,
 
 	/* format connection request */
 
-	if (va->sess_uuid) {
+	if (va->sess_uuid && strlen (va->sess_uuid)) {
 		if (jack_uuid_parse (va->sess_uuid, req.uuid) != 0) {
+                        jack_error ("Given UUID [%s] is not parseable", va->sess_uuid);
                         goto fail;
                 }
         } else {
@@ -1105,6 +1106,7 @@ jack_request_client (ClientType type,
 	return 0;
 
   fail:
+        jack_error ("attempt to connect to server failed");
 	if (*req_fd >= 0) {
 		close (*req_fd);
 		*req_fd = -1;
