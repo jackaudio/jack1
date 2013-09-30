@@ -1412,8 +1412,13 @@ jack_server_dir (const char *server_name, char *server_dir)
 	/* format the path name into the suppled server_dir char array,
 	 * assuming that server_dir is at least as large as PATH_MAX+1 */
 
-	snprintf (server_dir, PATH_MAX+1, "%s/%s",
-		  jack_user_dir (), server_name);
+        if (server_name == NULL || server_name[0] == '\0') {
+                snprintf (server_dir, PATH_MAX+1, "%s/%s",
+                          jack_user_dir (), jack_default_server_name());
+        } else {
+                snprintf (server_dir, PATH_MAX+1, "%s/%s",
+                          jack_user_dir (), server_name);
+        }
 
 	return server_dir;
 }

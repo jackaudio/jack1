@@ -194,7 +194,6 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	pthread_mutex_init (&port->connection_lock, NULL);
 	port->connections = 0;
 	port->tied = NULL;
-        uuid_generate (port->shared->uuid);
 
 	if (jack_uuid_compare (client->control->uuid, port->shared->client_id) == 0) {
 			

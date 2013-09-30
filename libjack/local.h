@@ -94,5 +94,6 @@ extern jack_port_t *jack_port_new (const jack_client_t *client,
 extern void *jack_zero_filled_buffer;
 
 extern void jack_set_clock_source (jack_timer_type_t);
+extern char* jack_server_dir (const char* server_name, char* server_dir);
 
 #endif /* __jack_libjack_local_h__ */

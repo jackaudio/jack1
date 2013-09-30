@@ -4349,6 +4349,7 @@ fallback:
 next:
 	shared->ptype_id = engine->control->port_types[i].ptype_id;
 	jack_uuid_copy (shared->client_id, req->x.port_info.client_id);
+        uuid_generate (shared->uuid);
 	shared->flags = req->x.port_info.flags;
 	shared->latency = 0;
 	shared->capture_latency.min = shared->capture_latency.max = 0;
@@ -4399,9 +4400,10 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 	shared = &engine->control->ports[req->x.port_info.port_id];
 
 	if (shared->client_id != req->x.port_info.client_id) {
-		jack_error ("Client %" PRIu32
-			    " is not allowed to remove port %s",
-			    req->x.port_info.client_id, shared->name);
+                char buf[JACK_UUID_STRING_SIZE];
+                jack_uuid_unparse (req->x.port_info.client_id, buf);
+		jack_error ("Client %s is not allowed to remove port %s",
+			    buf, shared->name);
 		return -1;
 	}
 
