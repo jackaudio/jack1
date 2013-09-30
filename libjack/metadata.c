@@ -92,7 +92,8 @@ make_key_dbt (DBT* dbt, jack_uuid_t subject, const char* key)
 
 
 int
-jack_set_property (jack_uuid_t subject,
+jack_set_property (jack_client_t* client,
+                   jack_uuid_t subject,
                    const char* key,
                    const char* value,
                    const char* type)
@@ -381,7 +382,7 @@ int jack_set_property_change_callback (jack_client_t* client,
 }
 
 int        
-jack_remove_property (jack_uuid_t subject, const char* key)
+jack_remove_property (jack_client_t* client, jack_uuid_t subject, const char* key)
 {
         DBT d_key;
         int ret;
@@ -399,7 +400,7 @@ jack_remove_property (jack_uuid_t subject, const char* key)
 }
 
 int        
-jack_remove_properties (jack_uuid_t subject)
+jack_remove_properties (jack_client_t* client, jack_uuid_t subject)
 {
         DBT key;
         DBT data;
@@ -460,7 +461,7 @@ jack_remove_properties (jack_uuid_t subject)
 }
 
 int        
-jack_remove_all_properties ()
+jack_remove_all_properties (jack_client_t* client)
 {
         int ret;
 
