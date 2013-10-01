@@ -24,6 +24,7 @@
 #include <jack/uuid.h>
 
 #include "internal.h"
+#include "local.h"
 
 static DB* db = NULL;
 
@@ -374,11 +375,18 @@ jack_get_all_descriptions (jack_description_t** descs)
         return 0;
 }
 
-int jack_set_property_change_callback (jack_client_t* client,
-                                       JackPropertyChangeCallback callback,
-                                       void *arg)
+int 
+jack_set_property_change_callback (jack_client_t *client,
+                                   JackPropertyChangeCallback callback, void *arg)
 {
-        return 0;
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+	client->property_cb = callback;
+	client->property_cb_arg = arg;
+	client->control->property_cbset = (callback != NULL);
+	return 0;
 }
 
 int        

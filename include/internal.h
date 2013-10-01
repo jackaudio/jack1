@@ -59,6 +59,7 @@ extern void jack_info (const char *fmt, ...);
 #include <jack/transport.h>
 #include <jack/session.h>
 #include <jack/thread.h>
+#include <jack/metadata.h>
 
 #include "port.h"
 
@@ -221,7 +222,8 @@ typedef enum  {
   ClientRegistered,
   ClientUnregistered,
   SaveSession,
-  LatencyCallback
+  LatencyCallback,
+  PropertyCallback
 } JackEventType;
 
 const char* jack_event_type_name (JackEventType);
@@ -233,12 +235,17 @@ typedef struct {
         char name[JACK_PORT_NAME_SIZE];    
 	jack_port_id_t port_id;
 	jack_port_id_t self_id;
+        jack_uuid_t    property_owner;            
     } x;
     union {
 	uint32_t n;
 	jack_port_type_id_t ptid;
 	jack_port_id_t other_id;
+        uint32_t key_size; /* key data will follow the event structure */
     } y;
+    union {        
+            jack_property_change_t property_change;
+    } z;
 } POST_PACKED_STRUCTURE jack_event_t;
 
 typedef enum {
@@ -301,6 +308,7 @@ typedef volatile struct {
     volatile uint8_t	thread_cb_cbset;
     volatile uint8_t	session_cbset;
     volatile uint8_t	latency_cbset;
+    volatile uint8_t	property_cbset;
 
 } POST_PACKED_STRUCTURE jack_client_control_t;
 
