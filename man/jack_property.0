@@ -8,7 +8,7 @@ jack_property \- JACK client to list, set and delete metadata information
 .br
 \fBjack_property\fR [ -c | -p ] -l \fIidentifier\fR \fIkey\fR
 .br
-\fBjack_property\fR [ -c | -p ] -s \fIidentifier\fR \fIkey\fR \fIvalue\fR [ \fItype\fR]
+\fBjack_property\fR [ -c | -p ] -s \fIidentifier\fR \fIkey\fR \fIvalue\fR [ \fItype\fR ]
 .br
 \fBjack_property\fR [ -c | -p ] -d \fIidentifier\fR 
 .br
@@ -19,7 +19,7 @@ jack_property \- JACK client to list, set and delete metadata information
 \fBjack_property\fR can be used to list, set and delete any and all metadata associated with the ports
 and clients of a JACK server.
 .P
-There are three many ways to use the command. The \fB-l\fR option is used to list existing metadata. The \fB-s\fR option is used
+There are three main ways to use the command. The \fB-l\fR option is used to list existing metadata. The \fB-s\fR option is used
 to set metadata. The \fB-d/-D\fR options are used to delete metadata.
 .P
 The \fIidentifier\fR is normally a UUID (UUIDs for ports and clients can be shown with jack_lsp(1)). If the \fB-c\fR option is used, then \fIidentifier\fR will
