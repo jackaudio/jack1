@@ -70,10 +70,23 @@ jack_properties_uninit ()
 }
 
 void
-jack_free_description(jack_description_t* desc)
+jack_free_description(jack_description_t* desc, int free_actual_description_too)
 {
-        /* XXX iterate over each property, free values, then free desc itself */
-        return;
+        uint32_t n;
+
+        for (n = 0; n < desc->property_cnt; ++n) {
+                free ((char*) desc->properties[n].key);
+                free ((char*) desc->properties[n].data);
+                if (desc->properties[n].type) {
+                        free ((char*) desc->properties[n].type);
+                }
+        }
+
+        free (desc->properties);
+
+        if (free_actual_description_too) {
+                free (desc);
+        }
 }
 
 static int
@@ -117,6 +130,16 @@ jack_set_property (jack_client_t* client,
         int ret;
         size_t len1, len2;
         jack_property_change_t change;
+
+        if (!key || key[0] == '\0') {
+                jack_error ("empty key string for metadata not allowed");
+                return -1;
+        }
+        
+        if (!value || value[0] == '\0') {
+                jack_error ("empty value string for metadata not allowed");
+                return -1;
+        }
 
         if (jack_property_init (NULL)) {
                 return -1;
@@ -246,6 +269,7 @@ jack_get_properties (jack_uuid_t subject,
         jack_property_t* prop;
 
         desc->properties = NULL;
+        desc->property_cnt = 0;
 
         jack_uuid_unparse (subject, ustr);
 
@@ -298,11 +322,11 @@ jack_get_properties (jack_uuid_t subject,
        
                 if (cnt == props_size) {
                         if (props_size == 0) {
-                                props_size = 8;
+                                props_size = 8; /* a rough guess at a likely upper bound for the number of properties */
                         } else {
                                 props_size *= 2;
                         }
-
+                        
                         desc->properties = (jack_property_t*) realloc (desc->properties, sizeof (jack_property_t) * props_size);
                 }
 
@@ -315,10 +339,12 @@ jack_get_properties (jack_uuid_t subject,
                 /* copy key (without leading UUID as subject */
 
                 len1 = key.size - JACK_UUID_STRING_SIZE;
-                prop->key = malloc (key.size);
+                prop->key = malloc (len1);
                 memcpy ((char*) prop->key, key.data + JACK_UUID_STRING_SIZE, len1);
                 
-                /* copy data */
+                /* copy data (which contains 1 or 2 null terminated strings, the value
+                   and optionally a MIME type.
+                 */
 
                 len1 = strlen (data.data) + 1;
                 prop->data = (char *) malloc (len1);
@@ -342,23 +368,30 @@ jack_get_properties (jack_uuid_t subject,
         }
         
         cursor->close (cursor);
+        desc->property_cnt = cnt;
 
         return cnt;
 }
 
 int
-jack_get_all_properties (jack_description_t** desc)
+jack_get_all_properties (jack_description_t** descriptions)
 {
         DBT key;
         DBT data;
         DBC* cursor;
         int ret;
-        size_t cnt = 0;
+        size_t dcnt = 0;
+        size_t dsize = 0;
+        size_t n = 0;
+        jack_description_t* desc = NULL;
+        jack_uuid_t uuid;
+        jack_description_t* current_desc = NULL;
+        jack_property_t* current_prop = NULL;
+        size_t len1, len2;
 
         if (jack_property_init (NULL)) {
                 return -1;
         }
-
 
         if ((ret = db->cursor (db, NULL, &cursor, 0)) != 0) {
                 jack_error ("Cannot create cursor for metadata search (%s)", db_strerror (ret));
@@ -369,18 +402,106 @@ jack_get_all_properties (jack_description_t** desc)
 	memset(&data, 0, sizeof(data));
         data.flags = DB_DBT_MALLOC;
 
+        dsize = 8; /* initial guess at number of descriptions we need */
+        dcnt = 0;
+        desc = (jack_description_t*) malloc (dsize * sizeof (jack_description_t));
+
         while ((ret = cursor->get(cursor, &key, &data, DB_NEXT)) == 0) {
 
+                /* require 2 extra chars (data+null) for key,
+                   which is composed of UUID str plus a key name
+                */
+
+                if (key.size < JACK_UUID_STRING_SIZE + 2) {
+                        if (data.size > 0) {
+                                free (data.data);
+                        }
+                        continue;
+                }
+
+                if (jack_uuid_parse (key.data, uuid) != 0) {
+                        continue;
+                }
+                
+                /* do we have an existing description for this UUID */
+
+                for (n = 0; n < dcnt ; ++n) {
+                        if (jack_uuid_compare (uuid, desc[n].subject) == 0) {
+                                break;
+                        }
+                }
+                
+                if (n == dcnt) {
+                        /* we do not have an existing description, so grow the array */
+
+                        if (dcnt == dsize) {
+                                dsize *= 2;
+                                desc = (jack_description_t*) realloc (desc, sizeof (jack_description_t) * dsize);
+                        } 
+
+                        /* initialize */
+
+                        desc[n].property_size = 0;
+                        desc[n].property_cnt = 0;
+                        desc[n].properties = NULL;
+                        
+                        /* set up UUID */
+
+                        jack_uuid_copy (desc[n].subject, uuid);
+                        dcnt++;
+                }
+
+                current_desc = &desc[n];
+
+                /* see if there is room for the new property or if we need to realloc 
+                 */
+
+                if (current_desc->property_cnt == current_desc->property_size) {
+                        if (current_desc->property_size == 0) {
+                                current_desc->property_size = 8;
+                        } else {
+                                current_desc->property_size *= 2;
+                        }
+
+                        current_desc->properties = (jack_property_t*) realloc (current_desc->properties, sizeof (jack_property_t) * current_desc->property_size);
+                }
+                
+                current_prop = &current_desc->properties[current_desc->property_cnt++];
+                
+                /* copy key (without leading UUID) */
+
+                len1 = key.size - JACK_UUID_STRING_SIZE;
+                current_prop->key = malloc (len1);
+                memcpy ((char*) current_prop->key, key.data + JACK_UUID_STRING_SIZE, len1);
+                
+                /* copy data (which contains 1 or 2 null terminated strings, the value
+                   and optionally a MIME type.
+                 */
+
+                len1 = strlen (data.data) + 1;
+                current_prop->data = (char *) malloc (len1);
+                memcpy ((char*) current_prop->data, data.data, len1);
+                
+                if (len1 < data.size) {
+                        len2 = strlen (data.data+len1) + 1;
+                        
+                        current_prop->type= (char *) malloc (len2);
+                        memcpy ((char*) current_prop->type, data.data+len1, len2);
+                } else {
+                        /* no type specified, assume default */
+                        current_prop->type = NULL;
+                }
+                
                 if (data.size) {
                         free (data.data);
                 }
-                
-                ++cnt;
         }
         
         cursor->close (cursor);
 
-        return cnt;
+        (*descriptions) = desc;
+
+        return dcnt;
 }
 
 
