@@ -116,6 +116,7 @@ jack_set_property (jack_client_t* client,
         DBT data;
         int ret;
         size_t len1, len2;
+        jack_property_change_t change;
 
         if (jack_property_init (NULL)) {
                 return -1;
@@ -144,6 +145,12 @@ jack_set_property (jack_client_t* client,
                 memcpy (data.data + len1, type, len2);
         }
 
+        if (db->exists (db, NULL, &d_key, 0) == DB_NOTFOUND) {
+                change = PropertyCreated;
+        } else {
+                change = PropertyChanged;
+        }
+
         if ((ret = db->put (db, NULL, &d_key, &data, 0)) != 0) {
                 char ustr[JACK_UUID_STRING_SIZE];
                 jack_uuid_unparse (subject, ustr);
@@ -151,7 +158,7 @@ jack_set_property (jack_client_t* client,
                 return -1;
         }
 
-        jack_property_change_notify (client, subject, key, PropertyChanged);
+        jack_property_change_notify (client, subject, key, change);
 
         return 0;
 }
