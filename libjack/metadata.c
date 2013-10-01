@@ -72,7 +72,20 @@ jack_properties_uninit ()
 void
 jack_free_description(jack_description_t* desc)
 {
+        /* XXX iterate over each property, free values, then free desc itself */
         return;
+}
+
+static int
+jack_property_change_notify (jack_client_t* client, jack_uuid_t uuid, const char* key, jack_property_change_t change)
+{
+        jack_request_t req;
+        req.type = PropertyChangeNotify;
+        req.x.property.change = change;
+        jack_uuid_copy (req.x.property.uuid, uuid);
+        req.x.property.keylen = key ? strlen (key) + 1 : 0;
+        req.x.property.key = key;
+        return jack_client_deliver_request (client, &req);
 }
 
 static void
@@ -137,6 +150,8 @@ jack_set_property (jack_client_t* client,
                 jack_error ("Cannot store metadata for %s/%s (%s)", ustr, key, db_strerror (ret));
                 return -1;
         }
+
+        jack_property_change_notify (client, subject, key, PropertyChanged);
 
         return 0;
 }
@@ -404,6 +419,9 @@ jack_remove_property (jack_client_t* client, jack_uuid_t subject, const char* ke
                 jack_error ("Cannot delete key %s (%s)", key, db_strerror (ret));
                 return -1;
         }
+
+        jack_property_change_notify (client, subject, key, PropertyDeleted);
+
         return 0;
 }
 
@@ -465,6 +483,8 @@ jack_remove_properties (jack_client_t* client, jack_uuid_t subject)
 
         cursor->close (cursor);
 
+        jack_property_change_notify (client, subject, NULL, PropertyDeleted);
+
         return retval;
 }
 
@@ -472,6 +492,7 @@ int
 jack_remove_all_properties (jack_client_t* client)
 {
         int ret;
+        jack_uuid_t empty_uuid;
 
         if (jack_property_init (NULL)) {
                 return -1;
@@ -481,6 +502,9 @@ jack_remove_all_properties (jack_client_t* client)
                 jack_error ("Cannot clear properties (%s)", db_strerror (ret));
                 return -1;
         }
+
+        jack_uuid_clear (empty_uuid);
+        jack_property_change_notify (client, empty_uuid, NULL, PropertyDeleted);
 
         return 0;
 }

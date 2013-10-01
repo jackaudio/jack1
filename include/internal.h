@@ -223,7 +223,7 @@ typedef enum  {
   ClientUnregistered,
   SaveSession,
   LatencyCallback,
-  PropertyCallback
+  PropertyChange
 } JackEventType;
 
 const char* jack_event_type_name (JackEventType);
@@ -235,7 +235,7 @@ typedef struct {
         char name[JACK_PORT_NAME_SIZE];    
 	jack_port_id_t port_id;
 	jack_port_id_t self_id;
-        jack_uuid_t    property_owner;            
+        jack_uuid_t    uuid;
     } x;
     union {
 	uint32_t n;
@@ -394,7 +394,8 @@ typedef enum {
 	GetUUIDByClientName = 27,
 	ReserveName = 30,
 	SessionReply = 31,
-	SessionHasCallback = 32
+	SessionHasCallback = 32,
+        PropertyChangeNotify = 33
 } RequestType;
 
 struct _jack_request {
@@ -448,6 +449,12 @@ struct _jack_request {
 	    char path[PATH_MAX+1];
 	    char init[JACK_LOAD_INIT_LIMIT];
 	} POST_PACKED_STRUCTURE intclient;
+        struct { 
+                jack_property_change_t change;
+                jack_uuid_t uuid;
+                size_t keylen;
+                const char* key; /* not delivered inline to server, see oop_client_deliver_request() */
+        } POST_PACKED_STRUCTURE property;
 	jack_uuid_t client_id;
 	jack_nframes_t nframes;
 	jack_time_t timeout;

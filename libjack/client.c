@@ -250,6 +250,21 @@ oop_client_deliver_request (void *ptr, jack_request_t *req)
 
 	wok = (write (client->request_fd, req, sizeof (*req))
 	       == sizeof (*req));
+
+        /* if necessary, add variable length key data after a PropertyChange request
+         */
+        
+        if (req->type == PropertyChangeNotify) {
+                if (req->x.property.keylen) {
+                        if (write (client->request_fd, req->x.property.key, req->x.property.keylen) != req->x.property.keylen) {
+                                jack_error ("cannot send property key of length %d to server",
+                                            req->x.property.keylen);
+                                req->status = -1;
+                                return req->status;
+                        }
+                }
+        }
+
 	rok = (read (client->request_fd, req, sizeof (*req))
 	       == sizeof (*req));
 
@@ -281,8 +296,7 @@ jack_client_deliver_request (const jack_client_t *client, jack_request_t *req)
 	 * the server.
 	 */
 
-	return client->deliver_request (client->deliver_arg,
-						 req);
+	return client->deliver_request (client->deliver_arg, req);
 }
 
 #if JACK_USE_MACH_THREADS 
@@ -1711,6 +1725,7 @@ jack_client_process_events (jack_client_t* client)
 	jack_client_control_t *control = client->control;
 	JSList *node;
 	jack_port_t* port;
+        char* key = 0;
 
 	DEBUG ("process events");
 
@@ -1728,7 +1743,17 @@ jack_client_process_events (jack_client_t* client)
 				    strerror (errno));
 			return -1;
 		}
-		
+
+                if (event.type == PropertyChange) {
+                        key = (char *) malloc (event.y.key_size);
+                        if (read (client->event_fd, key, event.y.key_size) != 
+                            event.y.key_size) {
+                                jack_error ("cannot read property change key (%s)",
+                                            strerror (errno));
+                                return -1;
+                        }
+                }
+
 		status = 0;
 		
 		switch (event.type) {
@@ -1821,6 +1846,14 @@ jack_client_process_events (jack_client_t* client)
 		case LatencyCallback:
 			status = jack_client_handle_latency_callback (client, &event, 0 );
 			break;
+                case PropertyChange:
+                        if (control->property_cbset) {
+                                client->property_cb (event.x.uuid, key, event.z.property_change, client->property_cb_arg);
+                        }
+                        if (key) {
+                                free (key);
+                        }
+                        break;
 		}
 		
 		DEBUG ("client has dealt with the event, writing "
@@ -1832,7 +1865,7 @@ jack_client_process_events (jack_client_t* client)
 				    "engine (%s)", strerror (errno));
 			return -1;
 		}
-	}
+        }
 
 	return 0;
 }
@@ -3015,6 +3048,8 @@ jack_event_type_name (JackEventType type)
                 return "save session";
         case LatencyCallback:
                 return "latency callback";
+        case PropertyChange:
+                return "property change callback";
         default:
                 break;
         }

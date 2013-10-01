@@ -141,6 +141,7 @@ static void jack_do_reserve_name (jack_engine_t *engine, jack_request_t *req);
 static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req );
 static void jack_compute_new_latency (jack_engine_t *engine);
 static int jack_do_has_session_cb (jack_engine_t *engine, jack_request_t *req);
+static void jack_property_change_notify (jack_engine_t *engine, jack_property_change_t change, jack_uuid_t uuid, const char* key);
 
 static inline int 
 jack_rolling_interval (jack_time_t period_usecs)
@@ -1193,7 +1194,7 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 	 */
 	pthread_mutex_lock (&engine->request_lock);
 
-	DEBUG ("got a request of type %d", req->type);
+	DEBUG ("got a request of type %d (%s)", req->type, jack_event_type_name (req->type));
 
 	switch (req->type) {
 	case RegisterPort:
@@ -1355,12 +1356,17 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 		jack_rdlock_graph (engine);
 		req->status = jack_do_has_session_cb (engine, req);
 		jack_unlock_graph (engine);
+                break;
+        case PropertyChangeNotify:
+                jack_property_change_notify (engine, req->x.property.change, req->x.property.uuid, req->x.property.key);
+                break;
+
 	default:
 		/* some requests are handled entirely on the client
 		 * side, by adjusting the shared memory area(s) */
 		break;
 	}
-
+        
 	pthread_mutex_unlock (&engine->request_lock);
 
 	DEBUG ("status of request: %d", req->status);
@@ -1423,11 +1429,28 @@ handle_external_client_request (jack_engine_t *engine, int fd)
 		}
 	}
 
+        if (req.type == PropertyChangeNotify) {
+                if (req.x.property.keylen) {
+                        req.x.property.key = (char*) malloc (req.x.property.keylen);
+                        if ((r = read (client->request_fd, (char*) req.x.property.key, req.x.property.keylen)) != req.x.property.keylen) {
+                                jack_error ("cannot read property key from client (%d/%d/%s)",
+                                            r, sizeof(req), strerror (errno));
+                                return -1;
+                        }
+                } else {
+                        req.x.property.key = 0;
+                }
+        }
+
 	reply_fd = client->request_fd;
 	
 	jack_unlock_graph (engine);
 	do_request (engine, &req, &reply_fd);
 	jack_lock_graph (engine);
+
+        if (req.type == PropertyChangeNotify && req.x.property.key) {
+                free ((char *) req.x.property.key);
+        }
 
 	if (reply_fd >= 0) {
 		DEBUG ("replying to client");
@@ -2616,7 +2639,7 @@ jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event)
 	jack_unlock_graph (engine);
 }
 
-static void jack_do_get_client_by_uuid ( jack_engine_t *engine, jack_request_t *req)
+static void jack_do_get_client_by_uuid (jack_engine_t *engine, jack_request_t *req)
 {
 	JSList *node;
 	req->status = -1;
@@ -2875,9 +2898,14 @@ jack_notify_all_port_interested_clients (jack_engine_t *engine, jack_uuid_t src,
 
 int
 jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
-		    jack_event_t *event)
+		    jack_event_t *event, ...)
 {
+        va_list ap;
 	char status=0;
+        char* key = 0;
+        size_t keylen = 0;
+
+        va_start (ap, event);
 
 	/* caller must hold the graph lock */
 
@@ -2895,6 +2923,21 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 	}
 
 	DEBUG ("client %s is still alive", client->control->name);
+
+        /* Check property change events for matching key_size and keys */
+
+        if (event->type == PropertyChange) {
+                key = va_arg (ap, char*);
+                if (key && key[0] != '\0') {
+                        keylen = strlen (key) + 1;
+                        if (event->y.key_size != keylen) {
+                                jack_error ("property change key %s sent with wrong length (%d vs %d)", key, event->y.key_size, keylen);
+                                return -1;
+                        }
+                }
+        }
+
+        va_end (ap);
 
 	if (jack_client_is_internal (client)) {
 
@@ -2938,6 +2981,13 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 			}
 			break;
 
+                case PropertyChange:
+                        if (client->control->property_cbset) {
+                                client->private_client->property_cb
+                                        (event->x.uuid, key, event->z.property_change, client->private_client->property_cb_arg);
+                        }
+                        break;
+
 		case LatencyCallback:
 			jack_client_handle_latency_callback (client->private_client, event, (client->control->type == ClientDriver));
 			break;
@@ -2964,6 +3014,20 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 				client->error += JACK_ERROR_WITH_SOCKETS;
 				jack_engine_signal_problems (engine);
 			}
+
+                        /* for property changes, deliver the extra data representing
+                           the variable length "key" that has changed in some way.
+                        */
+                        
+                        if (event->type == PropertyChange) {
+                                if (write (client->event_fd, key, keylen) != keylen) {
+                                        jack_error ("cannot send property change key to client [%s] (%s)",
+                                                    client->control->name,
+                                                    strerror (errno));
+                                        client->error += JACK_ERROR_WITH_SOCKETS;
+                                        jack_engine_signal_problems (engine);
+                                }
+                        }
 
  			if (client->error) {
  				status = -1;
@@ -4399,7 +4463,7 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 
 	shared = &engine->control->ports[req->x.port_info.port_id];
 
-	if (shared->client_id != req->x.port_info.client_id) {
+	if (jack_uuid_compare (shared->client_id, req->x.port_info.client_id) != 0) {
                 char buf[JACK_UUID_STRING_SIZE];
                 jack_uuid_unparse (req->x.port_info.client_id, buf);
 		jack_error ("Client %s is not allowed to remove port %s",
@@ -4547,6 +4611,40 @@ jack_port_registration_notify (jack_engine_t *engine,
 
 		if (client->control->port_register_cbset) {
 			if (jack_deliver_event (engine, client, &event)) {
+				jack_error ("cannot send port registration"
+					    " notification to %s (%s)",
+					     client->control->name,
+					    strerror (errno));
+			}
+		}
+	}
+}
+
+void
+jack_property_change_notify (jack_engine_t *engine,
+                             jack_property_change_t change,
+                             jack_uuid_t uuid,
+                             const char* key)
+{
+	jack_event_t event;
+	jack_client_internal_t *client;
+	JSList *node;
+
+	event.type = PropertyChange;
+	event.z.property_change = change;
+	jack_uuid_copy (event.x.uuid, uuid);
+        event.y.key_size = strlen (key) + 1;
+
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		
+		client = (jack_client_internal_t *) node->data;
+
+		if (!client->control->active) {
+			continue;
+		}
+
+		if (client->control->port_register_cbset) {
+			if (jack_deliver_event (engine, client, &event, key)) {
 				jack_error ("cannot send port registration"
 					    " notification to %s (%s)",
 					     client->control->name,

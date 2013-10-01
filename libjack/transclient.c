@@ -25,6 +25,8 @@
 #include <math.h>
 #include <stdio.h>
 
+#include <jack/uuid.h>
+
 #include "atomicity.h"
 #include "internal.h"
 #include "local.h"
