@@ -34,6 +34,8 @@
 #include <dlfcn.h>
 
 #include <jack/midiport.h>
+#include <jack/intclient.h>
+#include <jack/uuid.h>
 
 #include "engine.h"
 #include "internal.h"
@@ -41,6 +43,7 @@
 #include "shm.h"
 #include "driver_parse.h"
 #include "messagebuffer.h"
+#include "clientengine.h"
 
 #ifdef USE_CAPABILITIES
 
@@ -89,7 +92,7 @@ do_nothing_handler (int sig)
 }
 
 static int
-jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * slave_names)
+jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * slave_names, JSList * load_list)
 {
 	int sig;
 	int i;
@@ -182,6 +185,24 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * sl
 		jack_error ("cannot start driver");
 		goto error;
 	}
+
+        for (node = load_list; node; node = jack_slist_next (node)) {
+
+                char* client_name = node->data;
+                jack_request_t req;
+
+                memset (&req, 0, sizeof (req));
+                req.type = IntClientLoad;
+                req.x.intclient.options = 0;
+                strncpy (req.x.intclient.name, client_name, sizeof (req.x.intclient.name));
+                strncpy (req.x.intclient.path, client_name, sizeof (req.x.intclient.path));
+                req.x.intclient.init[0] = '\0';
+
+                pthread_mutex_lock (&engine->request_lock);
+                jack_intclient_load_request (engine, &req);
+                pthread_mutex_unlock (&engine->request_lock);
+        }
+
 
 	/* install a do-nothing handler because otherwise pthreads
 	   behaviour is undefined when we enter sigwait.
@@ -384,6 +405,7 @@ static void usage (FILE *file)
 "             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
 "      (the two previous arguments are mutually exclusive. The default is --realtime)\n"
 "             [ --name OR -n server-name ]\n"
+"             [ --load OR -l internal-client ]\n"
 "             [ --no-mlock OR -m ]\n"
 "             [ --unlock OR -u ]\n"
 "             [ --timeout OR -t client-timeout-in-msecs ]\n"
@@ -537,7 +559,7 @@ main (int argc, char *argv[])
 	int do_sanity_checks = 1;
 	int show_version = 0;
 
-	const char *options = "-d:P:uvshVrRZTFlt:mM:n:Np:c:X:C:";
+	const char *options = "-d:P:uvshVrRZTFlL:t:mM:n:Np:c:X:C:";
 	struct option long_options[] = 
 	{ 
 		/* keep ordered by single-letter option code */
@@ -546,6 +568,7 @@ main (int argc, char *argv[])
 		{ "driver", 1, 0, 'd' },
 		{ "help", 0, 0, 'h' },
 		{ "tmpdir-location", 0, 0, 'l' },
+		{ "load", 0, 0, 'L' },
 		{ "no-mlock", 0, 0, 'm' },
 		{ "midi-bufsize", 1, 0, 'M' },
 		{ "name", 1, 0, 'n' },
@@ -574,6 +597,7 @@ main (int argc, char *argv[])
 	char **driver_args = NULL;
 	JSList * driver_params;
 	JSList * slave_drivers = NULL;
+        JSList * load_list = NULL;
 	size_t midi_buffer_size = 0;
 	int driver_nargs = 1;
 	int i;
@@ -622,6 +646,10 @@ main (int argc, char *argv[])
 			/* special flag to allow libjack to determine jackd's idea of where tmpdir is */
 			printf ("%s\n", jack_tmpdir);
 			exit (0);
+
+                case 'L':
+			load_list = jack_slist_append(load_list, optarg);
+                        break;
 
 		case 'm':
 			do_mlock = 0;
@@ -791,7 +819,7 @@ main (int argc, char *argv[])
 	jack_cleanup_files (server_name);
 
 	/* run the server engine until it terminates */
-	jack_main (desc, driver_params, slave_drivers);
+	jack_main (desc, driver_params, slave_drivers, load_list);
 
 	/* clean up shared memory and files from this server instance */
 	if (verbose)
