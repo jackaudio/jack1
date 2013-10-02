@@ -2,7 +2,7 @@
 .SH NAME
 jack_lsp \- JACK toolkit client to list informtion on ports
 .SH SYNOPSIS
-\fBjack_lsp\fR [ \fI-s\fR | \fI--server\fR servername ] [ \fI-AclLptvh\fR ]
+\fBjack_lsp\fR [ \fI-s\fR | \fI--server\fR servername ] [ \fI-AclLptvhuU\fR ]
 .SH DESCRIPTION
 \fBjack_lsp\fR lists all known ports associated with a JACK
 server. It can also optionally list various kinds of information about each port.
@@ -39,6 +39,10 @@ Display port type
 \fB-u\fR, \fB--uuid\fR
 .br
 Display client UUIDs instead of names
+.TP
+\fB-U\fR
+.br
+Show port UUIDs as well as names
 .TP
 \fB-h\fR, \fB--help\fR
 .br
