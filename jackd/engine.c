@@ -41,6 +41,7 @@
 
 #include <jack/thread.h>
 #include <jack/uuid.h>
+#include <jack/metadata.h>
 
 #include "internal.h"
 #include "engine.h"
@@ -141,7 +142,6 @@ static void jack_do_reserve_name (jack_engine_t *engine, jack_request_t *req);
 static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req );
 static void jack_compute_new_latency (jack_engine_t *engine);
 static int jack_do_has_session_cb (jack_engine_t *engine, jack_request_t *req);
-static void jack_property_change_notify (jack_engine_t *engine, jack_property_change_t change, jack_uuid_t uuid, const char* key);
 
 static inline int 
 jack_rolling_interval (jack_time_t period_usecs)
@@ -4275,6 +4275,16 @@ jack_get_free_port (jack_engine_t *engine)
 void
 jack_port_release (jack_engine_t *engine, jack_port_internal_t *port)
 {
+        char buf[JACK_UUID_STRING_SIZE];
+        jack_uuid_unparse (port->shared->uuid, buf);
+        if (jack_remove_properties (NULL, port->shared->uuid) > 0) {
+                /* have to do the notification ourselves, since the client argument
+                   to jack_remove_properties() was NULL
+                */
+                jack_property_change_notify (engine, PropertyDeleted, port->shared->uuid, NULL);
+        }
+
+
 	pthread_mutex_lock (&engine->port_lock);
 	port->shared->in_use = 0;
 	port->shared->alias1[0] = '\0';
@@ -4452,6 +4462,7 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 	jack_client_internal_t *client;
 	jack_port_shared_t *shared;
 	jack_port_internal_t *port;
+        jack_uuid_t uuid;
 
 	if (req->x.port_info.port_id < 0 ||
 	    req->x.port_info.port_id > engine->port_max) {
@@ -4471,6 +4482,8 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 		return -1;
 	}
 
+        jack_uuid_copy (uuid, shared->uuid);
+
 	jack_lock_graph (engine);
 	if ((client = jack_client_internal_by_id (engine, shared->client_id))
 	    == NULL) {
@@ -4482,8 +4495,7 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 	port = &engine->internal_ports[req->x.port_info.port_id];
 
 	jack_port_clear_connections (engine, port);
-	jack_port_release (engine,
-			   &engine->internal_ports[req->x.port_info.port_id]);
+	jack_port_release (engine, &engine->internal_ports[req->x.port_info.port_id]);
 	
 	client->ports = jack_slist_remove (client->ports, port);
 	jack_port_registration_notify (engine, req->x.port_info.port_id,
@@ -4621,40 +4633,6 @@ jack_port_registration_notify (jack_engine_t *engine,
 }
 
 void
-jack_property_change_notify (jack_engine_t *engine,
-                             jack_property_change_t change,
-                             jack_uuid_t uuid,
-                             const char* key)
-{
-	jack_event_t event;
-	jack_client_internal_t *client;
-	JSList *node;
-
-	event.type = PropertyChange;
-	event.z.property_change = change;
-	jack_uuid_copy (event.x.uuid, uuid);
-        event.y.key_size = strlen (key) + 1;
-
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		
-		client = (jack_client_internal_t *) node->data;
-
-		if (!client->control->active) {
-			continue;
-		}
-
-		if (client->control->port_register_cbset) {
-			if (jack_deliver_event (engine, client, &event, key)) {
-				jack_error ("cannot send port registration"
-					    " notification to %s (%s)",
-					     client->control->name,
-					    strerror (errno));
-			}
-		}
-	}
-}
-
-void
 jack_client_registration_notify (jack_engine_t *engine,
 				 const char* name, int yn)
 {
@@ -4683,6 +4661,44 @@ jack_client_registration_notify (jack_engine_t *engine,
 				jack_error ("cannot send client registration"
 					    " notification to %s (%s)",
 					     client->control->name,
+					    strerror (errno));
+			}
+		}
+	}
+}
+
+void
+jack_property_change_notify (jack_engine_t *engine,
+                             jack_property_change_t change,
+                             jack_uuid_t uuid,
+                             const char* key)
+{
+	jack_event_t event;
+	jack_client_internal_t *client;
+	JSList *node;
+
+	event.type = PropertyChange;
+	event.z.property_change = change;
+	jack_uuid_copy (event.x.uuid, uuid);
+
+        if (key) {
+                event.y.key_size = strlen (key) + 1;
+        } else {
+                event.y.key_size = 0;
+        }
+
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		
+		client = (jack_client_internal_t *) node->data;
+
+		if (!client->control->active) {
+			continue;
+		}
+
+		if (client->control->property_cbset) {
+			if (jack_deliver_event (engine, client, &event, key)) {
+				jack_error ("cannot send property change notification to %s (%s)",
+                                            client->control->name,
 					    strerror (errno));
 			}
 		}

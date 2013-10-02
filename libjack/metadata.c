@@ -27,6 +27,7 @@
 #include "local.h"
 
 static DB* db = NULL;
+static DB_ENV* db_env = NULL;
 
 static int
 jack_property_init (const char* server_name)
@@ -37,11 +38,21 @@ jack_property_init (const char* server_name)
 
         /* idempotent */
 
-        if (db) {
+        if (db_env) {
                 return 0;
         }
 
-        if ((ret = db_create (&db, NULL, 0)) != 0) {
+        if ((ret = db_env_create(&db_env, 0)) != 0) { 
+                jack_error ("cannot initialize DB environment: %s\n", db_strerror(ret));
+                return -1;
+        } 
+        
+        if ((ret = db_env->open(db_env, jack_server_dir (server_name, server_dir), DB_CREATE | DB_INIT_LOCK | DB_INIT_MPOOL | DB_THREAD, 0)) != 0) { 
+                jack_error ("cannot open DB environment: %s", db_strerror (ret));
+                return -1;
+        }
+
+        if ((ret = db_create (&db, db_env, 0)) != 0) {
                 jack_error ("Cannot initialize metadata DB (%s)", db_strerror (ret));
                 return -1;
         }
@@ -66,6 +77,10 @@ jack_properties_uninit ()
         if (db) {
                 db->close (db, 0);
                 db = NULL;
+        }
+        if (db_env) {
+                db_env->close (db_env, 0);
+                db_env = 0;
         }
 }
 
@@ -93,6 +108,14 @@ static int
 jack_property_change_notify (jack_client_t* client, jack_uuid_t uuid, const char* key, jack_property_change_t change)
 {
         jack_request_t req;
+
+        /* the engine passes in a NULL client when it removes metadata during port or client removal
+         */
+
+        if (client == NULL) {
+                return 0;
+        }
+
         req.type = PropertyChangeNotify;
         req.x.property.change = change;
         jack_uuid_copy (req.x.property.uuid, uuid);
@@ -562,13 +585,13 @@ jack_remove_properties (jack_client_t* client, jack_uuid_t subject)
         int ret;
         char ustr[JACK_UUID_STRING_SIZE];
         int retval = 0;
+        uint32_t cnt = 0;
 
         jack_uuid_unparse (subject, ustr);
 
         if (jack_property_init (NULL)) {
                 return -1;
         }
-
 
         if ((ret = db->cursor (db, NULL, &cursor, 0)) != 0) {
                 jack_error ("Cannot create cursor for metadata search (%s)", db_strerror (ret));
@@ -607,13 +630,20 @@ jack_remove_properties (jack_client_t* client, jack_uuid_t subject)
                         */
                         retval = -1;
                 }
+                cnt++;
         }
 
         cursor->close (cursor);
 
-        jack_property_change_notify (client, subject, NULL, PropertyDeleted);
+        if (cnt) {
+                jack_property_change_notify (client, subject, NULL, PropertyDeleted);
+        }
 
-        return retval;
+        if (retval) {
+                return -1;
+        } 
+
+        return cnt;
 }
 
 int        

@@ -42,6 +42,7 @@
 #include "transengine.h"
 
 #include <jack/uuid.h>
+#include <jack/metadata.h>
 
 #include "libjack/local.h"
 
@@ -51,6 +52,7 @@ jack_client_disconnect_ports (jack_engine_t *engine,
 {
 	JSList *node;
 	jack_port_internal_t *port;
+        char buf[JACK_UUID_STRING_SIZE];
 
 	/* call tree **** MUST HOLD *** engine->client_lock */
 
@@ -1061,7 +1063,16 @@ jack_mark_client_socket_error (jack_engine_t *engine, int fd)
 void
 jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 {
+        jack_uuid_t uuid;
+        jack_uuid_copy (uuid, client->control->uuid);
+
 	jack_client_registration_notify (engine, (const char*) client->control->name, 0);
+
+        jack_remove_properties (NULL, uuid);
+                /* have to do the notification ourselves, since the client argument
+                   to jack_remove_properties() was NULL
+                */
+        jack_property_change_notify (engine, PropertyDeleted, uuid, NULL);
 
 	if (jack_client_is_internal (client)) {
 

@@ -62,4 +62,6 @@ int	jack_check_clients (jack_engine_t* engine, int with_timeout_check);
 void	jack_remove_clients (jack_engine_t* engine, int* exit_freewheeling);
 void    jack_client_registration_notify (jack_engine_t *engine,
 					 const char* name, int yn);
+void jack_property_change_notify (jack_engine_t *engine, jack_property_change_t change, jack_uuid_t uuid, const char* key);
+
 void jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client);
