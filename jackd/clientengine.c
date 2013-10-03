@@ -599,7 +599,7 @@ jack_setup_client_control (jack_engine_t *engine, int fd, ClientType type, const
 	client->control->timed_out = 0;
 
         if (jack_uuid_empty (uuid)) {
-                uuid_generate (client->control->uuid);
+                jack_uuid_generate (client->control->uuid);
         } else {
                 jack_uuid_copy (client->control->uuid, uuid);
         }

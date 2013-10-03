@@ -22,6 +22,12 @@
 
 #include "internal.h"
 
+void
+jack_uuid_generate (jack_uuid_t uuid)
+{
+        uuid_generate (uuid);
+}
+
 int
 jack_uuid_empty (const jack_uuid_t u)
 {

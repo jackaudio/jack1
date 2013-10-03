@@ -4423,7 +4423,7 @@ fallback:
 next:
 	shared->ptype_id = engine->control->port_types[i].ptype_id;
 	jack_uuid_copy (shared->client_id, req->x.port_info.client_id);
-        uuid_generate (shared->uuid);
+        jack_uuid_generate (shared->uuid);
 	shared->flags = req->x.port_info.flags;
 	shared->latency = 0;
 	shared->capture_latency.min = shared->capture_latency.max = 0;
