@@ -99,7 +99,7 @@ a2j_port_free (struct a2j_port * port)
 }
 
 void
-a2j_port_fill_name (struct a2j_port * port_ptr, int input, snd_seq_client_info_t * client_info_ptr,
+a2j_port_fill_name (struct a2j_port * port_ptr, int dir, snd_seq_client_info_t * client_info_ptr,
 		    const snd_seq_port_info_t * port_info_ptr, bool make_unique)
 {
 	char *c;
@@ -107,16 +107,18 @@ a2j_port_fill_name (struct a2j_port * port_ptr, int input, snd_seq_client_info_t
 	if (make_unique) {
 		snprintf (port_ptr->name,
 			  sizeof(port_ptr->name),
-			  "%s [%d]: %s",
+			  "%s [%d] %s %s",
 			  snd_seq_client_info_get_name(client_info_ptr),
 			  snd_seq_client_info_get_client(client_info_ptr),
-			  snd_seq_port_info_get_name(port_info_ptr));
+			  snd_seq_port_info_get_name(port_info_ptr), 
+                          (dir == A2J_PORT_CAPTURE ? "in" : "out"));
 	} else {
 		snprintf (port_ptr->name,
 			  sizeof(port_ptr->name),
-			  "%s: %s",
+			  "%s %s %s",
 			  snd_seq_client_info_get_name(client_info_ptr),
-			  snd_seq_port_info_get_name(port_info_ptr));
+			  snd_seq_port_info_get_name(port_info_ptr),
+                          (dir == A2J_PORT_CAPTURE ? "in" : "out"));
 	}
 	
 	// replace all offending characters with ' '
@@ -128,7 +130,7 @@ a2j_port_fill_name (struct a2j_port * port_ptr, int input, snd_seq_client_info_t
 }
 
 struct a2j_port *
-a2j_port_create (struct a2j * self, snd_seq_addr_t addr, const snd_seq_port_info_t * info)
+a2j_port_create (struct a2j * self, int dir, snd_seq_addr_t addr, const snd_seq_port_info_t * info)
 {
 	struct a2j_port *port;
 	int err;
@@ -137,7 +139,7 @@ a2j_port_create (struct a2j * self, snd_seq_addr_t addr, const snd_seq_port_info
 	int jack_caps;
 	struct a2j_stream * stream_ptr;
 
-	stream_ptr = &self->stream;
+	stream_ptr = &self->stream[dir];
 
 	if ((err = snd_seq_client_info_malloc (&client_info_ptr)) != 0) {
 		a2j_error("Failed to allocate client info");
@@ -164,12 +166,12 @@ a2j_port_create (struct a2j * self, snd_seq_addr_t addr, const snd_seq_port_info
 	port->jack_port = JACK_INVALID_PORT;
 	port->remote = addr;
 
-	a2j_port_fill_name (port, self->input, client_info_ptr, info, true);
+	a2j_port_fill_name (port, dir, client_info_ptr, info, false);
 
 	/* Add port to list early, before registering to JACK, so map functionality is guaranteed to work during port registration */
 	list_add_tail (&port->siblings, &stream_ptr->list);
 	
-	if (self->input) {
+	if (dir == A2J_PORT_CAPTURE) {
 		jack_caps = JackPortIsOutput;
 	} else {
 		jack_caps = JackPortIsInput;
@@ -186,10 +188,10 @@ a2j_port_create (struct a2j * self, snd_seq_addr_t addr, const snd_seq_port_info
 		goto fail_free_port;
 	}
 
-	if (self->input) {
-		err = a2j_alsa_connect_from(self, port->remote.client, port->remote.port);
+	if (dir == A2J_PORT_CAPTURE) {
+		err = a2j_alsa_connect_from (self, port->remote.client, port->remote.port);
 	} else {
-		err = snd_seq_connect_to(self->seq, self->port_id, port->remote.client, port->remote.port);
+		err = snd_seq_connect_to (self->seq, self->port_id, port->remote.client, port->remote.port);
 	}
 
 	if (err) {

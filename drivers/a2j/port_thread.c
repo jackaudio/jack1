@@ -77,7 +77,7 @@ a2j_find_port_by_jack_port_name(
 
 static
 void
-a2j_update_port_type (struct a2j * self, snd_seq_addr_t addr, int caps, const snd_seq_port_info_t * info)
+a2j_update_port_type (struct a2j * self, int dir, snd_seq_addr_t addr, int caps, const snd_seq_port_info_t * info)
 {
 	struct a2j_stream * stream_ptr;
 	int alsa_mask;
@@ -85,10 +85,10 @@ a2j_update_port_type (struct a2j * self, snd_seq_addr_t addr, int caps, const sn
 
 	a2j_debug("update_port_type(%d:%d)", addr.client, addr.port);
 
-	stream_ptr = &self->stream;
+	stream_ptr = &self->stream[dir];
 	port_ptr = a2j_find_port_by_addr(stream_ptr, addr);
 
-	if (self->input) {
+	if (dir == A2J_PORT_CAPTURE) {
 		alsa_mask = SND_SEQ_PORT_CAP_SUBS_READ;
 	} else {
 		alsa_mask = SND_SEQ_PORT_CAP_SUBS_WRITE;
@@ -101,7 +101,7 @@ a2j_update_port_type (struct a2j * self, snd_seq_addr_t addr, int caps, const sn
 
 	if (port_ptr == NULL && (caps & alsa_mask) == alsa_mask) {
 		if(jack_ringbuffer_write_space(stream_ptr->new_ports) >= sizeof(port_ptr)) {
-			port_ptr = a2j_port_create (self, addr, info);
+                  port_ptr = a2j_port_create (self, dir, addr, info);
 			if (port_ptr != NULL) {
 				jack_ringbuffer_write(stream_ptr->new_ports, (char *)&port_ptr, sizeof(port_ptr));
 			}
@@ -186,17 +186,13 @@ a2j_update_port (struct a2j * self, snd_seq_addr_t addr, const snd_seq_port_info
 		return;
 	}
 
-	if ((port_type & SND_SEQ_PORT_TYPE_HARDWARE) && self->ignore_hardware_ports) {
-		a2j_debug("Ignoring hardware port");
-		return;
-	}
-
 	if (port_caps & SND_SEQ_PORT_CAP_NO_EXPORT) {
 		a2j_debug("Ignoring no-export port");
 		return;
 	}
 
-	a2j_update_port_type (self, addr, port_caps, info);
+        a2j_update_port_type (self, A2J_PORT_CAPTURE, addr, port_caps, info);
+        a2j_update_port_type (self, A2J_PORT_PLAYBACK, addr, port_caps, info);
 }
 
 void
@@ -204,34 +200,36 @@ a2j_free_ports (jack_ringbuffer_t * ports)
 {
 	struct a2j_port *port;
 	int sz;
-	while ((sz = jack_ringbuffer_read(ports, (char*)&port, sizeof(port)))) {
-		assert (sz == sizeof(port));
-		a2j_info("port deleted: %s", port->name);
-		list_del (&port->siblings);
-		a2j_port_free(port);
+
+	while ((sz = jack_ringbuffer_read (ports, (char*)&port, sizeof(port)))) {
+          assert (sz == sizeof(port));
+          a2j_info("port deleted: %s", port->name);
+          list_del (&port->siblings);
+          a2j_port_free(port);
 	}
 }
 
 void
 a2j_update_ports (struct a2j * self)
 {
-	snd_seq_addr_t addr;
-	int size;
-
-	while ((size = jack_ringbuffer_read(self->port_add, (char *)&addr, sizeof(addr))) != 0) {
-		snd_seq_port_info_t * info;
-		int err;
-
-		snd_seq_port_info_alloca(&info);
-
-		assert (size == sizeof(addr));
-		assert (addr.client != self->client_id);
-
-		if ((err = snd_seq_get_any_port_info(self->seq, addr.client, addr.port, info)) >= 0) {
-			a2j_update_port(self, addr, info);
-		} else {
-			//a2j_port_setdead(self->stream[A2J_PORT_CAPTURE].ports, addr);
-			//a2j_port_setdead(self->stream[A2J_PORT_PLAYBACK].ports, addr);
-		}
-	}
+  snd_seq_addr_t addr;
+  int size;
+  
+  while ((size = jack_ringbuffer_read(self->port_add, (char *)&addr, sizeof(addr))) != 0) {
+    
+    snd_seq_port_info_t * info;
+    int err;
+    
+    snd_seq_port_info_alloca(&info);
+    
+    assert (size == sizeof(addr));
+    assert (addr.client != self->client_id);
+    
+    if ((err = snd_seq_get_any_port_info(self->seq, addr.client, addr.port, info)) >= 0) {
+      a2j_update_port(self, addr, info);
+    } else {
+      a2j_port_setdead(self->stream[A2J_PORT_CAPTURE].port_hash, addr);
+      a2j_port_setdead(self->stream[A2J_PORT_PLAYBACK].port_hash, addr);
+    }
+  }
 }

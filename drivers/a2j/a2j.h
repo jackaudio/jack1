@@ -22,6 +22,7 @@
 #ifndef STRUCTS_H__FD2CC895_411F_4ADE_9200_50FE395EDB72__INCLUDED
 #define STRUCTS_H__FD2CC895_411F_4ADE_9200_50FE395EDB72__INCLUDED
 
+#include <stdbool.h>
 #include <semaphore.h>
 #include <jack/midiport.h>
 
@@ -32,6 +33,10 @@
 
 #define PORT_HASH_BITS 4
 #define PORT_HASH_SIZE (1 << PORT_HASH_BITS)
+
+/* Beside enum use, these are indeces for (struct a2j).stream array */
+#define A2J_PORT_CAPTURE   0 // ALSA playback port -> JACK capture port
+#define A2J_PORT_PLAYBACK  1 // JACK playback port -> ALSA capture port
 
 typedef struct a2j_port * a2j_port_hash_t[PORT_HASH_SIZE];
 
@@ -68,22 +73,23 @@ struct a2j
     jack_client_t * jack_client;
     
     snd_seq_t *seq;
-    pthread_t alsa_io_thread;
+    pthread_t alsa_input_thread;
+    pthread_t alsa_output_thread;
     int client_id;
     int port_id;
     int queue;
-    int input;
-    int finishing;
-    int ignore_hardware_ports;
+    bool freewheeling;
+    bool running;
+    bool finishing;
 
     jack_ringbuffer_t* port_add; // snd_seq_addr_t
     jack_ringbuffer_t* port_del; // struct a2j_port*
     jack_ringbuffer_t* outbound_events; // struct a2j_delivery_event
     jack_nframes_t cycle_start;
     
-    sem_t io_semaphore;
+    sem_t output_semaphore;
 
-    struct a2j_stream stream;
+    struct a2j_stream stream[2];
 };
 
 #define NSEC_PER_SEC ((int64_t)1000*1000*1000)
