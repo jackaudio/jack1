@@ -916,7 +916,6 @@ doc/reference.doxygen
 drivers/Makefile
 drivers/alsa/Makefile
 drivers/alsa-midi/Makefile
-drivers/a2j/Makefile
 drivers/dummy/Makefile
 drivers/oss/Makefile
 drivers/sun/Makefile
@@ -927,6 +926,7 @@ drivers/firewire/Makefile
 drivers/netjack/Makefile
 example-clients/Makefile
 tools/Makefile
+tools/alsa_midi/Makefile
 man/Makefile
 jack.pc
 jack.spec
