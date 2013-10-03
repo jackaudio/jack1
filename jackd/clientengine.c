@@ -52,7 +52,6 @@ jack_client_disconnect_ports (jack_engine_t *engine,
 {
 	JSList *node;
 	jack_port_internal_t *port;
-        char buf[JACK_UUID_STRING_SIZE];
 
 	/* call tree **** MUST HOLD *** engine->client_lock */
 
@@ -102,7 +101,17 @@ jack_load_client (jack_engine_t *engine, jack_client_internal_t *client,
 	const char *errstr;
 	char path_to_so[PATH_MAX+1];
 
-	snprintf (path_to_so, sizeof (path_to_so), ADDON_DIR "/%s.so", so_name);
+        if (!so_name) {
+                return -1;
+        }
+
+        if (so_name[0] == '/') {
+                /* Absolute, use as-is, user beware ... */
+                snprintf (path_to_so, sizeof (path_to_so), "%s.so", so_name);
+        } else {
+                snprintf (path_to_so, sizeof (path_to_so), ADDON_DIR "/%s.so", so_name);
+        }
+
 	client->handle = dlopen (path_to_so, RTLD_NOW|RTLD_GLOBAL);
 	
 	if (client->handle == 0) {
