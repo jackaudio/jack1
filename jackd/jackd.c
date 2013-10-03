@@ -559,7 +559,7 @@ main (int argc, char *argv[])
 	int do_sanity_checks = 1;
 	int show_version = 0;
 
-	const char *options = "-d:P:uvshVrRZTFlL:t:mM:n:Np:c:X:C:";
+	const char *options = "-d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
 	struct option long_options[] = 
 	{ 
 		/* keep ordered by single-letter option code */
@@ -568,7 +568,7 @@ main (int argc, char *argv[])
 		{ "driver", 1, 0, 'd' },
 		{ "help", 0, 0, 'h' },
 		{ "tmpdir-location", 0, 0, 'l' },
-		{ "load", 0, 0, 'L' },
+		{ "internal-client", 0, 0, 'I' },
 		{ "no-mlock", 0, 0, 'm' },
 		{ "midi-bufsize", 1, 0, 'M' },
 		{ "name", 1, 0, 'n' },
@@ -647,7 +647,7 @@ main (int argc, char *argv[])
 			printf ("%s\n", jack_tmpdir);
 			exit (0);
 
-                case 'L':
+                case 'I':
 			load_list = jack_slist_append(load_list, optarg);
                         break;
 
