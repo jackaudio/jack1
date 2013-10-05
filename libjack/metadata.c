@@ -26,6 +26,13 @@
 #include "internal.h"
 #include "local.h"
 
+const char* JACK_METADATA_PRETTY_NAME = "http://jackaudio.org/metadata/pretty-name";
+const char* JACK_METADATA_HARDWARE    = "http://jackaudio.org/metadata/hardware";
+const char* JACK_METADATA_CONNECTED   = "http://jackaudio.org/metadata/connected";
+const char* JACK_METADATA_PORT_GROUP  = "http://jackaudio.org/metadata/port-group";
+const char* JACK_METADATA_ICON_SMALL  = "http://jackaudio.org/metadata/icon-small";
+const char* JACK_METADATA_ICON_LARGE  = "http://jackaudio.org/metadata/icon-large";
+
 static DB* db = NULL;
 static DB_ENV* db_env = NULL;
 
