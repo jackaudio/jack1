@@ -2657,6 +2657,16 @@ static void jack_do_get_uuid_by_client_name (jack_engine_t *engine, jack_request
 {
 	JSList *node;
 	req->status = -1;
+
+        if (strcmp (req->x.name, "system") == 0) {
+                /* request concerns the driver */
+                if (engine->driver) {
+                        jack_uuid_copy (req->x.client_id, engine->driver->internal_client->control->uuid);
+                        req->status = 0;
+                }
+                return;
+        }
+        
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if (strcmp (client->control->name, req->x.name) == 0) {
