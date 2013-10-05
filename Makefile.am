@@ -43,5 +43,7 @@ libjackinclude_HEADERS =   \
 	jack/weakmacros.h  \
 	jack/weakjack.h    \
 	jack/control.h     \
+	jack/metadata.h     \
+	jack/uuid.h     \
 	jack/jslist.h
 
