@@ -207,7 +207,9 @@ if test "x$JACK_USE_MACH_THREADS" != "x"; then
 fi
 
 # headers
-AC_CHECK_HEADERS(string.h strings.h alloca.h db.h)
+AC_CHECK_HEADERS(string.h strings.h alloca.h db.h, [],
+     AC_MSG_ERROR([*** a required header file is missing]))
+
 AC_CHECK_HEADERS(getopt.h, [], [
     for d in /Developer/SDKs/MacOSX10.3.0.sdk/usr/include/ ; do
 	AC_CHECK_HEADERS($d/getopt.h, [], [CFLAGS="$CFLAGS -I$d"])
@@ -230,7 +232,8 @@ AC_CHECK_FUNC(pthread_create, [],
 AC_CHECK_FUNCS(on_exit atexit)
 AC_CHECK_FUNCS(posix_memalign)
 AC_CHECK_LIB(m, sin)
-AC_CHECK_LIB(db, db_create)
+AC_CHECK_LIB(db, db_create,[],
+	 AC_MSG_ERROR([*** JACK requires Berkeley DB libraries (libdb...)]))
 
 echo -n "Checking for ppoll()... "
 AC_EGREP_CPP( ppoll,
