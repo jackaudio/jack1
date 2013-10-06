@@ -52,7 +52,7 @@ typedef struct _jack_port_buffer_list {
 } jack_port_buffer_list_t;
 
 typedef struct _jack_reserved_name {
-    jack_client_id_t uuid;
+    jack_uuid_t uuid;
     char name[JACK_CLIENT_NAME_SIZE];
 } jack_reserved_name_t;
 
@@ -108,7 +108,6 @@ struct _jack_engine {
 
     int		    fds[2];
     int		    cleanup_fifo[2];
-    jack_client_id_t next_client_id;
     size_t	    pfd_size;
     size_t	    pfd_max;
     struct pollfd  *pfd;
@@ -124,7 +123,7 @@ struct _jack_engine {
     int		    rtpriority;
     volatile char   freewheeling;
     volatile char   stop_freewheeling;
-    jack_client_id_t fwclient;
+    jack_uuid_t     fwclient;
     pthread_t       freewheel_thread;
     char	    verbose;
     char	    do_munlock;
@@ -205,7 +204,7 @@ int		jack_get_fifo_fd (jack_engine_t *engine,
 extern jack_timer_type_t clock_source;
 
 extern jack_client_internal_t *
-jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id);
+jack_client_internal_by_id (jack_engine_t *engine, jack_uuid_t id);
 
 #define jack_rdlock_graph(e) { DEBUG ("acquiring graph read lock"); if (pthread_rwlock_rdlock (&e->client_lock)) abort(); }
 #define jack_lock_graph(e) { DEBUG ("acquiring graph write lock"); if (pthread_rwlock_wrlock (&e->client_lock)) abort(); }
@@ -255,7 +254,7 @@ int     jack_stop_freewheeling (jack_engine_t* engine, int engine_exiting);
 jack_client_internal_t *
 jack_client_by_name (jack_engine_t *engine, const char *name);
 
-int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_event_t *);
+int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, jack_event_t *, ...);
 
 void
 jack_engine_signal_problems (jack_engine_t* engine);

@@ -40,6 +40,7 @@
 #include <jack/jack.h>
 #include <jack/jslist.h>
 #include <jack/thread.h>
+#include <jack/uuid.h>
 
 #include "internal.h"
 #include "engine.h"
@@ -249,6 +250,21 @@ oop_client_deliver_request (void *ptr, jack_request_t *req)
 
 	wok = (write (client->request_fd, req, sizeof (*req))
 	       == sizeof (*req));
+
+        /* if necessary, add variable length key data after a PropertyChange request
+         */
+        
+        if (req->type == PropertyChangeNotify) {
+                if (req->x.property.keylen) {
+                        if (write (client->request_fd, req->x.property.key, req->x.property.keylen) != req->x.property.keylen) {
+                                jack_error ("cannot send property key of length %d to server",
+                                            req->x.property.keylen);
+                                req->status = -1;
+                                return req->status;
+                        }
+                }
+        }
+
 	rok = (read (client->request_fd, req, sizeof (*req))
 	       == sizeof (*req));
 
@@ -280,8 +296,7 @@ jack_client_deliver_request (const jack_client_t *client, jack_request_t *req)
 	 * the server.
 	 */
 
-	return client->deliver_request (client->deliver_arg,
-						 req);
+	return client->deliver_request (client->deliver_arg, req);
 }
 
 #if JACK_USE_MACH_THREADS 
@@ -436,9 +451,9 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 	jack_port_t *other = 0;
 	JSList *node;
 	int need_free = FALSE;
-
-	if (client->engine->ports[event->x.self_id].client_id == client->control->id ||
-	    client->engine->ports[event->y.other_id].client_id == client->control->id) {
+        
+	if (jack_uuid_compare (client->engine->ports[event->x.self_id].client_id, client->control->uuid) == 0 ||
+	    jack_uuid_compare (client->engine->ports[event->y.other_id].client_id, client->control->uuid) == 0) {
 
 		/* its one of ours */
 
@@ -516,24 +531,24 @@ jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 int
 jack_client_handle_session_callback (jack_client_t *client, jack_event_t *event)
 {
-	char prefix[32];
+        char uuidstr[37];
 	jack_session_event_t *s_event;
 
 	if (! client->control->session_cbset) {
 		return -1;
 	}
 
-	snprintf( prefix, sizeof(prefix), "%d", client->control->uid );
+        uuid_unparse (client->control->uuid, uuidstr);
 
 	s_event = malloc( sizeof(jack_session_event_t) );
 	s_event->type = event->y.n;
-	s_event->session_dir = strdup( event->x.name );
-	s_event->client_uuid = strdup( prefix );
+	s_event->session_dir = strdup (event->x.name);
+	s_event->client_uuid = strdup (uuidstr);
 	s_event->command_line = NULL;
 	s_event->future = 0;
 
 	client->session_cb_immediate_reply = 0;
-	client->session_cb ( s_event, client->session_cb_arg);
+	client->session_cb (s_event, client->session_cb_arg);
 
 	if (client->session_cb_immediate_reply) {
 		return 2;
@@ -772,9 +787,9 @@ server_connect (const char *server_name)
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		close (fd);
+                jack_error ("connect(2) call to %s failed (err=%s)", addr.sun_path, strerror (errno));
 		return -1;
 	}
-
 	return fd;
 }
 
@@ -805,7 +820,7 @@ server_event_connect (jack_client_t *client, const char *server_name)
 		return -1;
 	}
 
-	req.client_id = client->control->id;
+	jack_uuid_copy (req.client_id, client->control->uuid);
 
 	if (write (fd, &req, sizeof (req)) != sizeof (req)) {
 		jack_error ("cannot write event connect request to server (%s)",
@@ -1032,10 +1047,14 @@ jack_request_client (ClientType type,
 
 	/* format connection request */
 
-	if( va->sess_uuid )
-		req.uuid = atoi( va->sess_uuid );
-	else
-		req.uuid = 0;
+	if (va->sess_uuid && strlen (va->sess_uuid)) {
+		if (jack_uuid_parse (va->sess_uuid, req.uuid) != 0) {
+                        jack_error ("Given UUID [%s] is not parseable", va->sess_uuid);
+                        goto fail;
+                }
+        } else {
+		jack_uuid_clear (req.uuid);
+        }
 	req.protocol_v = jack_protocol_version;
 	req.load = TRUE;
 	req.type = type;
@@ -1101,6 +1120,7 @@ jack_request_client (ClientType type,
 	return 0;
 
   fail:
+        jack_error ("attempt to connect to server failed");
 	if (*req_fd >= 0) {
 		close (*req_fd);
 		*req_fd = -1;
@@ -1280,11 +1300,6 @@ jack_client_open_aux (const char *client_name,
 	client->deliver_request = oop_client_deliver_request;
 	client->deliver_arg = client;
 
-	if( va.sess_uuid )
-		client->control->uid = atoi( va.sess_uuid );
-	else
-		client->control->uid = 0U;
-
 	if ((ev_fd = server_event_connect (client, va.server_name)) < 0) {
 		goto fail;
 	}
@@ -1411,8 +1426,13 @@ jack_server_dir (const char *server_name, char *server_dir)
 	/* format the path name into the suppled server_dir char array,
 	 * assuming that server_dir is at least as large as PATH_MAX+1 */
 
-	snprintf (server_dir, PATH_MAX+1, "%s/%s",
-		  jack_user_dir (), server_name);
+        if (server_name == NULL || server_name[0] == '\0') {
+                snprintf (server_dir, PATH_MAX+1, "%s/%s",
+                          jack_user_dir (), jack_default_server_name());
+        } else {
+                snprintf (server_dir, PATH_MAX+1, "%s/%s",
+                          jack_user_dir (), server_name);
+        }
 
 	return server_dir;
 }
@@ -1470,7 +1490,7 @@ jack_set_freewheel (jack_client_t* client, int onoff)
         VALGRIND_MEMSET (&request, 0, sizeof (request));
 
 	request.type = onoff ? FreeWheel : StopFreeWheel;
-	request.x.client_id = client->control->id;
+	jack_uuid_copy (request.x.client_id, client->control->uuid);
 	return jack_client_deliver_request (client, &request);
 }
 
@@ -1496,7 +1516,7 @@ jack_session_reply (jack_client_t *client, jack_session_event_t *event )
                 VALGRIND_MEMSET (&request, 0, sizeof (request));
 
 		request.type = SessionReply;
-		request.x.client_id = client->control->id;
+		jack_uuid_copy (request.x.client_id, client->control->uuid);
 
 		retval = jack_client_deliver_request(client, &request);
 	}
@@ -1565,7 +1585,8 @@ jack_session_notify (jack_client_t* client, const char *target, jack_session_eve
 	}
 
 	while( 1 ) {
-		jack_client_id_t uid;
+		jack_uuid_t uid;
+
 		if (read (client->request_fd, &uid, sizeof (uid)) != sizeof (uid)) {
 			jack_error ("cannot read result for request type %d from"
 					" server (%s)", request.type, strerror (errno));
@@ -1576,16 +1597,16 @@ jack_session_notify (jack_client_t* client, const char *target, jack_session_eve
 		retval = realloc( retval, (num_replies)*sizeof(jack_session_command_t) );
 		retval[num_replies-1].client_name = malloc (JACK_CLIENT_NAME_SIZE);
 		retval[num_replies-1].command = malloc (JACK_PORT_NAME_SIZE);
-		retval[num_replies-1].uuid = malloc (16);
+		retval[num_replies-1].uuid = malloc (JACK_UUID_STRING_SIZE);
 
 		if ( (retval[num_replies-1].client_name == NULL)
 		   ||(retval[num_replies-1].command     == NULL)
 		   ||(retval[num_replies-1].uuid        == NULL) )
 			   goto out;
 
-		if( uid == 0 )
+		if (jack_uuid_empty (uid)) {
 			break;
-
+                }
 
 		if (read (client->request_fd, (char *)retval[num_replies-1].client_name, JACK_CLIENT_NAME_SIZE) 
 			       	!= JACK_CLIENT_NAME_SIZE) {
@@ -1605,7 +1626,7 @@ jack_session_notify (jack_client_t* client, const char *target, jack_session_eve
 					" server (%s)", request.type, strerror (errno));
 			goto out;
 		}
-		snprintf( (char *)retval[num_replies-1].uuid, 16, "%d", uid );
+                uuid_unparse (uid, (char *)retval[num_replies-1].uuid);
 	}
 	free((char *)retval[num_replies-1].uuid);
 	retval[num_replies-1].uuid = NULL;
@@ -1704,6 +1725,7 @@ jack_client_process_events (jack_client_t* client)
 	jack_client_control_t *control = client->control;
 	JSList *node;
 	jack_port_t* port;
+        char* key = 0;
 
 	DEBUG ("process events");
 
@@ -1721,7 +1743,17 @@ jack_client_process_events (jack_client_t* client)
 				    strerror (errno));
 			return -1;
 		}
-		
+
+                if (event.type == PropertyChange) {
+                        key = (char *) malloc (event.y.key_size);
+                        if (read (client->event_fd, key, event.y.key_size) != 
+                            event.y.key_size) {
+                                jack_error ("cannot read property change key (%s)",
+                                            strerror (errno));
+                                return -1;
+                        }
+                }
+
 		status = 0;
 		
 		switch (event.type) {
@@ -1814,6 +1846,14 @@ jack_client_process_events (jack_client_t* client)
 		case LatencyCallback:
 			status = jack_client_handle_latency_callback (client, &event, 0 );
 			break;
+                case PropertyChange:
+                        if (control->property_cbset) {
+                                client->property_cb (event.x.uuid, key, event.z.property_change, client->property_cb_arg);
+                        }
+                        if (key) {
+                                free (key);
+                        }
+                        break;
 		}
 		
 		DEBUG ("client has dealt with the event, writing "
@@ -1825,7 +1865,7 @@ jack_client_process_events (jack_client_t* client)
 				    "engine (%s)", strerror (errno));
 			return -1;
 		}
-	}
+        }
 
 	return 0;
 }
@@ -2342,7 +2382,7 @@ jack_activate (jack_client_t *client)
   startit:
 
 	req.type = ActivateClient;
-	req.x.client_id = client->control->id;
+	jack_uuid_copy (req.x.client_id, client->control->uuid);
 
 	return jack_client_deliver_request (client, &req);
 }
@@ -2358,7 +2398,7 @@ jack_deactivate_aux (jack_client_t *client)
 		if (client->control->active) { /* still active? */
                         VALGRIND_MEMSET (&req, 0, sizeof (req));
 			req.type = DeactivateClient;
-			req.x.client_id = client->control->id;
+			jack_uuid_copy (req.x.client_id, client->control->uuid);
 			rc = jack_client_deliver_request (client, &req);
 		}
 	}
@@ -2774,25 +2814,25 @@ jack_on_info_shutdown (jack_client_t *client, void (*function)(jack_status_t, co
 }
 
 char *
-jack_get_client_name_by_uuid( jack_client_t *client, const char *uuid )
+jack_get_client_name_by_uuid (jack_client_t *client, const char *uuid_str)
 { 
 	jack_request_t request;
-	char *end_ptr;
-	jack_client_id_t uuid_int = strtol( uuid, &end_ptr, 10 );
-	if ( *end_ptr != '\0' ) return NULL;
-
+        
         VALGRIND_MEMSET (&request, 0, sizeof (request));
 
+        if (uuid_parse (uuid_str, request.x.client_id) != 0) {
+                return NULL;
+        }
+
 	request.type = GetClientByUUID;
-	request.x.client_id = uuid_int;
-	if( jack_client_deliver_request( client, &request ) )
+	if( jack_client_deliver_request (client, &request)) 
 		return NULL;
 
-	return strdup( request.x.port_info.name );
+	return strdup  (request.x.port_info.name);
 }
 
 char*
-jack_get_uuid_for_client_name ( jack_client_t *client, const char *client_name )
+jack_get_uuid_for_client_name (jack_client_t *client, const char *client_name)
 {
 	jack_request_t request;
 	size_t len = strlen(client_name) + 1;
@@ -2804,40 +2844,38 @@ jack_get_uuid_for_client_name ( jack_client_t *client, const char *client_name )
 	request.type = GetUUIDByClientName;
 	memcpy(request.x.name, client_name, len);
 
-	if( jack_client_deliver_request( client, &request ) )
+	if (jack_client_deliver_request( client, &request)) {
 		return NULL;
+        }
 
-	return strdup( request.x.port_info.name );
+        char buf[37];
+        uuid_unparse (request.x.client_id, buf);
+        return strdup (buf);
 }
 
 char *
-jack_client_get_uuid( jack_client_t *client )
+jack_client_get_uuid (jack_client_t *client)
 { 
-	char retval[16];
-
-	snprintf( retval, sizeof(retval), "%d", client->control->uid );
-
-	return strdup(retval);
+	char retval[37];
+        uuid_unparse (client->control->uuid, retval);
+	return strdup (retval);
 }
 
 int
-jack_reserve_client_name( jack_client_t *client, const char *name, const char *uuid )
+jack_reserve_client_name (jack_client_t *client, const char *name, const char *uuid_str)
 { 
 	jack_request_t request;
-	char *end_ptr;
-	jack_client_id_t uuid_int = strtol( uuid, &end_ptr, 10 );
-
-	if( *end_ptr != '\0' ) {
-		return -1;
-        }
 
         VALGRIND_MEMSET (&request, 0, sizeof (request));
 
 	request.type = ReserveName;
 	snprintf( request.x.reservename.name, sizeof( request.x.reservename.name ),
 			"%s", name );
-	request.x.reservename.uuid = uuid_int;
-	return jack_client_deliver_request( client, &request );
+        if (uuid_parse (uuid_str, request.x.reservename.uuid) != 0) {
+                return NULL;
+        }
+
+	return jack_client_deliver_request (client, &request);
 }
 
 const char **
@@ -3010,6 +3048,8 @@ jack_event_type_name (JackEventType type)
                 return "save session";
         case LatencyCallback:
                 return "latency callback";
+        case PropertyChange:
+                return "property change callback";
         default:
                 break;
         }

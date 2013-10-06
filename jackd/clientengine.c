@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
+#include <uuid/uuid.h>
 
 #include "internal.h"
 #include "engine.h"
@@ -39,6 +40,9 @@
 
 #include "clientengine.h"
 #include "transengine.h"
+
+#include <jack/uuid.h>
+#include <jack/metadata.h>
 
 #include "libjack/local.h"
 
@@ -97,7 +101,17 @@ jack_load_client (jack_engine_t *engine, jack_client_internal_t *client,
 	const char *errstr;
 	char path_to_so[PATH_MAX+1];
 
-	snprintf (path_to_so, sizeof (path_to_so), ADDON_DIR "/%s.so", so_name);
+        if (!so_name) {
+                return -1;
+        }
+
+        if (so_name[0] == '/') {
+                /* Absolute, use as-is, user beware ... */
+                snprintf (path_to_so, sizeof (path_to_so), "%s.so", so_name);
+        } else {
+                snprintf (path_to_so, sizeof (path_to_so), ADDON_DIR "/%s.so", so_name);
+        }
+
 	client->handle = dlopen (path_to_so, RTLD_NOW|RTLD_GLOBAL);
 	
 	if (client->handle == 0) {
@@ -162,7 +176,8 @@ void
 jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
 	JSList *node;
-	jack_client_id_t finalizer=0;
+	jack_uuid_t finalizer;
+        jack_uuid_clear (finalizer);
 
 	/* caller must write-hold the client lock */
 
@@ -203,10 +218,8 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 	} 
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		if (((jack_client_internal_t *) node->data)->control->id
-		    == client->control->id) {
-			engine->clients =
-				jack_slist_remove_link (engine->clients, node);
+		if (jack_uuid_compare (((jack_client_internal_t *) node->data)->control->uuid, client->control->uuid) == 0) {
+			engine->clients = jack_slist_remove_link (engine->clients, node);
 			jack_slist_free_1 (node);
 			break;
 		}
@@ -331,7 +344,7 @@ jack_remove_clients (jack_engine_t* engine, int* exit_freewheeling_when_done)
 		
 		if (client->error) {
 			
-			if (engine->freewheeling && client->control->id == engine->fwclient) {
+			if (engine->freewheeling && jack_uuid_compare (client->control->uuid, engine->fwclient) == 0) {
 				VERBOSE (engine, "freewheeling client has errors");
 				*exit_freewheeling_when_done = 1;
 			}
@@ -404,11 +417,13 @@ jack_client_by_name (jack_engine_t *engine, const char *name)
 	return client;
 }
 
-static jack_client_id_t
-jack_client_id_by_name (jack_engine_t *engine, const char *name)
+static int
+jack_client_id_by_name (jack_engine_t *engine, const char *name, jack_uuid_t id)
 {
-	jack_client_id_t id = 0;	/* NULL client ID */
 	JSList *node;
+        int ret = -1;
+
+        jack_uuid_clear (id);
 
 	jack_rdlock_graph (engine);
 
@@ -418,17 +433,18 @@ jack_client_id_by_name (jack_engine_t *engine, const char *name)
 			    name) == 0) {
 			jack_client_internal_t *client = 
 				(jack_client_internal_t *) node->data;
-			id = client->control->id;
+			jack_uuid_copy (id, client->control->uuid);
+                        ret = 0;
 			break;
 		}
 	}
 
 	jack_unlock_graph (engine);
-	return id;
+        return ret;
 }
 
 jack_client_internal_t *
-jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id)
+jack_client_internal_by_id (jack_engine_t *engine, jack_uuid_t id)
 {
 	jack_client_internal_t *client = NULL;
 	JSList *node;
@@ -437,8 +453,7 @@ jack_client_internal_by_id (jack_engine_t *engine, jack_client_id_t id)
 
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 
-		if (((jack_client_internal_t *) node->data)->control->id
-		    == id) {
+		if (jack_uuid_compare (((jack_client_internal_t *) node->data)->control->uuid, id) == 0) {
 			client = (jack_client_internal_t *) node->data;
 			break;
 		}
@@ -453,8 +468,9 @@ jack_client_name_reserved( jack_engine_t *engine, const char *name )
 	JSList *node;
         for (node = engine->reserved_client_names; node; node = jack_slist_next (node)) {
 		jack_reserved_name_t *reservation = (jack_reserved_name_t *) node->data;
-		if( !strcmp( reservation->name, name ) )
+		if (!strcmp (reservation->name, name)) {
 			return 1;
+                }
 	}
 	return 0;
 }
@@ -532,8 +548,7 @@ jack_client_name_invalid (jack_engine_t *engine, char *name,
 /* Set up the engine's client internal and control structures for both
  * internal and external clients. */
 static jack_client_internal_t *
-jack_setup_client_control (jack_engine_t *engine, int fd,
-			   ClientType type, const char *name, jack_client_id_t uuid)
+jack_setup_client_control (jack_engine_t *engine, int fd, ClientType type, const char *name, jack_uuid_t uuid)
 {
 	jack_client_internal_t *client;
 
@@ -582,8 +597,13 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	client->control->active = 0;
 	client->control->dead = FALSE;
 	client->control->timed_out = 0;
-	client->control->id = engine->next_client_id++;
-	client->control->uid = uuid;
+
+        if (jack_uuid_empty (uuid)) {
+                jack_uuid_generate (client->control->uuid);
+        } else {
+                jack_uuid_copy (client->control->uuid, uuid);
+        }
+
 	strcpy ((char *) client->control->name, name);
 	client->subgraph_start_fd = -1;
 	client->subgraph_wait_fd = -1;
@@ -600,6 +620,7 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 	client->control->client_register_cbset = FALSE;
 	client->control->thread_cb_cbset = FALSE;
 	client->control->session_cbset = FALSE;
+	client->control->property_cbset = FALSE;
 
 #if 0
 	if (type != ClientExternal) {
@@ -636,38 +657,45 @@ jack_setup_client_control (jack_engine_t *engine, int fd,
 }
 
 static void
-jack_ensure_uuid_unique (jack_engine_t *engine, jack_client_id_t uuid)
+jack_ensure_uuid_unique (jack_engine_t *engine, jack_uuid_t uuid)
 {
 	JSList *node;
+        jack_uuid_t jj;
+
+        if (jack_uuid_empty (uuid)) {
+                return;
+        }
 
 	jack_lock_graph (engine);
 	for (node=engine->clients; node; node=jack_slist_next (node)) {
 		jack_client_internal_t *client = (jack_client_internal_t *) node->data;
-		if (client->control->uid == uuid)
-			client->control->uid = 0;
+		if (jack_uuid_compare (client->control->uuid, uuid) == 0) {
+			jack_uuid_clear (uuid);
+                }
 	}
 	jack_unlock_graph (engine);
 }
 
 /* set up all types of clients */
 static jack_client_internal_t *
-setup_client (jack_engine_t *engine, ClientType type, char *name, jack_client_id_t uuid,
+setup_client (jack_engine_t *engine, ClientType type, char *name,
+              jack_uuid_t uuid,
 	      jack_options_t options, jack_status_t *status, int client_fd,
 	      const char *object_path, const char *object_data)
 {
 	/* called with the request_lock */
 	jack_client_internal_t *client;
+        char bufx[64];
 
 	/* validate client name, generate a unique one if appropriate */
 	if (jack_client_name_invalid (engine, name, options, status))
 		return NULL;
 
-	if (uuid != 0)
-		jack_ensure_uuid_unique (engine, uuid);
+        jack_ensure_uuid_unique (engine, uuid);
 
 	/* create a client struct for this name */
 	if ((client = jack_setup_client_control (engine, client_fd,
-						 type, name, uuid )) == NULL) {
+						 type, name, uuid)) == NULL) {
 		*status |= (JackFailure|JackInitFailure);
 		jack_error ("cannot create new client object");
 		return NULL;
@@ -684,9 +712,11 @@ setup_client (jack_engine_t *engine, ClientType type, char *name, jack_client_id
 		}
 	}
 
-	VERBOSE (engine, "new client: %s, id = %" PRIu32
+        jack_uuid_unparse (client->control->uuid, bufx);
+                
+	VERBOSE (engine, "new client: %s, uuid = %s" 
 		 " type %d @ %p fd = %d", 
-		 client->control->name, client->control->id, 
+		 client->control->name, bufx,
 		 type, client->control, client_fd);
 
 	if (jack_client_is_internal(client)) {
@@ -757,11 +787,16 @@ jack_create_driver_client (jack_engine_t *engine, char *name)
 	jack_client_connect_request_t req;
 	jack_status_t status;
 	jack_client_internal_t *client;
+        jack_uuid_t empty_uuid;
+
+        VALGRIND_MEMSET(&empty_uuid, 0, sizeof(empty_uuid));
 
 	snprintf (req.name, sizeof (req.name), "%s", name);
 
+        jack_uuid_clear (empty_uuid);
+
 	pthread_mutex_lock (&engine->request_lock);
-	client = setup_client (engine, ClientDriver, name, 0, JackUseExactName,
+	client = setup_client (engine, ClientDriver, name, empty_uuid, JackUseExactName,
 			       &status, -1, NULL, NULL);
 	pthread_mutex_unlock (&engine->request_lock);
 
@@ -769,7 +804,7 @@ jack_create_driver_client (jack_engine_t *engine, char *name)
 }
 
 static jack_status_t
-handle_unload_client (jack_engine_t *engine, jack_client_id_t id)
+handle_unload_client (jack_engine_t *engine, jack_uuid_t id)
 {
 	/* called *without* the request_lock */
 	jack_client_internal_t *client;
@@ -790,16 +825,16 @@ handle_unload_client (jack_engine_t *engine, jack_client_id_t id)
 }
 
 static char *
-jack_get_reserved_name( jack_engine_t *engine, jack_client_id_t uuid )
+jack_get_reserved_name (jack_engine_t *engine, jack_uuid_t uuid)
 {
 	JSList *node;
         for (node = engine->reserved_client_names; node; node = jack_slist_next (node)) {
 		jack_reserved_name_t *reservation = (jack_reserved_name_t *) node->data;
-		if( reservation->uuid== uuid ) {
-			char *retval = strdup( reservation->name );
-			free( reservation );
+		if (jack_uuid_compare (reservation->uuid, uuid) != 0) {
+			char *retval = strdup (reservation->name);
+			free (reservation);
 			engine->reserved_client_names = 
-				jack_slist_remove( engine->reserved_client_names, reservation );
+				jack_slist_remove (engine->reserved_client_names, reservation);
 			return retval;
 		}
 	}
@@ -816,12 +851,14 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 
 	res.status = 0;
 
-	nbytes = read (client_fd, &req, sizeof (req));
+        VALGRIND_MEMSET(&res, 0, sizeof (res));
 
-	if (nbytes == 0) {		/* EOF? */
-		jack_error ("cannot read connection request from client");
-		return -1;
-	}
+        nbytes = read (client_fd, &req, sizeof (req));
+        
+        if (nbytes == 0) {		/* EOF? */
+                jack_error ("cannot read connection request from client (%s)", strerror(errno));
+                return -1;
+        }
 
 	/* First verify protocol version (first field of request), if
 	 * present, then make sure request has the expected length. */
@@ -841,9 +878,9 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 	if (!req.load) {		/* internal client close? */
 
 		int rc = -1;
-		jack_client_id_t id;
+		jack_uuid_t id;
 
-		if ((id = jack_client_id_by_name(engine, req.name))) {
+		if (jack_client_id_by_name(engine, req.name, id) == 0) {
 			rc = handle_unload_client (engine, id);
 		}
 		
@@ -852,13 +889,14 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 	}
 	
 	pthread_mutex_lock (&engine->request_lock);
-	if( req.uuid ) {
-		char *res_name = jack_get_reserved_name( engine, req.uuid );
-		if( res_name ) {
-			snprintf( req.name, sizeof(req.name), "%s", res_name );
-			free(res_name);
+	if (!jack_uuid_empty (req.uuid)) {
+		char *res_name = jack_get_reserved_name (engine, req.uuid);
+		if (res_name) {
+			snprintf (req.name, sizeof(req.name), "%s", res_name);
+			free (res_name);
 		}
 	}
+
 	client = setup_client (engine, req.type, req.name, req.uuid,
 			       req.options, &res.status, client_fd,
 			       req.object_path, req.object_data);
@@ -912,13 +950,15 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 }
 
 int
-jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
+jack_client_activate (jack_engine_t *engine, jack_uuid_t id)
 {
 	jack_client_internal_t *client;
 	JSList *node;
 	int ret = -1;
 	int i;
 	jack_event_t event;
+
+        VALGRIND_MEMSET(&event, 0, sizeof(event));
 
 	jack_lock_graph (engine);
 
@@ -963,7 +1003,7 @@ jack_client_activate (jack_engine_t *engine, jack_client_id_t id)
 }	
 
 int
-jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
+jack_client_deactivate (jack_engine_t *engine, jack_uuid_t id)
 {
 	JSList *node;
 	int ret = -1;
@@ -974,8 +1014,8 @@ jack_client_deactivate (jack_engine_t *engine, jack_client_id_t id)
 
 		jack_client_internal_t *client =
 			(jack_client_internal_t *) node->data;
-
-		if (client->control->id == id) {
+                
+		if (jack_uuid_compare (client->control->uuid, id) == 0) {
 		        
 	        	JSList *portnode;
 			jack_port_internal_t *port;
@@ -1032,7 +1072,16 @@ jack_mark_client_socket_error (jack_engine_t *engine, int fd)
 void
 jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 {
+        jack_uuid_t uuid;
+        jack_uuid_copy (uuid, client->control->uuid);
+
 	jack_client_registration_notify (engine, (const char*) client->control->name, 0);
+
+        jack_remove_properties (NULL, uuid);
+                /* have to do the notification ourselves, since the client argument
+                   to jack_remove_properties() was NULL
+                */
+        jack_property_change_notify (engine, PropertyDeleted, uuid, NULL);
 
 	if (jack_client_is_internal (client)) {
 
@@ -1061,7 +1110,7 @@ jack_intclient_handle_request (jack_engine_t *engine, jack_request_t *req)
 
 	req->status = 0;
 	if ((client = jack_client_by_name (engine, req->x.intclient.name))) {
-		req->x.intclient.id = client->control->id;
+		jack_uuid_copy (req->x.intclient.uuid, client->control->uuid);
 	} else {
 		req->status |= (JackNoSuchClient|JackFailure);
 	}
@@ -1073,22 +1122,26 @@ jack_intclient_load_request (jack_engine_t *engine, jack_request_t *req)
 	/* called with the request_lock */
 	jack_client_internal_t *client;
 	jack_status_t status = 0;
+        jack_uuid_t empty_uuid;
 
 	VERBOSE (engine, "load internal client %s from %s, init `%s', "
 		 "options: 0x%x", req->x.intclient.name,
 		 req->x.intclient.path, req->x.intclient.init,
 		 req->x.intclient.options);
 
-	client = setup_client (engine, ClientInternal, req->x.intclient.name, 0,
+        VALGRIND_MEMSET (&empty_uuid, 0, sizeof (empty_uuid));
+        jack_uuid_clear (empty_uuid);
+
+	client = setup_client (engine, ClientInternal, req->x.intclient.name, empty_uuid,
 			       req->x.intclient.options, &status, -1,
 			       req->x.intclient.path, req->x.intclient.init);
 
 	if (client == NULL) {
 		status |= JackFailure;	/* just making sure */
-		req->x.intclient.id = 0;
+		jack_uuid_clear (req->x.intclient.uuid);
 		VERBOSE (engine, "load failed, status = 0x%x", status);
 	} else {
-		req->x.intclient.id = client->control->id;
+		jack_uuid_copy (req->x.intclient.uuid, client->control->uuid);
 	}
 
 	req->status = status;
@@ -1101,7 +1154,7 @@ jack_intclient_name_request (jack_engine_t *engine, jack_request_t *req)
 
 	jack_rdlock_graph (engine);
 	if ((client = jack_client_internal_by_id (engine,
-						  req->x.intclient.id))) {
+						  req->x.intclient.uuid))) {
 		strncpy ((char *) req->x.intclient.name,
 			 (char *) client->control->name,
 			 sizeof (req->x.intclient.name));
@@ -1118,10 +1171,10 @@ jack_intclient_unload_request (jack_engine_t *engine, jack_request_t *req)
 	/* Called with the request_lock, but we need to call
 	 * handle_unload_client() *without* it. */
 
-	if (req->x.intclient.id) {
+	if (!jack_uuid_empty (req->x.intclient.uuid)) {
+                /* non-empty UUID */
 		pthread_mutex_unlock (&engine->request_lock);
-		req->status =
-			handle_unload_client (engine, req->x.intclient.id);
+		req->status = handle_unload_client (engine, req->x.intclient.uuid);
 		pthread_mutex_lock (&engine->request_lock);
 	} else {
 		VERBOSE (engine, "invalid unload request");

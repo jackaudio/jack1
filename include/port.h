@@ -45,7 +45,6 @@
 
 /* these should probably go somewhere else, but not in <jack/types.h> */
 #define JACK_CLIENT_NAME_SIZE 33
-typedef uint32_t jack_client_id_t;
 
 /* JACK shared memory segments are limited to MAX_INT32, they can be
  * shared between 32-bit and 64-bit clients. 
@@ -113,11 +112,12 @@ typedef struct _jack_port_shared {
     jack_port_type_id_t      ptype_id;	/* index into port type array */
     jack_shmsize_t           offset;	/* buffer offset in shm segment */
     jack_port_id_t           id;	/* index into engine port array */
-    uint32_t			     flags;    
+    jack_uuid_t              uuid;
+    uint32_t		     flags;    
     char                     name[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
     char                     alias1[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
     char                     alias2[JACK_CLIENT_NAME_SIZE+JACK_PORT_NAME_SIZE];
-    jack_client_id_t         client_id;	/* who owns me */
+    jack_uuid_t              client_id;	/* who owns me */
 
     volatile jack_nframes_t  latency;
     volatile jack_nframes_t  total_latency;

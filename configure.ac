@@ -61,7 +61,7 @@ dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=123
+JACK_MINOR_VERSION=124
 JACK_MICRO_VERSION=0
 
 dnl ---
@@ -207,7 +207,7 @@ if test "x$JACK_USE_MACH_THREADS" != "x"; then
 fi
 
 # headers
-AC_CHECK_HEADERS(string.h strings.h alloca.h)
+AC_CHECK_HEADERS(string.h strings.h alloca.h db.h)
 AC_CHECK_HEADERS(getopt.h, [], [
     for d in /Developer/SDKs/MacOSX10.3.0.sdk/usr/include/ ; do
 	AC_CHECK_HEADERS($d/getopt.h, [], [CFLAGS="$CFLAGS -I$d"])
@@ -230,6 +230,7 @@ AC_CHECK_FUNC(pthread_create, [],
 AC_CHECK_FUNCS(on_exit atexit)
 AC_CHECK_FUNCS(posix_memalign)
 AC_CHECK_LIB(m, sin)
+AC_CHECK_LIB(db, db_create)
 
 echo -n "Checking for ppoll()... "
 AC_EGREP_CPP( ppoll,
@@ -654,6 +655,15 @@ if test "x$USE_BARRIER" = "xyes"; then
 		AC_DEFINE(USE_BARRIER, 1, [Use pthread barrier functions]))
 fi
 
+HAVE_UUID=false
+PKG_CHECK_MODULES(UUID,uuid > 1.0,[HAVE_UUID=true], [true])
+if test x$HAVE_UUID = xfalse ; then
+      AC_MSG_ERROR([*** You do not have libuuid installed])
+else
+        CFLAGS="$CFLAGS $UUID_CFLAGS"
+        LIBS="$LIBS $UUID_LIBS"
+fi
+
 # some example-clients need libsndfile
 HAVE_SNDFILE=false
 PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
@@ -907,7 +917,6 @@ doc/reference.doxygen
 drivers/Makefile
 drivers/alsa/Makefile
 drivers/alsa-midi/Makefile
-drivers/a2j/Makefile
 drivers/dummy/Makefile
 drivers/oss/Makefile
 drivers/sun/Makefile
@@ -918,6 +927,7 @@ drivers/firewire/Makefile
 drivers/netjack/Makefile
 example-clients/Makefile
 tools/Makefile
+tools/alsa_midi/Makefile
 man/Makefile
 jack.pc
 jack.spec
