@@ -1133,7 +1133,7 @@ jack_intclient_load_request (jack_engine_t *engine, jack_request_t *req)
         jack_uuid_clear (empty_uuid);
 
 	client = setup_client (engine, ClientInternal, req->x.intclient.name, empty_uuid,
-			       req->x.intclient.options, &status, -1,
+			       req->x.intclient.options|JackUseExactName, &status, -1,
 			       req->x.intclient.path, req->x.intclient.init);
 
 	if (client == NULL) {
