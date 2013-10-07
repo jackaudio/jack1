@@ -815,8 +815,12 @@ handle_unload_client (jack_engine_t *engine, jack_uuid_t id)
 	if ((client = jack_client_internal_by_id (engine, id))) {
 		VERBOSE (engine, "unloading client \"%s\"",
 			 client->control->name);
-		jack_remove_client (engine, client);
-		status = 0;
+                if (client->control->type != ClientInternal) {
+                        status = JackFailure|JackInvalidOption;
+                } else {
+                        jack_remove_client (engine, client);
+                        status = 0;
+                }
 	}
 
 	jack_unlock_graph (engine);
