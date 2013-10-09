@@ -686,6 +686,28 @@ else
     	AC_DEFINE(HAVE_SAMPLERATE,1,"Whether libsamplerate is available")
 fi
 
+# if we have Fons Adriensen's zita libs installed, we can build the zita-based
+# internal clients for using additional (ALSA) devices with JACK
+
+HAVE_ZITA_RESAMPLE=false
+HAVE_ZITA_ALSA_PCMI=false
+AC_CHECK_LIB(zita-resampler, _Z28zita_resampler_major_versionv,
+                             [
+                                HAVE_ZITA_RESAMPLE=true
+                                AC_MSG_RESULT(yes)
+                             ])
+AC_CHECK_LIB(zita-alsa-pcmi, _Z28zita_alsa_pcmi_major_versionv,
+                             [
+                                HAVE_ZITA_ALSA_PCMI=true
+                                AC_MSG_RESULT(yes)
+                             ])
+
+HAVE_ZITA_BRIDGE_DEPS=false
+if test x$HAVE_ZITA_RESAMPLE = xtrue -a x$HAVE_ZITA_ALSA_PCMI = xtrue ; then
+   AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
+   HAVE_ZITA_BRIDGE_DEPS=true
+fi
+
 # Celt low-latency audio codec. netjack transmission via internet.
 HAVE_CELT=false
 PKG_CHECK_MODULES(CELT, celt >= 0.8.0,[HAVE_CELT=true], [true])
@@ -895,6 +917,7 @@ AM_CONDITIONAL(HAVE_DOXYGEN, $HAVE_DOXYGEN)
 AM_CONDITIONAL(USE_CAPABILITIES, $USE_CAPABILITIES)
 AM_CONDITIONAL(STRIPPED_JACKD, $STRIPPED_JACKD)
 AM_CONDITIONAL(HAVE_PPOLL, $HAVE_PPOLL)
+AM_CONDITIONAL(HAVE_ZITA_BRIDGE_DEPS, $HAVE_ZITA_BRIDGE_DEPS)
 
 AC_OUTPUT(
 Makefile
@@ -931,6 +954,7 @@ drivers/netjack/Makefile
 example-clients/Makefile
 tools/Makefile
 tools/alsa_midi/Makefile
+tools/zalsa/Makefile
 man/Makefile
 jack.pc
 jack.spec
@@ -958,6 +982,7 @@ echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
 echo \| Build with Celt support............................... : $HAVE_CELT
 echo \| Build with dynamic buffer size support................ : $buffer_resizing
+echo \| Build with ZITA ALSA bridge support................... : $HAVE_ZITA_BRIDGE_DEPS
 echo \| Compiler optimization flags........................... : $JACK_OPT_CFLAGS
 echo \| Compiler full flags................................... : $CFLAGS
 echo \| Install dir for libjack + backends.................... : $libdir/jack
