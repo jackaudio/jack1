@@ -990,6 +990,7 @@ jack_client_activate (jack_engine_t *engine, jack_uuid_t id)
 		}
 
 		event.type = BufferSizeChange;
+                event.x.n = engine->control->buffer_size;
 		jack_deliver_event (engine, client, &event);
 
 		// send delayed notifications for ports.

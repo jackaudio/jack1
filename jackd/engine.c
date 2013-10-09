@@ -535,6 +535,7 @@ jack_driver_buffer_size (jack_engine_t *engine, jack_nframes_t nframes)
 	}
 
 	event.type = BufferSizeChange;
+        event.x.n = engine->control->buffer_size;
 	jack_deliver_event_to_all (engine, &event);
 
 	return 0;
@@ -2908,7 +2909,7 @@ jack_notify_all_port_interested_clients (jack_engine_t *engine, jack_uuid_t src,
 
 int
 jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
-		    jack_event_t *event, ...)
+		    const jack_event_t *event, ...)
 {
         va_list ap;
 	char status=0;
@@ -2959,13 +2960,14 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 			break;
 
 		case BufferSizeChange:
-			jack_client_fix_port_buffers
-				(client->private_client);
+			jack_client_fix_port_buffers (client->private_client);
 
 			if (client->control->bufsize_cbset) {
+                                if (event->x.n < 16) {
+                                        abort ();
+                                }
 				client->private_client->bufsize
-					(event->x.n,
-					 client->private_client->bufsize_arg);
+					(event->x.n, client->private_client->bufsize_arg);
 			}
 			break;
 
@@ -3479,12 +3481,12 @@ jack_compute_new_latency (jack_engine_t *engine)
 {
 	JSList *node;
 	JSList *reverse_list = NULL;
-
 	jack_event_t event;
-	event.type = LatencyCallback;
-	event.x.n  = 0;
 
         VALGRIND_MEMSET (&event, 0, sizeof (event));
+
+	event.type = LatencyCallback;
+	event.x.n  = 0;
 
 	/* iterate over all clients in graph order, and emit
 	 * capture latency callback.
