@@ -2987,6 +2987,11 @@ jack_reset_max_delayed_usecs (jack_client_t *client)
 pthread_t
 jack_client_thread_id (jack_client_t *client)
 {
+        if (client->control->type != ClientExternal) {
+                /* Internal and driver clients run in ... ??? */
+                return 0;
+        } 
+
 	return client->thread_id;
 }
 
