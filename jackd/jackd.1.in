@@ -42,9 +42,40 @@ show how to list them.
 \fB\-m, \-\-no\-mlock\fR
 Do not attempt to lock memory, even if \fB\-\-realtime\fR.
 .TP
-\fB\-I, \-\-internal-client \fRclient-name
+\fB\-I, \-\-internal-client \fIclient-spec\fR
 .br
-Load \fIclient-name\fR as an internal client. May be used multiple times.
+Load \fIclient-name\fR as an internal client. May be used multiple
+times. The form of \fIclient-spec\fR can be any of the following:
+.br
+client-path
+.br
+client-name/client-path
+.br
+client-name/client-path/init-string
+.br
+client-path/init-string
+.br
+The first form will cause jackd to attempt to load the client from a
+shared object named "client-path" with appropriate suffixes
+appended. If "client-path" is absolute, jackd will use that (adding
+a platform appropriate suffix for a shared object). If it is not
+absolute, jackd will look for "client-path" (with an appropriate
+suffix) in the same location that drivers and other JACK add-ons are
+located.
+.br
+The second form provides "client-name" as the desired name for the
+client once loaded, in addition to the "client-path".
+.br
+The third form provides an "init-string" in addition to a client name
+and path, which will be passed to the client's initialization
+function.
+.br
+The final form does not specify the client name, but does include 
+the path to the client's shared object file and an initializations
+string.
+.br
+When invoking JACK from the shell, remember to quote the argument to
+-I if it includes spaces.
 .TP
 \fB\-M, \-\-midi\-bufsize\fR [ \fIevent-count\fR ]
 Specify the size of the buffer used for MIDI ports. Units are "MIDI
