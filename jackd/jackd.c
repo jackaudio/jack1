@@ -91,6 +91,104 @@ do_nothing_handler (int sig)
 	write (1, buf, strlen (buf));
 }
 
+static void
+jack_load_internal_clients (JSList* load_list)
+{ 
+	JSList * node;
+
+        for (node = load_list; node; node = jack_slist_next (node)) {
+
+                char* str = (char*) node->data;
+                jack_request_t req;
+                char* slash = strchr (str, '/');
+                char* sslash;
+                char* client_name;
+                char* path;
+                char* args = NULL;
+                char* rest;
+
+                /* parse each argument/load_list member for the form foo,arg-list
+                   and split it apart if the slash is there.
+                 */
+
+                if (slash == NULL) {
+                        client_name = str;
+                        path = client_name;
+                } else {
+                        /* we want to copy the text up to the slash, not
+                           including the slash.
+                        */
+                        size_t len = slash - str;
+                        /* add 1 to leave space for a NULL */
+                        client_name = (char*) malloc (len + 1);
+                        memcpy (client_name, str, len);
+                        client_name[len] = '\0';
+
+                        /* is there another slash ? */
+
+                        sslash = strchr (slash+1, '/');
+
+                        if (sslash) {
+                                
+                                len = sslash - (slash+1);
+
+                                if (len) {
+                                        /* add 1 to leave space for a NULL */
+                                        path = (char*) malloc (len + 1);
+                                        memcpy (path, slash + 1, len);
+                                        path[len] = '\0';
+                                } else {
+                                        path = client_name;
+                                }
+
+                                rest = sslash + 1;
+
+                        } else {
+
+                                path = client_name;
+                                rest = slash + 1;
+                        }
+
+                        /* we want to skip the text before the slash (len)
+                         * plus the slash itself
+                         */
+                        len = strlen (rest);
+
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                args = (char*) malloc (len + 1);
+                                memcpy (args, rest, len);
+                                args[len] = '\0';
+                        }
+                }
+
+                memset (&req, 0, sizeof (req));
+                req.type = IntClientLoad;
+                req.x.intclient.options = 0;
+                strncpy (req.x.intclient.name, client_name, sizeof (req.x.intclient.name));
+                strncpy (req.x.intclient.path, path, sizeof (req.x.intclient.path));
+
+                if (args) {
+                        strncpy (req.x.intclient.init, args, sizeof (req.x.intclient.init));
+                } else {
+                        req.x.intclient.init[0] = '\0';
+                }
+
+                pthread_mutex_lock (&engine->request_lock);
+                jack_intclient_load_request (engine, &req);
+                pthread_mutex_unlock (&engine->request_lock);
+   
+                if (slash) {
+                        free (client_name);
+                        if (args) {
+                                free (args);
+                        }
+                }
+        }
+}
+
+
+
 static int
 jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * slave_names, JSList * load_list)
 {
@@ -186,23 +284,7 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * sl
 		goto error;
 	}
 
-        for (node = load_list; node; node = jack_slist_next (node)) {
-
-                char* client_name = node->data;
-                jack_request_t req;
-
-                memset (&req, 0, sizeof (req));
-                req.type = IntClientLoad;
-                req.x.intclient.options = 0;
-                strncpy (req.x.intclient.name, client_name, sizeof (req.x.intclient.name));
-                strncpy (req.x.intclient.path, client_name, sizeof (req.x.intclient.path));
-                req.x.intclient.init[0] = '\0';
-
-                pthread_mutex_lock (&engine->request_lock);
-                jack_intclient_load_request (engine, &req);
-                pthread_mutex_unlock (&engine->request_lock);
-        }
-
+        jack_load_internal_clients (load_list);
 
 	/* install a do-nothing handler because otherwise pthreads
 	   behaviour is undefined when we enter sigwait.
