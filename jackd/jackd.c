@@ -845,6 +845,9 @@ main (int argc, char *argv[])
                                 }
                         }
                         break;
+                } else if (strcmp (argv[i], "-Xseq") == 0) {
+                        slave_drivers = jack_slist_append (slave_drivers,"alsa_midi");
+                        break;
                 }
         }
 
