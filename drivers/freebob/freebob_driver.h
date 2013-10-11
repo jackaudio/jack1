@@ -138,8 +138,8 @@
 
 #ifdef FREEBOB_DRIVER_WITH_JACK_MIDI
 
-#include "../alsa-midi/midi_pack.h"
-#include "../alsa-midi/midi_unpack.h"
+#include "../alsa_midi/midi_pack.h"
+#include "../alsa_midi/midi_unpack.h"
 #include <jack/midiport.h>
 
 typedef struct freebob_midi_input_port_t {

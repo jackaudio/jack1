@@ -55,8 +55,8 @@
 #include "engine.h"
 #include "internal.h"
 
-#include <../alsa-midi/midi_pack.h>
-#include <../alsa-midi/midi_unpack.h>
+#include "../alsa_midi/midi_pack.h"
+#include "../alsa_midi/midi_unpack.h"
 
 // debug print control flags
 #define DEBUG_LEVEL_BUFFERS           	(1<<0)
