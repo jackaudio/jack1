@@ -7,7 +7,7 @@ ALSA_DIR =
 endif
 
 if HAVE_ALSA_MIDI
-ALSA_MIDI_DIR = alsa-midi
+ALSA_MIDI_DIR = alsa_midi
 else
 ALSA_MIDI_DIR =
 endif
@@ -49,4 +49,4 @@ FIREWIRE_DIR =
 endif
 
 SUBDIRS = $(ALSA_MIDI_DIR) $(ALSA_DIR) dummy $(OSS_DIR) $(SUN_DIR) $(PA_DIR) $(CA_DIR) $(FREEBOB_DIR) $(FIREWIRE_DIR) netjack
-DIST_SUBDIRS = alsa alsa-midi dummy oss sun portaudio coreaudio freebob firewire netjack
+DIST_SUBDIRS = alsa alsa_midi dummy oss sun portaudio coreaudio freebob firewire netjack
