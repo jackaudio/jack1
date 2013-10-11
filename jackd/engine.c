@@ -1049,17 +1049,20 @@ jack_engine_load_slave_driver (jack_engine_t *engine,
 	jack_driver_info_t *info;
 
 	if ((info = jack_load_driver (engine, driver_desc)) == NULL) {
+                jack_info ("Loading slave failed\n");
 		return -1;
 	}
 
 	if ((client = jack_create_driver_client (engine, info->client_name)
 		    ) == NULL) {
+                jack_info ("Creating slave failed\n");
 		return -1;
 	}
 
 	if ((driver = info->initialize (client->private_client,
 					driver_params)) == NULL) {
 		free (info);
+                jack_info ("Initializing slave failed\n");
 		return -1;
 	}
 
@@ -1069,6 +1072,7 @@ jack_engine_load_slave_driver (jack_engine_t *engine,
 	free (info);
 
 	if (jack_add_slave_driver (engine, driver) < 0) {
+                jack_info ("Adding slave failed\n");
 		jack_client_delete (engine, client);
 		return -1;
 	}
@@ -2127,8 +2131,9 @@ jack_drivers_start (jack_engine_t *engine)
 	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
 	{
 		jack_driver_t *sdriver = node->data;
-		if (sdriver->start( sdriver ))
+		if (sdriver->start (sdriver)) {
 			failed_drivers = jack_slist_append(failed_drivers, sdriver);
+                }
 	}
 
 	// Clean up drivers which failed to start.
@@ -4248,7 +4253,8 @@ jack_add_slave_driver (jack_engine_t *engine, jack_driver_t *driver)
 {
 	if (driver) {
 		if (driver->attach (driver, engine)) {
-			return -1;
+                        jack_info ("could not attach slave %s\n", driver->internal_client->control->name);
+                        return -1;
 		}
 
 		engine->slave_drivers = jack_slist_append (engine->slave_drivers, driver);
