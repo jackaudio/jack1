@@ -716,7 +716,7 @@ main (int argc, char *argv[])
 			break;
 
 		case 'd':
-			seen_driver = 1;
+			seen_driver = optind + 1;
 			driver_name = optarg;
 			break;
 
@@ -830,7 +830,26 @@ main (int argc, char *argv[])
 		exit (1);
 	}
 
+        /* DIRTY HACK needed to pick up -X supplied as part of ALSA driver args. This is legacy
+           hack to make control apps like qjackctl based on the < 0.124 command line interface
+           continue to work correctly.
+
+           If -X seq was given as part of the driver args, load the ALSA MIDI slave driver.
+        */
+        
+        for (i = seen_driver; i < argc; ++i) {
+                if (strcmp (argv[i], "-X") == 0) {
+                        if (argc >= i + 2) {
+                                if (strcmp (argv[i+1], "seq") == 0) {
+                                        slave_drivers = jack_slist_append (slave_drivers,"alsa_midi");
+                                }
+                        }
+                        break;
+                }
+        }
+
 	drivers = jack_drivers_load ();
+
 	if (!drivers) {
 		fprintf (stderr, "jackd: no drivers found; exiting\n");
 		exit (1);
