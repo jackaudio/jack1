@@ -79,6 +79,8 @@ struct _jack_client {
     void *latency_cb_arg;
     JackPropertyChangeCallback property_cb;	
     void *property_cb_arg;
+    JackPortRenameCallback port_rename_cb;
+    void *port_rename_cb_arg;
 
     /* external clients: set by libjack
      * internal clients: set by engine */

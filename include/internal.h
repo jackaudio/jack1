@@ -223,7 +223,8 @@ typedef enum  {
   ClientUnregistered,
   SaveSession,
   LatencyCallback,
-  PropertyChange
+  PropertyChange,
+  PortRename
 } JackEventType;
 
 const char* jack_event_type_name (JackEventType);
@@ -244,6 +245,7 @@ typedef struct {
         uint32_t key_size; /* key data will follow the event structure */
     } y;
     union {        
+            char other_name[JACK_PORT_NAME_SIZE];
             jack_property_change_t property_change;
     } z;
 } POST_PACKED_STRUCTURE jack_event_t;
@@ -309,6 +311,7 @@ typedef volatile struct {
     volatile uint8_t	session_cbset;
     volatile uint8_t	latency_cbset;
     volatile uint8_t	property_cbset;
+    volatile uint8_t	port_rename_cbset;
 
 } POST_PACKED_STRUCTURE jack_client_control_t;
 

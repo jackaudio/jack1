@@ -1853,6 +1853,10 @@ jack_client_process_events (jack_client_t* client)
                         if (key) {
                                 free (key);
                         }
+                case PortRename:
+                        if (control->port_rename_cbset) {
+                                client->port_rename_cb (event.y.other_id, event.x.name, event.z.other_name, client->port_rename_cb_arg);
+                        }
                         break;
 		}
 		

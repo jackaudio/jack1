@@ -809,7 +809,7 @@ jack_port_set_name (jack_port_t *port, const char *new_name)
 	len = sizeof (port->shared->name) -
 		((int) (colon - port->shared->name)) - 2;
 	snprintf (colon+1, len, "%s", new_name);
-	
+        
 	return 0;
 }
 
