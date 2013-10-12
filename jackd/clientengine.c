@@ -227,26 +227,37 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 
 	jack_client_delete (engine, client);
 
-	/* ignore the driver, which counts as a client. */
 
-	if (engine->temporary && (jack_slist_length(engine->clients) <= 1)) {
-		if (engine->wait_pid >= 0) {
-                        /* block new clients from being created
-                           after we release the lock.
-                        */
-                        engine->new_clients_allowed = 0;
-			/* tell the waiter we're done
-			   to initiate a normal shutdown.
-			*/
-			VERBOSE (engine, "Kill wait pid to stop");
-			kill (engine->wait_pid, SIGUSR2);
-                        /* unlock the graph so that the server thread can finish */
-                        jack_unlock_graph (engine);                        
-			sleep (-1);
-		} else {
-			exit (0);
-		}
+	if (engine->temporary) {
+                int external_clients = 0;
 
+                /* count external clients only when deciding whether to shutdown */
+
+                for (node = engine->clients; node; node = jack_slist_next (node)) {
+                        jack_client_t* client = (jack_client_t*) node->data;
+                        if (client->control->type == ClientExternal) {
+                                external_clients++;
+                        }
+                }
+                
+                if (external_clients == 0) {
+                        if (engine->wait_pid >= 0) {
+                                /* block new clients from being created
+                                   after we release the lock.
+                                */
+                                engine->new_clients_allowed = 0;
+                                /* tell the waiter we're done
+                                   to initiate a normal shutdown.
+                                */
+                                VERBOSE (engine, "Kill wait pid to stop");
+                                kill (engine->wait_pid, SIGUSR2);
+                                /* unlock the graph so that the server thread can finish */
+                                jack_unlock_graph (engine);                        
+                                sleep (-1);
+                        } else {
+                                exit (0);
+                        }
+                }
 	}
 }
 
