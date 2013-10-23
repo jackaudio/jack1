@@ -275,6 +275,7 @@ jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 		client = (jack_client_internal_t *) node->data;
 
 		if (client->error) {
+                        VERBOSE (engine, "client %s already marked with error = %d\n", client->control->name, client->error);
 			errs++;
 			continue;
 		}

@@ -810,9 +810,14 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 
 	if (read (client->subgraph_wait_fd, &c, sizeof(c))
 	    != sizeof (c)) {
-		jack_error ("pp: cannot clean up byte from graph wait "
-			    "fd (%s)", strerror (errno));
-		client->error++;
+                if (errno == EAGAIN) {
+                        jack_error ("pp: cannot clean up byte from graph wait "
+                                    "fd (%s) - no data present");
+                } else {
+                        jack_error ("pp: cannot clean up byte from graph wait "
+                                    "fd (%s)", strerror (errno));
+                        client->error++;
+                }
 		return NULL;	/* will stop the loop */
 	}
 
@@ -1624,10 +1629,10 @@ jack_server_thread (void *arg)
 			}
 
 			if (engine->pfd[i].revents & ~POLLIN) {
-
+                                
 				jack_mark_client_socket_error (engine, engine->pfd[i].fd);
 				jack_engine_signal_problems (engine);
-
+                                VERBOSE (engine, "non-POLLIN events on fd %d", engine->pfd[i].fd);
 			} else if (engine->pfd[i].revents & POLLIN) {
 
 				if (handle_external_client_request (engine, engine->pfd[i].fd)) {
