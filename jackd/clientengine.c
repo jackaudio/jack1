@@ -217,16 +217,20 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 		close (client->request_fd);
 	} 
 
+        VERBOSE (engine, "before: client list contains %d", jack_slist_length (engine->clients));
+
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		if (jack_uuid_compare (((jack_client_internal_t *) node->data)->control->uuid, client->control->uuid) == 0) {
 			engine->clients = jack_slist_remove_link (engine->clients, node);
 			jack_slist_free_1 (node);
+                        VERBOSE (engine, "removed from client list, via matching UUID");
 			break;
 		}
 	}
 
-	jack_client_delete (engine, client);
+        VERBOSE (engine, "after: client list contains %d", jack_slist_length (engine->clients));
 
+	jack_client_delete (engine, client);
 
 	if (engine->temporary) {
                 int external_clients = 0;
@@ -234,7 +238,7 @@ jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
                 /* count external clients only when deciding whether to shutdown */
 
                 for (node = engine->clients; node; node = jack_slist_next (node)) {
-                        jack_client_t* client = (jack_client_t*) node->data;
+                        jack_client_internal_t* client = (jack_client_internal_t*) node->data;
                         if (client->control->type == ClientExternal) {
                                 external_clients++;
                         }

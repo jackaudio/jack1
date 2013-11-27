@@ -2042,7 +2042,7 @@ jack_client_core_wait (jack_client_t* client)
 			*/
 			
 			if (client->upstream_is_jackd) {
-				DEBUG ("WE DIE\n");
+				DEBUG ("WE (%s) DIE\n", client->name);
 				return 0;
 			} else {
 				DEBUG ("WE PUNT\n");
