@@ -85,7 +85,7 @@ jack_intclient_request(RequestType type, jack_client_t *client,
 	if (*status & JackFailure)
 		return -1;
 
-	jack_uuid_copy (uuid, req.x.intclient.uuid);
+	jack_uuid_copy (&uuid, req.x.intclient.uuid);
         return 0;
 }
 
@@ -99,7 +99,7 @@ jack_get_internal_client_name (jack_client_t *client,
 	memset (&req, 0, sizeof (req));
 	req.type = IntClientName;
 	req.x.intclient.options = JackNullOption;
-	jack_uuid_copy (req.x.intclient.uuid, intclient);
+	jack_uuid_copy (&req.x.intclient.uuid, intclient);
 
 	jack_client_deliver_request (client, &req);
 
@@ -137,7 +137,7 @@ jack_internal_client_handle (jack_client_t *client,
 	*status = jack_client_deliver_request (client, &req);
 
         if (!jack_uuid_empty (req.x.intclient.uuid)) {
-                jack_uuid_copy (handle, req.x.intclient.uuid);
+                jack_uuid_copy (&handle, req.x.intclient.uuid);
                 return 0;
         }
 
@@ -179,7 +179,7 @@ jack_internal_client_load (jack_client_t *client,
                            jack_intclient_t handle, ...)
 {
     va_list ap;
-    va_start(ap, status);
+    va_start(ap, handle);
     int res = jack_internal_client_load_aux(client, client_name, options, status, handle, ap);
     va_end(ap);
     return res;
@@ -197,7 +197,7 @@ jack_internal_client_unload (jack_client_t *client,
 		memset (&req, 0, sizeof (req));
 		req.type = IntClientUnload;
 		req.x.intclient.options = JackNullOption;
-		jack_uuid_copy (req.x.intclient.uuid, intclient);
+		jack_uuid_copy (&req.x.intclient.uuid, intclient);
 		jack_client_deliver_request (client, &req);
 		status = req.status;
 

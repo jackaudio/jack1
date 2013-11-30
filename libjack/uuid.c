@@ -17,55 +17,90 @@
 
 */
 
+#include <stdio.h>
+#include <stdint.h>
+
 #include <jack/types.h>
 #include <jack/uuid.h>
 
 #include "internal.h"
 
-void
-jack_uuid_generate (jack_uuid_t uuid)
+static pthread_mutex_t uuid_lock = PTHREAD_MUTEX_INITIALIZER;
+static uint32_t        uuid_cnt = 0;
+
+enum JackUUIDType {
+        JackUUIDPort = 0x1,
+        JackUUIDClient = 0x2
+};
+
+jack_uuid_t
+jack_client_uuid_generate ()
 {
-        uuid_generate (uuid);
+        jack_uuid_t uuid = JackUUIDClient;
+        pthread_mutex_lock (&uuid_lock);
+        uuid = (uuid << 32) | ++uuid_cnt;
+        pthread_mutex_unlock (&uuid_lock);
+        return uuid;
+}
+
+jack_uuid_t
+jack_port_uuid_generate (uint32_t port_id)
+{
+        jack_uuid_t uuid = JackUUIDPort;
+        uuid = (uuid << 32) | (port_id + 1);
+        return uuid;
+}
+
+uint32_t
+jack_uuid_to_index (jack_uuid_t u)
+{
+        return (u & 0xffff) - 1;
 }
 
 int
-jack_uuid_empty (const jack_uuid_t u)
+jack_uuid_empty (jack_uuid_t u)
 {
-        jack_uuid_t empty;
-        VALGRIND_MEMSET(&empty, 0, sizeof(empty));
-        uuid_clear (empty);
-        if (jack_uuid_compare (u, empty) == 0) {
-                return 1;
+        return (u == 0);
+}
+
+int
+jack_uuid_compare (jack_uuid_t a, jack_uuid_t b)
+{
+        if (a == b) { 
+                return 0;
         }
-        return 0;
+
+        if (a < b) {
+                return -1;
+        } 
+
+        return 1;
+}
+
+void
+jack_uuid_copy (jack_uuid_t* dst, jack_uuid_t src)
+{
+        *dst = src;
+}
+
+void
+jack_uuid_clear (jack_uuid_t* u)
+{
+        *u = 0;
+}
+
+void
+jack_uuid_unparse (jack_uuid_t u, char b[JACK_UUID_STRING_SIZE])
+{
+        snprintf (b, JACK_UUID_STRING_SIZE, "%" PRIu64, u);
 }
 
 int
-jack_uuid_compare (const jack_uuid_t a, const jack_uuid_t b)
+jack_uuid_parse (const char *b, jack_uuid_t* u)
 {
-        return uuid_compare (a, b);
-}
+        if (sscanf (b, "%" PRIu64, u) == 1) {
+                return 0;
+        }
 
-void
-jack_uuid_copy (jack_uuid_t a, const jack_uuid_t b)
-{
-        uuid_copy (a, b);
-}
-
-void
-jack_uuid_clear (jack_uuid_t u)
-{
-        uuid_clear (u);
-}
-
-void
-jack_uuid_unparse (const jack_uuid_t u, char b[JACK_UUID_STRING_SIZE])
-{
-        uuid_unparse (u, b);
-}
-
-int
-jack_uuid_parse (const char *b, jack_uuid_t u)
-{
-        return uuid_parse (b, u);
+        return -1;
 }

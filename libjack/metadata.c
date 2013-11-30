@@ -125,7 +125,7 @@ jack_property_change_notify (jack_client_t* client, jack_uuid_t uuid, const char
 
         req.type = PropertyChangeNotify;
         req.x.property.change = change;
-        jack_uuid_copy (req.x.property.uuid, uuid);
+        jack_uuid_copy (&req.x.property.uuid, uuid);
         req.x.property.keylen = key ? strlen (key) + 1 : 0;
         req.x.property.key = key;
         return jack_client_deliver_request (client, &req);
@@ -138,6 +138,7 @@ make_key_dbt (DBT* dbt, jack_uuid_t subject, const char* key)
         size_t len1, len2;
 
         memset(dbt, 0, sizeof(DBT));
+        memset(ustr, 0, JACK_UUID_STRING_SIZE);
         jack_uuid_unparse (subject, ustr);
         len1 = JACK_UUID_STRING_SIZE;
         len2 = strlen (key) + 1;
@@ -364,7 +365,7 @@ jack_get_properties (jack_uuid_t subject,
 
                 /* store UUID/subject */
 
-                jack_uuid_copy (desc->subject, subject);
+                jack_uuid_copy (&desc->subject, subject);
                 
                 /* copy key (without leading UUID as subject */
 
@@ -414,7 +415,7 @@ jack_get_all_properties (jack_description_t** descriptions)
         size_t dsize = 0;
         size_t n = 0;
         jack_description_t* desc = NULL;
-        jack_uuid_t uuid;
+        jack_uuid_t uuid = JACK_UUID_EMPTY_INITIALIZER;
         jack_description_t* current_desc = NULL;
         jack_property_t* current_prop = NULL;
         size_t len1, len2;
@@ -449,7 +450,7 @@ jack_get_all_properties (jack_description_t** descriptions)
                         continue;
                 }
 
-                if (jack_uuid_parse (key.data, uuid) != 0) {
+                if (jack_uuid_parse (key.data, &uuid) != 0) {
                         continue;
                 }
                 
@@ -477,7 +478,7 @@ jack_get_all_properties (jack_description_t** descriptions)
                         
                         /* set up UUID */
 
-                        jack_uuid_copy (desc[n].subject, uuid);
+                        jack_uuid_copy (&desc[n].subject, uuid);
                         dcnt++;
                 }
 
@@ -657,7 +658,7 @@ int
 jack_remove_all_properties (jack_client_t* client)
 {
         int ret;
-        jack_uuid_t empty_uuid;
+        jack_uuid_t empty_uuid = JACK_UUID_EMPTY_INITIALIZER;
 
         if (jack_property_init (NULL)) {
                 return -1;
@@ -668,7 +669,6 @@ jack_remove_all_properties (jack_client_t* client)
                 return -1;
         }
 
-        jack_uuid_clear (empty_uuid);
         jack_property_change_notify (client, empty_uuid, NULL, PropertyDeleted);
 
         return 0;

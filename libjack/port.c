@@ -272,7 +272,7 @@ jack_port_register (jack_client_t *client,
 		  "%s", port_type);
 	req.x.port_info.flags = flags;
 	req.x.port_info.buffer_size = buffer_size;
-	jack_uuid_copy (req.x.port_info.client_id, client->control->uuid);
+	jack_uuid_copy (&req.x.port_info.client_id, client->control->uuid);
 
 	if (jack_client_deliver_request (client, &req)) {
 		jack_error ("cannot deliver port registration request");
@@ -300,7 +300,7 @@ jack_port_unregister (jack_client_t *client, jack_port_t *port)
 
 	req.type = UnRegisterPort;
 	req.x.port_info.port_id = port->shared->id;
-	jack_uuid_copy (req.x.port_info.client_id, client->control->uuid);
+	jack_uuid_copy (&req.x.port_info.client_id, client->control->uuid);
 
 	return jack_client_deliver_request (client, &req);
 }
@@ -403,7 +403,7 @@ jack_port_get_all_connections (const jack_client_t *client,
 	req.x.port_info.type[0] = '\0';
 	req.x.port_info.flags = 0;
 	req.x.port_info.buffer_size = 0;
-	jack_uuid_clear (req.x.port_info.client_id);
+	jack_uuid_clear (&req.x.port_info.client_id);
 	req.x.port_info.port_id = port->shared->id;
 
 	jack_client_deliver_request (client, &req);
@@ -747,10 +747,10 @@ jack_port_name (const jack_port_t *port)
 	return port->shared->name;
 }
 
-void
-jack_port_uuid (const jack_port_t *port, jack_uuid_t uuid)
+jack_uuid_t
+jack_port_uuid (const jack_port_t *port)
 {
-	return jack_uuid_copy (uuid, port->shared->uuid);
+	return port->shared->uuid;
 }
 
 int

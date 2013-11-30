@@ -24,10 +24,6 @@ List connections to/from each port
 .br
 Display per-port latency in frames at each port
 .TP
-\fB-L\fR, \fI--latency\fR
-.br
-Display total latency in frames at each port
-.TP
 \fB-p\fR, \fB--properties\fR
 .br
 Display port properties. Output may include input|output, can-monitor, physical, terminal

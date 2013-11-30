@@ -1806,7 +1806,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->temporary = temporary;
 	engine->freewheeling = 0;
 	engine->stop_freewheeling = 0;
-	jack_uuid_clear (engine->fwclient);
+	jack_uuid_clear (&engine->fwclient);
 	engine->feedbackcount = 0;
 	engine->wait_pid = wait_pid;
 	engine->nozombies = nozombies;
@@ -2226,7 +2226,7 @@ jack_start_freewheeling (jack_engine_t* engine, jack_uuid_t client_id)
 	client = jack_client_internal_by_id (engine, client_id);
 
 	if (client->control->process_cbset || client->control->thread_cb_cbset) {
-		jack_uuid_copy (engine->fwclient, client_id);
+		jack_uuid_copy (&engine->fwclient, client_id);
 	}
 
 	engine->freewheeling = 1;
@@ -2274,7 +2274,7 @@ jack_stop_freewheeling (jack_engine_t* engine, int engine_exiting)
 	pthread_join (engine->freewheel_thread, &ftstatus);
 	VERBOSE (engine, "freewheel thread has returned");
 
-	jack_uuid_clear (engine->fwclient);
+	jack_uuid_clear (&engine->fwclient);
 	engine->freewheeling = 0;
 	engine->first_wakeup = 1;
 
@@ -2672,7 +2672,7 @@ static void jack_do_get_uuid_by_client_name (jack_engine_t *engine, jack_request
         if (strcmp (req->x.name, "system") == 0) {
                 /* request concerns the driver */
                 if (engine->driver) {
-                        jack_uuid_copy (req->x.client_id, engine->driver->internal_client->control->uuid);
+                        jack_uuid_copy (&req->x.client_id, engine->driver->internal_client->control->uuid);
                         req->status = 0;
                 }
                 return;
@@ -2681,7 +2681,7 @@ static void jack_do_get_uuid_by_client_name (jack_engine_t *engine, jack_request
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 		if (strcmp (client->control->name, req->x.name) == 0) {
-                        jack_uuid_copy (req->x.client_id, client->control->uuid);
+                        jack_uuid_copy (&req->x.client_id, client->control->uuid);
 			req->status = 0;
 			return;
 		}
@@ -2708,7 +2708,7 @@ static void jack_do_reserve_name (jack_engine_t *engine, jack_request_t *req)
 	}
 
 	snprintf (reservation->name, sizeof (reservation->name), "%s", req->x.reservename.name);
-	jack_uuid_copy (reservation->uuid, req->x.reservename.uuid);
+	jack_uuid_copy (&reservation->uuid, req->x.reservename.uuid);
 	engine->reserved_client_names = jack_slist_append (engine->reserved_client_names, reservation);
 
 	req->status = 0;
@@ -2760,7 +2760,7 @@ jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd
 	jack_uuid_t finalizer;
         struct stat sbuf;
 
-        jack_uuid_clear (finalizer);
+        jack_uuid_clear (&finalizer);
 
 	if (engine->session_reply_fd != -1) {
 		// we should have a notion of busy or somthing.
@@ -2855,11 +2855,11 @@ static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req )
 {
 	jack_uuid_t client_id;
 	jack_client_internal_t *client;
-	jack_uuid_t finalizer;
+	jack_uuid_t finalizer = JACK_UUID_EMPTY_INITIALIZER;
 
-        jack_uuid_copy (client_id, req->x.client_id);
+        jack_uuid_copy (&client_id, req->x.client_id);
         client = jack_client_internal_by_id (engine, client_id);
-        jack_uuid_clear (finalizer);
+        jack_uuid_clear (&finalizer);
 
 	req->status = 0;
 
@@ -4445,8 +4445,8 @@ fallback:
 
 next:
 	shared->ptype_id = engine->control->port_types[i].ptype_id;
-	jack_uuid_copy (shared->client_id, req->x.port_info.client_id);
-        jack_uuid_generate (shared->uuid);
+	jack_uuid_copy (&shared->client_id, req->x.port_info.client_id);
+        shared->uuid = jack_port_uuid_generate (port_id);
 	shared->flags = req->x.port_info.flags;
 	shared->latency = 0;
 	shared->capture_latency.min = shared->capture_latency.max = 0;
@@ -4505,7 +4505,7 @@ jack_port_do_unregister (jack_engine_t *engine, jack_request_t *req)
 		return -1;
 	}
 
-        jack_uuid_copy (uuid, shared->uuid);
+        jack_uuid_copy (&uuid, shared->uuid);
 
 	jack_lock_graph (engine);
 	if ((client = jack_client_internal_by_id (engine, shared->client_id))
@@ -4702,7 +4702,7 @@ jack_property_change_notify (jack_engine_t *engine,
 
 	event.type = PropertyChange;
 	event.z.property_change = change;
-	jack_uuid_copy (event.x.uuid, uuid);
+	jack_uuid_copy (&event.x.uuid, uuid);
 
         if (key) {
                 event.y.key_size = strlen (key) + 1;

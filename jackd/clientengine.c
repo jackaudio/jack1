@@ -176,8 +176,9 @@ void
 jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client)
 {
 	JSList *node;
-	jack_uuid_t finalizer;
-        jack_uuid_clear (finalizer);
+	jack_uuid_t finalizer = JACK_UUID_EMPTY_INITIALIZER;
+
+        jack_uuid_clear (&finalizer);
 
 	/* caller must write-hold the client lock */
 
@@ -439,7 +440,7 @@ jack_client_id_by_name (jack_engine_t *engine, const char *name, jack_uuid_t id)
 	JSList *node;
         int ret = -1;
 
-        jack_uuid_clear (id);
+        jack_uuid_clear (&id);
 
 	jack_rdlock_graph (engine);
 
@@ -449,7 +450,7 @@ jack_client_id_by_name (jack_engine_t *engine, const char *name, jack_uuid_t id)
 			    name) == 0) {
 			jack_client_internal_t *client = 
 				(jack_client_internal_t *) node->data;
-			jack_uuid_copy (id, client->control->uuid);
+			jack_uuid_copy (&id, client->control->uuid);
                         ret = 0;
 			break;
 		}
@@ -615,9 +616,9 @@ jack_setup_client_control (jack_engine_t *engine, int fd, ClientType type, const
 	client->control->timed_out = 0;
 
         if (jack_uuid_empty (uuid)) {
-                jack_uuid_generate (client->control->uuid);
+                client->control->uuid = jack_client_uuid_generate ();
         } else {
-                jack_uuid_copy (client->control->uuid, uuid);
+                jack_uuid_copy (&client->control->uuid, uuid);
         }
 
 	strcpy ((char *) client->control->name, name);
@@ -676,7 +677,6 @@ static void
 jack_ensure_uuid_unique (jack_engine_t *engine, jack_uuid_t uuid)
 {
 	JSList *node;
-        jack_uuid_t jj;
 
         if (jack_uuid_empty (uuid)) {
                 return;
@@ -686,7 +686,7 @@ jack_ensure_uuid_unique (jack_engine_t *engine, jack_uuid_t uuid)
 	for (node=engine->clients; node; node=jack_slist_next (node)) {
 		jack_client_internal_t *client = (jack_client_internal_t *) node->data;
 		if (jack_uuid_compare (client->control->uuid, uuid) == 0) {
-			jack_uuid_clear (uuid);
+			jack_uuid_clear (&uuid);
                 }
 	}
 	jack_unlock_graph (engine);
@@ -803,13 +803,13 @@ jack_create_driver_client (jack_engine_t *engine, char *name)
 	jack_client_connect_request_t req;
 	jack_status_t status;
 	jack_client_internal_t *client;
-        jack_uuid_t empty_uuid;
+        jack_uuid_t empty_uuid = JACK_UUID_EMPTY_INITIALIZER;
 
         VALGRIND_MEMSET(&empty_uuid, 0, sizeof(empty_uuid));
 
 	snprintf (req.name, sizeof (req.name), "%s", name);
 
-        jack_uuid_clear (empty_uuid);
+        jack_uuid_clear (&empty_uuid);
 
 	pthread_mutex_lock (&engine->request_lock);
 	client = setup_client (engine, ClientDriver, name, empty_uuid, JackUseExactName,
@@ -898,7 +898,7 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 	if (!req.load) {		/* internal client close? */
 
 		int rc = -1;
-		jack_uuid_t id;
+		jack_uuid_t id = JACK_UUID_EMPTY_INITIALIZER;
 
 		if (jack_client_id_by_name(engine, req.name, id) == 0) {
 			rc = handle_unload_client (engine, id);
@@ -1093,8 +1093,8 @@ jack_mark_client_socket_error (jack_engine_t *engine, int fd)
 void
 jack_client_delete (jack_engine_t *engine, jack_client_internal_t *client)
 {
-        jack_uuid_t uuid;
-        jack_uuid_copy (uuid, client->control->uuid);
+        jack_uuid_t uuid = JACK_UUID_EMPTY_INITIALIZER;
+        jack_uuid_copy (&uuid, client->control->uuid);
 
 	jack_client_registration_notify (engine, (const char*) client->control->name, 0);
 
@@ -1131,7 +1131,7 @@ jack_intclient_handle_request (jack_engine_t *engine, jack_request_t *req)
 
 	req->status = 0;
 	if ((client = jack_client_by_name (engine, req->x.intclient.name))) {
-		jack_uuid_copy (req->x.intclient.uuid, client->control->uuid);
+		jack_uuid_copy (&req->x.intclient.uuid, client->control->uuid);
 	} else {
 		req->status |= (JackNoSuchClient|JackFailure);
 	}
@@ -1143,15 +1143,14 @@ jack_intclient_load_request (jack_engine_t *engine, jack_request_t *req)
 	/* called with the request_lock */
 	jack_client_internal_t *client;
 	jack_status_t status = 0;
-        jack_uuid_t empty_uuid;
+        jack_uuid_t empty_uuid = JACK_UUID_EMPTY_INITIALIZER;
 
 	VERBOSE (engine, "load internal client %s from %s, init `%s', "
 		 "options: 0x%x", req->x.intclient.name,
 		 req->x.intclient.path, req->x.intclient.init,
 		 req->x.intclient.options);
 
-        VALGRIND_MEMSET (&empty_uuid, 0, sizeof (empty_uuid));
-        jack_uuid_clear (empty_uuid);
+        jack_uuid_clear (&empty_uuid);
 
 	client = setup_client (engine, ClientInternal, req->x.intclient.name, empty_uuid,
 			       req->x.intclient.options|JackUseExactName, &status, -1,
@@ -1159,10 +1158,10 @@ jack_intclient_load_request (jack_engine_t *engine, jack_request_t *req)
 
 	if (client == NULL) {
 		status |= JackFailure;	/* just making sure */
-		jack_uuid_clear (req->x.intclient.uuid);
+		jack_uuid_clear (&req->x.intclient.uuid);
 		VERBOSE (engine, "load failed, status = 0x%x", status);
 	} else {
-		jack_uuid_copy (req->x.intclient.uuid, client->control->uuid);
+		jack_uuid_copy (&req->x.intclient.uuid, client->control->uuid);
 	}
 
 	req->status = status;

@@ -538,7 +538,7 @@ jack_client_handle_session_callback (jack_client_t *client, jack_event_t *event)
 		return -1;
 	}
 
-        uuid_unparse (client->control->uuid, uuidstr);
+        jack_uuid_unparse (client->control->uuid, uuidstr);
 
 	s_event = malloc( sizeof(jack_session_event_t) );
 	s_event->type = event->y.n;
@@ -820,7 +820,7 @@ server_event_connect (jack_client_t *client, const char *server_name)
 		return -1;
 	}
 
-	jack_uuid_copy (req.client_id, client->control->uuid);
+	jack_uuid_copy (&req.client_id, client->control->uuid);
 
 	if (write (fd, &req, sizeof (req)) != sizeof (req)) {
 		jack_error ("cannot write event connect request to server (%s)",
@@ -1048,12 +1048,12 @@ jack_request_client (ClientType type,
 	/* format connection request */
 
 	if (va->sess_uuid && strlen (va->sess_uuid)) {
-		if (jack_uuid_parse (va->sess_uuid, req.uuid) != 0) {
+		if (jack_uuid_parse (va->sess_uuid, &req.uuid) != 0) {
                         jack_error ("Given UUID [%s] is not parseable", va->sess_uuid);
                         goto fail;
                 }
         } else {
-		jack_uuid_clear (req.uuid);
+		jack_uuid_clear (&req.uuid);
         }
 	req.protocol_v = jack_protocol_version;
 	req.load = TRUE;
@@ -1490,7 +1490,7 @@ jack_set_freewheel (jack_client_t* client, int onoff)
         VALGRIND_MEMSET (&request, 0, sizeof (request));
 
 	request.type = onoff ? FreeWheel : StopFreeWheel;
-	jack_uuid_copy (request.x.client_id, client->control->uuid);
+	jack_uuid_copy (&request.x.client_id, client->control->uuid);
 	return jack_client_deliver_request (client, &request);
 }
 
@@ -1516,7 +1516,7 @@ jack_session_reply (jack_client_t *client, jack_session_event_t *event )
                 VALGRIND_MEMSET (&request, 0, sizeof (request));
 
 		request.type = SessionReply;
-		jack_uuid_copy (request.x.client_id, client->control->uuid);
+		jack_uuid_copy (&request.x.client_id, client->control->uuid);
 
 		retval = jack_client_deliver_request(client, &request);
 	}
@@ -1626,7 +1626,7 @@ jack_session_notify (jack_client_t* client, const char *target, jack_session_eve
 					" server (%s)", request.type, strerror (errno));
 			goto out;
 		}
-                uuid_unparse (uid, (char *)retval[num_replies-1].uuid);
+                jack_uuid_unparse (uid, (char *)retval[num_replies-1].uuid);
 	}
 	free((char *)retval[num_replies-1].uuid);
 	retval[num_replies-1].uuid = NULL;
@@ -2386,7 +2386,7 @@ jack_activate (jack_client_t *client)
   startit:
 
 	req.type = ActivateClient;
-	jack_uuid_copy (req.x.client_id, client->control->uuid);
+	jack_uuid_copy (&req.x.client_id, client->control->uuid);
 
 	return jack_client_deliver_request (client, &req);
 }
@@ -2402,7 +2402,7 @@ jack_deactivate_aux (jack_client_t *client)
 		if (client->control->active) { /* still active? */
                         VALGRIND_MEMSET (&req, 0, sizeof (req));
 			req.type = DeactivateClient;
-			jack_uuid_copy (req.x.client_id, client->control->uuid);
+			jack_uuid_copy (&req.x.client_id, client->control->uuid);
 			rc = jack_client_deliver_request (client, &req);
 		}
 	}
@@ -2824,7 +2824,7 @@ jack_get_client_name_by_uuid (jack_client_t *client, const char *uuid_str)
         
         VALGRIND_MEMSET (&request, 0, sizeof (request));
 
-        if (uuid_parse (uuid_str, request.x.client_id) != 0) {
+        if (jack_uuid_parse (uuid_str, &request.x.client_id) != 0) {
                 return NULL;
         }
 
@@ -2853,7 +2853,7 @@ jack_get_uuid_for_client_name (jack_client_t *client, const char *client_name)
         }
 
         char buf[37];
-        uuid_unparse (request.x.client_id, buf);
+        jack_uuid_unparse (request.x.client_id, buf);
         return strdup (buf);
 }
 
@@ -2861,7 +2861,7 @@ char *
 jack_client_get_uuid (jack_client_t *client)
 { 
 	char retval[37];
-        uuid_unparse (client->control->uuid, retval);
+        jack_uuid_unparse (client->control->uuid, retval);
 	return strdup (retval);
 }
 
@@ -2873,10 +2873,9 @@ jack_reserve_client_name (jack_client_t *client, const char *name, const char *u
         VALGRIND_MEMSET (&request, 0, sizeof (request));
 
 	request.type = ReserveName;
-	snprintf( request.x.reservename.name, sizeof( request.x.reservename.name ),
-			"%s", name );
-        if (uuid_parse (uuid_str, request.x.reservename.uuid) != 0) {
-                return NULL;
+	snprintf( request.x.reservename.name, sizeof( request.x.reservename.name ), "%s", name );
+        if (jack_uuid_parse (uuid_str, &request.x.reservename.uuid) != 0) {
+                return -1;
         }
 
 	return jack_client_deliver_request (client, &request);
