@@ -69,7 +69,8 @@ jack_port_type_info_t jack_builtin_port_types[] = {
 	  .buffer_scale_factor = 1,
 	},
 	{ .type_name = JACK_DEFAULT_MIDI_TYPE, 
-	  .buffer_scale_factor = 8,
+	  .buffer_scale_factor = -1,
+          .buffer_size = 8192
 	},
 	{ .type_name = "", }
 };
