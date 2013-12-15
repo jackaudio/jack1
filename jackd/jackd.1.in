@@ -80,9 +80,9 @@ When invoking JACK from the shell, remember to quote the argument to
 \fB\-M, \-\-midi\-bufsize\fR [ \fIevent-count\fR ]
 Specify the size of the buffer used for MIDI ports. Units are "MIDI
 events per process() cycle", where an event occupies up to 4 bytes (as most common MIDI events
-do). The default buffer size is 8192 bytes, which is about 2000 MIDI events.
+do). The default buffer size is 2048 bytes, which is about 500 MIDI events.
 Typical values for \fIevent-count\fR will range from 10 to about
-2000. Be aware that using very high values along with a large number of
+1000. Be aware that using very high values along with a large number of
 ports may  cause JACK to fail to start because of the amount of memory 
 that would be required.
 .TP
