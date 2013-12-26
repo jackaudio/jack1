@@ -689,24 +689,39 @@ fi
 # if we have Fons Adriensen's zita libs installed, we can build the zita-based
 # internal clients for using additional (ALSA) devices with JACK
 
+HAVE_ZITA_BRIDGE_DEPS=false
 HAVE_ZITA_RESAMPLE=false
 HAVE_ZITA_ALSA_PCMI=false
-AC_CHECK_LIB(zita-resampler, _Z28zita_resampler_major_versionv,
-                             [
-                                HAVE_ZITA_RESAMPLE=true
-                                AC_MSG_RESULT(yes)
-                             ])
-AC_CHECK_LIB(zita-alsa-pcmi, _Z28zita_alsa_pcmi_major_versionv,
-                             [
-                                HAVE_ZITA_ALSA_PCMI=true
-                                AC_MSG_RESULT(yes)
-                             ])
 
-HAVE_ZITA_BRIDGE_DEPS=false
-if test x$HAVE_ZITA_RESAMPLE = xtrue -a x$HAVE_ZITA_ALSA_PCMI = xtrue ; then
-   AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
-   HAVE_ZITA_BRIDGE_DEPS=true
-fi
+case $build_os in
+     linux*)
+     AC_ARG_ENABLE(zalsa,
+           AC_HELP_STRING([--enable-zalsa],[Build clients based on Fons Adriensen\'s Zita libraries for access to multiple devices]),
+           [
+           if test x$enable_zalsa != xno ; then
+               HAVE_ZITA_RESAMPLE=false
+               HAVE_ZITA_ALSA_PCMI=false
+               AC_CHECK_LIB(zita-resampler, _Z28zita_resampler_major_versionv,
+                             [
+                                 HAVE_ZITA_RESAMPLE=true
+                                 AC_MSG_RESULT(yes)
+                                 ])
+               AC_CHECK_LIB(zita-alsa-pcmi, _Z28zita_alsa_pcmi_major_versionv,
+                   [
+                       HAVE_ZITA_ALSA_PCMI=true
+                       AC_MSG_RESULT(yes)
+                       ])
+
+               HAVE_ZITA_BRIDGE_DEPS=false
+               if test x$HAVE_ZITA_RESAMPLE = xtrue -a x$HAVE_ZITA_ALSA_PCMI = xtrue ; then
+                   AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
+                   HAVE_ZITA_BRIDGE_DEPS=true
+               fi
+           fi
+           ]
+     )
+     ;;
+esac
 
 # Celt low-latency audio codec. netjack transmission via internet.
 HAVE_CELT=false
