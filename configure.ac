@@ -8,6 +8,11 @@ dnl
 dnl Check for existing JACK installs
 dnl 
 
+AC_ARG_ENABLE(force-install,
+	AC_HELP_STRING([--enable-force-install],
+    [force installation when another Jack is found]),
+	[FORCE_INSTALL=$enableval])
+
 AC_MSG_CHECKING([existing, conflicting JACK installs])
 not_overwriting=0
 installs=
@@ -22,7 +27,7 @@ for dir in /usr/lib /usr/local/lib /opt/lib ; do
     fi
 done
 
-if test $not_overwriting -gt 0 ; then
+if test "x$FORCE_INSTALL" != "xyes" -a $not_overwriting -gt 0 ; then
     echo 
     echo
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -37,15 +42,17 @@ if test $not_overwriting -gt 0 ; then
     echo "Before building, you should first remove the existing JACK"
     echo "installation(s). "
     echo
-    echo "Alternatively use ./configure --prefix=... to force overwriting"
-    echo "the existing install."
+    echo "Alternatively use ./configure --enable-force-install to force"
+    echo "overwriting the existing install."
     echo
     echo "WARNING: ON ANY DEBIAN-DERIVED DISTRIBUTION (Debian, Ubuntu etc)"
     echo "CHANGING THE INSTALLATION PREFIX WILL NOT PRODUCE A WORKING JACK"
     echo "INSTALL. Please contact the distribution packager for JACK and"
     echo "ask them to fix their packaging."
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    exit 1
+    if test "x$FORCE_INSTALL" != "xyes"; then
+        exit 1
+    fi
 fi
 
 AC_CONFIG_AUX_DIR(config)
