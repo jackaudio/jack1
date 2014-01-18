@@ -1,9 +1,9 @@
 [submodule "jack"]
 	path = jack
-	url = git://github.com/jackaudio/headers.git
+	url = git@github.com:drobilla/headers.git
 [submodule "tools"]
 	path = tools
-	url = git://github.com/jackaudio/tools.git
+	url = git@github.com:drobilla/tools.git
 [submodule "example-clients"]
 	path = example-clients
 	url = git://github.com/jackaudio/example-clients.git
