@@ -729,6 +729,7 @@ case $build_os in
      )
      ;;
 esac
+AM_CONDITIONAL(HAVE_ZITA_ALSA_PCMI, $HAVE_ZITA_ALSA_PCMI)
 
 # Celt low-latency audio codec. netjack transmission via internet.
 HAVE_CELT=false
