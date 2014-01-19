@@ -99,6 +99,7 @@ little clearer:
     - @ref SessionClientFunctions
     - @ref WeakLinkage
     - @ref ControlAPI
+    - @ref Metadata
 
 The full API is described in:
 
@@ -123,6 +124,9 @@ The full API is described in:
   session API
   - @ref control.h "<jack/control.h>" the API for starting and
 controlling a JACK server
+  - @ref metadata.h "<jack/metadata.h>" the API for managing metadata
+about objects within JACK (clients and ports)
+
 
 In addition, the tools directory provides numerous examples
 of simple JACK clients that nevertheless use the API to do something
