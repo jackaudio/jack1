@@ -712,7 +712,6 @@ case $build_os in
                        AC_MSG_RESULT(yes)
                        ])
 
-               HAVE_ZITA_BRIDGE_DEPS=false
                if test x$HAVE_ZITA_RESAMPLE = xtrue -a x$HAVE_ZITA_ALSA_PCMI = xtrue ; then
                    AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
                    HAVE_ZITA_BRIDGE_DEPS=true
