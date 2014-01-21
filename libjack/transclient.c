@@ -281,8 +281,8 @@ jack_time_to_frames(const jack_client_t *client, jack_time_t usecs)
 		*/
 	        int64_t du = usecs - time.current_wakeup;
                 int64_t dp = time.next_wakeup - time.current_wakeup;
-		return time.frames + (int32_t) rint ((double) du / (double) dp
-						     * ectl->buffer_size);
+		return time.frames + (int32_t) floor (((double) du / (double) dp
+                                                       * ectl->buffer_size) + 0.5);
 	}
 	return 0;
 }
@@ -320,8 +320,8 @@ jack_frames_to_time(const jack_client_t *client, jack_nframes_t frames)
 	        */
 	        int32_t df = frames - time.frames;
                 int64_t dp = time.next_wakeup - time.current_wakeup;
-	        return time.current_wakeup + (int64_t) rint ((double) df * (double) dp
-							     / ectl->buffer_size);
+	        return time.current_wakeup + (int64_t) floor (((double) df * (double) dp
+                                                               / ectl->buffer_size) + 0.5);
 	} 
 	return 0;
 }
