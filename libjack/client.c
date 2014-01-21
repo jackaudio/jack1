@@ -861,9 +861,14 @@ _start_server (const char *server_name)
 	int i = 0;
 	int good = 0;
 	int ret;
+        char *startup_file;
 
-	snprintf(filename, 255, "%s/.jackdrc", getenv("HOME"));
-	fp = fopen(filename, "r");
+        if ((startup_file = getenv ("JACK_RC_FILE")) == NULL) {
+                snprintf(filename, 255, "%s/.jackdrc", getenv("HOME"));
+                startup_file = filename;
+        }
+
+	fp = fopen(startup_file, "r");
 
 	if (!fp) {
 		fp = fopen("/etc/jackdrc", "r");
