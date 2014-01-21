@@ -105,13 +105,14 @@ jack_load_internal_clients (JSList* load_list)
                 char* client_name;
                 char* path;
                 char* args = NULL;
-                char* rest;
+                char* rest = NULL;
 
                 /* parse each argument/load_list member for the form foo,arg-list
                    and split it apart if the slash is there.
                  */
 
                 if (slash == NULL) {
+                        /* path (also client name) */
                         client_name = str;
                         path = client_name;
                 } else {
@@ -129,6 +130,8 @@ jack_load_internal_clients (JSList* load_list)
                         sslash = strchr (slash+1, '/');
 
                         if (sslash) {
+
+                                /* client-name/path/args */
                                 
                                 len = sslash - (slash+1);
 
@@ -144,21 +147,24 @@ jack_load_internal_clients (JSList* load_list)
                                 rest = sslash + 1;
 
                         } else {
-
-                                path = client_name;
-                                rest = slash + 1;
+                                /* client-name/path */
+                                path = slash + 1;
                         }
 
                         /* we want to skip the text before the slash (len)
                          * plus the slash itself
                          */
-                        len = strlen (rest);
 
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                args = (char*) malloc (len + 1);
-                                memcpy (args, rest, len);
-                                args[len] = '\0';
+                        if (rest) {
+
+                                len = strlen (rest);
+                                
+                                if (len) {
+                                        /* add 1 to leave space for a NULL */
+                                        args = (char*) malloc (len + 1);
+                                        memcpy (args, rest, len);
+                                        args[len] = '\0';
+                                }
                         }
                 }
 
@@ -641,11 +647,18 @@ main (int argc, char *argv[])
 	int do_sanity_checks = 1;
 	int show_version = 0;
 
-	const char *options = "-d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
+#ifdef HAVE_ZITA_BRIDGE_DEPS
+	const char *options = "A:d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
+#else
+	const char *options = "A:d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
+#endif
 	struct option long_options[] = 
 	{ 
 		/* keep ordered by single-letter option code */
 
+#ifdef HAVE_ZITA_BRIDGE_DEPS
+                { "alsa-add", 1, 0, 'A' },
+#endif
 		{ "clock-source", 1, 0, 'c' },
 		{ "driver", 1, 0, 'd' },
 		{ "help", 0, 0, 'h' },
@@ -684,7 +697,12 @@ main (int argc, char *argv[])
 	int driver_nargs = 1;
 	int i;
 	int rc;
-
+#ifdef HAVE_ZITA_BRIDGE_DEPS
+        const char* alsa_add_client_name_playback = "zalsa_out";
+        const char* alsa_add_client_name_capture = "zalsa_in";
+        char alsa_add_args[64];
+        char* dirstr;
+#endif
 	setvbuf (stdout, NULL, _IOLBF, 0);
 
 	maybe_use_capabilities ();
@@ -694,6 +712,40 @@ main (int argc, char *argv[])
 	       (opt = getopt_long (argc, argv, options,
 				   long_options, &option_index)) != EOF) {
 		switch (opt) {
+
+#ifdef HAVE_ZITA_BRIDGE_DEPS
+                case 'A':
+                        /* add a new internal client named after the ALSA device name
+                           given as optarg, using the last character 'p' or 'c' to
+                           indicate playback or capture. If there isn't one,
+                           assume capture (common case: USB mics etc.)
+                        */
+                        if ((dirstr = strstr (optarg, "%p")) != NULL && dirstr == (optarg + strlen(optarg) - 2)) {
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_play/%s/-dhw:%.*s", 
+                                          (int) strlen (optarg) - 2, optarg,
+                                          alsa_add_client_name_playback,
+                                          (int) strlen (optarg) - 2, optarg);
+                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
+                        } else if ((dirstr = strstr (optarg, "%c")) != NULL && dirstr == (optarg + strlen(optarg) - 2)) {
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_rec/%s/-dhw:%.*s", 
+                                          (int) strlen (optarg) - 2, optarg,
+                                          alsa_add_client_name_capture,
+                                          (int) strlen (optarg) - 2, optarg);
+                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
+                        } else {
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_play/%s/-dhw:%s", 
+                                          optarg,
+                                          alsa_add_client_name_playback,
+                                          optarg);
+                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_rec/%s/-dhw:%s", 
+                                          optarg,
+                                          alsa_add_client_name_capture,
+                                          optarg);
+                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
+                        }
+                        break;
+#endif
 
 		case 'c':
 			if (tolower (optarg[0]) == 'h') {
