@@ -132,6 +132,14 @@ Exit once all clients have closed their connections.
 .br
 Set client timeout limit in milliseconds.  The default is 500 msec.
 .TP
+\fB\-X, \-\-slave-driver\fR \fIdriver-name\fR
+.br
+Asks the server to load the "slave" driver given by
+\fIdriver-name\fR. Slave drivers can provide builtin-access to other
+devices and protocols; the primary slave-driver at this time is the
+"alsa_midi" one which provides bridging on Linux between native ALSA
+MIDI and JACK MIDI.
+.TP
 \fB\-Z, \-\-nozombies\fR
 .br
 Prevent JACK from ever kicking out clients because they were too slow.
@@ -257,15 +265,14 @@ unsuccessful.  Default is to prefer 32\-bit samples.
 Ignore xruns reported by the ALSA driver.  This makes JACK less likely
 to disconnect unresponsive ports when running without \fB\-\-realtime\fR.
 .TP
-\fB\-X, \-\-midi \fR[\fIseq\fR|\fIraw\fR]
+\fB\-X, \-\-midi seq
 .br
-Specify which ALSA MIDI system to provide access to. Using \fBraw\fR
-will provide a set of JACK MIDI ports that correspond to each raw ALSA
-device on the machine. Using \fBseq\fR will provide a set of JACK MIDI
-ports that correspond to each ALSA "sequencer" client (which includes
-each hardware MIDI port on the machine). \fBraw\fR provides slightly
-better performance but does not permit JACK MIDI communication with
-software written to use the ALSA "sequencer" API.
+Provide bridging between ALSA MIDI and JACK MIDI (using the ALSA
+sequencer system). All ALSA MIDI clients and MIDI hardware that exist
+when jackd starts will be represented by JACK MIDI ports. 
+.br
+The "seq" argument has been retained from older versions of JACK, in
+part to provide for the possibility of alternate implementations.
 .SS COREAUDIO BACKEND PARAMETERS
 .TP
 \fB\-c \-\-channel\fR
