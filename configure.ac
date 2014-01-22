@@ -683,32 +683,34 @@ fi
 HAVE_ZITA_BRIDGE_DEPS=false
 HAVE_ZITA_RESAMPLE=false
 HAVE_ZITA_ALSA_PCMI=false
-
+        
 case $build_os in
      linux*)
-     AC_ARG_ENABLE(zalsa,
-           AC_HELP_STRING([--enable-zalsa],[Build clients based on Fons Adriensen\'s Zita libraries for access to multiple devices]),
-           [
-           if test x$enable_zalsa != xno ; then
-               HAVE_ZITA_RESAMPLE=false
-               HAVE_ZITA_ALSA_PCMI=false
-               AC_CHECK_LIB(zita-resampler, _Z28zita_resampler_major_versionv,
-                             [
-                                 HAVE_ZITA_RESAMPLE=true
-                                 AC_MSG_RESULT(yes)
-                                 ])
-               AC_CHECK_LIB(zita-alsa-pcmi, _Z28zita_alsa_pcmi_major_versionv,
-                   [
-                       HAVE_ZITA_ALSA_PCMI=true
-                       AC_MSG_RESULT(yes)
-                       ])
+      AC_CHECK_LIB(zita-resampler, _Z28zita_resampler_major_versionv,
+            [
+               HAVE_ZITA_RESAMPLE=true
+               AC_MSG_RESULT(yes)
+            ])
+      AC_CHECK_LIB(zita-alsa-pcmi, _Z28zita_alsa_pcmi_major_versionv,
+            [
+               HAVE_ZITA_ALSA_PCMI=true
+               AC_MSG_RESULT(yes)
+            ])
 
+     AC_ARG_ENABLE(zalsa,
+           AC_HELP_STRING([--enable-zalsa],[Build clients using Fons Adriensen\'s Zita libraries for access to multiple devices (default=yes if required libraries are present)]),
+           [
+               if test x$enable_zalsa != xno -a x$HAVE_ZITA_RESAMPLE = xtrue -a x$HAVE_ZITA_ALSA_PCMI = xtrue ; then
+                   AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
+                   HAVE_ZITA_BRIDGE_DEPS=true
+               fi
+           ],
+           [
                if test x$HAVE_ZITA_RESAMPLE = xtrue -a x$HAVE_ZITA_ALSA_PCMI = xtrue ; then
                    AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
                    HAVE_ZITA_BRIDGE_DEPS=true
                fi
-           fi
-           ]
+           ]        
      )
      ;;
 esac
