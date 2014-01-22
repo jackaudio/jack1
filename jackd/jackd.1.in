@@ -30,7 +30,6 @@ Select the audio interface backend.  The current list of supported
 backends is: \fBalsa\fR, \fBcoreaudio\fR, \fBdummy\fR, \fBfreebob\fR,
 \fBoss\fR \fBsun\fR and \fBportaudio\fR.  They are not all available
 on all platforms.  All \fIbackend\-parameters\fR are optional.
-
 .TP
 \fB\-h, \-\-help\fR
 .br
@@ -42,6 +41,41 @@ show how to list them.
 \fB\-m, \-\-no\-mlock\fR
 Do not attempt to lock memory, even if \fB\-\-realtime\fR.
 .TP
+\fB\-A \fIdevice\fR, \fB\-A \fIdevice%p\fR, \fB\-A \fIdevice%c\fR
+.br
+(Linux-only) A simplified way to add additional audio I/O hardware to an instance
+of JACK. This argument is actually just a wrapper around the -I
+(internal client) version, requiring only the name of the ALSA "card"
+to be used. The name should \fBNOT\fR include any ALSA device access
+prefix (e.g. "hw:" or "plughw:") but can include a
+subdevice. If %p is added to the device name, it will be made
+available for playback only. If %c is added to the device name, it
+will be made available for capture (recording) only. If neither %p nor
+%c is added, it will be made available (if possible) for both capture
+and playback. Although device names may be visible in various places
+on your system, the file /proc/asound/cards shows them inside square
+braces. 
+.br
+Examples:
+.br
+-A SB   (adds playback and capture for the "SB" device)
+.br
+-A Codec,1%c  (adds capture (recording) for the 2nd subdevice of the "Codec" device)
+.br
+-A MT1a2%p   (adds playback the 1st subdevice of the "MT1a2" device)
+.br
+The use of -A CARD is actually equivalent to -I foo:zalsa_in/-dhw:CARD
+\fIand\fR -I CARD:zalsa_out/-dhw:CARD. 
+.br
+The use of -A CARD%p is actually equivalent to  -I CARD:zalsa_out/-dhw:CARD. 
+.br
+The use of -A CARD%c is actually equivalent to -I CARD:zalsa_in/-dhw:CARD
+.br
+.br
+Note that this option (like -I) can be used regardless of the backend
+used, so even if you do not use the ALSA backend, you can still add
+ALSA-supported devices to an instance of JACK.
+.TP
 \fB\-I, \-\-internal-client \fIclient-spec\fR
 .br
 Load \fIclient-name\fR as an internal client. May be used multiple
@@ -49,9 +83,9 @@ times. The form of \fIclient-spec\fR can be any of the following:
 .br
 client-path
 .br
-client-name/client-path
+client-name:client-path
 .br
-client-name/client-path/init-string
+client-name:client-path/init-string
 .br
 client-path/init-string
 .br

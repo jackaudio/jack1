@@ -100,72 +100,112 @@ jack_load_internal_clients (JSList* load_list)
 
                 char* str = (char*) node->data;
                 jack_request_t req;
+                char* colon = strchr (str, ':');
                 char* slash = strchr (str, '/');
-                char* sslash;
-                char* client_name;
-                char* path;
+                char* client_name = NULL;
+                char* path = NULL;
                 char* args = NULL;
                 char* rest = NULL;
+                int free_path = 0;
+                int free_name = 0;
+                size_t len;
 
-                /* parse each argument/load_list member for the form foo,arg-list
-                   and split it apart if the slash is there.
-                 */
+                /* possible argument forms:
 
-                if (slash == NULL) {
-                        /* path (also client name) */
+                   client-name:client-type/args
+                   client-type/args
+                   client-name:client-type
+                   client-type
+
+                   client-name is the desired JACK client name.
+                   client-type is basically the name of the DLL/DSO without any suffix.
+                   args is a string whose contents will be passed to the client as
+                   it is instantiated
+                */
+
+                if ((slash == NULL && colon == NULL) || (slash && colon && colon > slash)) {
+
+                        /* client-type */
+
                         client_name = str;
                         path = client_name;
-                } else {
-                        /* we want to copy the text up to the slash, not
-                           including the slash.
-                        */
-                        size_t len = slash - str;
-                        /* add 1 to leave space for a NULL */
-                        client_name = (char*) malloc (len + 1);
-                        memcpy (client_name, str, len);
-                        client_name[len] = '\0';
 
-                        /* is there another slash ? */
+                } else if (slash && colon) {
 
-                        sslash = strchr (slash+1, '/');
+                        /* client-name:client-type/args */
 
-                        if (sslash) {
+                        len = colon - str;
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                client_name = (char*) malloc (len + 1);
+                                free_name = 1;
+                                memcpy (client_name, str, len);
+                                client_name[len] = '\0';
+                        }
 
-                                /* client-name/path/args */
-                                
-                                len = sslash - (slash+1);
-
-                                if (len) {
-                                        /* add 1 to leave space for a NULL */
-                                        path = (char*) malloc (len + 1);
-                                        memcpy (path, slash + 1, len);
-                                        path[len] = '\0';
-                                } else {
-                                        path = client_name;
-                                }
-
-                                rest = sslash + 1;
-
+                        len = slash - (colon+1);
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                path = (char*) malloc (len + 1);
+                                free_path = 1;
+                                memcpy (path, colon + 1, len);
+                                path[len] = '\0';
                         } else {
-                                /* client-name/path */
-                                path = slash + 1;
+                                path = client_name;
                         }
-
-                        /* we want to skip the text before the slash (len)
-                         * plus the slash itself
-                         */
-
-                        if (rest) {
-
-                                len = strlen (rest);
+                        
+                        rest = slash + 1;
+                        len = strlen (rest);
                                 
-                                if (len) {
-                                        /* add 1 to leave space for a NULL */
-                                        args = (char*) malloc (len + 1);
-                                        memcpy (args, rest, len);
-                                        args[len] = '\0';
-                                }
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                args = (char*) malloc (len + 1);
+                                memcpy (args, rest, len);
+                                args[len] = '\0';
                         }
+                        
+                } else if (slash && colon == NULL) {
+
+                        /* client-type/args */
+
+                        len = slash - str;
+
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                path = (char *) malloc (len + 1);
+                                free_path = 1;
+                                memcpy (path, str, len);
+                                path[len] = '\0';
+                        }
+
+                        rest = slash + 1;
+                        len = strlen (rest);
+                                
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                args = (char*) malloc (len + 1);
+                                memcpy (args, rest, len);
+                                args[len] = '\0';
+                        }
+                } else {
+                        
+                        /* client-name:client-type */
+
+                        len = colon - str;
+
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                client_name = (char *) malloc (len + 1);
+                                free_name = 1;
+                                memcpy (client_name, str, len);
+                                client_name[len] = '\0';
+                                path = colon + 1;
+                        }
+                }
+
+                if (client_name == NULL || path == NULL) {
+                        fprintf (stderr, "incorrect format for internal client specification (%s)\n", str);
+                        exit (1);
                 }
 
                 memset (&req, 0, sizeof (req));
@@ -184,16 +224,17 @@ jack_load_internal_clients (JSList* load_list)
                 jack_intclient_load_request (engine, &req);
                 pthread_mutex_unlock (&engine->request_lock);
    
-                if (slash) {
+                if (free_name) {
                         free (client_name);
-                        if (args) {
-                                free (args);
-                        }
+                }
+                if (free_path) {
+                        free (path);
+                }
+                if (args) {
+                        free (args);
                 }
         }
 }
-
-
 
 static int
 jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * slave_names, JSList * load_list)
@@ -721,24 +762,24 @@ main (int argc, char *argv[])
                            assume capture (common case: USB mics etc.)
                         */
                         if ((dirstr = strstr (optarg, "%p")) != NULL && dirstr == (optarg + strlen(optarg) - 2)) {
-                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_play/%s/-dhw:%.*s", 
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_play:%s/-dhw:%.*s", 
                                           (int) strlen (optarg) - 2, optarg,
                                           alsa_add_client_name_playback,
                                           (int) strlen (optarg) - 2, optarg);
                                 load_list = jack_slist_append(load_list, strdup (alsa_add_args));
                         } else if ((dirstr = strstr (optarg, "%c")) != NULL && dirstr == (optarg + strlen(optarg) - 2)) {
-                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_rec/%s/-dhw:%.*s", 
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_rec:%s/-dhw:%.*s", 
                                           (int) strlen (optarg) - 2, optarg,
                                           alsa_add_client_name_capture,
                                           (int) strlen (optarg) - 2, optarg);
                                 load_list = jack_slist_append(load_list, strdup (alsa_add_args));
                         } else {
-                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_play/%s/-dhw:%s", 
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_play:%s/-dhw:%s", 
                                           optarg,
                                           alsa_add_client_name_playback,
                                           optarg);
                                 load_list = jack_slist_append(load_list, strdup (alsa_add_args));
-                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_rec/%s/-dhw:%s", 
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_rec:%s/-dhw:%s", 
                                           optarg,
                                           alsa_add_client_name_capture,
                                           optarg);
