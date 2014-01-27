@@ -34,21 +34,6 @@
 #include <sys/types.h>
 #include <sys/time.h>
 
-#ifndef POST_PACKED_STRUCTURE
-#ifdef __GNUC__
-/* POST_PACKED_STRUCTURE needs to be a macro which
-   expands into a compiler directive. The directive must
-   tell the compiler to arrange the preceding structure
-   declaration so that it is packed on byte-boundaries rather 
-   than use the natural alignment of the processor and/or
-   compiler.
-*/
-#define POST_PACKED_STRUCTURE __attribute__((__packed__))
-#else
-/* Add other things here for non-gcc platforms */
-#endif
-#endif
-
 /* Needed by <sysdeps/time.h> */
 extern void jack_error (const char *fmt, ...);
 
