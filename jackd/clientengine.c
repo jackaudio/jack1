@@ -638,6 +638,7 @@ jack_setup_client_control (jack_engine_t *engine, int fd, ClientType type, const
 	client->control->thread_cb_cbset = FALSE;
 	client->control->session_cbset = FALSE;
 	client->control->property_cbset = FALSE;
+	client->control->latency_cbset = FALSE;
 
 #if 0
 	if (type != ClientExternal) {
