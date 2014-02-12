@@ -99,6 +99,12 @@ int
 jack_uuid_parse (const char *b, jack_uuid_t* u)
 {
         if (sscanf (b, "%" PRIu64, u) == 1) {
+
+                if (*u < (0x1LL << 32)) {
+                        /* has not type bits set - not legal */
+                        return -1;
+                }
+
                 return 0;
         }
 
