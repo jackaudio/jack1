@@ -582,6 +582,7 @@ jack_setup_client_control (jack_engine_t *engine, int fd, ClientType type, const
 	client->handle = NULL;
 	client->finish = NULL;
 	client->error = 0;
+	client->private_client = NULL;
 
 	if (type != ClientExternal) {
 		
