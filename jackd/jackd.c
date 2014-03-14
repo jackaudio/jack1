@@ -919,7 +919,7 @@ main (int argc, char *argv[])
 
 	copyright (stdout);
 
-	if (do_sanity_checks && (0 < sanitycheck (realtime, (clock_source == JACK_TIMER_CYCLE_COUNTER)))) {
+	if (do_sanity_checks && (0 < sanitycheck (realtime, FALSE))) {
 		return -1;
 	}
 
