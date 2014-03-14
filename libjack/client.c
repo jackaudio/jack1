@@ -962,6 +962,9 @@ failure:
 int
 start_server (const char *server_name, jack_options_t options)
 {
+        int status;
+        pid_t first_child_pid;
+
 	if ((options & JackNoStartServer)
 	    || getenv("JACK_NO_START_SERVER")) {
 		return 1;
@@ -976,7 +979,10 @@ start_server (const char *server_name, jack_options_t options)
 	 * virtual memory tricks, the overhead of the second fork() is
 	 * probably relatively small.
 	 */
-	switch (fork()) {
+
+        first_child_pid = fork();
+
+	switch (first_child_pid) {
 	case 0:				/* child process */
 		switch (fork()) {
 		case 0:			/* grandchild process */
@@ -990,6 +996,9 @@ start_server (const char *server_name, jack_options_t options)
 	case -1:			/* fork() error */
 		return 1;		/* failed to start server */
 	}
+
+        /* reap the initaial child */
+        waitpid (first_child_pid, &status, 0);
 
 	/* only the original parent process goes here */
 	return 0;			/* (probably) successful */
