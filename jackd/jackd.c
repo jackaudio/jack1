@@ -542,7 +542,7 @@ static void usage (FILE *file)
 "             [ --debug-timer OR -D ]\n"
 "             [ --no-sanity-checks OR -N ]\n"
 "             [ --verbose OR -v ]\n"
-"             [ --clocksource OR -c [ c(ycle) | h(pet) | s(ystem) ]\n"
+"             [ --clocksource OR -c [ h(pet) | s(ystem) ]\n"
 "             [ --replace-registry ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
