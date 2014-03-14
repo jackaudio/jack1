@@ -792,7 +792,12 @@ main (int argc, char *argv[])
 			if (tolower (optarg[0]) == 'h') {
 				clock_source = JACK_TIMER_HPET;
 			} else if (tolower (optarg[0]) == 'c') {
-				clock_source = JACK_TIMER_CYCLE_COUNTER;
+				/* For backwards compatibility with scripts,
+				 * allow the user to request the cycle clock
+				 * on the command line, but use the system
+				 * clock instead
+				 */
+				clock_source = JACK_TIMER_SYSTEM_CLOCK;
 			} else if (tolower (optarg[0]) == 's') {
 				clock_source = JACK_TIMER_SYSTEM_CLOCK;
 			} else {
