@@ -542,7 +542,7 @@ static void usage (FILE *file)
 "             [ --debug-timer OR -D ]\n"
 "             [ --no-sanity-checks OR -N ]\n"
 "             [ --verbose OR -v ]\n"
-"             [ --clocksource OR -c [ c(ycle) | h(pet) | s(ystem) ]\n"
+"             [ --clocksource OR -c [ h(pet) | s(ystem) ]\n"
 "             [ --replace-registry ]\n"
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
@@ -792,7 +792,12 @@ main (int argc, char *argv[])
 			if (tolower (optarg[0]) == 'h') {
 				clock_source = JACK_TIMER_HPET;
 			} else if (tolower (optarg[0]) == 'c') {
-				clock_source = JACK_TIMER_CYCLE_COUNTER;
+				/* For backwards compatibility with scripts,
+				 * allow the user to request the cycle clock
+				 * on the command line, but use the system
+				 * clock instead
+				 */
+				clock_source = JACK_TIMER_SYSTEM_CLOCK;
 			} else if (tolower (optarg[0]) == 's') {
 				clock_source = JACK_TIMER_SYSTEM_CLOCK;
 			} else {
@@ -914,7 +919,7 @@ main (int argc, char *argv[])
 
 	copyright (stdout);
 
-	if (do_sanity_checks && (0 < sanitycheck (realtime, (clock_source == JACK_TIMER_CYCLE_COUNTER)))) {
+	if (do_sanity_checks && (0 < sanitycheck (realtime, FALSE))) {
 		return -1;
 	}
 

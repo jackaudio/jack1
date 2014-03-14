@@ -45,8 +45,6 @@ const char*
 jack_clock_source_name (jack_timer_type_t src)
 {
 	switch (src) {
-	case JACK_TIMER_CYCLE_COUNTER:
-		return "cycle counter";
 	case JACK_TIMER_HPET:
 		return "hpet";
 	case JACK_TIMER_SYSTEM_CLOCK:

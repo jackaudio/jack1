@@ -52,7 +52,6 @@ extern jack_thread_creator_t jack_thread_creator;
 
 typedef enum {
 	JACK_TIMER_SYSTEM_CLOCK,
-	JACK_TIMER_CYCLE_COUNTER,
 	JACK_TIMER_HPET,
 } jack_timer_type_t;
 
