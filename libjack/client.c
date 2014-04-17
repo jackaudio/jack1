@@ -36,6 +36,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include <jack/jack.h>
 #include <jack/jslist.h>
