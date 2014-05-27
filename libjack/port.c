@@ -24,7 +24,6 @@
 
 #include <config.h>
 #include <sys/mman.h>
-#include <uuid/uuid.h>
 
 #include <jack/jack.h>
 #include <jack/types.h>
