@@ -302,6 +302,7 @@ jack_get_properties (jack_uuid_t subject,
         desc->properties = NULL;
         desc->property_cnt = 0;
 
+        memset(ustr, 0, JACK_UUID_STRING_SIZE);
         jack_uuid_unparse (subject, ustr);
 
         if (jack_property_init (NULL)) {
@@ -595,6 +596,7 @@ jack_remove_properties (jack_client_t* client, jack_uuid_t subject)
         int retval = 0;
         uint32_t cnt = 0;
 
+        memset(ustr, 0, JACK_UUID_STRING_SIZE);
         jack_uuid_unparse (subject, ustr);
 
         if (jack_property_init (NULL)) {
