@@ -500,6 +500,7 @@ static void usage (FILE *file)
 "             [ --silent OR -s ]\n"
 "             [ --version OR -V ]\n"
 "             [ --nozombies OR -Z ]\n"
+"             [ --midi-bufsize OR -M midi-buffer-size-in-events ]\n"
 "         -d backend [ ... backend args ... ]\n"
 #ifdef __APPLE__
 "             Available backends may include: coreaudio, dummy, net, portaudio.\n\n"
