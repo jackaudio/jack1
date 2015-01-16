@@ -812,7 +812,7 @@ jack_process_external(jack_engine_t *engine, JSList *node)
 	    != sizeof (c)) {
                 if (errno == EAGAIN) {
                         jack_error ("pp: cannot clean up byte from graph wait "
-                                    "fd (%s) - no data present");
+                                    "fd - no data present");
                 } else {
                         jack_error ("pp: cannot clean up byte from graph wait "
                                     "fd (%s)", strerror (errno));
