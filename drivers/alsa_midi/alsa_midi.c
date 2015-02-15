@@ -44,7 +44,7 @@ _a2j_debug (const char* fmt, ...)
 	va_list ap;
 	va_start (ap, fmt);
 	vfprintf (stderr, fmt, ap);
-	fputc ('\n', stdout);
+	fputc ('\n', stderr);
 }
 #endif
 
@@ -150,13 +150,12 @@ a2j_port_event (alsa_midi_driver_t* driver, snd_seq_event_t * ev)
 	if (addr.client == driver->client_id)
 		return;
 
-	if (ev->type == SND_SEQ_EVENT_PORT_START || ev->type == SND_SEQ_EVENT_PORT_CHANGE) {
-		if (jack_ringbuffer_write_space(driver->port_add) >= sizeof(addr)) {
-			a2j_debug("port_event: add/change %d:%d", addr.client, addr.port);
-			jack_ringbuffer_write(driver->port_add, (char*)&addr, sizeof(addr));
-		} else {
-			a2j_error("dropping port_event: add/change %d:%d", addr.client, addr.port);
-		}
+	if (ev->type == SND_SEQ_EVENT_PORT_START) {
+		a2j_debug("port_event: add %d:%d", addr.client, addr.port);
+		a2j_new_ports (driver, addr);
+	} else if (ev->type == SND_SEQ_EVENT_PORT_CHANGE) {
+		a2j_debug("port_event: change %d:%d", addr.client, addr.port);
+		a2j_update_ports (driver, addr);
 	} else if (ev->type == SND_SEQ_EVENT_PORT_EXIT) {
 		a2j_debug("port_event: del %d:%d", addr.client, addr.port);
 		a2j_port_setdead(driver->stream[A2J_PORT_CAPTURE].port_hash, addr);
@@ -321,7 +320,6 @@ alsa_input_thread (void* arg)
 	struct pollfd * pfd;
 	snd_seq_addr_t addr;
 	snd_seq_client_info_t * client_info;
-	snd_seq_port_info_t * port_info;
 	bool initial;
 	snd_seq_event_t * event;
 	int ret;
@@ -338,19 +336,14 @@ alsa_input_thread (void* arg)
 			while (snd_seq_event_input (driver->seq, &event) > 0) {
 				if (initial) {
 					snd_seq_client_info_alloca(&client_info);
-					snd_seq_port_info_alloca(&port_info);
 					snd_seq_client_info_set_client(client_info, -1);
 					while (snd_seq_query_next_client(driver->seq, client_info) >= 0) {
 						addr.client = snd_seq_client_info_get_client(client_info);
 						if (addr.client == SND_SEQ_CLIENT_SYSTEM || addr.client == driver->client_id) {
 							continue;
 						}
-						snd_seq_port_info_set_client(port_info, addr.client);
-						snd_seq_port_info_set_port(port_info, -1);
-						while (snd_seq_query_next_port(driver->seq, port_info) >= 0) {
-							addr.port = snd_seq_port_info_get_port(port_info);
-							a2j_update_port(driver, addr, port_info);
-						}
+						
+						a2j_new_ports (driver, addr);
 					}
 
 					initial = false;
@@ -470,6 +463,10 @@ alsa_output_thread(void * arg)
   int limit;
 
   while (driver->running) {
+    /* pre-first, handle port deletion requests */
+
+    a2j_free_ports(driver);
+
     /* first, make a list of all events in the outbound_events FIFO */
     
     INIT_LIST_HEAD(&evlist);
@@ -610,6 +607,7 @@ a2j_jack_process_internal (alsa_midi_driver_t* driver, int dir, jack_nframes_t n
         a2j_debug("jack: removed port %s", port_ptr->name);
         *port_ptr_ptr = port_ptr->next;
         jack_ringbuffer_write(driver->port_del, (char*)&port_ptr, sizeof(port_ptr));
+        nevents += 1; /* wake up output thread, see: a2j_free_ports */
         continue;
         
       }
@@ -692,13 +690,6 @@ static int
 alsa_midi_attach (alsa_midi_driver_t* driver, jack_engine_t* engine)
 {
   int error;
-  
-  driver->port_add = jack_ringbuffer_create (2 * MAX_PORTS * sizeof(snd_seq_addr_t));
-  
-  if (driver->port_add == NULL) {
-    return -1;
-    
-  }
   
   driver->port_del = jack_ringbuffer_create(2 * MAX_PORTS * sizeof(struct a2j_port *));
   if (driver->port_del == NULL) {
@@ -812,7 +803,6 @@ alsa_midi_driver_delete (alsa_midi_driver_t* driver)
   sem_destroy (&driver->output_semaphore);
 
   jack_ringbuffer_free (driver->outbound_events);
-  jack_ringbuffer_free (driver->port_add);
   jack_ringbuffer_free (driver->port_del);
 }
 

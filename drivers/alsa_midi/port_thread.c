@@ -196,12 +196,12 @@ a2j_update_port (alsa_midi_driver_t * driver, snd_seq_addr_t addr, const snd_seq
 }
 
 void
-a2j_free_ports (jack_ringbuffer_t * ports)
+a2j_free_ports (alsa_midi_driver_t * driver)
 {
 	struct a2j_port *port;
 	int sz;
 
-	while ((sz = jack_ringbuffer_read (ports, (char*)&port, sizeof(port)))) {
+	while ((sz = jack_ringbuffer_read (driver->port_del, (char*)&port, sizeof(port)))) {
           assert (sz == sizeof(port));
           a2j_debug("port deleted: %s", port->name);
           list_del (&port->siblings);
@@ -210,26 +210,39 @@ a2j_free_ports (jack_ringbuffer_t * ports)
 }
 
 void
-a2j_update_ports (alsa_midi_driver_t * driver)
+a2j_update_ports (alsa_midi_driver_t * driver, snd_seq_addr_t addr)
 {
-  snd_seq_addr_t addr;
-  int size;
+  snd_seq_port_info_t * info;
+  int err;
   
-  while ((size = jack_ringbuffer_read(driver->port_add, (char *)&addr, sizeof(addr))) != 0) {
-    
-    snd_seq_port_info_t * info;
-    int err;
-    
-    snd_seq_port_info_alloca(&info);
-    
-    assert (size == sizeof(addr));
-    assert (addr.client != driver->client_id);
-    
-    if ((err = snd_seq_get_any_port_info(driver->seq, addr.client, addr.port, info)) >= 0) {
-      a2j_update_port(driver, addr, info);
-    } else {
-      a2j_port_setdead(driver->stream[A2J_PORT_CAPTURE].port_hash, addr);
-      a2j_port_setdead(driver->stream[A2J_PORT_PLAYBACK].port_hash, addr);
-    }
+  assert (addr.client != driver->client_id);
+  
+  snd_seq_port_info_alloca(&info);
+  
+  if ((err = snd_seq_get_any_port_info(driver->seq, addr.client, addr.port, info)) >= 0) {
+		a2j_debug("updating: %d:%d", addr.client, addr.port);
+    a2j_update_port(driver, addr, info);
+  } else {
+		a2j_debug("setting dead: %d:%d", addr.client, addr.port);
+    a2j_port_setdead(driver->stream[A2J_PORT_CAPTURE].port_hash, addr);
+    a2j_port_setdead(driver->stream[A2J_PORT_PLAYBACK].port_hash, addr);
+  }
+}
+
+void
+a2j_new_ports (alsa_midi_driver_t * driver, snd_seq_addr_t addr)
+{
+  snd_seq_port_info_t * port_info;
+
+	assert (addr.client != driver->client_id);
+
+  snd_seq_port_info_alloca(&port_info);
+
+  a2j_debug("adding new port: %d:%d", addr.client, addr.port);
+  snd_seq_port_info_set_client(port_info, addr.client);
+  snd_seq_port_info_set_port(port_info, -1);
+  while (snd_seq_query_next_port(driver->seq, port_info) >= 0) {
+    addr.port = snd_seq_port_info_get_port(port_info);
+    a2j_update_port(driver, addr, port_info);
   }
 }
