@@ -23,8 +23,9 @@
 #define PORT_THREAD_H__1C6B5065_5556_4AC6_AA9F_44C32A9648C6__INCLUDED
 
 void a2j_update_port (alsa_midi_driver_t* driver, snd_seq_addr_t addr, const snd_seq_port_info_t* info);
-void a2j_update_ports (alsa_midi_driver_t* driver);
-void a2j_free_ports (jack_ringbuffer_t * ports);
+void a2j_update_ports (alsa_midi_driver_t* driver, snd_seq_addr_t addr);
+void a2j_new_ports (alsa_midi_driver_t* driver, snd_seq_addr_t addr);
+void a2j_free_ports (alsa_midi_driver_t* driver);
 struct a2j_port * a2j_find_port_by_addr (struct a2j_stream * stream_ptr, snd_seq_addr_t addr);
 struct a2j_port * a2j_find_port_by_jack_port_name (struct a2j_stream * stream_ptr, const char * jack_port);
 
