@@ -524,7 +524,7 @@ jack_get_all_properties (jack_description_t** descriptions)
                         current_prop->type = NULL;
                 }
                 
-                if (key.size  > 0) free(key.data);
+                /* if (key.size  > 0) free(key.data);  */
                 if (data.size > 0) free(data.data);
         }
         
@@ -642,7 +642,7 @@ jack_remove_properties (jack_client_t* client, jack_uuid_t subject)
                 }
                 cnt++;
 
-                if (key.size  > 0) free(key.data);
+                /* if (key.size  > 0) free(key.data); */
                 if (data.size > 0) free(data.data);
         }
 
