@@ -395,7 +395,7 @@ jack_get_properties (jack_uuid_t subject,
                 }
                 
                 /* if (key.size  > 0) free(key.data);  */
-                /* if (data.size > 0) free(data.data); */
+                if (data.size > 0) free(data.data);
 
                 ++cnt;
         }
@@ -525,7 +525,7 @@ jack_get_all_properties (jack_description_t** descriptions)
                 }
                 
                 /* if (key.size  > 0) free(key.data);  */
-                /* if (data.size > 0) free(data.data); */
+                if (data.size > 0) free(data.data);
         }
         
         cursor->close (cursor);
