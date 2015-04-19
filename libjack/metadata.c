@@ -446,7 +446,7 @@ jack_get_all_properties (jack_description_t** descriptions)
                 */
 
                 if (key.size < JACK_UUID_STRING_SIZE + 2) {
-                        if (key.size  > 0) free(key.data);
+                        /* if (key.size  > 0) free(key.data);  */
                         if (data.size > 0) free(data.data);
                         continue;
                 }
@@ -621,7 +621,7 @@ jack_remove_properties (jack_client_t* client, jack_uuid_t subject)
                 */
 
                 if (key.size < JACK_UUID_STRING_SIZE + 2) {
-                        if (key.size  > 0) free(key.data);
+                        /* if (key.size  > 0) free(key.data); */
                         if (data.size > 0) free(data.data);
                         continue;
                 }
