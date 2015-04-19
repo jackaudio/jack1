@@ -331,7 +331,7 @@ jack_get_properties (jack_uuid_t subject,
                 */
 
                 if (key.size < JACK_UUID_STRING_SIZE + 2) {
-                        if (key.size  > 0) free(key.data);
+                        /* if (key.size  > 0) free(key.data); */
                         if (data.size > 0) free(data.data);
                         continue;
                 }
@@ -347,7 +347,7 @@ jack_get_properties (jack_uuid_t subject,
                  */
                 
                 if (data.size < 4) {
-                        if (key.size  > 0) free(key.data);
+                        /* if (key.size  > 0) free(key.data); */
                         if (data.size > 0) free(data.data);
                         continue;
                 }
@@ -394,8 +394,8 @@ jack_get_properties (jack_uuid_t subject,
                         prop->type = NULL;
                 }
                 
-                if (key.size  > 0) free(key.data);
-                if (data.size > 0) free(data.data);
+                /* if (key.size  > 0) free(key.data);  */
+                /* if (data.size > 0) free(data.data); */
 
                 ++cnt;
         }
@@ -525,7 +525,7 @@ jack_get_all_properties (jack_description_t** descriptions)
                 }
                 
                 /* if (key.size  > 0) free(key.data);  */
-                if (data.size > 0) free(data.data);
+                /* if (data.size > 0) free(data.data); */
         }
         
         cursor->close (cursor);
@@ -642,8 +642,8 @@ jack_remove_properties (jack_client_t* client, jack_uuid_t subject)
                 }
                 cnt++;
 
-                /* if (key.size  > 0) free(key.data); */
-                if (data.size > 0) free(data.data);
+                /* if (key.size  > 0) free(key.data);  */
+                /* if (data.size > 0) free(data.data); */
         }
 
         cursor->close (cursor);
