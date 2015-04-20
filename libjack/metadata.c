@@ -643,7 +643,7 @@ jack_remove_properties (jack_client_t* client, jack_uuid_t subject)
                 cnt++;
 
                 /* if (key.size  > 0) free(key.data);  */
-                /* if (data.size > 0) free(data.data); */
+                if (data.size > 0) free(data.data);
         }
 
         cursor->close (cursor);
