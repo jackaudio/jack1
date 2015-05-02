@@ -674,7 +674,7 @@ alsa_midi_start (alsa_midi_driver_t* driver)
   }
   
   if (pthread_create(&driver->alsa_output_thread, NULL, alsa_output_thread, driver) < 0) {
-    a2j_error("cannot start ALSA input thread");
+    a2j_error("cannot start ALSA output thread");
     return -1;
   }
   
@@ -684,6 +684,8 @@ alsa_midi_start (alsa_midi_driver_t* driver)
 static int
 alsa_midi_stop (alsa_midi_driver_t* driver)
 {
+  stop_threads (driver);
+
   (void) snd_seq_stop_queue (driver->seq, driver->queue, 0); 
   return 0;
 }
@@ -764,7 +766,6 @@ alsa_midi_detach (alsa_midi_driver_t* driver, jack_engine_t* engine)
 {
   driver->finishing = true;
   
-  stop_threads (driver);
   snd_seq_close (driver->seq);
   driver->seq = NULL;
   return 0;
