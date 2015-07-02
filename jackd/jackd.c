@@ -530,24 +530,8 @@ static void usage (FILE *file)
 {
 	copyright (file);
 	fprintf (file, "\n"
-"usage: jackd [ --no-realtime OR -r ]\n"
-"             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
-"      (the two previous arguments are mutually exclusive. The default is --realtime)\n"
-"             [ --name OR -n server-name ]\n"
-"             [ --load OR -l internal-client ]\n"
-"             [ --no-mlock OR -m ]\n"
-"             [ --unlock OR -u ]\n"
-"             [ --timeout OR -t client-timeout-in-msecs ]\n"
-"             [ --port-max OR -p maximum-number-of-ports]\n"
-"             [ --debug-timer OR -D ]\n"
-"             [ --no-sanity-checks OR -N ]\n"
-"             [ --verbose OR -v ]\n"
-"             [ --clocksource OR -c [ h(pet) | s(ystem) ]\n"
-"             [ --replace-registry ]\n"
-"             [ --silent OR -s ]\n"
-"             [ --version OR -V ]\n"
-"             [ --nozombies OR -Z ]\n"
-"         -d backend [ ... backend args ... ]\n"
+"usage: jackd [ server options ] -d backend [ ... backend options ... ]\n"
+"             (see the manual page for jackd for a complete list of options)\n\n"
 #ifdef __APPLE__
 "             Available backends may include: coreaudio, dummy, net, portaudio.\n\n"
 #else 
