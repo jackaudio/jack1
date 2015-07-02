@@ -136,6 +136,7 @@ static void jack_compute_all_port_total_latencies (jack_engine_t *engine);
 static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_shared_t*);
 static int jack_check_client_status (jack_engine_t* engine);
 static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, int reply_fd );
+static void jack_port_rename_notify (jack_engine_t *engine, const char* old_name, const char* new_name);
 static void jack_do_get_client_by_uuid (jack_engine_t *engine, jack_request_t *req);
 static void jack_do_get_uuid_by_client_name (jack_engine_t *engine, jack_request_t *req);
 static void jack_do_reserve_name (jack_engine_t *engine, jack_request_t *req);
@@ -1371,6 +1372,12 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
                 jack_property_change_notify (engine, req->x.property.change, req->x.property.uuid, req->x.property.key);
                 break;
 
+	case PortNameChanged:
+		jack_rdlock_graph (engine);
+		jack_port_rename_notify (engine, req->x.connect.source_port, req->x.connect.destination_port);
+		jack_unlock_graph (engine);
+		break;
+                
 	default:
 		/* some requests are handled entirely on the client
 		 * side, by adjusting the shared memory area(s) */
@@ -4639,6 +4646,47 @@ jack_port_registration_notify (jack_engine_t *engine,
 					    " notification to %s (%s)",
 					     client->control->name,
 					    strerror (errno));
+			}
+		}
+	}
+}
+
+static void
+jack_port_rename_notify (jack_engine_t *engine,
+                         const char* old_name,
+                         const char* new_name)
+{
+	jack_event_t event;
+	jack_client_internal_t *client;
+	JSList *node;
+	jack_port_internal_t* port;
+	
+	if ((port = jack_get_port_by_name (engine, new_name)) == NULL) {
+		/* possible race condition: port renamed again
+		   since this rename happened. Oh well.
+		*/
+		return;
+	}
+	
+	event.type = PortRename;
+	event.y.other_id = port->shared->id;
+	snprintf (event.x.name, JACK_PORT_NAME_SIZE-1, old_name);
+	snprintf (event.z.other_name, JACK_PORT_NAME_SIZE-1, new_name);
+	
+	for (node = engine->clients; node; node = jack_slist_next (node)) {
+		
+		client = (jack_client_internal_t *) node->data;
+
+		if (!client->control->active) {
+			continue;
+		}
+
+		if (client->control->port_rename_cbset) {
+			if (jack_deliver_event (engine, client, &event)) {
+				jack_error ("cannot send port registration"
+				            " notification to %s (%s)",
+				            client->control->name,
+				            strerror (errno));
 			}
 		}
 	}

@@ -800,16 +800,45 @@ jack_port_type (const jack_port_t *port)
 }
 
 int
+jack_port_rename (jack_client_t* client, jack_port_t *port, const char *new_name)
+{
+	int ret;
+	char* old_name = strdup (port->shared->name);
+
+	if ((ret = jack_port_set_name (port, new_name)) == 0) {
+
+		/* tell server about name change */
+		jack_request_t req;
+
+		req.type = PortNameChanged;
+
+		/* re-purpose an appropriate part of the request union to convey the names */
+		snprintf ((char *) req.x.connect.source_port, JACK_PORT_NAME_SIZE-1, old_name);
+		snprintf ((char *) req.x.connect.destination_port, JACK_PORT_NAME_SIZE-1, new_name);
+		
+		(void) jack_client_deliver_request (client, &req);
+	}
+
+	free (old_name);
+
+	return ret;
+}	
+int
 jack_port_set_name (jack_port_t *port, const char *new_name)
 {
 	char *colon;
 	int len;
 
+	if (strcmp (new_name, port->shared->name) == 0) {
+		return 0;
+	}
+	
 	colon = strchr (port->shared->name, ':');
 	len = sizeof (port->shared->name) -
 		((int) (colon - port->shared->name)) - 2;
 	snprintf (colon+1, len, "%s", new_name);
-        
+
+	
 	return 0;
 }
 

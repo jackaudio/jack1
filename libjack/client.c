@@ -2752,6 +2752,21 @@ jack_set_buffer_size_callback (jack_client_t *client,
 }
 
 int
+jack_set_port_rename_callback (jack_client_t *client,
+                               JackPortRenameCallback callback,
+                               void *arg)
+{
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+	client->port_rename_arg = arg;
+	client->port_rename = callback;
+	client->control->port_rename_cbset = (callback != NULL);
+	return 0;
+}
+
+int
 jack_set_port_registration_callback(jack_client_t *client,
 				    JackPortRegistrationCallback callback,
 				    void *arg)
@@ -3090,6 +3105,8 @@ jack_event_type_name (JackEventType type)
                 return "latency callback";
         case PropertyChange:
                 return "property change callback";
+        case PortRename:
+                return "port rename";
         default:
                 break;
         }

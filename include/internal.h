@@ -382,7 +382,8 @@ typedef enum {
 	ReserveName = 30,
 	SessionReply = 31,
 	SessionHasCallback = 32,
-        PropertyChangeNotify = 33
+	PropertyChangeNotify = 33,
+	PortNameChanged = 34
 } RequestType;
 
 struct _jack_request {

@@ -55,6 +55,8 @@ struct _jack_client {
     void *bufsize_arg;
     JackSampleRateCallback srate;
     void *srate_arg;
+    JackPortRenameCallback port_rename;
+    void *port_rename_arg;
     JackPortRegistrationCallback port_register;
     void *port_register_arg;
     JackPortConnectCallback port_connect;
