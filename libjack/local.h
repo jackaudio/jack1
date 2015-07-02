@@ -55,8 +55,6 @@ struct _jack_client {
     void *bufsize_arg;
     JackSampleRateCallback srate;
     void *srate_arg;
-    JackPortRenameCallback port_rename;
-    void *port_rename_arg;
     JackPortRegistrationCallback port_register;
     void *port_register_arg;
     JackPortConnectCallback port_connect;
@@ -82,7 +80,7 @@ struct _jack_client {
     JackPropertyChangeCallback property_cb;	
     void *property_cb_arg;
     JackPortRenameCallback port_rename_cb;
-    void *port_rename_cb_arg;
+    void *port_rename_arg;
 
     /* external clients: set by libjack
      * internal clients: set by engine */

@@ -1885,9 +1885,10 @@ jack_client_process_events (jack_client_t* client)
                         if (key) {
                                 free (key);
                         }
+                        break;
                 case PortRename:
                         if (control->port_rename_cbset) {
-                                client->port_rename_cb (event.y.other_id, event.x.name, event.z.other_name, client->port_rename_cb_arg);
+                                client->port_rename_cb (event.y.other_id, event.x.name, event.z.other_name, client->port_rename_arg);
                         }
                         break;
 		}
@@ -2761,7 +2762,7 @@ jack_set_port_rename_callback (jack_client_t *client,
 		return -1;
 	}
 	client->port_rename_arg = arg;
-	client->port_rename = callback;
+	client->port_rename_cb = callback;
 	client->control->port_rename_cbset = (callback != NULL);
 	return 0;
 }
