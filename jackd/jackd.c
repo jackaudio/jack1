@@ -675,7 +675,7 @@ main (int argc, char *argv[])
 #ifdef HAVE_ZITA_BRIDGE_DEPS
 	const char *options = "A:d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
 #else
-	const char *options = "A:d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
+	const char *options = "d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
 #endif
 	struct option long_options[] = 
 	{ 
