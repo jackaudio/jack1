@@ -813,8 +813,8 @@ jack_port_rename (jack_client_t* client, jack_port_t *port, const char *new_name
 		req.type = PortNameChanged;
 
 		/* re-purpose an appropriate part of the request union to convey the names */
-		snprintf ((char *) req.x.connect.source_port, JACK_PORT_NAME_SIZE-1, old_name);
-		snprintf ((char *) req.x.connect.destination_port, JACK_PORT_NAME_SIZE-1, new_name);
+		snprintf ((char *) req.x.connect.source_port, JACK_PORT_NAME_SIZE-1, "%s", old_name);
+		snprintf ((char *) req.x.connect.destination_port, JACK_PORT_NAME_SIZE-1, "%s", new_name);
 		
 		(void) jack_client_deliver_request (client, &req);
 	}

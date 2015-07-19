@@ -4670,8 +4670,8 @@ jack_port_rename_notify (jack_engine_t *engine,
 	
 	event.type = PortRename;
 	event.y.other_id = port->shared->id;
-	snprintf (event.x.name, JACK_PORT_NAME_SIZE-1, old_name);
-	snprintf (event.z.other_name, JACK_PORT_NAME_SIZE-1, new_name);
+	snprintf (event.x.name, JACK_PORT_NAME_SIZE-1, "%s", old_name);
+	snprintf (event.z.other_name, JACK_PORT_NAME_SIZE-1, "%s", new_name);
 	
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		
