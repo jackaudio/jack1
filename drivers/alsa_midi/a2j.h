@@ -106,7 +106,7 @@ struct a2j_alsa_midi_event
     int size;
 };
 
-#define MAX_JACKMIDI_EV_SIZE 16
+#define MAX_JACKMIDI_EV_SIZE 64
 
 struct a2j_delivery_event 
 {
