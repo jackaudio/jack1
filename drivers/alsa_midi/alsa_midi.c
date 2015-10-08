@@ -386,6 +386,8 @@ a2j_process_outgoing (
   limit = vec[0].len / sizeof (struct a2j_delivery_event);
   nevents = jack_midi_get_event_count (port->jack_buf);
 
+  a2j_debug ("alsa_out: port has %d events for delivery\n", nevents);
+  
   for (i = 0; (i < nevents) && (written < limit); ++i) {
 
     jack_midi_event_get (&dev->jack_event, port->jack_buf, i);
@@ -459,7 +461,6 @@ alsa_output_thread(void * arg)
   struct a2j_delivery_event* ev;
   float sr;
   jack_nframes_t now;
-  int err;
   int limit;
 
   while (driver->running) {
@@ -473,7 +474,7 @@ alsa_output_thread(void * arg)
 
     jack_ringbuffer_get_read_vector (driver->outbound_events, vec);
 
-    a2j_debug ("output thread: got %d+%d events", 
+    a2j_debug ("alsa_out: output thread: got %d+%d events", 
                (vec[0].len / sizeof (struct a2j_delivery_event)),
                (vec[1].len / sizeof (struct a2j_delivery_event)));
     
@@ -493,9 +494,9 @@ alsa_output_thread(void * arg)
 
     if (vec[0].len < sizeof(struct a2j_delivery_event) && (vec[1].len == 0)) {
       /* no events: wait for some */
-      a2j_debug ("output thread: wait for events");
+      a2j_debug ("alsa_out: output thread: wait for events");
       sem_wait (&driver->output_semaphore);
-      a2j_debug ("output thread: AWAKE ... loop back for events");
+      a2j_debug ("alsa_out: output thread: AWAKE ... loop back for events");
       continue;
     }
 
@@ -515,7 +516,8 @@ alsa_output_thread(void * arg)
       snd_midi_event_reset_encode(str->codec);
       if (!snd_midi_event_encode(str->codec, (const unsigned char *)ev->midistring, ev->jack_event.size, &alsa_event))
       {
-        continue; // invalid event
+	      a2j_debug ("alsa_out: invalid event of size %d, ignored\n", ev->jack_event.size);
+	      continue; // invalid event
       }
       
       snd_seq_ev_set_source(&alsa_event, driver->port_id);
@@ -526,7 +528,7 @@ alsa_output_thread(void * arg)
 
       ev->time += driver->cycle_start;
 
-      a2j_debug ("@ %d, next event @ %d", now, ev->time);
+      a2j_debug ("alsa_out:@ %d, next event @ %d", now, ev->time);
       
       /* do we need to wait a while before delivering? */
 
@@ -541,7 +543,7 @@ alsa_output_thread(void * arg)
           nanoseconds.tv_sec = (time_t) seconds;
           nanoseconds.tv_nsec = (long) NSEC_PER_SEC * (seconds - nanoseconds.tv_sec);
           
-          a2j_debug ("output thread sleeps for %.2f msec", ((double) nanoseconds.tv_nsec / NSEC_PER_SEC) * 1000.0);
+          a2j_debug ("alsa_out: output thread sleeps for %.2f msec", ((double) nanoseconds.tv_nsec / NSEC_PER_SEC) * 1000.0);
 
           if (nanosleep (&nanoseconds, NULL) < 0) {
             fprintf (stderr, "BAD SLEEP\n");
@@ -551,7 +553,7 @@ alsa_output_thread(void * arg)
       }
       
       /* its time to deliver */
-      err = snd_seq_event_output(driver->seq, &alsa_event);
+      snd_seq_event_output(driver->seq, &alsa_event);
       snd_seq_drain_output (driver->seq);
       now = jack_frame_time (driver->jack_client);
       a2j_debug("alsa_out: written %d bytes to %s at %d, DELTA = %d", ev->jack_event.size, ev->port->name, now, 
