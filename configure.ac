@@ -6,7 +6,7 @@ AC_INIT(jackd/jackd.c)
 
 dnl
 dnl Check for existing JACK installs
-dnl 
+dnl
 
 AC_ARG_ENABLE(force-install,
 	AC_HELP_STRING([--enable-force-install],
@@ -23,18 +23,18 @@ for dir in /usr/lib /usr/local/lib /opt/lib ; do
 		not_overwriting=$(expr $not_overwriting + 1)
 	    fi
 	    installs="$installs $dir"
-	fi	    
+	fi
     fi
 done
 
 if test "x$FORCE_INSTALL" != "xyes" -a $not_overwriting -gt 0 ; then
-    echo 
+    echo
     echo
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo "You appear to have at least one existing installation of JACK."
     echo
     echo "Complete or partial JACK installs exist in:$installs"
-    echo 
+    echo
     echo "Installing this version will leave at least one of these"
     echo "existing installations installed and this will probably break"
     echo "JACK on your machine. "
@@ -85,7 +85,7 @@ JACK_PROTOCOL_VERSION=25
 dnl ---
 dnl HOWTO: updating the libjack interface version
 dnl
-dnl current = incremented whenever the public libjack API is changed 
+dnl current = incremented whenever the public libjack API is changed
 dnl revision = incremented when the libjack implementation is changed
 dnl age = current libjack is both source and binary compatible with
 dnl       libjack interfaces current,current-1,...,current-age
@@ -125,7 +125,7 @@ AM_INIT_AUTOMAKE(jack-audio-connection-kit,${JACK_VERSION})
 dnl
 dnl save any user-provided CFLAGS so we can forget
 dnl about any nonsense that configure generates
-dnl 
+dnl
 
 ORIGINAL_CFLAGS="$CFLAGS"
 
@@ -189,7 +189,7 @@ case "${host_os}" in
     ;;
     solaris*)
     ## libnn=lib/sparcv9 ## on 64-bit only, but that's compiler-specific
-    ;;  
+    ;;
 esac
 
 ## take care not to  override the command-line setting
@@ -230,7 +230,7 @@ AC_CHECK_FUNC(getopt_long, [],
 AC_CHECK_FUNC(gethostent, [], AC_CHECK_LIB(nsl, gethostent))
 AC_CHECK_FUNC(setsockopt, [], AC_CHECK_LIB(socket, setsockopt))
 AC_CHECK_FUNC(connect, [], AC_CHECK_LIB(inet, connect))
-AC_CHECK_FUNC(dlopen, [], 
+AC_CHECK_FUNC(dlopen, [],
     AC_CHECK_LIB(dl, dlopen, [],
 	AC_MSG_ERROR([*** JACK requires dynamic load support])))
 AC_CHECK_FUNC(pthread_create, [],
@@ -255,21 +255,21 @@ AC_EGREP_CPP( ppoll,
 	echo "no"
    ] )
 
-	 
 
-AC_CHECK_FUNC(clock_gettime, 
+
+AC_CHECK_FUNC(clock_gettime,
        [
            AC_DEFINE(HAVE_CLOCK_GETTIME,0,"Whether or not clock_gettime can be found in system libraries")
-       ], 
+       ],
        #
        # if not found, check librt specifically
        #
-       AC_CHECK_LIB(rt, clock_gettime, 
+       AC_CHECK_LIB(rt, clock_gettime,
            [
               AC_DEFINE(HAVE_CLOCK_GETTIME,1,"Whether or not clock_gettime can be found in system libraries")
 	      OS_LDFLAGS="$OS_LDFLAGS -lrt"
 	   ])
-)	  
+)
 
 # should we use mlockall() on this platform?
 if test "x$JACK_DO_NOT_MLOCK" = "x"; then
@@ -313,13 +313,13 @@ AC_ARG_ENABLE(ancient_libc,
 	JACK_LIBC_HELPER_FLAGS="-D_XOPEN_SOURCE=600 -D_BSD_SOURCE",
 	JACK_LIBC_HELPER_FLAGS=""
 	)
-	 
-JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS $JACK_LIBC_HELPER_FLAGS"   
+
+JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS $JACK_LIBC_HELPER_FLAGS"
 
 case $build_os in
      # we need weak linkage which appeared in 10.2, but lets ask for 10.4 anyway
      darwin*) JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS -mmacosx-version-min=10.4" ;;
-esac    
+esac
 
 AC_ARG_WITH(cpu-target,
             [  --with-cpu-target=cpu-type    explicit, overriding argument for gcc -march= flag])
@@ -347,7 +347,7 @@ fi
 if test "build_cpu" = "powerpc" -o "$build_cpu" = "powerpc64" ; then
 
     AC_DEFINE(POWERPC, 1, "Are we running a ppc CPU?")
-    
+
 ############################
 # Check for Altivec assembly
 ############################
@@ -355,11 +355,11 @@ if test "build_cpu" = "powerpc" -o "$build_cpu" = "powerpc64" ; then
     AC_ARG_ENABLE(altivec,
 	AC_HELP_STRING([--enable-altivec],[enable Altivec support (default=auto)]),,
 	[ enable_altivec=yes ])
-    
+
     if test "x$enable_altivec" = xyes; then
-	
+
 	AC_MSG_CHECKING(whether we can compile Altivec code)
-	
+
 	AC_COMPILE_IFELSE([asm ("vand %v0, %v0, %v0");],
 	    AC_DEFINE(USE_ALTIVEC, 1, [Define to 1 if Altivec assembly is available.])
 	    AC_DEFINE(HAVE_ALTIVEC_LINUX, 1, "Is there Altivec Support ?")
@@ -370,21 +370,21 @@ if test "build_cpu" = "powerpc" -o "$build_cpu" = "powerpc64" ; then
 	    AC_MSG_RESULT(no)
 	    AC_MSG_WARN([The assembler does not support the Altivec command set.])
 	)
-	
+
     fi
 
     dnl -mcpu=7450 does not reliably work with gcc 3.*
-    
+
     JACK_OPT_CFLAGS="-O2 -mcpu=7400 $ALTIVEC_OPT_FLAGS -mhard-float -mpowerpc-gfxopt"
 
     if test "$build_cpu" = "powerpc64"; then
-	JACK_OPT_CFLAGS="-O2 -mcpu=powerpc64 $ALTIVEC_OPT_FLAGS -mhard-float" 
+	JACK_OPT_CFLAGS="-O2 -mcpu=powerpc64 $ALTIVEC_OPT_FLAGS -mhard-float"
     fi
 
 elif echo $build_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 
     dnl Check for SSE usability
-    
+
     if test -r /proc/cpuinfo ; then
 	procflags=`grep '^flags' /proc/cpuinfo`
 	if echo $procflags | grep -s sse ; then
@@ -396,56 +396,56 @@ elif echo $build_cpu | egrep '(i.86|x86_64)' >/dev/null; then
         cpu_supports_sse=yes
 	AC_MSG_WARN([Assuming your x86/x86_64 system can support SSE. Use --disable-sse if this is not the case])
     fi
-    
+
     AC_ARG_ENABLE(optimization-by-compiler,
 	AC_HELP_STRING([--enable-optimization-by-compiler],[use compiler (NOT processor) capabilities to determine optimization flags (default=no)]),
 	optimization_by_compiler=yes,
 	optimization_by_compiler=no
     )
-    
+
     AC_ARG_ENABLE(optimization-by-cpu,
 	AC_HELP_STRING([--enable-optimization-by-cpu],[use processor capabilities to determine optimization flags (default=yes)]),,
 	optimization_by_cpu=yes
     )
-    
+
     AC_ARG_ENABLE(sse,
 	AC_HELP_STRING([--enable-sse],[enable SSE support (default=auto)]),,
 	enable_sse=yes)
-    
+
 
     if test "x$enable_sse" = xyes; then
-	
+
 	AC_MSG_CHECKING(whether we can compile SSE code)
-	
+
 	AC_COMPILE_IFELSE([asm ("movntps %xmm0, 0");],
 	    [
 		if test x$optimization_by_cpu = xyes ; then
 		    if test x$cpu_supports_sse = xyes ; then
 			SSE_FLAGS="-msse -mfpmath=sse"
 		    fi
-		else 
+		else
 		    SSE_FLAGS="-msse -mfpmath=sse"
 		fi
-		
+
 		AC_MSG_RESULT(yes)
 		],
 	    [
 		enable_sse=no
 		AC_MSG_RESULT(no)
-		AC_MSG_WARN([The assembler does not support the SSE command set.]) 
+		AC_MSG_WARN([The assembler does not support the SSE command set.])
 		])
     fi
-    
+
     AC_DEFINE(x86, 1, "Nope it's intel")
     COMMON_X86_OPT_FLAGS="-O3 -fomit-frame-pointer -ffast-math -funroll-loops"
 
 dnl
-dnl its a little sad that OS X doesn't make it possible to identify 
+dnl its a little sad that OS X doesn't make it possible to identify
 dnl the build_cpu a little more precisely. on os x we always get "i386"
-dnl as the CPU type. we miss out on some possible optimizations as 
+dnl as the CPU type. we miss out on some possible optimizations as
 dnl a result. oh well.
-dnl     
-    
+dnl
+
     if test x$with_cpu_target != x ; then
         JACK_OPT_CFLAGS="-march=$with_cpu_target -mtune=$with_cpu_target"
     else
@@ -460,7 +460,7 @@ dnl
 dnl
 dnl do not add h/w specific flags if asked to let compiler
 dnl to the optimization
-dnl    
+dnl
 
     if test x$optimization_by_compiler != xyes ; then
         JACK_OPT_CFLAGS="$COMMON_X86_OPT_FLAGS $JACK_OPT_CFLAGS $SSE_FLAGS"
@@ -490,7 +490,7 @@ AC_ARG_ENABLE(optimize,
         # no optimization, so lets get debugging symbols instead
 	JACK_OPT_CFLAGS="-g"
 	AC_MSG_WARN([no optimization.........................])
-      fi 
+      fi
     ],
     [
         # no optimization, so lets get debugging symbols instead
@@ -510,7 +510,7 @@ AC_SUBST(JACK_CORE_CFLAGS)
 
 dnl
 dnl use JACK_CFLAGS for jackd compilation
-dnl 
+dnl
 
 CFLAGS="$CFLAGS $JACK_CFLAGS"
 
@@ -518,20 +518,20 @@ CFLAGS="$CFLAGS $JACK_CFLAGS"
 buffer_resizing=yes
 AC_ARG_ENABLE(resize,
 	AC_HELP_STRING([--enable-resize], [enable buffer resizing feature (default=yes)]),
-        [ 
+        [
 	  if test x$enable_resize = xno ; then
 	  	buffer_resizing=no
 	  fi
 	 ]
 )
 
-if test x$buffer_resizing != xno; then 
+if test x$buffer_resizing != xno; then
    AC_DEFINE(DO_BUFFER_RESIZE,,[Enable buffer resizing])
 fi
 
 AC_ARG_ENABLE(valgrind-clean,
 	AC_HELP_STRING([--enable-valgrind-clean],[spend a few extra CPU cycles avoiding unnecessary valgrind warnings (default=no)]),
-        [ 
+        [
 	  if test x$enable_valgrind_clean != xno ; then
 	     AC_DEFINE(VALGRIND_CLEAN,,[clean up for valgrind])
           fi
@@ -541,7 +541,7 @@ AC_ARG_ENABLE(valgrind-clean,
 AC_ARG_ENABLE(debug,
 	AC_HELP_STRING([--enable-debug],
 		[enable debugging messages in jackd and libjack (default=no)]),
-        [ 
+        [
 	  if test x$enable_debug != xno ; then
 	     AC_DEFINE(DEBUG_ENABLED,,[Enable debugging messages])
           fi
@@ -551,11 +551,11 @@ AC_ARG_ENABLE(debug,
 AC_ARG_ENABLE(timestamps,
 	AC_HELP_STRING([--enable-timestamps],
 		[allow clients to use the JACK timestamp API (JACK developers only) (default=no)]),
-        [ 
+        [
 	  if test x$enable_timestamps != xno ; then
 	  	AC_DEFINE(WITH_TIMESTAMPS,,[Enable JACK timestamp API])
           fi
-        ]		
+        ]
 )
 
 AC_ARG_ENABLE(preemption-check,
@@ -603,7 +603,7 @@ AC_ARG_ENABLE(oldtrans,
 	AC_HELP_STRING([--disable-oldtrans],[remove old transport interfaces (default=yes)]),
               [ if test "x$enable_oldtrans" = "xno" ; then
 		    with_oldtrans=no
-		fi 
+		fi
 	      ]
 )
 if test "x$with_oldtrans" != "xno" ; then
@@ -613,12 +613,12 @@ fi
 STRIPPED_JACKD=false
 AC_ARG_ENABLE(stripped-jackd,
 	AC_HELP_STRING([--enable-stripped-jackd],[strip jack before computing its md5 sum (useful only with Linux 2.4 kernel)]),
-              [ if test "x$USE_CAPABILITIES" != "xtrue" ; then	    
+              [ if test "x$USE_CAPABILITIES" != "xtrue" ; then
                     AC_MSG_WARN([*** capabilities not enabled, stripped jackd has no effect])
                 elif test "x$enable_stripped_jackd" != "xno"; then
-                    STRIPPED_JACKD=true		    
-                fi  
-              ]	
+                    STRIPPED_JACKD=true
+                fi
+              ]
 )
 
 # plugins go in the addon dir.
@@ -690,7 +690,7 @@ fi
 HAVE_ZITA_BRIDGE_DEPS=false
 HAVE_ZITA_RESAMPLE=false
 HAVE_ZITA_ALSA_PCMI=false
-        
+
 case $build_os in
      linux*)
       AC_CHECK_LIB(zita-resampler, _Z28zita_resampler_major_versionv,
@@ -717,7 +717,7 @@ case $build_os in
                    AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
                    HAVE_ZITA_BRIDGE_DEPS=true
                fi
-           ]        
+           ]
      )
      ;;
 esac
@@ -806,7 +806,7 @@ fi
 AM_CONDITIONAL(HAVE_COREAUDIO, $HAVE_COREAUDIO)
 
 AC_ARG_ENABLE(oss, AC_HELP_STRING([--disable-oss],[ignore OSS driver ]),
-			TRY_OSS=$enableval , TRY_OSS=yes ) 
+			TRY_OSS=$enableval , TRY_OSS=yes )
 HAVE_OSS="false"
 if test "x$TRY_OSS" = "xyes"
 then
@@ -818,7 +818,7 @@ fi
 AM_CONDITIONAL(HAVE_OSS, $HAVE_OSS)
 
 AC_ARG_ENABLE(sun, AC_HELP_STRING([--disable-sun],[ignore Sun driver ]),
-			TRY_SUN=$enableval , TRY_SUN=yes ) 
+			TRY_SUN=$enableval , TRY_SUN=yes )
 HAVE_SUN="false"
 if test "x$TRY_SUN" = "xyes"
 then
@@ -830,7 +830,7 @@ fi
 AM_CONDITIONAL(HAVE_SUN, $HAVE_SUN)
 
 AC_ARG_ENABLE(freebob, AC_HELP_STRING([--disable-freebob],[ignore FreeBob driver ]),
-			TRY_FREEBOB=$enableval , TRY_FREEBOB=yes ) 
+			TRY_FREEBOB=$enableval , TRY_FREEBOB=yes )
 HAVE_FREEBOB="false"
 if test "x$TRY_FREEBOB" = "xyes"
 then
@@ -847,7 +847,7 @@ fi
 AM_CONDITIONAL(HAVE_FREEBOB,$HAVE_FREEBOB)
 
 AC_ARG_ENABLE(firewire, AC_HELP_STRING([--disable-firewire],[ignore FireWire driver (FFADO)]),
-			TRY_FIREWIRE=$enableval , TRY_FIREWIRE=yes ) 
+			TRY_FIREWIRE=$enableval , TRY_FIREWIRE=yes )
 HAVE_FIREWIRE="false"
 if test "x$TRY_FIREWIRE" = "xyes"
 then
@@ -864,7 +864,7 @@ fi
 AM_CONDITIONAL(HAVE_FIREWIRE,$HAVE_FIREWIRE)
 
 AC_ARG_ENABLE(alsa, AC_HELP_STRING([--disable-alsa],[ignore ALSA driver ]),
-			TRY_ALSA=$enableval , TRY_ALSA=yes ) 
+			TRY_ALSA=$enableval , TRY_ALSA=yes )
 HAVE_ALSA="false"
 if test "x$TRY_ALSA" = "xyes"
 then
@@ -897,7 +897,7 @@ AC_SUBST(JACK_SEMAPHORE_KEY)
 
 # On some systems, readline depends on termcap or ncurses.  But, the
 # MacOSX linker complains bitterly if these libraries are explicitly
-# referenced.  
+# referenced.
 #
 # AC_CHECK_LIB() foolishly assumes that checking a library for an entry
 # point always returns the same result regardless of any dependent
@@ -1009,4 +1009,4 @@ echo \| Default tmp dir....................................... : $DEFAULT_TMP_DI
 echo
 
 
- 
+
