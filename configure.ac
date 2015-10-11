@@ -1,8 +1,14 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl $Id$
 
-AC_INIT(jackd/jackd.c)
+AC_INIT([jack-audio-connection-kit],[0.124.2],
+                [jack-devel@lists.jackaudio.org],[],[http://www.jackaudio.org/])
 
+AC_CONFIG_SRCDIR([jackd/jackd.c])
+
+AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_AUX_DIR(config)
+AC_LANG([C])
 
 dnl
 dnl Check for existing JACK installs
@@ -28,7 +34,7 @@ for dir in /usr/lib /usr/local/lib /opt/lib ; do
 done
 
 if test "x$FORCE_INSTALL" != "xyes" -a $not_overwriting -gt 0 ; then
-    echo
+    AC_MSG_RESULT(yes)
     echo
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
     echo "You appear to have at least one existing installation of JACK."
@@ -54,6 +60,7 @@ if test "x$FORCE_INSTALL" != "xyes" -a $not_overwriting -gt 0 ; then
         exit 1
     fi
 fi
+AC_MSG_RESULT(no)
 
 AC_CONFIG_AUX_DIR(config)
 AC_CANONICAL_BUILD
@@ -67,9 +74,17 @@ dnl                 interfaces are changed
 dnl micro version = incremented when implementation-only
 dnl                 changes are made
 dnl ---
-JACK_MAJOR_VERSION=0
-JACK_MINOR_VERSION=124
-JACK_MICRO_VERSION=3
+
+JACK_MAJOR_VERSION=$(echo $PACKAGE_VERSION | sed "s/\..*//")
+JACK_MINOR_VERSION=$(echo $PACKAGE_VERSION | sed "s/${JACK_MAJOR_VERSION}\.//;s/\..*//")
+JACK_MICRO_VERSION=$(echo $PACKAGE_VERSION | sed "s/.*\.//g")
+
+if test "${JACK_MAJOR_VERSION}.${JACK_MINOR_VERSION}.${JACK_MICRO_VERSION}" != "${PACKAGE_VERSION}" ; then
+	echo "ooops"
+	echo "Found : ${JACK_MAJOR_VERSION}.${JACK_MINOR_VERSION}.${JACK_MICRO_VERSION}"
+	echo "Expected : ${PACKAGE_VERSION}"
+	exit 1
+	fi
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -100,10 +115,6 @@ JACK_API_CURRENT=0
 JACK_API_REVISION=28
 JACK_API_AGE=0
 
-AC_SUBST(JACK_MAJOR_VERSION)
-AC_SUBST(JACK_MINOR_VERSION)
-AC_SUBST(JACK_MICRO_VERSION)
-
 AC_SUBST(JACK_PROTOCOL_VERSION)
 AC_DEFINE_UNQUOTED(PROTOCOL_VERSION, "$JACK_PROTOCOL_VERSION", [Protocol version])
 
@@ -116,11 +127,12 @@ JACK_SO_VERSION=${JACK_API_CURRENT}:${JACK_API_REVISION}:${JACK_API_AGE}
 JACK_VERSION=$JACK_MAJOR_VERSION.$JACK_MINOR_VERSION.${JACK_MICRO_VERSION}${BETA}
 JACK_RELEASE=$JACK_MAJOR_VERSION-$JACK_MINOR_VERSION-${JACK_MICRO_VERSION}${BETA}
 
+
 AC_SUBST(JACK_SO_VERSION)
-AC_SUBST(JACK_VERSION)
 AC_SUBST(JACK_RELEASE)
 
-AM_INIT_AUTOMAKE(jack-audio-connection-kit,${JACK_VERSION})
+AM_INIT_AUTOMAKE
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 dnl
 dnl save any user-provided CFLAGS so we can forget
@@ -360,7 +372,7 @@ if test "build_cpu" = "powerpc" -o "$build_cpu" = "powerpc64" ; then
 
 	AC_MSG_CHECKING(whether we can compile Altivec code)
 
-	AC_COMPILE_IFELSE([asm ("vand %v0, %v0, %v0");],
+	AC_COMPILE_IFELSE([AC_LANG_SOURCE([asm ("vand %v0, %v0, %v0");])],
 	    AC_DEFINE(USE_ALTIVEC, 1, [Define to 1 if Altivec assembly is available.])
 	    AC_DEFINE(HAVE_ALTIVEC_LINUX, 1, "Is there Altivec Support ?")
 	    ALTIVEC_OPT_FLAGS="-maltivec -mabi=altivec"
@@ -417,7 +429,7 @@ elif echo $build_cpu | egrep '(i.86|x86_64)' >/dev/null; then
 
 	AC_MSG_CHECKING(whether we can compile SSE code)
 
-	AC_COMPILE_IFELSE([asm ("movntps %xmm0, 0");],
+	AC_COMPILE_IFELSE([AC_LANG_SOURCE([asm ("movntps %xmm0, 0");])],
 	    [
 		if test x$optimization_by_cpu = xyes ; then
 		    if test x$cpu_supports_sse = xyes ; then
@@ -985,7 +997,7 @@ dnl Output summary message
 dnl
 
 echo
-echo $PACKAGE $VERSION :
+echo $PACKAGE_NAME $PACKAGE_VERSION :
 echo
 echo \| Build with ALSA support............................... : $HAVE_ALSA
 echo \| Build with old FireWire \(FreeBob\) support............. : $HAVE_FREEBOB

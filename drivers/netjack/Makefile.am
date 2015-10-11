@@ -1,6 +1,6 @@
 MAINTAINCLEANFILES = Makefile.in
 
-AM_CFLAGS = $(JACK_CFLAGS) 
+AM_CFLAGS = $(JACK_CFLAGS)
 
 
 plugindir = $(ADDON_DIR)
@@ -14,3 +14,6 @@ jack_net_la_LIBADD = $(top_builddir)/libjack/libjack.la $(top_builddir)/jackd/li
 
 noinst_HEADERS = netjack.h net_driver.h netjack_packet.h
 
+noinst_LTLIBRARIES = libnetjack_packet.la
+
+libnetjack_packet_la_SOURCES = netjack_packet.c

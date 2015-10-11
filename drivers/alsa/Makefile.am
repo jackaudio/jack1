@@ -18,3 +18,8 @@ noinst_HEADERS = alsa_driver.h \
 		usx2y.h
 
 jack_alsa_la_LIBADD = $(ALSA_LIBS) $(top_builddir)/jackd/libjackserver.la
+
+
+noinst_LTLIBRARIES = libmemops.la
+
+libmemops_la_SOURCES = memops.c

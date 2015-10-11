@@ -18,11 +18,12 @@ else
     fi
 fi
 
-$LIBTOOLIZE --force 2>&1 | sed '/^You should/d' || {
+$LIBTOOLIZE --force --automake 2>&1 | sed '/^You should/d' || {
     echo "libtool failed, exiting..."
     exit 1
 }
 
+ACLOCAL_FLAGS="-I m4"
 aclocal $ACLOCAL_FLAGS || {
     echo "aclocal \$ACLOCAL_FLAGS where \$ACLOCAL_FLAGS= failed, exiting..."
     exit 1
