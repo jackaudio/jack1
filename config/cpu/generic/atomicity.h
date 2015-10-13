@@ -20,24 +20,20 @@
 #ifndef _ATOMICITY_H
 #define _ATOMICITY_H	1
 
-#warning "stub atomicity functions are not atomic on this platform"
-
 typedef int _Atomic_word;
 
 static inline _Atomic_word 
 __attribute__ ((__unused__))
 __exchange_and_add(volatile _Atomic_word* mem, int val)
 {
-  int result = *mem;
-  *mem += val;
-  return result;
+  return __sync_fetch_and_add(mem, val);
 }
 
 static inline void
 __attribute__ ((__unused__))
 __atomic_add(volatile _Atomic_word* mem, int val)
 {
-  *mem += val;
+  __sync_add_and_fetch(mem, val);
 }
 
 #endif /* atomicity.h */

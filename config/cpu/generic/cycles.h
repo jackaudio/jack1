@@ -22,17 +22,16 @@
 
 /* generic solution that is not really a solution at all */
 
-#warning You are compiling JACK on a platform for which jack/config/sysdep/cycles.h needs work
 #include <sys/time.h>
 
 typedef long cycles_t;
 
 static inline cycles_t get_cycles(void)
 {
-       struct timeval tv;
-       gettimeofday (&tv, NULL);
+       struct timespec time;
+       clock_gettime(CLOCK_REALTIME, &time);
 
-       return ((cycles_t) tv.tv_sec * 1000000) + tv.tv_usec;
+       return ((cycles_t) time.tv_sec * 1000000) + time.tv_nsec*1000;
 }
 
 #endif /* __jack_cycles_h__ */
