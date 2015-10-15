@@ -1,3 +1,5 @@
+NULL=
+
 MAINTAINERCLEANFILES    = Makefile.in
 
 if USE_POSIX_SHM
@@ -10,20 +12,24 @@ install-exec-hook:
 endif
 
 SOURCE_FILES = \
-	     client.c \
-	     intclient.c \
-	     messagebuffer.c \
-	     pool.c \
-	     port.c \
-	     metadata.c \
-             midiport.c \
-	     ringbuffer.c \
-	     shm.c \
-	     thread.c \
-             time.c \
-	     transclient.c \
-	     unlock.c \
-	     uuid.c
+	client.c \
+	driver.c \
+	intclient.c \
+	messagebuffer.c \
+	pool.c \
+	port.c \
+	metadata.c \
+	midiport.c \
+	ringbuffer.c \
+	sanitycheck.c \
+	shm.c \
+	systemtest.c \
+	thread.c \
+	time.c \
+	transclient.c \
+	unlock.c \
+	uuid.c \
+	$(NULL)
 
 simd.lo: $(srcdir)/simd.c
 	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/simd.c
