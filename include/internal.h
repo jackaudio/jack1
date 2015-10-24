@@ -34,21 +34,6 @@
 #include <sys/types.h>
 #include <sys/time.h>
 
-#ifndef POST_PACKED_STRUCTURE
-#ifdef __GNUC__
-/* POST_PACKED_STRUCTURE needs to be a macro which
-   expands into a compiler directive. The directive must
-   tell the compiler to arrange the preceding structure
-   declaration so that it is packed on byte-boundaries rather 
-   than use the natural alignment of the processor and/or
-   compiler.
-*/
-#define POST_PACKED_STRUCTURE __attribute__((__packed__))
-#else
-/* Add other things here for non-gcc platforms */
-#endif
-#endif
-
 /* Needed by <sysdeps/time.h> */
 extern void jack_error (const char *fmt, ...);
 
@@ -67,7 +52,6 @@ extern jack_thread_creator_t jack_thread_creator;
 
 typedef enum {
 	JACK_TIMER_SYSTEM_CLOCK,
-	JACK_TIMER_CYCLE_COUNTER,
 	JACK_TIMER_HPET,
 } jack_timer_type_t;
 
@@ -398,7 +382,8 @@ typedef enum {
 	ReserveName = 30,
 	SessionReply = 31,
 	SessionHasCallback = 32,
-        PropertyChangeNotify = 33
+	PropertyChangeNotify = 33,
+	PortNameChanged = 34
 } RequestType;
 
 struct _jack_request {

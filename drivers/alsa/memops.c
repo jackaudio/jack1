@@ -163,7 +163,7 @@
  * less random than rand(), but good enough and 10x faster 
  */
 
-inline unsigned int fast_rand() {
+static inline unsigned int fast_rand() {
 	static unsigned int seed = 22222;
 	seed = (seed * 96314165) + 907633515;
 

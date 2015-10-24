@@ -30,7 +30,6 @@ Select the audio interface backend.  The current list of supported
 backends is: \fBalsa\fR, \fBcoreaudio\fR, \fBdummy\fR, \fBfreebob\fR,
 \fBoss\fR \fBsun\fR and \fBportaudio\fR.  They are not all available
 on all platforms.  All \fIbackend\-parameters\fR are optional.
-
 .TP
 \fB\-h, \-\-help\fR
 .br
@@ -42,6 +41,41 @@ show how to list them.
 \fB\-m, \-\-no\-mlock\fR
 Do not attempt to lock memory, even if \fB\-\-realtime\fR.
 .TP
+\fB\-A \fIdevice\fR, \fB\-A \fIdevice%p\fR, \fB\-A \fIdevice%c\fR
+.br
+(Linux-only) A simplified way to add additional audio I/O hardware to an instance
+of JACK. This argument is actually just a wrapper around the -I
+(internal client) version, requiring only the name of the ALSA "card"
+to be used. The name should \fBNOT\fR include any ALSA device access
+prefix (e.g. "hw:" or "plughw:") but can include a
+subdevice. If %p is added to the device name, it will be made
+available for playback only. If %c is added to the device name, it
+will be made available for capture (recording) only. If neither %p nor
+%c is added, it will be made available (if possible) for both capture
+and playback. Although device names may be visible in various places
+on your system, the file /proc/asound/cards shows them inside square
+braces. 
+.br
+Examples:
+.br
+-A SB   (adds playback and capture for the "SB" device)
+.br
+-A Codec,1%c  (adds capture (recording) for the 2nd subdevice of the "Codec" device)
+.br
+-A MT1a2%p   (adds playback the 1st subdevice of the "MT1a2" device)
+.br
+The use of -A CARD is actually equivalent to -I foo:zalsa_in/-dhw:CARD
+\fIand\fR -I CARD:zalsa_out/-dhw:CARD. 
+.br
+The use of -A CARD%p is actually equivalent to  -I CARD:zalsa_out/-dhw:CARD. 
+.br
+The use of -A CARD%c is actually equivalent to -I CARD:zalsa_in/-dhw:CARD
+.br
+.br
+Note that this option (like -I) can be used regardless of the backend
+used, so even if you do not use the ALSA backend, you can still add
+ALSA-supported devices to an instance of JACK.
+.TP
 \fB\-I, \-\-internal-client \fIclient-spec\fR
 .br
 Load \fIclient-name\fR as an internal client. May be used multiple
@@ -49,9 +83,9 @@ times. The form of \fIclient-spec\fR can be any of the following:
 .br
 client-path
 .br
-client-name/client-path
+client-name:client-path
 .br
-client-name/client-path/init-string
+client-name:client-path/init-string
 .br
 client-path/init-string
 .br
@@ -132,6 +166,14 @@ Exit once all clients have closed their connections.
 .br
 Set client timeout limit in milliseconds.  The default is 500 msec.
 .TP
+\fB\-X, \-\-slave-driver\fR \fIdriver-name\fR
+.br
+Asks the server to load the "slave" driver given by
+\fIdriver-name\fR. Slave drivers can provide builtin-access to other
+devices and protocols; the primary slave-driver at this time is the
+"alsa_midi" one which provides bridging on Linux between native ALSA
+MIDI and JACK MIDI.
+.TP
 \fB\-Z, \-\-nozombies\fR
 .br
 Prevent JACK from ever kicking out clients because they were too slow.
@@ -150,8 +192,10 @@ Unlock libraries GTK+, QT, FLTK, Wine.
 \fB\-v, \-\-verbose\fR
 Give verbose output.
 .TP
-\fB\-c, \-\-clocksource\fR (\fI c(ycle)\fR | \fI h(pet) \fR | \fI s(ystem) \fR)
-Select a specific wall clock (Cycle Counter, HPET timer, System timer).
+\fB\-c, \-\-clocksource\fR (\fI h(pet) \fR | \fI s(ystem) \fR)
+Select a specific wall clock (HPET timer or the system clock). Asking for
+the now removed cycle-counter timer usiung \fI-c c\fR will result in
+the use of the system clock.
 .TP
 \fB\-V, \-\-version\fR
 Print the current JACK version number and exit.
@@ -257,15 +301,14 @@ unsuccessful.  Default is to prefer 32\-bit samples.
 Ignore xruns reported by the ALSA driver.  This makes JACK less likely
 to disconnect unresponsive ports when running without \fB\-\-realtime\fR.
 .TP
-\fB\-X, \-\-midi \fR[\fIseq\fR|\fIraw\fR]
+\fB\-X, \-\-midi seq
 .br
-Specify which ALSA MIDI system to provide access to. Using \fBraw\fR
-will provide a set of JACK MIDI ports that correspond to each raw ALSA
-device on the machine. Using \fBseq\fR will provide a set of JACK MIDI
-ports that correspond to each ALSA "sequencer" client (which includes
-each hardware MIDI port on the machine). \fBraw\fR provides slightly
-better performance but does not permit JACK MIDI communication with
-software written to use the ALSA "sequencer" API.
+Provide bridging between ALSA MIDI and JACK MIDI (using the ALSA
+sequencer system). All ALSA MIDI clients and MIDI hardware that exist
+when jackd starts will be represented by JACK MIDI ports. 
+.br
+The "seq" argument has been retained from older versions of JACK, in
+part to provide for the possibility of alternate implementations.
 .SS COREAUDIO BACKEND PARAMETERS
 .TP
 \fB\-c \-\-channel\fR

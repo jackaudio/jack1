@@ -69,7 +69,7 @@ dnl                 changes are made
 dnl ---
 JACK_MAJOR_VERSION=0
 JACK_MINOR_VERSION=124
-JACK_MICRO_VERSION=0
+JACK_MICRO_VERSION=2
 
 dnl ---
 dnl HOWTO: updating the jack protocol version
@@ -665,15 +665,6 @@ if test "x$USE_BARRIER" = "xyes"; then
 		AC_DEFINE(USE_BARRIER, 1, [Use pthread barrier functions]))
 fi
 
-HAVE_UUID=false
-PKG_CHECK_MODULES(UUID,uuid > 1.0,[HAVE_UUID=true], [true])
-if test x$HAVE_UUID = xfalse ; then
-      AC_MSG_ERROR([*** You do not have libuuid installed])
-else
-        CFLAGS="$CFLAGS $UUID_CFLAGS"
-        LIBS="$LIBS $UUID_LIBS"
-fi
-
 # some example-clients need libsndfile
 HAVE_SNDFILE=false
 PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
@@ -699,33 +690,34 @@ fi
 HAVE_ZITA_BRIDGE_DEPS=false
 HAVE_ZITA_RESAMPLE=false
 HAVE_ZITA_ALSA_PCMI=false
-
+        
 case $build_os in
      linux*)
-     AC_ARG_ENABLE(zalsa,
-           AC_HELP_STRING([--enable-zalsa],[Build clients based on Fons Adriensen\'s Zita libraries for access to multiple devices]),
-           [
-           if test x$enable_zalsa != xno ; then
-               HAVE_ZITA_RESAMPLE=false
-               HAVE_ZITA_ALSA_PCMI=false
-               AC_CHECK_LIB(zita-resampler, _Z28zita_resampler_major_versionv,
-                             [
-                                 HAVE_ZITA_RESAMPLE=true
-                                 AC_MSG_RESULT(yes)
-                                 ])
-               AC_CHECK_LIB(zita-alsa-pcmi, _Z28zita_alsa_pcmi_major_versionv,
-                   [
-                       HAVE_ZITA_ALSA_PCMI=true
-                       AC_MSG_RESULT(yes)
-                       ])
+      AC_CHECK_LIB(zita-resampler, _Z28zita_resampler_major_versionv,
+            [
+               HAVE_ZITA_RESAMPLE=true
+               AC_MSG_RESULT(yes)
+            ])
+      AC_CHECK_LIB(zita-alsa-pcmi, _Z28zita_alsa_pcmi_major_versionv,
+            [
+               HAVE_ZITA_ALSA_PCMI=true
+               AC_MSG_RESULT(yes)
+            ])
 
-               HAVE_ZITA_BRIDGE_DEPS=false
+     AC_ARG_ENABLE(zalsa,
+           AC_HELP_STRING([--enable-zalsa],[Build clients using Fons Adriensen\'s Zita libraries for access to multiple devices (default=yes if required libraries are present)]),
+           [
+               if test x$enable_zalsa != xno -a x$HAVE_ZITA_RESAMPLE = xtrue -a x$HAVE_ZITA_ALSA_PCMI = xtrue ; then
+                   AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
+                   HAVE_ZITA_BRIDGE_DEPS=true
+               fi
+           ],
+           [
                if test x$HAVE_ZITA_RESAMPLE = xtrue -a x$HAVE_ZITA_ALSA_PCMI = xtrue ; then
                    AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
                    HAVE_ZITA_BRIDGE_DEPS=true
                fi
-           fi
-           ]
+           ]        
      )
      ;;
 esac

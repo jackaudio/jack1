@@ -100,66 +100,112 @@ jack_load_internal_clients (JSList* load_list)
 
                 char* str = (char*) node->data;
                 jack_request_t req;
+                char* colon = strchr (str, ':');
                 char* slash = strchr (str, '/');
-                char* sslash;
-                char* client_name;
-                char* path;
+                char* client_name = NULL;
+                char* path = NULL;
                 char* args = NULL;
-                char* rest;
+                char* rest = NULL;
+                int free_path = 0;
+                int free_name = 0;
+                size_t len;
 
-                /* parse each argument/load_list member for the form foo,arg-list
-                   and split it apart if the slash is there.
-                 */
+                /* possible argument forms:
 
-                if (slash == NULL) {
+                   client-name:client-type/args
+                   client-type/args
+                   client-name:client-type
+                   client-type
+
+                   client-name is the desired JACK client name.
+                   client-type is basically the name of the DLL/DSO without any suffix.
+                   args is a string whose contents will be passed to the client as
+                   it is instantiated
+                */
+
+                if ((slash == NULL && colon == NULL) || (slash && colon && colon > slash)) {
+
+                        /* client-type */
+
                         client_name = str;
                         path = client_name;
-                } else {
-                        /* we want to copy the text up to the slash, not
-                           including the slash.
-                        */
-                        size_t len = slash - str;
-                        /* add 1 to leave space for a NULL */
-                        client_name = (char*) malloc (len + 1);
-                        memcpy (client_name, str, len);
-                        client_name[len] = '\0';
 
-                        /* is there another slash ? */
+                } else if (slash && colon) {
 
-                        sslash = strchr (slash+1, '/');
+                        /* client-name:client-type/args */
 
-                        if (sslash) {
-                                
-                                len = sslash - (slash+1);
-
-                                if (len) {
-                                        /* add 1 to leave space for a NULL */
-                                        path = (char*) malloc (len + 1);
-                                        memcpy (path, slash + 1, len);
-                                        path[len] = '\0';
-                                } else {
-                                        path = client_name;
-                                }
-
-                                rest = sslash + 1;
-
-                        } else {
-
-                                path = client_name;
-                                rest = slash + 1;
+                        len = colon - str;
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                client_name = (char*) malloc (len + 1);
+                                free_name = 1;
+                                memcpy (client_name, str, len);
+                                client_name[len] = '\0';
                         }
 
-                        /* we want to skip the text before the slash (len)
-                         * plus the slash itself
-                         */
+                        len = slash - (colon+1);
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                path = (char*) malloc (len + 1);
+                                free_path = 1;
+                                memcpy (path, colon + 1, len);
+                                path[len] = '\0';
+                        } else {
+                                path = client_name;
+                        }
+                        
+                        rest = slash + 1;
                         len = strlen (rest);
-
+                                
                         if (len) {
                                 /* add 1 to leave space for a NULL */
                                 args = (char*) malloc (len + 1);
                                 memcpy (args, rest, len);
                                 args[len] = '\0';
                         }
+                        
+                } else if (slash && colon == NULL) {
+
+                        /* client-type/args */
+
+                        len = slash - str;
+
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                path = (char *) malloc (len + 1);
+                                free_path = 1;
+                                memcpy (path, str, len);
+                                path[len] = '\0';
+                        }
+
+                        rest = slash + 1;
+                        len = strlen (rest);
+                                
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                args = (char*) malloc (len + 1);
+                                memcpy (args, rest, len);
+                                args[len] = '\0';
+                        }
+                } else {
+                        
+                        /* client-name:client-type */
+
+                        len = colon - str;
+
+                        if (len) {
+                                /* add 1 to leave space for a NULL */
+                                client_name = (char *) malloc (len + 1);
+                                free_name = 1;
+                                memcpy (client_name, str, len);
+                                client_name[len] = '\0';
+                                path = colon + 1;
+                        }
+                }
+
+                if (client_name == NULL || path == NULL) {
+                        fprintf (stderr, "incorrect format for internal client specification (%s)\n", str);
+                        exit (1);
                 }
 
                 memset (&req, 0, sizeof (req));
@@ -178,16 +224,17 @@ jack_load_internal_clients (JSList* load_list)
                 jack_intclient_load_request (engine, &req);
                 pthread_mutex_unlock (&engine->request_lock);
    
-                if (slash) {
+                if (free_name) {
                         free (client_name);
-                        if (args) {
-                                free (args);
-                        }
+                }
+                if (free_path) {
+                        free (path);
+                }
+                if (args) {
+                        free (args);
                 }
         }
 }
-
-
 
 static int
 jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * slave_names, JSList * load_list)
@@ -483,25 +530,8 @@ static void usage (FILE *file)
 {
 	copyright (file);
 	fprintf (file, "\n"
-"usage: jackd [ --no-realtime OR -r ]\n"
-"             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
-"      (the two previous arguments are mutually exclusive. The default is --realtime)\n"
-"             [ --name OR -n server-name ]\n"
-"             [ --load OR -l internal-client ]\n"
-"             [ --no-mlock OR -m ]\n"
-"             [ --unlock OR -u ]\n"
-"             [ --timeout OR -t client-timeout-in-msecs ]\n"
-"             [ --port-max OR -p maximum-number-of-ports]\n"
-"             [ --debug-timer OR -D ]\n"
-"             [ --no-sanity-checks OR -N ]\n"
-"             [ --verbose OR -v ]\n"
-"             [ --clocksource OR -c [ c(ycle) | h(pet) | s(ystem) ]\n"
-"             [ --replace-registry ]\n"
-"             [ --silent OR -s ]\n"
-"             [ --version OR -V ]\n"
-"             [ --nozombies OR -Z ]\n"
-"             [ --midi-bufsize OR -M midi-buffer-size-in-events ]\n"
-"         -d backend [ ... backend args ... ]\n"
+"usage: jackd [ server options ] -d backend [ ... backend options ... ]\n"
+"             (see the manual page for jackd for a complete list of options)\n\n"
 #ifdef __APPLE__
 "             Available backends may include: coreaudio, dummy, net, portaudio.\n\n"
 #else 
@@ -642,11 +672,18 @@ main (int argc, char *argv[])
 	int do_sanity_checks = 1;
 	int show_version = 0;
 
-	const char *options = "-d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
+#ifdef HAVE_ZITA_BRIDGE_DEPS
+	const char *options = "A:d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
+#else
+	const char *options = "A:d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
+#endif
 	struct option long_options[] = 
 	{ 
 		/* keep ordered by single-letter option code */
 
+#ifdef HAVE_ZITA_BRIDGE_DEPS
+                { "alsa-add", 1, 0, 'A' },
+#endif
 		{ "clock-source", 1, 0, 'c' },
 		{ "driver", 1, 0, 'd' },
 		{ "help", 0, 0, 'h' },
@@ -685,7 +722,12 @@ main (int argc, char *argv[])
 	int driver_nargs = 1;
 	int i;
 	int rc;
-
+#ifdef HAVE_ZITA_BRIDGE_DEPS
+        const char* alsa_add_client_name_playback = "zalsa_out";
+        const char* alsa_add_client_name_capture = "zalsa_in";
+        char alsa_add_args[64];
+        char* dirstr;
+#endif
 	setvbuf (stdout, NULL, _IOLBF, 0);
 
 	maybe_use_capabilities ();
@@ -696,11 +738,50 @@ main (int argc, char *argv[])
 				   long_options, &option_index)) != EOF) {
 		switch (opt) {
 
+#ifdef HAVE_ZITA_BRIDGE_DEPS
+                case 'A':
+                        /* add a new internal client named after the ALSA device name
+                           given as optarg, using the last character 'p' or 'c' to
+                           indicate playback or capture. If there isn't one,
+                           assume capture (common case: USB mics etc.)
+                        */
+                        if ((dirstr = strstr (optarg, "%p")) != NULL && dirstr == (optarg + strlen(optarg) - 2)) {
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_play:%s/-dhw:%.*s", 
+                                          (int) strlen (optarg) - 2, optarg,
+                                          alsa_add_client_name_playback,
+                                          (int) strlen (optarg) - 2, optarg);
+                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
+                        } else if ((dirstr = strstr (optarg, "%c")) != NULL && dirstr == (optarg + strlen(optarg) - 2)) {
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_rec:%s/-dhw:%.*s", 
+                                          (int) strlen (optarg) - 2, optarg,
+                                          alsa_add_client_name_capture,
+                                          (int) strlen (optarg) - 2, optarg);
+                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
+                        } else {
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_play:%s/-dhw:%s", 
+                                          optarg,
+                                          alsa_add_client_name_playback,
+                                          optarg);
+                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
+                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_rec:%s/-dhw:%s", 
+                                          optarg,
+                                          alsa_add_client_name_capture,
+                                          optarg);
+                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
+                        }
+                        break;
+#endif
+
 		case 'c':
 			if (tolower (optarg[0]) == 'h') {
 				clock_source = JACK_TIMER_HPET;
 			} else if (tolower (optarg[0]) == 'c') {
-				clock_source = JACK_TIMER_CYCLE_COUNTER;
+				/* For backwards compatibility with scripts,
+				 * allow the user to request the cycle clock
+				 * on the command line, but use the system
+				 * clock instead
+				 */
+				clock_source = JACK_TIMER_SYSTEM_CLOCK;
 			} else if (tolower (optarg[0]) == 's') {
 				clock_source = JACK_TIMER_SYSTEM_CLOCK;
 			} else {
@@ -822,7 +903,7 @@ main (int argc, char *argv[])
 
 	copyright (stdout);
 
-	if (do_sanity_checks && (0 < sanitycheck (realtime, (clock_source == JACK_TIMER_CYCLE_COUNTER)))) {
+	if (do_sanity_checks && (0 < sanitycheck (realtime, FALSE))) {
 		return -1;
 	}
 

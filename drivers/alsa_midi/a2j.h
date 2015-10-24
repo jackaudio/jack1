@@ -88,7 +88,6 @@ typedef struct alsa_midi_driver
     bool running;
     bool finishing;
 
-    jack_ringbuffer_t* port_add; // snd_seq_addr_t
     jack_ringbuffer_t* port_del; // struct a2j_port*
     jack_ringbuffer_t* outbound_events; // struct a2j_delivery_event
     jack_nframes_t cycle_start;
@@ -107,7 +106,7 @@ struct a2j_alsa_midi_event
     int size;
 };
 
-#define MAX_JACKMIDI_EV_SIZE 16
+#define MAX_JACKMIDI_EV_SIZE 64
 
 struct a2j_delivery_event 
 {

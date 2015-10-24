@@ -36,6 +36,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include <jack/jack.h>
 #include <jack/jslist.h>
@@ -168,7 +170,7 @@ jack_get_tmpdir ()
 	}
 
 	if (fgets (buf, sizeof (buf), in) == NULL) {
-		fclose (in);
+		pclose (in);
 		free (pathcopy);
 		return -1;
 	}
@@ -177,7 +179,7 @@ jack_get_tmpdir ()
 
 	if (buf[len-1] != '\n') {
 		/* didn't get a whole line */
-		fclose (in);
+		pclose (in);
 		free (pathcopy);
 		return -1;
 	}
@@ -190,7 +192,7 @@ jack_get_tmpdir ()
 	memcpy (jack_tmpdir, buf, len-1);
 	jack_tmpdir[len-1] = '\0';
 	
-	fclose (in);
+	pclose (in);
 	free (pathcopy);
 
 	return 0;
@@ -861,9 +863,14 @@ _start_server (const char *server_name)
 	int i = 0;
 	int good = 0;
 	int ret;
+        char *startup_file;
 
-	snprintf(filename, 255, "%s/.jackdrc", getenv("HOME"));
-	fp = fopen(filename, "r");
+        if ((startup_file = getenv ("JACK_RC_FILE")) == NULL) {
+                snprintf(filename, 255, "%s/.jackdrc", getenv("HOME"));
+                startup_file = filename;
+        }
+
+	fp = fopen(startup_file, "r");
 
 	if (!fp) {
 		fp = fopen("/etc/jackdrc", "r");
@@ -925,17 +932,33 @@ _start_server (const char *server_name)
 			}
 		}
 
-		result = strcspn(arguments+pos, " ");
-		if (result == 0) {
+		/* skip whitespace */
+		while (pos < strlen(arguments) && arguments[pos] && arguments[pos] == ' ') {
+			++pos;
+		}
+
+		if (pos >= strlen(arguments)) {
 			break;
 		}
-		argv[i] = (char*)malloc(result+1);
 
-		strncpy(argv[i], arguments+pos, result);
+		if (arguments[pos] == '\"') {
+			++pos;
+			result = strcspn(arguments + pos, "\"");
+		} else {
+			result = strcspn(arguments + pos, " ");
+		}
+
+		if (0 == result) {
+			break;
+		}
+
+		argv[i] = (char*)malloc(result + 1);
+		strncpy(argv[i], arguments + pos, result);
 		argv[i][result] = '\0';
-
-		pos += result+1;
-		++i;
+		pos += result + 1;
+		if (++i > 253) {
+			break;
+		}
 	}
 	argv[i] = 0;
 
@@ -957,6 +980,9 @@ failure:
 int
 start_server (const char *server_name, jack_options_t options)
 {
+        int status;
+        pid_t first_child_pid;
+
 	if ((options & JackNoStartServer)
 	    || getenv("JACK_NO_START_SERVER")) {
 		return 1;
@@ -971,7 +997,10 @@ start_server (const char *server_name, jack_options_t options)
 	 * virtual memory tricks, the overhead of the second fork() is
 	 * probably relatively small.
 	 */
-	switch (fork()) {
+
+        first_child_pid = fork();
+
+	switch (first_child_pid) {
 	case 0:				/* child process */
 		switch (fork()) {
 		case 0:			/* grandchild process */
@@ -985,6 +1014,9 @@ start_server (const char *server_name, jack_options_t options)
 	case -1:			/* fork() error */
 		return 1;		/* failed to start server */
 	}
+
+        /* reap the initaial child */
+        waitpid (first_child_pid, &status, 0);
 
 	/* only the original parent process goes here */
 	return 0;			/* (probably) successful */
@@ -1853,9 +1885,10 @@ jack_client_process_events (jack_client_t* client)
                         if (key) {
                                 free (key);
                         }
+                        break;
                 case PortRename:
                         if (control->port_rename_cbset) {
-                                client->port_rename_cb (event.y.other_id, event.x.name, event.z.other_name, client->port_rename_cb_arg);
+                                client->port_rename_cb (event.y.other_id, event.x.name, event.z.other_name, client->port_rename_arg);
                         }
                         break;
 		}
@@ -2720,6 +2753,21 @@ jack_set_buffer_size_callback (jack_client_t *client,
 }
 
 int
+jack_set_port_rename_callback (jack_client_t *client,
+                               JackPortRenameCallback callback,
+                               void *arg)
+{
+	if (client->control->active) {
+		jack_error ("You cannot set callbacks on an active client.");
+		return -1;
+	}
+	client->port_rename_arg = arg;
+	client->port_rename_cb = callback;
+	client->control->port_rename_cbset = (callback != NULL);
+	return 0;
+}
+
+int
 jack_set_port_registration_callback(jack_client_t *client,
 				    JackPortRegistrationCallback callback,
 				    void *arg)
@@ -3058,6 +3106,8 @@ jack_event_type_name (JackEventType type)
                 return "latency callback";
         case PropertyChange:
                 return "property change callback";
+        case PortRename:
+                return "port rename";
         default:
                 break;
         }

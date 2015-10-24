@@ -119,7 +119,7 @@ int
 jack_internal_client_handle (jack_client_t *client,
 			     const char *client_name,
 			     jack_status_t *status,
-                             jack_intclient_t handle)
+                             jack_intclient_t *handle)
 {
 	jack_request_t req;
 	jack_status_t my_status;
@@ -137,7 +137,7 @@ jack_internal_client_handle (jack_client_t *client,
 	*status = jack_client_deliver_request (client, &req);
 
         if (!jack_uuid_empty (req.x.intclient.uuid)) {
-                jack_uuid_copy (&handle, req.x.intclient.uuid);
+                jack_uuid_copy (handle, req.x.intclient.uuid);
                 return 0;
         }
 
