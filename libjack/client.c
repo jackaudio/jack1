@@ -313,7 +313,7 @@ jack_client_alloc ()
 {
 	jack_client_t *client;
 
-	if ((client = (jack_client_t *) malloc (sizeof (jack_client_t))) == NULL) {
+	if ((client = (jack_client_t *) calloc (1, sizeof (jack_client_t))) == NULL) {
 		return NULL;
 	}
 
@@ -353,7 +353,7 @@ jack_client_alloc ()
 {
 	jack_client_t *client;
 
-	if ((client = (jack_client_t *) malloc (sizeof (jack_client_t))) == NULL) {
+	if ((client = (jack_client_t *) calloc (1, sizeof (jack_client_t))) == NULL) {
 		return NULL;
 	}
 	if ((client->pollfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 2)) == NULL) {
