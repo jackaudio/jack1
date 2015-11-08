@@ -4472,6 +4472,17 @@ next:
 
 	req->x.port_info.port_id = port_id;
 
+	if (internal) {
+		/* set port order so clients can list ports in the proper order if
+		 * there are more than 9 driver ports (since the lack of leading zeros
+		 * breaks sorting by name) */
+		char index_str[16];
+		snprintf (index_str, sizeof(index_str), "%d", port_id);
+		jack_set_property (client, shared->uuid,
+		                   "http://jackaudio.org/metadata/order", index_str,
+		                   "http://www.w3.org/2001/XMLSchema#integer");
+	}
+
 	return 0;
 }
 

@@ -295,10 +295,15 @@ jack_client_deliver_request (const jack_client_t *client, jack_request_t *req)
 {
 	/* indirect through the function pointer that was set either
 	 * by jack_client_open() or by jack_new_client_request() in
-	 * the server.
+	 * the server. possibly NULL during driver port registration,
+	 * in which case we don't care about request delivery.
 	 */
 
-	return client->deliver_request (client->deliver_arg, req);
+	if (client->deliver_request) {
+		return client->deliver_request (client->deliver_arg, req);
+	}
+
+	return 0;
 }
 
 #if JACK_USE_MACH_THREADS 
