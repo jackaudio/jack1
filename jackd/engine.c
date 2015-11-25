@@ -3038,6 +3038,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
                         */
                         
                         if (event->type == PropertyChange) {
+                            if (keylen) {
                                 if (write (client->event_fd, key, keylen) != keylen) {
                                         jack_error ("cannot send property change key to client [%s] (%s)",
                                                     client->control->name,
@@ -3045,6 +3046,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
                                         client->error += JACK_ERROR_WITH_SOCKETS;
                                         jack_engine_signal_problems (engine);
                                 }
+                            }
                         }
 
  			if (client->error) {
