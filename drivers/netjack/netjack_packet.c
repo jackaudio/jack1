@@ -1268,7 +1268,7 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
         {
             // midi port, decode midi events
             // convert the data buffer to a standard format (uint32_t based)
-            unsigned int buffer_size_uint32 = net_period_down / 2;
+            unsigned int buffer_size_uint32 = net_period_down / 4;
             uint32_t * buffer_uint32 = (uint32_t*) packet_bufX;
             decode_midi_buffer (buffer_uint32, buffer_size_uint32, buf);
         }
