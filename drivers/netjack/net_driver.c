@@ -233,6 +233,20 @@ net_driver_write (net_driver_t* driver, jack_nframes_t nframes)
     // offset packet_bufX by the packetheader.
     packet_bufX = packet_buf + sizeof(jacknet_packet_header) / sizeof(jack_default_audio_sample_t);
 
+		// clear unused header fields
+    pkthdr->capture_channels_audio = 0;
+    pkthdr->playback_channels_audio = 0;
+    pkthdr->capture_channels_midi = 0;
+    pkthdr->playback_channels_midi = 0;
+    pkthdr->period_size = 0;
+    pkthdr->sample_rate = 0;
+    pkthdr->transport_frame = 0;
+    pkthdr->transport_state = 0;
+    pkthdr->framecnt = 0;
+    pkthdr->reply_port = 0;
+    pkthdr->mtu = 0;
+
+		// set used header fields
     pkthdr->sync_state = sync_state;
     pkthdr->latency = netj->time_to_deadline;
     //printf( "time to deadline = %d  goodness=%d\n", (int)netj->time_to_deadline, netj->deadline_goodness );
