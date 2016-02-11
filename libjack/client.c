@@ -1782,6 +1782,7 @@ jack_client_process_events (jack_client_t* client)
 		}
 
                 if (event.type == PropertyChange) {
+                    if (event.y.key_size) {
                         key = (char *) malloc (event.y.key_size);
                         if (read (client->event_fd, key, event.y.key_size) != 
                             event.y.key_size) {
@@ -1789,6 +1790,7 @@ jack_client_process_events (jack_client_t* client)
                                             strerror (errno));
                                 return -1;
                         }
+                    }
                 }
 
 		status = 0;
