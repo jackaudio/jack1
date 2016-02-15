@@ -688,11 +688,23 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 
  		err = snd_pcm_hw_params_get_period_size (
  			driver->playback_hw_params, &p_period_size, &dir);
+ 		if (err != 0)
+			jack_error ("snd_pcm_hw_params_get_period_size (playback) : %s",
+				snd_strerror (err));
+
  		err = snd_pcm_hw_params_get_format (
  			driver->playback_hw_params,
 			&(driver->playback_sample_format));
+ 		if (err != 0)
+			jack_error ("snd_pcm_hw_params_get_format (playback) : %s",
+				snd_strerror (err));
+
  		err = snd_pcm_hw_params_get_access (driver->playback_hw_params,
 						    &access);
+ 		if (err != 0)
+			jack_error ("snd_pcm_hw_params_get_access (playback) : %s",
+				snd_strerror (err));
+
  		driver->playback_interleaved =
 			(access == SND_PCM_ACCESS_MMAP_INTERLEAVED)
 			|| (access == SND_PCM_ACCESS_MMAP_COMPLEX);
@@ -711,11 +723,23 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 
  		err = snd_pcm_hw_params_get_period_size (
  			driver->capture_hw_params, &c_period_size, &dir);
+ 		if (err != 0)
+			jack_error ("snd_pcm_hw_params_get_period_size (capture): %s",
+				snd_strerror (err));
+
  		err = snd_pcm_hw_params_get_format (
  			driver->capture_hw_params,
 			&(driver->capture_sample_format));
+ 		if (err != 0)
+			jack_error ("snd_pcm_hw_params_get_format (capture) : %s",
+				snd_strerror (err));
+
  		err = snd_pcm_hw_params_get_access (driver->capture_hw_params,
 						    &access);
+ 		if (err != 0)
+			jack_error ("snd_pcm_hw_params_get_access (capture) : %s",
+				snd_strerror (err));
+
  		driver->capture_interleaved =
 			(access == SND_PCM_ACCESS_MMAP_INTERLEAVED)
 			|| (access == SND_PCM_ACCESS_MMAP_COMPLEX);
