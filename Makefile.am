@@ -1,6 +1,8 @@
 MAINTAINERCLEANFILES = Makefile.in aclocal.m4 configure config.h.in \
                        stamp-h.in config.log config.cache config.status
 
+ACLOCAL_AMFLAGS = -I m4
+
 if HAVE_DOXYGEN
 DOC_DIR = doc
 dist-check-doxygen:

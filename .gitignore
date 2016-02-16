@@ -50,6 +50,7 @@ jack/version.h
 jackd/jack_md5.h
 jackd/jackd
 jackd/jackd.1
+m4
 tags
 tools/alsa_in
 tools/alsa_out
@@ -66,3 +67,4 @@ tools/jack_thread_wait
 tools/jack_transport
 tools/jack_unload
 tools/jackrec
+libjack/.dirstamp
