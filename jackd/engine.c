@@ -2931,6 +2931,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 	    || (client->control->type == ClientExternal && kill (client->control->pid, 0))) {
 		DEBUG ("client %s is dead - no event sent",
 		       client->control->name);
+		va_end (ap);
 		return 0;
 	}
 
@@ -2944,6 +2945,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 			keylen = strlen (key) + 1;
 			if (event->y.key_size != keylen) {
 				jack_error ("property change key %s sent with wrong length (%d vs %d)", key, event->y.key_size, keylen);
+				va_end (ap);
 				return -1;
 			}
 		}
