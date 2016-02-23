@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2001 Paul Davis 
+    Copyright (C) 2001 Paul Davis
     Copyright (C) 2002 Dave LaRose
 
     This program is free software; you can redistribute it and/or modify
@@ -16,7 +16,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-*/
+ */
 
 #include "hardware.h"
 #include "alsa_driver.h"
@@ -29,45 +29,48 @@ static const int HDSP_UNITY_GAIN = 32768;
 static const int HDSP_MAX_GAIN = 65535;
 
 /*
- * Use these two arrays to choose the value of the input_channel 
- * argument to hsdp_set_mixer_gain().  hdsp_physical_input_index[n] 
- * selects the nth optical/analog input.  audio_stream_index[n] 
+ * Use these two arrays to choose the value of the input_channel
+ * argument to hsdp_set_mixer_gain().  hdsp_physical_input_index[n]
+ * selects the nth optical/analog input.  audio_stream_index[n]
  * selects the nth channel being received from the host via pci/pccard.
  */
 static const int hdsp_num_input_channels = 52;
 static const int hdsp_physical_input_index[] = {
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-  12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25};
+	0,  1,	2,  3,	4,  5,	6,  7,	8,  9,	10, 11,
+	12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,24,  25
+};
 static const int hdsp_audio_stream_index[] = {
-  26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
-  38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51};
+	26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
+	38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,50,  51
+};
 
 /*
- * Use this array to choose the value of the output_channel 
+ * Use this array to choose the value of the output_channel
  * argument to hsdp_set_mixer_gain().  hdsp_physical_output_index[26]
  * and hdsp_physical_output_index[27] refer to the two "line out"
  * channels (1/4" phone jack on the front of digiface/multiface).
  */
 static const int hdsp_num_output_channels = 28;
 static const int hdsp_physical_output_index[] = {
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-  12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27};
+	0,  1,	2,  3,	4,  5,	6,  7,	8,  9,	10, 11,
+	12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,24,  25, 26, 27
+};
 
 
 /* Function for checking argument values */
-static int clamp_int(int value, int lower_bound, int upper_bound)
+static int clamp_int (int value, int lower_bound, int upper_bound)
 {
-  if(value < lower_bound) {
-    return lower_bound;
-  }
-  if(value > upper_bound) {
-    return upper_bound;
-  }
-  return value;
+	if (value < lower_bound) {
+		return lower_bound;
+	}
+	if (value > upper_bound) {
+		return upper_bound;
+	}
+	return value;
 }
 
 /* Note(XXX): Maybe should share this code with hammerfall.c? */
-static void 
+static void
 set_control_id (snd_ctl_elem_id_t *ctl, const char *name)
 {
 	snd_ctl_elem_id_set_name (ctl, name);
@@ -86,18 +89,18 @@ set_control_id (snd_ctl_elem_id_t *ctl, const char *name)
 /* gain is an int from 0 to 65535, with 0 being -inf gain, and */
 /* 65535 being about +2dB. */
 
-static int hdsp_set_mixer_gain(jack_hardware_t *hw, int input_channel,
-			       int output_channel, int gain)
+static int hdsp_set_mixer_gain (jack_hardware_t *hw, int input_channel,
+				int output_channel, int gain)
 {
-	hdsp_t *h = (hdsp_t *) hw->private;
+	hdsp_t *h = (hdsp_t*)hw->private;
 	snd_ctl_elem_value_t *ctl;
 	snd_ctl_elem_id_t *ctl_id;
 	int err;
 
 	/* Check args */
-	input_channel = clamp_int(input_channel, 0, hdsp_num_input_channels);
-	output_channel = clamp_int(output_channel, 0, hdsp_num_output_channels);
-	gain = clamp_int(gain, HDSP_MINUS_INFINITY_GAIN, HDSP_MAX_GAIN);
+	input_channel = clamp_int (input_channel, 0, hdsp_num_input_channels);
+	output_channel = clamp_int (output_channel, 0, hdsp_num_output_channels);
+	gain = clamp_int (gain, HDSP_MINUS_INFINITY_GAIN, HDSP_MAX_GAIN);
 
 	/* Allocate control element and select "Mixer" control */
 	snd_ctl_elem_value_alloca (&ctl);
@@ -106,15 +109,15 @@ static int hdsp_set_mixer_gain(jack_hardware_t *hw, int input_channel,
 	snd_ctl_elem_value_set_id (ctl, ctl_id);
 
 	/* Apparently non-standard and unstable interface for the */
-        /* mixer control. */
+	/* mixer control. */
 	snd_ctl_elem_value_set_integer (ctl, 0, input_channel);
 	snd_ctl_elem_value_set_integer (ctl, 1, output_channel);
 	snd_ctl_elem_value_set_integer (ctl, 2, gain);
 
 	/* Commit the mixer value and check for errors */
 	if ((err = snd_ctl_elem_write (h->driver->ctl_handle, ctl)) != 0) {
-	  jack_error ("ALSA/HDSP: cannot set mixer gain (%s)", snd_strerror (err));
-	  return -1;
+		jack_error ("ALSA/HDSP: cannot set mixer gain (%s)", snd_strerror (err));
+		return -1;
 	}
 
 	/* Note (XXX): Perhaps we should maintain a cache of the current */
@@ -122,7 +125,7 @@ static int hdsp_set_mixer_gain(jack_hardware_t *hw, int input_channel,
 	/* hdsp hardware.  We'll leave this out until a little later. */
 	return 0;
 }
-  
+
 static int hdsp_set_input_monitor_mask (jack_hardware_t *hw, unsigned long mask)
 {
 	int i;
@@ -130,40 +133,40 @@ static int hdsp_set_input_monitor_mask (jack_hardware_t *hw, unsigned long mask)
 	/* For each input channel */
 	for (i = 0; i < 26; i++) {
 		/* Monitoring requested for this channel? */
-		if(mask & (1<<i)) {
+		if (mask & (1 << i)) {
 			/* Yes.  Connect physical input to output */
 
-			if(hdsp_set_mixer_gain (hw, hdsp_physical_input_index[i],
-						hdsp_physical_output_index[i],
-						HDSP_UNITY_GAIN) != 0) {
-			  return -1;
+			if (hdsp_set_mixer_gain (hw, hdsp_physical_input_index[i],
+						 hdsp_physical_output_index[i],
+						 HDSP_UNITY_GAIN) != 0) {
+				return -1;
 			}
 
 #ifdef CANNOT_HEAR_SOFTWARE_STREAM_WHEN_MONITORING
 			/* ...and disconnect the corresponding software */
 			/* channel */
-			if(hdsp_set_mixer_gain (hw, hdsp_audio_stream_index[i],
-						hdsp_physical_output_index[i],
-						HDSP_MINUS_INFINITY_GAIN) != 0) {
-			  return -1;
+			if (hdsp_set_mixer_gain (hw, hdsp_audio_stream_index[i],
+						 hdsp_physical_output_index[i],
+						 HDSP_MINUS_INFINITY_GAIN) != 0) {
+				return -1;
 			}
 #endif
 
 		} else {
 			/* No.  Disconnect physical input from output */
-			if(hdsp_set_mixer_gain (hw, hdsp_physical_input_index[i],
-						hdsp_physical_output_index[i],
-						HDSP_MINUS_INFINITY_GAIN) != 0) {
-			  return -1;
+			if (hdsp_set_mixer_gain (hw, hdsp_physical_input_index[i],
+						 hdsp_physical_output_index[i],
+						 HDSP_MINUS_INFINITY_GAIN) != 0) {
+				return -1;
 			}
 
 #ifdef CANNOT_HEAR_SOFTWARE_STREAM_WHEN_MONITORING
 			/* ...and connect the corresponding software */
 			/* channel */
-			if(hdsp_set_mixer_gain (hw, hdsp_audio_stream_index[i],
-						hdsp_physical_output_index[i],
-						HDSP_UNITY_GAIN) != 0) {
-			  return -1;
+			if (hdsp_set_mixer_gain (hw, hdsp_audio_stream_index[i],
+						 hdsp_physical_output_index[i],
+						 HDSP_UNITY_GAIN) != 0) {
+				return -1;
 			}
 #endif
 		}
@@ -174,11 +177,11 @@ static int hdsp_set_input_monitor_mask (jack_hardware_t *hw, unsigned long mask)
 }
 
 
-static int hdsp_change_sample_clock (jack_hardware_t *hw, SampleClockMode mode) 
+static int hdsp_change_sample_clock (jack_hardware_t *hw, SampleClockMode mode)
 {
-  // Empty for now, until Dave understands more about clock sync so
-  // he can test.
-  return -1;
+	// Empty for now, until Dave understands more about clock sync so
+	// he can test.
+	return -1;
 }
 
 static double hdsp_get_hardware_peak (jack_port_t *port, jack_nframes_t frame)
@@ -194,10 +197,10 @@ static double hdsp_get_hardware_power (jack_port_t *port, jack_nframes_t frame)
 static void
 hdsp_release (jack_hardware_t *hw)
 {
-	hdsp_t *h = (hdsp_t *) hw->private;
+	hdsp_t *h = (hdsp_t*)hw->private;
 
 	if (h != 0) {
-	  free (h);
+		free (h);
 	}
 }
 
@@ -209,7 +212,7 @@ jack_alsa_hdsp_hw_new (alsa_driver_t *driver)
 	jack_hardware_t *hw;
 	hdsp_t *h;
 
-	hw = (jack_hardware_t *) malloc (sizeof (jack_hardware_t));
+	hw = (jack_hardware_t*)malloc (sizeof(jack_hardware_t));
 
 	/* Not using clock lock-sync-whatever in home hardware setup */
 	/* yet.  Will write this code when can test it. */
@@ -223,8 +226,8 @@ jack_alsa_hdsp_hw_new (alsa_driver_t *driver)
 	hw->release = hdsp_release;
 	hw->get_hardware_peak = hdsp_get_hardware_peak;
 	hw->get_hardware_power = hdsp_get_hardware_power;
-	
-	h = (hdsp_t *) malloc (sizeof (hdsp_t));
+
+	h = (hdsp_t*)malloc (sizeof(hdsp_t));
 	h->driver = driver;
 	hw->private = h;
 

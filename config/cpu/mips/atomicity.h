@@ -34,50 +34,50 @@ typedef int _Atomic_word;
 
 static inline int
 __attribute__ ((__unused__))
-__exchange_and_add(volatile _Atomic_word* __mem, int __val)
+__exchange_and_add (volatile _Atomic_word* __mem, int __val)
 {
-  int __result, __tmp;
+	int __result, __tmp;
 
-  __asm__ __volatile__
-    ("/* Inline exchange & add */\n\t"
-     "1:\n\t"
-     ".set	push\n\t"
+	__asm__ __volatile__
+	("/* Inline exchange & add */\n\t"
+	 "1:\n\t"
+	 ".set	push\n\t"
 #if _MIPS_SIM == _ABIO32
-     ".set	mips2\n\t"
+	 ".set	mips2\n\t"
 #endif
-     "ll	%0,%3\n\t"
-     "addu	%1,%4,%0\n\t"
-     "sc	%1,%2\n\t"
-     ".set	pop\n\t"
-     "beqz	%1,1b\n\t"
-     "/* End exchange & add */"
-     : "=&r"(__result), "=&r"(__tmp), "=m"(*__mem)
-     : "m" (*__mem), "r"(__val));
+	 "ll	%0,%3\n\t"
+	 "addu	%1,%4,%0\n\t"
+	 "sc	%1,%2\n\t"
+	 ".set	pop\n\t"
+	 "beqz	%1,1b\n\t"
+	 "/* End exchange & add */"
+	 : "=&r" (__result), "=&r" (__tmp), "=m" (*__mem)
+	 : "m" (*__mem), "r" (__val));
 
-  return __result;
+	return __result;
 }
 
 static inline void
 __attribute__ ((__unused__))
-__atomic_add(volatile _Atomic_word* __mem, int __val)
+__atomic_add (volatile _Atomic_word* __mem, int __val)
 {
-  int __result;
+	int __result;
 
-  __asm__ __volatile__
-    ("/* Inline atomic add */\n\t"
-     "1:\n\t"
-     ".set	push\n\t"
+	__asm__ __volatile__
+	("/* Inline atomic add */\n\t"
+	 "1:\n\t"
+	 ".set	push\n\t"
 #if _MIPS_SIM == _ABIO32
-     ".set	mips2\n\t"
+	 ".set	mips2\n\t"
 #endif
-     "ll	%0,%2\n\t"
-     "addu	%0,%3,%0\n\t"
-     "sc	%0,%1\n\t"
-     ".set	pop\n\t"
-     "beqz	%0,1b\n\t"
-     "/* End atomic add */"
-     : "=&r"(__result), "=m"(*__mem)
-     : "m" (*__mem), "r"(__val));
+	 "ll	%0,%2\n\t"
+	 "addu	%0,%3,%0\n\t"
+	 "sc	%0,%1\n\t"
+	 ".set	pop\n\t"
+	 "beqz	%0,1b\n\t"
+	 "/* End atomic add */"
+	 : "=&r" (__result), "=m" (*__mem)
+	 : "m" (*__mem), "r" (__val));
 }
 
 #endif /* atomicity.h */

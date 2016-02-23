@@ -1,7 +1,7 @@
 /*
     Copyright (C) 2001 Paul Davis
     Code derived from various headers from the Linux kernel
-    
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -16,16 +16,16 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-*/
+ */
 
 #ifndef __jack_cycles_h__
 #define __jack_cycles_h__
 
 /* PowerPC */
 
-#define CPU_FTR_601			0x00000100
+#define CPU_FTR_601                     0x00000100
 #ifdef __powerpc64__
-#define CPU_FTR_CELL_TB_BUG		0x0000800000000000UL
+#define CPU_FTR_CELL_TB_BUG             0x0000800000000000UL
 #endif /* __powerpc64__ */
 
 typedef unsigned long cycles_t;
@@ -34,13 +34,13 @@ typedef unsigned long cycles_t;
 
 extern cycles_t cacheflush_time;
 
-static inline cycles_t get_cycles(void)
+static inline cycles_t get_cycles (void)
 {
 	cycles_t ret = 0;
 
 #ifdef __powerpc64__
 #ifdef ENABLE_CELLBE
-	asm volatile(					\
+	asm volatile (					 \
 		"90:	mftb %0;\n"			\
 		"97:	cmpwi %0,0;\n"			\
 		"	beq- 90b;\n"			\
@@ -54,11 +54,11 @@ static inline cycles_t get_cycles(void)
 		"	.llong 99b-98b\n"		\
 		".previous"				\
 		: "=r" (ret) : "i" (CPU_FTR_CELL_TB_BUG));
-#else /* !ENABLE_CELLBE */
-	__asm__ __volatile__("mftb %0" : "=r" (ret));
+#else   /* !ENABLE_CELLBE */
+	__asm__ __volatile__ ("mftb %0" : "=r" (ret));
 #endif /* !ENABLE_CELLBE */
-#else /* !__powerpc64__ */
-	__asm__ __volatile__(
+#else   /* !__powerpc64__ */
+	__asm__ __volatile__ (
 		"98:	mftb %0\n"
 		"99:\n"
 		".section __ftr_fixup,\"a\"\n"
@@ -68,7 +68,7 @@ static inline cycles_t get_cycles(void)
 		"	.long 99b\n"
 		".previous"
 		: "=r" (ret) : "i" (CPU_FTR_601));
-#endif /* !__powerpc64__ */
+#endif  /* !__powerpc64__ */
 	return ret;
 }
 

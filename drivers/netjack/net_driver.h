@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
+ */
 
 
 #ifndef __JACK_NET_DRIVER_H__
@@ -35,11 +35,10 @@
 
 typedef struct _net_driver net_driver_t;
 
-struct _net_driver
-{
-    JACK_DRIVER_NT_DECL;
+struct _net_driver {
+	JACK_DRIVER_NT_DECL;
 
-    netjack_driver_state_t netj;
+	netjack_driver_state_t netj;
 };
 
 #endif /* __JACK_NET_DRIVER_H__ */

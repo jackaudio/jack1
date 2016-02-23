@@ -1,6 +1,6 @@
 /*
     Copyright (C) 2001 Paul Davis
-    
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -15,14 +15,14 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-*/
+ */
 
 #ifndef __jack_hardware_h__
 #define __jack_hardware_h__
 
 #include <jack/types.h>
 
-typedef	enum  {
+typedef enum  {
 	AutoSync,
 	WordClock,
 	ClockMaster
@@ -48,18 +48,18 @@ typedef double (*JackHardwareGetHardwarePower)(jack_port_t *port, jack_nframes_t
 
 typedef struct _jack_hardware {
 
-    unsigned long capabilities;
-    unsigned long input_monitor_mask;
+	unsigned long capabilities;
+	unsigned long input_monitor_mask;
 
-    JackHardwareChangeSampleClockFunction change_sample_clock;
-    JackHardwareSetInputMonitorMaskFunction set_input_monitor_mask;
-    JackHardwareReleaseFunction release;
-    JackHardwareGetHardwarePeak get_hardware_peak;
-    JackHardwareGetHardwarePower get_hardware_power;
-    void *private;
+	JackHardwareChangeSampleClockFunction change_sample_clock;
+	JackHardwareSetInputMonitorMaskFunction set_input_monitor_mask;
+	JackHardwareReleaseFunction release;
+	JackHardwareGetHardwarePeak get_hardware_peak;
+	JackHardwareGetHardwarePower get_hardware_power;
+	void *private;
 
 } jack_hardware_t;
 
-jack_hardware_t * jack_hardware_new ();
+jack_hardware_t * jack_hardware_new();
 
 #endif /* __jack_hardware_h__ */

@@ -28,31 +28,31 @@
 // the GNU General Public License.
 
 #ifndef _GLIBCXX_ATOMICITY_H
-#define _GLIBCXX_ATOMICITY_H	1
+#define _GLIBCXX_ATOMICITY_H    1
 
 typedef int _Atomic_word;
 
-static inline _Atomic_word 
+static inline _Atomic_word
 __attribute__ ((__unused__))
-__exchange_and_add(volatile _Atomic_word* __mem, int __val)
+__exchange_and_add (volatile _Atomic_word* __mem, int __val)
 {
-  register _Atomic_word __old_val, __new_val;
+	register _Atomic_word __old_val, __new_val;
 
-  __asm__ __volatile__ ("   l     %0,0(%3)\n"
-                        "0: lr    %1,%0\n"
-                        "   ar    %1,%4\n"
-                        "   cs    %0,%1,0(%3)\n"
-                        "   jl    0b"
-                        : "=&d" (__old_val), "=&d" (__new_val), "=m" (*__mem)
-                        : "a" (__mem), "d" (__val), "m" (*__mem) : "cc");
-  return __old_val;
+	__asm__ __volatile__ ("   l     %0,0(%3)\n"
+			      "0: lr    %1,%0\n"
+			      "   ar    %1,%4\n"
+			      "   cs    %0,%1,0(%3)\n"
+			      "   jl    0b"
+			      : "=&d" (__old_val), "=&d" (__new_val), "=m" (*__mem)
+			      : "a" (__mem), "d" (__val), "m" (*__mem) : "cc");
+	return __old_val;
 }
 
 static inline void
 __attribute__ ((__unused__))
-__atomic_add(volatile _Atomic_word* __mem, int __val)
+__atomic_add (volatile _Atomic_word* __mem, int __val)
 {
-  __exchange_and_add(__mem, __val);
+	__exchange_and_add (__mem, __val);
 }
 
 #endif /* atomicity.h */

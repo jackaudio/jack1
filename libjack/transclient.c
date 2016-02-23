@@ -3,22 +3,22 @@
 
     Copyright (C) 2001-2003 Paul Davis
     Copyright (C) 2003 Jack O'Quin
-    
+
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public License
     as published by the Free Software Foundation; either version 2.1
     of the License, or (at your option) any later version.
-    
+
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
     Lesser General Public License for more details.
-    
+
     You should have received a copy of the GNU Lesser General Public
     License along with this program; if not, write to the Free
     Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
     02111-1307, USA.
-*/
+ */
 
 #include <config.h>
 #include <errno.h>
@@ -39,7 +39,7 @@ jack_unique_t
 jack_generate_unique_id (jack_control_t *ectl)
 {
 	/* The jack_unique_t is an opaque type. */
-	return exchange_and_add(&ectl->seq_number, 1);
+	return exchange_and_add (&ectl->seq_number, 1);
 }
 
 static inline void
@@ -49,7 +49,7 @@ jack_read_frame_time (const jack_client_t *client, jack_frame_timer_t *copy)
 	long timeout = 1000;
 
 	do {
-		/* throttle the busy wait if we don't get 
+		/* throttle the busy wait if we don't get
 		   the answer very quickly.
 
 		   XXX This is disgusting. on a UP
@@ -58,7 +58,7 @@ jack_read_frame_time (const jack_client_t *client, jack_frame_timer_t *copy)
 		   system, it should wait for half of
 		   the context switch time before
 		   sleeping.
-		*/
+		 */
 
 		if (tries > 10) {
 			usleep (20);
@@ -67,7 +67,7 @@ jack_read_frame_time (const jack_client_t *client, jack_frame_timer_t *copy)
 			/* debug code to avoid system hangs... */
 			if (--timeout == 0) {
 				jack_error ("hung in loop copying position A");
-				abort();
+				abort ();
 			}
 		}
 
@@ -97,7 +97,7 @@ jack_transport_copy_position (jack_position_t *from, jack_position_t *to)
 			/* debug code to avoid system hangs... */
 			if (--timeout == 0) {
 				jack_error ("hung in loop copying position B");
-				abort();
+				abort ();
 			}
 		}
 		*to = *from;
@@ -112,7 +112,7 @@ jack_transport_request_new_pos (jack_client_t *client, jack_position_t *pos)
 	jack_control_t *ectl = client->engine;
 
 	/* distinguish this request from all others */
-	pos->unique_1 = pos->unique_2 = jack_generate_unique_id(ectl);
+	pos->unique_1 = pos->unique_2 = jack_generate_unique_id (ectl);
 
 	/* clients may not set these fields */
 	pos->usecs = ectl->current_time.usecs;
@@ -120,7 +120,7 @@ jack_transport_request_new_pos (jack_client_t *client, jack_position_t *pos)
 
 	/* carefully copy requested postion into shared memory */
 	jack_transport_copy_position (pos, &ectl->request_time);
-	
+
 	return 0;
 }
 
@@ -139,8 +139,8 @@ jack_call_sync_client (jack_client_t *client)
 	    control->active_slowsync) {
 
 		if (client->sync_cb (ectl->transport_state,
-				      &ectl->current_time,
-				      client->sync_arg)) {
+				     &ectl->current_time,
+				     client->sync_arg)) {
 
 			if (control->sync_poll) {
 				control->sync_poll = 0;
@@ -156,14 +156,14 @@ jack_call_timebase_master (jack_client_t *client)
 {
 	jack_client_control_t *control = client->control;
 	jack_control_t *ectl = client->engine;
-	int new_pos = (int) ectl->pending_pos;
+	int new_pos = (int)ectl->pending_pos;
 
-	
+
 	/* Make sure this is still the master; is_timebase is set in a
 	 * critical section; timebase_cb is not. */
-	if (control->is_timebase) { 
+	if (control->is_timebase) {
 
-		if (control->timebase_new) {	/* first callback? */
+		if (control->timebase_new) {    /* first callback? */
 			control->timebase_new = 0;
 			new_pos = 1;
 		}
@@ -173,10 +173,10 @@ jack_call_timebase_master (jack_client_t *client)
 		    new_pos) {
 
 			client->timebase_cb (ectl->transport_state,
-					      ectl->buffer_size,
-					      &ectl->pending_time,
-					      new_pos,
-					      client->timebase_arg);
+					     ectl->buffer_size,
+					     &ectl->pending_time,
+					     new_pos,
+					     client->timebase_arg);
 		}
 
 	} else {
@@ -194,35 +194,35 @@ jack_call_timebase_master (jack_client_t *client)
 jack_nframes_t
 jack_get_current_transport_frame (const jack_client_t *client)
 {
- 	jack_position_t position;
+	jack_position_t position;
 	float usecs;
 	jack_nframes_t elapsed;
 	jack_transport_state_t tstate;
 
-	/* get the current transport position information. 
+	/* get the current transport position information.
 	   this is thread-safe and atomic with respect
 	   to the structure contents.
-	*/
+	 */
 
 	tstate = jack_transport_query (client, &position);
-	
+
 	if (tstate != JackTransportRolling) {
 		return position.frame;
 	}
-	
+
 	/* compute the elapsed usecs then audio frames since
 	   the transport info was last updated
-	*/
-	
-	usecs = jack_get_microseconds() - position.usecs;
-	elapsed = (jack_nframes_t) floor ((((float) position.frame_rate)
-					   / 1000000.0f) * usecs);
+	 */
+
+	usecs = jack_get_microseconds () - position.usecs;
+	elapsed = (jack_nframes_t)floor ((((float)position.frame_rate)
+					  / 1000000.0f) * usecs);
 
 	/* return the estimated transport frame position
 	 */
-	
+
 	return position.frame + elapsed;
-}	
+}
 
 jack_nframes_t
 jack_frames_since_cycle_start (const jack_client_t *client)
@@ -230,59 +230,59 @@ jack_frames_since_cycle_start (const jack_client_t *client)
 	float usecs;
 	jack_control_t *ectl = client->engine;
 
-	usecs = jack_get_microseconds() - ectl->current_time.usecs;
-	return (jack_nframes_t) floor ((((float) ectl->current_time.frame_rate)
-					/ 1000000.0f) * usecs);
+	usecs = jack_get_microseconds () - ectl->current_time.usecs;
+	return (jack_nframes_t)floor ((((float)ectl->current_time.frame_rate)
+				       / 1000000.0f) * usecs);
 }
 
 int
 jack_get_cycle_times (const jack_client_t *client,
 		      jack_nframes_t *current_frames,
-                      jack_time_t    *current_usecs,
-                      jack_time_t    *next_usecs,
+		      jack_time_t    *current_usecs,
+		      jack_time_t    *next_usecs,
 		      float          *period_usecs)
 {
 	jack_frame_timer_t time;
 
 	jack_read_frame_time (client, &time);
 	if (time.initialized) {
-	    *current_frames  = time.frames;
-	    *current_usecs   = time.current_wakeup;
-	    *next_usecs      = time.next_wakeup;
-	    *period_usecs    = time.period_usecs;
-	    return 0;
+		*current_frames  = time.frames;
+		*current_usecs   = time.current_wakeup;
+		*next_usecs      = time.next_wakeup;
+		*period_usecs    = time.period_usecs;
+		return 0;
 	}
 	return 1;
 }
 
 jack_time_t
-jack_get_time()
+jack_get_time ()
 {
-	return jack_get_microseconds();
+	return jack_get_microseconds ();
 }
 
 jack_nframes_t
-jack_time_to_frames(const jack_client_t *client, jack_time_t usecs)
+jack_time_to_frames (const jack_client_t *client, jack_time_t usecs)
 {
 	jack_frame_timer_t time;
 	jack_control_t *ectl = client->engine;
 
 	jack_read_frame_time (client, &time);
 	if (time.initialized) {
-	        /*
-		Make sure we have signed differences. It would make a lot  of sense
-		to use the standard signed intNN_t types everywhere  instead of e.g.
-		jack_nframes_t and jack_time_t. This would at least ensure that the
-		types used below are the correct ones. There is no way to get a type
-		that would be 'a signed version of jack_time_t' for example - the
-		types below are inherently fragile and there is no automatic way to
-	        check they are the correct ones. The only way is to check manually
-                against jack/types.h.  FA - 16/02/2012
-		*/
-	        int64_t du = usecs - time.current_wakeup;
-                int64_t dp = time.next_wakeup - time.current_wakeup;
-		return time.frames + (int32_t) floor (((double) du / (double) dp
-                                                       * ectl->buffer_size) + 0.5);
+		/*
+		   Make sure we have signed differences. It would make a lot  of sense
+		   to use the standard signed intNN_t types everywhere  instead of e.g.
+		   jack_nframes_t and jack_time_t. This would at least ensure that the
+		   types used below are the correct ones. There is no way to get a type
+		   that would be 'a signed version of jack_time_t' for example - the
+		   types below are inherently fragile and there is no automatic way to
+		   check they are the correct ones. The only way is to check manually
+		   against jack/types.h.  FA - 16/02/2012
+		 */
+		int64_t du = usecs - time.current_wakeup;
+		int64_t dp = time.next_wakeup - time.current_wakeup;
+		return time.frames + (int32_t)floor (((double)du / (double)dp
+						      * ectl->buffer_size) + 0.5);
 	}
 	return 0;
 }
@@ -290,8 +290,9 @@ jack_time_to_frames(const jack_client_t *client, jack_time_t usecs)
 jack_nframes_t
 jack_frame_time (const jack_client_t *client)
 {
-	jack_time_t now = jack_get_microseconds();
-	return jack_time_to_frames(client, now);
+	jack_time_t now = jack_get_microseconds ();
+
+	return jack_time_to_frames (client, now);
 }
 
 jack_nframes_t
@@ -301,28 +302,28 @@ jack_last_frame_time (const jack_client_t *client)
 }
 
 jack_time_t
-jack_frames_to_time(const jack_client_t *client, jack_nframes_t frames)
+jack_frames_to_time (const jack_client_t *client, jack_nframes_t frames)
 {
 	jack_frame_timer_t time;
 	jack_control_t *ectl = client->engine;
 
 	jack_read_frame_time (client, &time);
 	if (time.initialized) {
-	        /*
-                Make sure we have signed differences. It would make a lot  of sense
-	        to use the standard signed intNN_t types everywhere  instead of e.g.
-	        jack_nframes_t and jack_time_t. This would at least ensure that the
-	        types used below are the correct ones. There is no way to get a type
-	        that would be 'a signed version of jack_time_t' for example - the
-	        types below are inherently fragile and there is no automatic way to
-	        check they are the correct ones. The only way is to check manually
-                against jack/types.h.  FA - 16/02/2012
-	        */
-	        int32_t df = frames - time.frames;
-                int64_t dp = time.next_wakeup - time.current_wakeup;
-	        return time.current_wakeup + (int64_t) floor (((double) df * (double) dp
-                                                               / ectl->buffer_size) + 0.5);
-	} 
+		/*
+		   Make sure we have signed differences. It would make a lot  of sense
+		   to use the standard signed intNN_t types everywhere  instead of e.g.
+		   jack_nframes_t and jack_time_t. This would at least ensure that the
+		   types used below are the correct ones. There is no way to get a type
+		   that would be 'a signed version of jack_time_t' for example - the
+		   types below are inherently fragile and there is no automatic way to
+		   check they are the correct ones. The only way is to check manually
+		   against jack/types.h.  FA - 16/02/2012
+		 */
+		int32_t df = frames - time.frames;
+		int64_t dp = time.next_wakeup - time.current_wakeup;
+		return time.current_wakeup + (int64_t)floor (((double)df * (double)dp
+							      / ectl->buffer_size) + 0.5);
+	}
 	return 0;
 }
 
@@ -351,15 +352,15 @@ jack_set_sample_rate_callback (jack_client_t *client,
 	return 0;
 }
 
-int  
+int
 jack_release_timebase (jack_client_t *client)
 {
 	int rc;
 	jack_request_t req;
 	jack_client_control_t *ctl = client->control;
 
-        VALGRIND_MEMSET (&req, 0, sizeof (req));
-		
+	VALGRIND_MEMSET (&req, 0, sizeof(req));
+
 	req.type = ResetTimeBaseClient;
 	jack_uuid_copy (&req.x.client_id, ctl->uuid);
 
@@ -373,7 +374,7 @@ jack_release_timebase (jack_client_t *client)
 	return rc;
 }
 
-int  
+int
 jack_set_sync_callback (jack_client_t *client,
 			JackSyncCallback sync_callback, void *arg)
 {
@@ -381,12 +382,13 @@ jack_set_sync_callback (jack_client_t *client,
 	jack_request_t req;
 	int rc;
 
-        VALGRIND_MEMSET (&req, 0, sizeof (req));
-		
-	if (sync_callback)
+	VALGRIND_MEMSET (&req, 0, sizeof(req));
+
+	if (sync_callback) {
 		req.type = SetSyncClient;
-	else
+	} else {
 		req.type = ResetSyncClient;
+	}
 	jack_uuid_copy (&req.x.client_id, ctl->uuid);
 
 	rc = jack_client_deliver_request (client, &req);
@@ -398,20 +400,20 @@ jack_set_sync_callback (jack_client_t *client,
 	return rc;
 }
 
-int  
+int
 jack_set_sync_timeout (jack_client_t *client, jack_time_t usecs)
 {
 	jack_request_t req;
 
-        VALGRIND_MEMSET (&req, 0, sizeof (req));
-		
+	VALGRIND_MEMSET (&req, 0, sizeof(req));
+
 	req.type = SetSyncTimeout;
 	req.x.timeout = usecs;
 
 	return jack_client_deliver_request (client, &req);
 }
 
-int  
+int
 jack_set_timebase_callback (jack_client_t *client, int conditional,
 			    JackTimebaseCallback timebase_cb, void *arg)
 {
@@ -419,8 +421,8 @@ jack_set_timebase_callback (jack_client_t *client, int conditional,
 	jack_request_t req;
 	jack_client_control_t *ctl = client->control;
 
-        VALGRIND_MEMSET (&req, 0, sizeof (req));
-		
+	VALGRIND_MEMSET (&req, 0, sizeof(req));
+
 	req.type = SetTimeBaseClient;
 	jack_uuid_copy (&req.x.timebase.client_id, ctl->uuid);
 	req.x.timebase.conditional = conditional;
@@ -444,14 +446,14 @@ jack_transport_locate (jack_client_t *client, jack_nframes_t frame)
 	return jack_transport_request_new_pos (client, &pos);
 }
 
-jack_transport_state_t 
+jack_transport_state_t
 jack_transport_query (const jack_client_t *client, jack_position_t *pos)
 {
 	jack_control_t *ectl = client->engine;
 
 	if (pos) {
 		/* the guarded copy makes this function work in any
-		 * thread 
+		 * thread
 		 */
 		jack_transport_copy_position (&ectl->current_time, pos);
 	}
@@ -466,13 +468,14 @@ jack_transport_reposition (jack_client_t *client, const jack_position_t *pos)
 	jack_position_t tmp = *pos;
 
 	/* validate input */
-	if (tmp.valid & ~JACK_POSITION_MASK) /* unknown field present? */
+	if (tmp.valid & ~JACK_POSITION_MASK) { /* unknown field present? */
 		return EINVAL;
+	}
 
 	return jack_transport_request_new_pos (client, &tmp);
 }
 
-void  
+void
 jack_transport_start (jack_client_t *client)
 {
 	client->engine->transport_cmd = TransportCommandStart;
@@ -494,7 +497,7 @@ jack_engine_takeover_timebase (jack_client_t *client)
 {
 	jack_error ("jack_engine_takeover_timebase() is no longer supported.");
 	return ENOSYS;
-}	
+}
 
 void
 jack_get_transport_info (jack_client_t *client,
@@ -503,14 +506,15 @@ jack_get_transport_info (jack_client_t *client,
 	jack_control_t *ectl = client->engine;
 	static int first_time = 1;
 
-	if (first_time)
+	if (first_time) {
 		jack_error ("jack_get_transport_info() is deprecated.");
+	}
 	first_time = 0;
 
 	/* check that this is the process thread */
-	if (!pthread_equal(client->thread_id, pthread_self())) {
-		jack_error("Invalid thread for jack_get_transport_info().");
-		abort();		/* kill this client */
+	if (!pthread_equal (client->thread_id, pthread_self ())) {
+		jack_error ("Invalid thread for jack_get_transport_info().");
+		abort ();                /* kill this client */
 	}
 
 	info->usecs = ectl->current_time.usecs;
@@ -538,9 +542,10 @@ jack_set_transport_info (jack_client_t *client,
 {
 	static int first_time = 1;
 
-	if (first_time)
+	if (first_time) {
 		jack_error ("jack_set_transport_info() no longer supported.");
+	}
 	first_time = 0;
-}	
+}
 
 #endif /* OLD_TRANSPORT */

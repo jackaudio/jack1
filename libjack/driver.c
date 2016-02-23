@@ -1,22 +1,22 @@
 /* -*- mode: c; c-file-style: "linux"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
-    
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
     the Free Software Foundation; either version 2.1 of the License, or
     (at your option) any later version.
-    
+
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU Lesser General Public License for more details.
-    
+
     You should have received a copy of the GNU Lesser General Public License
-    along with this program; if not, write to the Free Software 
+    along with this program; if not, write to the Free Software
     Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
-    
-*/
+
+ */
 
 #include <config.h>
 #include <stdio.h>
@@ -36,22 +36,46 @@
 #include <sys/mman.h>
 #endif /* USE_MLOCK */
 
-static int dummy_attach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
-static int dummy_detach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
+static int dummy_attach (jack_driver_t *drv, jack_engine_t *eng)
+{
+	return 0;
+}
+static int dummy_detach (jack_driver_t *drv, jack_engine_t *eng)
+{
+	return 0;
+}
 static int dummy_write (jack_driver_t *drv,
-			jack_nframes_t nframes) { return 0; }
-static int dummy_read (jack_driver_t *drv, jack_nframes_t nframes) { return 0; }
+			jack_nframes_t nframes)
+{
+	return 0;
+}
+static int dummy_read (jack_driver_t *drv, jack_nframes_t nframes)
+{
+	return 0;
+}
 static int dummy_null_cycle (jack_driver_t *drv,
-			     jack_nframes_t nframes) { return 0; }
+			     jack_nframes_t nframes)
+{
+	return 0;
+}
 static int dummy_bufsize (jack_driver_t *drv,
-			  jack_nframes_t nframes) {return 0;}
-static int dummy_stop (jack_driver_t *drv) { return 0; }
-static int dummy_start (jack_driver_t *drv) { return 0; }
+			  jack_nframes_t nframes)
+{
+	return 0;
+}
+static int dummy_stop (jack_driver_t *drv)
+{
+	return 0;
+}
+static int dummy_start (jack_driver_t *drv)
+{
+	return 0;
+}
 
 void
 jack_driver_init (jack_driver_t *driver)
 {
-	memset (driver, 0, sizeof (*driver));
+	memset (driver, 0, sizeof(*driver));
 
 	driver->attach = dummy_attach;
 	driver->detach = dummy_detach;
@@ -66,12 +90,21 @@ jack_driver_init (jack_driver_t *driver)
 
 
 /****************************
- *** Non-Threaded Drivers ***
- ****************************/
+*** Non-Threaded Drivers ***
+****************************/
 
-static int dummy_nt_run_cycle (jack_driver_nt_t *drv) { return 0; }
-static int dummy_nt_attach    (jack_driver_nt_t *drv) { return 0; }
-static int dummy_nt_detach    (jack_driver_nt_t *drv) { return 0; }
+static int dummy_nt_run_cycle (jack_driver_nt_t *drv)
+{
+	return 0;
+}
+static int dummy_nt_attach (jack_driver_nt_t *drv)
+{
+	return 0;
+}
+static int dummy_nt_detach (jack_driver_nt_t *drv)
+{
+	return 0;
+}
 
 
 /*
@@ -104,16 +137,16 @@ jack_driver_nt_detach (jack_driver_nt_t * driver, jack_engine_t * engine)
 static void *
 jack_driver_nt_thread (void * arg)
 {
-	jack_driver_nt_t * driver = (jack_driver_nt_t *) arg;
+	jack_driver_nt_t * driver = (jack_driver_nt_t*)arg;
 	int rc = 0;
 	int run;
 
 	/* This thread may start running before pthread_create()
 	 * actually stores the driver->nt_thread value.  It's safer to
-	 * store it here as well. 
+	 * store it here as well.
 	 */
 
-	driver->nt_thread = pthread_self();
+	driver->nt_thread = pthread_self ();
 
 	pthread_mutex_lock (&driver->nt_run_lock);
 
@@ -130,7 +163,7 @@ jack_driver_nt_thread (void * arg)
 
 	pthread_mutex_unlock (&driver->nt_run_lock);
 
- out:
+out:
 	if (rc) {
 		driver->nt_run = DRIVER_NT_DYING;
 		driver->engine->driver_exit (driver->engine);
@@ -145,13 +178,13 @@ jack_driver_nt_start (jack_driver_nt_t * driver)
 
 	/* stop the new thread from really starting until the driver has
 	   been started.
-	*/
- 
+	 */
+
 	pthread_mutex_lock (&driver->nt_run_lock);
 	driver->nt_run = DRIVER_NT_RUN;
 
 	if ((err = jack_client_create_thread (NULL,
-					      &driver->nt_thread, 
+					      &driver->nt_thread,
 					      driver->engine->rtpriority,
 					      driver->engine->control->real_time,
 					      jack_driver_nt_thread, driver)) != 0) {
@@ -180,7 +213,7 @@ jack_driver_nt_do_stop (jack_driver_nt_t * driver, int run)
 	int err;
 
 	pthread_mutex_lock (&driver->nt_run_lock);
-	if(driver->nt_run != DRIVER_NT_DYING) {
+	if (driver->nt_run != DRIVER_NT_DYING) {
 		driver->nt_run = run;
 	}
 	pthread_mutex_unlock (&driver->nt_run_lock);
@@ -189,7 +222,7 @@ jack_driver_nt_do_stop (jack_driver_nt_t * driver, int run)
 	if (driver->nt_thread && driver->nt_run != DRIVER_NT_DYING
 	    && (err = pthread_join (driver->nt_thread, NULL)) != 0) {
 		jack_error ("DRIVER NT: error waiting for driver thread: %s",
-                            strerror (err));
+			    strerror (err));
 		return err;
 	}
 
@@ -235,19 +268,19 @@ jack_driver_nt_bufsize (jack_driver_nt_t * driver, jack_nframes_t nframes)
 void
 jack_driver_nt_init (jack_driver_nt_t * driver)
 {
-	memset (driver, 0, sizeof (*driver));
+	memset (driver, 0, sizeof(*driver));
 
-	jack_driver_init ((jack_driver_t *) driver);
+	jack_driver_init ((jack_driver_t*)driver);
 
-	driver->attach       = (JackDriverAttachFunction)    jack_driver_nt_attach;
-	driver->detach       = (JackDriverDetachFunction)    jack_driver_nt_detach;
-	driver->bufsize      = (JackDriverBufSizeFunction)   jack_driver_nt_bufsize;
-	driver->stop         = (JackDriverStopFunction)      jack_driver_nt_stop;
-	driver->start        = (JackDriverStartFunction)     jack_driver_nt_start;
+	driver->attach       = (JackDriverAttachFunction)jack_driver_nt_attach;
+	driver->detach       = (JackDriverDetachFunction)jack_driver_nt_detach;
+	driver->bufsize      = (JackDriverBufSizeFunction)jack_driver_nt_bufsize;
+	driver->stop         = (JackDriverStopFunction)jack_driver_nt_stop;
+	driver->start        = (JackDriverStartFunction)jack_driver_nt_start;
 
-	driver->nt_bufsize   = (JackDriverNTBufSizeFunction) dummy_bufsize;
-	driver->nt_start     = (JackDriverNTStartFunction)   dummy_start;
-	driver->nt_stop      = (JackDriverNTStopFunction)    dummy_stop;
+	driver->nt_bufsize   = (JackDriverNTBufSizeFunction)dummy_bufsize;
+	driver->nt_start     = (JackDriverNTStartFunction)dummy_start;
+	driver->nt_stop      = (JackDriverNTStopFunction)dummy_stop;
 	driver->nt_attach    =                               dummy_nt_attach;
 	driver->nt_detach    =                               dummy_nt_detach;
 	driver->nt_run_cycle =                               dummy_nt_run_cycle;
@@ -257,7 +290,7 @@ jack_driver_nt_init (jack_driver_nt_t * driver)
 }
 
 void
-jack_driver_nt_finish     (jack_driver_nt_t * driver)
+jack_driver_nt_finish (jack_driver_nt_t * driver)
 {
 	pthread_mutex_destroy (&driver->nt_run_lock);
 }

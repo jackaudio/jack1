@@ -18,22 +18,22 @@
    02111-1307 USA.  */
 
 #ifndef _ATOMICITY_H
-#define _ATOMICITY_H	1
+#define _ATOMICITY_H    1
 
 typedef int _Atomic_word;
 
-static inline _Atomic_word 
+static inline _Atomic_word
 __attribute__ ((__unused__))
-__exchange_and_add(volatile _Atomic_word* mem, int val)
+__exchange_and_add (volatile _Atomic_word* mem, int val)
 {
-  return __sync_fetch_and_add(mem, val);
+	return __sync_fetch_and_add (mem, val);
 }
 
 static inline void
 __attribute__ ((__unused__))
-__atomic_add(volatile _Atomic_word* mem, int val)
+__atomic_add (volatile _Atomic_word* mem, int val)
 {
-  __sync_add_and_fetch(mem, val);
+	__sync_add_and_fetch (mem, val);
 }
 
 #endif /* atomicity.h */

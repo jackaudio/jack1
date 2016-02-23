@@ -28,7 +28,7 @@
 // the GNU General Public License.
 
 #ifndef _GLIBCXX_ATOMICITY_H
-#define _GLIBCXX_ATOMICITY_H	1
+#define _GLIBCXX_ATOMICITY_H    1
 
 /* @@@ With gas we can play nice .subsection games to get the
    non-predicted branch pointing forward.  But Digital assemblers
@@ -39,38 +39,38 @@ typedef int _Atomic_word;
 
 static inline _Atomic_word
 __attribute__ ((__unused__))
-__exchange_and_add(volatile _Atomic_word* __mem, int __val)
+__exchange_and_add (volatile _Atomic_word* __mem, int __val)
 {
-  register int __result, __tmp;
+	register int __result, __tmp;
 
-  __asm__ __volatile__ (
-      "\n$Lxadd_%=:\n\t"
-      "ldl_l  %0,%3\n\t"
-      "addl   %0,%4,%1\n\t"
-      "stl_c  %1,%2\n\t"
-      "beq    %1,$Lxadd_%=\n\t"
-      "mb"
-      : "=&r"(__result), "=&r"(__tmp), "=m"(*__mem)
-      : "m" (*__mem), "r"(__val));
+	__asm__ __volatile__ (
+		"\n$Lxadd_%=:\n\t"
+		"ldl_l  %0,%3\n\t"
+		"addl   %0,%4,%1\n\t"
+		"stl_c  %1,%2\n\t"
+		"beq    %1,$Lxadd_%=\n\t"
+		"mb"
+		: "=&r" (__result), "=&r" (__tmp), "=m" (*__mem)
+		: "m" (*__mem), "r" (__val));
 
-  return __result;
+	return __result;
 }
 
 static inline void
 __attribute__ ((__unused__))
-__atomic_add(volatile _Atomic_word* __mem, int __val)
+__atomic_add (volatile _Atomic_word* __mem, int __val)
 {
-  register _Atomic_word __result;
+	register _Atomic_word __result;
 
-  __asm__ __volatile__ (
-      "\n$Ladd_%=:\n\t"
-      "ldl_l  %0,%2\n\t"
-      "addl   %0,%3,%0\n\t"
-      "stl_c  %0,%1\n\t"
-      "beq    %0,$Ladd_%=\n\t"
-      "mb"
-      : "=&r"(__result), "=m"(*__mem)
-      : "m" (*__mem), "r"(__val));
+	__asm__ __volatile__ (
+		"\n$Ladd_%=:\n\t"
+		"ldl_l  %0,%2\n\t"
+		"addl   %0,%3,%0\n\t"
+		"stl_c  %0,%1\n\t"
+		"beq    %0,$Ladd_%=\n\t"
+		"mb"
+		: "=&r" (__result), "=m" (*__mem)
+		: "m" (*__mem), "r" (__val));
 }
 
 #endif /* atomicity.h */

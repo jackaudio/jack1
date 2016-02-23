@@ -32,18 +32,16 @@
 #include "port_thread.h"
 
 struct a2j_port *
-a2j_find_port_by_addr(
+a2j_find_port_by_addr (
 	struct a2j_stream * stream_ptr,
 	snd_seq_addr_t addr)
 {
 	struct list_head * node_ptr;
 	struct a2j_port * port_ptr;
 
-	list_for_each(node_ptr, &stream_ptr->list)
-	{
-		port_ptr = list_entry(node_ptr, struct a2j_port, siblings);
-		if (port_ptr->remote.client == addr.client && port_ptr->remote.port == addr.port)
-		{
+	list_for_each (node_ptr, &stream_ptr->list){
+		port_ptr = list_entry (node_ptr, struct a2j_port, siblings);
+		if (port_ptr->remote.client == addr.client && port_ptr->remote.port == addr.port) {
 			return port_ptr;
 		}
 	}
@@ -52,18 +50,16 @@ a2j_find_port_by_addr(
 }
 
 struct a2j_port *
-a2j_find_port_by_jack_port_name(
+a2j_find_port_by_jack_port_name (
 	struct a2j_stream * stream_ptr,
 	const char * jack_port)
 {
 	struct list_head * node_ptr;
 	struct a2j_port * port_ptr;
 
-	list_for_each(node_ptr, &stream_ptr->list)
-	{
-		port_ptr = list_entry(node_ptr, struct a2j_port, siblings);
-		if (strcmp(port_ptr->name, jack_port) == 0)
-		{
+	list_for_each (node_ptr, &stream_ptr->list){
+		port_ptr = list_entry (node_ptr, struct a2j_port, siblings);
+		if (strcmp (port_ptr->name, jack_port) == 0) {
 			return port_ptr;
 		}
 	}
@@ -83,10 +79,10 @@ a2j_update_port_type (alsa_midi_driver_t * driver, int dir, snd_seq_addr_t addr,
 	int alsa_mask;
 	struct a2j_port * port_ptr;
 
-	a2j_debug("update_port_type(%d:%d)", addr.client, addr.port);
+	a2j_debug ("update_port_type(%d:%d)", addr.client, addr.port);
 
 	stream_ptr = &driver->stream[dir];
-	port_ptr = a2j_find_port_by_addr(stream_ptr, addr);
+	port_ptr = a2j_find_port_by_addr (stream_ptr, addr);
 
 	if (dir == A2J_PORT_CAPTURE) {
 		alsa_mask = SND_SEQ_PORT_CAP_SUBS_READ;
@@ -95,18 +91,18 @@ a2j_update_port_type (alsa_midi_driver_t * driver, int dir, snd_seq_addr_t addr,
 	}
 
 	if (port_ptr != NULL && (caps & alsa_mask) != alsa_mask) {
-		a2j_debug("setdead: %s", port_ptr->name);
+		a2j_debug ("setdead: %s", port_ptr->name);
 		port_ptr->is_dead = true;
 	}
 
 	if (port_ptr == NULL && (caps & alsa_mask) == alsa_mask) {
-		if(jack_ringbuffer_write_space(stream_ptr->new_ports) >= sizeof(port_ptr)) {
-                  port_ptr = a2j_port_create (driver, dir, addr, info);
+		if (jack_ringbuffer_write_space (stream_ptr->new_ports) >= sizeof(port_ptr)) {
+			port_ptr = a2j_port_create (driver, dir, addr, info);
 			if (port_ptr != NULL) {
-				jack_ringbuffer_write(stream_ptr->new_ports, (char *)&port_ptr, sizeof(port_ptr));
+				jack_ringbuffer_write (stream_ptr->new_ports, (char*)&port_ptr, sizeof(port_ptr));
 			}
 		} else {
-			a2j_error( "dropping new port event... increase MAX_PORTS" );
+			a2j_error ( "dropping new port event... increase MAX_PORTS" );
 		}
 	}
 }
@@ -114,85 +110,85 @@ a2j_update_port_type (alsa_midi_driver_t * driver, int dir, snd_seq_addr_t addr,
 void
 a2j_update_port (alsa_midi_driver_t * driver, snd_seq_addr_t addr, const snd_seq_port_info_t * info)
 {
-	unsigned int port_caps = snd_seq_port_info_get_capability(info);
-	unsigned int port_type = snd_seq_port_info_get_type(info);
+	unsigned int port_caps = snd_seq_port_info_get_capability (info);
+	unsigned int port_type = snd_seq_port_info_get_type (info);
 
-	a2j_debug("port %u:%u", addr.client, addr.port);
-	a2j_debug("port type: 0x%08X", port_type);
-	a2j_debug("port caps: 0x%08X", port_caps);
+	a2j_debug ("port %u:%u", addr.client, addr.port);
+	a2j_debug ("port type: 0x%08X", port_type);
+	a2j_debug ("port caps: 0x%08X", port_caps);
 
 	if (port_type & SND_SEQ_PORT_TYPE_SPECIFIC) {
-		a2j_debug("SPECIFIC");
+		a2j_debug ("SPECIFIC");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_MIDI_GENERIC) {
-		a2j_debug("MIDI_GENERIC");
+		a2j_debug ("MIDI_GENERIC");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_MIDI_GM) {
-		a2j_debug("MIDI_GM");
+		a2j_debug ("MIDI_GM");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_MIDI_GS) {
-		a2j_debug("MIDI_GS");
+		a2j_debug ("MIDI_GS");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_MIDI_XG) {
-		a2j_debug("MIDI_XG");
+		a2j_debug ("MIDI_XG");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_MIDI_MT32) {
-		a2j_debug("MIDI_MT32");
+		a2j_debug ("MIDI_MT32");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_MIDI_GM2) {
-		a2j_debug("MIDI_GM2");
+		a2j_debug ("MIDI_GM2");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_SYNTH) {
-		a2j_debug("SYNTH");
+		a2j_debug ("SYNTH");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_DIRECT_SAMPLE) {
-		a2j_debug("DIRECT_SAMPLE");
+		a2j_debug ("DIRECT_SAMPLE");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_SAMPLE) {
-		a2j_debug("SAMPLE");
+		a2j_debug ("SAMPLE");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_HARDWARE) {
-		a2j_debug("HARDWARE");
+		a2j_debug ("HARDWARE");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_SOFTWARE) {
-		a2j_debug("SOFTWARE");
+		a2j_debug ("SOFTWARE");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_SYNTHESIZER) {
-		a2j_debug("SYNTHESIZER");
+		a2j_debug ("SYNTHESIZER");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_PORT) {
-		a2j_debug("PORT");
+		a2j_debug ("PORT");
 	}
 
 	if (port_type & SND_SEQ_PORT_TYPE_APPLICATION) {
-		a2j_debug("APPLICATION");
+		a2j_debug ("APPLICATION");
 	}
 
 	if (port_type == 0) {
-		a2j_debug("Ignoring port of type 0");
+		a2j_debug ("Ignoring port of type 0");
 		return;
 	}
 
 	if (port_caps & SND_SEQ_PORT_CAP_NO_EXPORT) {
-		a2j_debug("Ignoring no-export port");
+		a2j_debug ("Ignoring no-export port");
 		return;
 	}
 
-        a2j_update_port_type (driver, A2J_PORT_CAPTURE, addr, port_caps, info);
-        a2j_update_port_type (driver, A2J_PORT_PLAYBACK, addr, port_caps, info);
+	a2j_update_port_type (driver, A2J_PORT_CAPTURE, addr, port_caps, info);
+	a2j_update_port_type (driver, A2J_PORT_PLAYBACK, addr, port_caps, info);
 }
 
 void
@@ -202,47 +198,47 @@ a2j_free_ports (alsa_midi_driver_t * driver)
 	int sz;
 
 	while ((sz = jack_ringbuffer_read (driver->port_del, (char*)&port, sizeof(port)))) {
-          assert (sz == sizeof(port));
-          a2j_debug("port deleted: %s", port->name);
-          list_del (&port->siblings);
-          a2j_port_free(port);
+		assert (sz == sizeof(port));
+		a2j_debug ("port deleted: %s", port->name);
+		list_del (&port->siblings);
+		a2j_port_free (port);
 	}
 }
 
 void
 a2j_update_ports (alsa_midi_driver_t * driver, snd_seq_addr_t addr)
 {
-  snd_seq_port_info_t * info;
-  int err;
-  
-  assert (addr.client != driver->client_id);
-  
-  snd_seq_port_info_alloca(&info);
-  
-  if ((err = snd_seq_get_any_port_info(driver->seq, addr.client, addr.port, info)) >= 0) {
-		a2j_debug("updating: %d:%d", addr.client, addr.port);
-    a2j_update_port(driver, addr, info);
-  } else {
-		a2j_debug("setting dead: %d:%d", addr.client, addr.port);
-    a2j_port_setdead(driver->stream[A2J_PORT_CAPTURE].port_hash, addr);
-    a2j_port_setdead(driver->stream[A2J_PORT_PLAYBACK].port_hash, addr);
-  }
+	snd_seq_port_info_t * info;
+	int err;
+
+	assert (addr.client != driver->client_id);
+
+	snd_seq_port_info_alloca (&info);
+
+	if ((err = snd_seq_get_any_port_info (driver->seq, addr.client, addr.port, info)) >= 0) {
+		a2j_debug ("updating: %d:%d", addr.client, addr.port);
+		a2j_update_port (driver, addr, info);
+	} else {
+		a2j_debug ("setting dead: %d:%d", addr.client, addr.port);
+		a2j_port_setdead (driver->stream[A2J_PORT_CAPTURE].port_hash, addr);
+		a2j_port_setdead (driver->stream[A2J_PORT_PLAYBACK].port_hash, addr);
+	}
 }
 
 void
 a2j_new_ports (alsa_midi_driver_t * driver, snd_seq_addr_t addr)
 {
-  snd_seq_port_info_t * port_info;
+	snd_seq_port_info_t * port_info;
 
 	assert (addr.client != driver->client_id);
 
-  snd_seq_port_info_alloca(&port_info);
+	snd_seq_port_info_alloca (&port_info);
 
-  a2j_debug("adding new port: %d:%d", addr.client, addr.port);
-  snd_seq_port_info_set_client(port_info, addr.client);
-  snd_seq_port_info_set_port(port_info, -1);
-  while (snd_seq_query_next_port(driver->seq, port_info) >= 0) {
-    addr.port = snd_seq_port_info_get_port(port_info);
-    a2j_update_port(driver, addr, port_info);
-  }
+	a2j_debug ("adding new port: %d:%d", addr.client, addr.port);
+	snd_seq_port_info_set_client (port_info, addr.client);
+	snd_seq_port_info_set_port (port_info, -1);
+	while (snd_seq_query_next_port (driver->seq, port_info) >= 0) {
+		addr.port = snd_seq_port_info_get_port (port_info);
+		a2j_update_port (driver, addr, port_info);
+	}
 }

@@ -32,8 +32,8 @@
 #include "port.h"
 
 /* This should be part of JACK API */
-#define JACK_IS_VALID_PORT_NAME_CHAR(c)         \
-	(isalnum(c) ||				\
+#define JACK_IS_VALID_PORT_NAME_CHAR(c)		\
+	(isalnum (c) ||				 \
 	 (c) == '/' ||				\
 	 (c) == '_' ||				\
 	 (c) == '(' ||				\
@@ -63,7 +63,7 @@ a2j_alsa_connect_from (alsa_midi_driver_t * driver, int client, int port)
 	snd_seq_port_subscribe_set_time_real (sub, 1);
 
 	if ((err = snd_seq_subscribe_port (driver->seq, sub))) {
-		a2j_error ("can't subscribe to %d:%d - %s", client, port, snd_strerror(err));
+		a2j_error ("can't subscribe to %d:%d - %s", client, port, snd_strerror (err));
 	}
 
 	return err;
@@ -72,12 +72,12 @@ a2j_alsa_connect_from (alsa_midi_driver_t * driver, int client, int port)
 void
 a2j_port_setdead (a2j_port_hash_t hash, snd_seq_addr_t addr)
 {
-	struct a2j_port *port = a2j_port_get(hash, addr);
+	struct a2j_port *port = a2j_port_get (hash, addr);
 
 	if (port) {
 		port->is_dead = true; // see jack_process_internal
 	} else {
-		a2j_debug("port_setdead: not found (%d:%d)", addr.client, addr.port);
+		a2j_debug ("port_setdead: not found (%d:%d)", addr.client, addr.port);
 	}
 }
 
@@ -108,22 +108,22 @@ a2j_port_fill_name (struct a2j_port * port_ptr, int dir, snd_seq_client_info_t *
 		snprintf (port_ptr->name,
 			  sizeof(port_ptr->name),
 			  "%s [%d] %s %s",
-			  snd_seq_client_info_get_name(client_info_ptr),
-			  snd_seq_client_info_get_client(client_info_ptr),
-			  snd_seq_port_info_get_name(port_info_ptr), 
-                          (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+			  snd_seq_client_info_get_name (client_info_ptr),
+			  snd_seq_client_info_get_client (client_info_ptr),
+			  snd_seq_port_info_get_name (port_info_ptr),
+			  (dir == A2J_PORT_CAPTURE ? "in" : "out"));
 	} else {
 		snprintf (port_ptr->name,
 			  sizeof(port_ptr->name),
 			  "%s %s %s",
-			  snd_seq_client_info_get_name(client_info_ptr),
-			  snd_seq_port_info_get_name(port_info_ptr),
-                          (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+			  snd_seq_client_info_get_name (client_info_ptr),
+			  snd_seq_port_info_get_name (port_info_ptr),
+			  (dir == A2J_PORT_CAPTURE ? "in" : "out"));
 	}
-	
+
 	// replace all offending characters with ' '
 	for (c = port_ptr->name; *c; ++c) {
-		if (!JACK_IS_VALID_PORT_NAME_CHAR(*c)) {
+		if (!JACK_IS_VALID_PORT_NAME_CHAR (*c)) {
 			*c = ' ';
 		}
 	}
@@ -142,7 +142,7 @@ a2j_port_create (alsa_midi_driver_t * driver, int dir, snd_seq_addr_t addr, cons
 	stream_ptr = &driver->stream[dir];
 
 	if ((err = snd_seq_client_info_malloc (&client_info_ptr)) != 0) {
-		a2j_error("Failed to allocate client info");
+		a2j_error ("Failed to allocate client info");
 		goto fail;
 	}
 
@@ -150,12 +150,12 @@ a2j_port_create (alsa_midi_driver_t * driver, int dir, snd_seq_addr_t addr, cons
 
 	err = snd_seq_get_any_client_info (driver->seq, client, client_info_ptr);
 	if (err != 0) {
-		a2j_error("Failed to get client info");
+		a2j_error ("Failed to get client info");
 		goto fail_free_client_info;
 	}
 
-	a2j_debug ("client name: '%s'", snd_seq_client_info_get_name(client_info_ptr));
-	a2j_debug ("port name: '%s'", snd_seq_port_info_get_name(info));
+	a2j_debug ("client name: '%s'", snd_seq_client_info_get_name (client_info_ptr));
+	a2j_debug ("port name: '%s'", snd_seq_port_info_get_name (info));
 
 	port = calloc (1, sizeof(struct a2j_port));
 	if (!port) {
@@ -170,7 +170,7 @@ a2j_port_create (alsa_midi_driver_t * driver, int dir, snd_seq_addr_t addr, cons
 
 	/* Add port to list early, before registering to JACK, so map functionality is guaranteed to work during port registration */
 	list_add_tail (&port->siblings, &stream_ptr->list);
-	
+
 	if (dir == A2J_PORT_CAPTURE) {
 		jack_caps = JackPortIsOutput;
 	} else {
@@ -178,13 +178,13 @@ a2j_port_create (alsa_midi_driver_t * driver, int dir, snd_seq_addr_t addr, cons
 	}
 
 	/* mark anything that looks like a hardware port as physical&terminal */
-	if (snd_seq_port_info_get_type (info) & (SND_SEQ_PORT_TYPE_HARDWARE|SND_SEQ_PORT_TYPE_PORT|SND_SEQ_PORT_TYPE_SPECIFIC)) {
-		jack_caps |= JackPortIsPhysical|JackPortIsTerminal;
+	if (snd_seq_port_info_get_type (info) & (SND_SEQ_PORT_TYPE_HARDWARE | SND_SEQ_PORT_TYPE_PORT | SND_SEQ_PORT_TYPE_SPECIFIC)) {
+		jack_caps |= JackPortIsPhysical | JackPortIsTerminal;
 	}
 
 	port->jack_port = jack_port_register (driver->jack_client, port->name, JACK_DEFAULT_MIDI_TYPE, jack_caps, 0);
 	if (port->jack_port == JACK_INVALID_PORT) {
-		a2j_error("jack_port_register() failed for '%s'", port->name);
+		a2j_error ("jack_port_register() failed for '%s'", port->name);
 		goto fail_free_port;
 	}
 
@@ -195,23 +195,23 @@ a2j_port_create (alsa_midi_driver_t * driver, int dir, snd_seq_addr_t addr, cons
 	}
 
 	if (err) {
-		a2j_debug("port skipped: %s", port->name);
+		a2j_debug ("port skipped: %s", port->name);
 		goto fail_free_port;
 	}
 
-	port->inbound_events = jack_ringbuffer_create(MAX_EVENT_SIZE*16);
+	port->inbound_events = jack_ringbuffer_create (MAX_EVENT_SIZE * 16);
 
-	a2j_debug("port created: %s", port->name);
+	a2j_debug ("port created: %s", port->name);
 	return port;
 
-  fail_free_port:
+fail_free_port:
 	list_del (&port->siblings);
 
 	a2j_port_free (port);
 
-  fail_free_client_info:
+fail_free_client_info:
 	snd_seq_client_info_free (client_info_ptr);
 
-  fail:
+fail:
 	return NULL;
 }

@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2001 Paul Davis 
+    Copyright (C) 2001 Paul Davis
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-*/
+ */
 
 #ifndef __jack_driver_h__
 #define __jack_driver_h__
@@ -26,53 +26,53 @@
 #include "port.h"
 #include "driver_interface.h"
 
-typedef float         gain_t;
+typedef float gain_t;
 typedef unsigned long channel_t;
 
-typedef	enum  {
+typedef enum  {
 	Lock = 0x1,
 	NoLock = 0x2,
 	Sync = 0x4,
 	NoSync = 0x8
 } ClockSyncStatus;
 
-typedef void (*ClockSyncListenerFunction)(channel_t,ClockSyncStatus,void*);
+typedef void (*ClockSyncListenerFunction)(channel_t, ClockSyncStatus, void*);
 
 typedef struct {
-    unsigned long id;
-    ClockSyncListenerFunction function;
-    void *arg;
+	unsigned long id;
+	ClockSyncListenerFunction function;
+	void *arg;
 } ClockSyncListener;
 
 struct _jack_engine;
 struct _jack_driver;
 
-typedef int       (*JackDriverAttachFunction)(struct _jack_driver *,
-					      struct _jack_engine *);
-typedef int       (*JackDriverDetachFunction)(struct _jack_driver *,
-					      struct _jack_engine *);
-typedef int       (*JackDriverReadFunction)(struct _jack_driver *,
-					    jack_nframes_t nframes);
-typedef int       (*JackDriverWriteFunction)(struct _jack_driver *,
-					     jack_nframes_t nframes);
-typedef int       (*JackDriverNullCycleFunction)(struct _jack_driver *,
-						 jack_nframes_t nframes);
-typedef int       (*JackDriverStopFunction)(struct _jack_driver *);
-typedef int       (*JackDriverStartFunction)(struct _jack_driver *);
-typedef int	  (*JackDriverBufSizeFunction)(struct _jack_driver *,
-					       jack_nframes_t nframes);
-/* 
+typedef int (*JackDriverAttachFunction)(struct _jack_driver *,
+					struct _jack_engine *);
+typedef int (*JackDriverDetachFunction)(struct _jack_driver *,
+					struct _jack_engine *);
+typedef int (*JackDriverReadFunction)(struct _jack_driver *,
+				      jack_nframes_t nframes);
+typedef int (*JackDriverWriteFunction)(struct _jack_driver *,
+				       jack_nframes_t nframes);
+typedef int (*JackDriverNullCycleFunction)(struct _jack_driver *,
+					   jack_nframes_t nframes);
+typedef int (*JackDriverStopFunction)(struct _jack_driver *);
+typedef int (*JackDriverStartFunction)(struct _jack_driver *);
+typedef int (*JackDriverBufSizeFunction)(struct _jack_driver *,
+					 jack_nframes_t nframes);
+/*
    Call sequence summary:
 
      1) engine loads driver via runtime dynamic linking
-	 - calls jack_driver_load
-	 - we call dlsym for "driver_initialize" and execute it
+         - calls jack_driver_load
+         - we call dlsym for "driver_initialize" and execute it
      2) engine attaches to driver
      3) engine starts driver
      4) driver runs its own thread, calling
          while () {
           driver->wait ();
-	  driver->engine->run_cycle ()
+          driver->engine->run_cycle ()
          }
      5) engine stops driver
      6) engine detaches from driver
@@ -80,7 +80,7 @@ typedef int	  (*JackDriverBufSizeFunction)(struct _jack_driver *,
 
      Note that stop/start may be called multiple times in the event of an
      error return from the `wait' function.
-*/
+ */
 
 typedef struct _jack_driver {
 
@@ -88,7 +88,7 @@ typedef struct _jack_driver {
    each driver-specific structure using the JACK_DRIVER_DECL macro,
    which is defined below.  The comments that follow describe each
    common field.
-  
+
    The driver should set this to be the interval it expects to elapse
    between returning from the `wait' function. if set to zero, it
    implies that the driver does not expect regular periodic wakeups.
@@ -106,7 +106,7 @@ typedef struct _jack_driver {
 
    These are not used by the driver.  They should not be written to or
    modified in any way
- 
+
     void *handle;
     struct _jack_internal_client *internal_client;
 
@@ -133,23 +133,23 @@ typedef struct _jack_driver {
     JackDriverDetachFunction detach;
 
 
-   The JACK engine will call this when it wants to wait until the 
+   The JACK engine will call this when it wants to wait until the
    driver decides that its time to process some data. the driver returns
-   a count of the number of audioframes that can be processed. 
+   a count of the number of audioframes that can be processed.
 
    it should set the variable pointed to by `status' as follows:
 
    zero: the wait completed normally, processing may begin
    negative: the wait failed, and recovery is not possible
    positive: the wait failed, and the driver stopped itself.
-	       a call to `start' will return the driver to	
-	       a correct and known state.
+               a call to `start' will return the driver to
+               a correct and known state.
 
    the driver should also fill out the `delayed_usecs' variable to
    indicate any delay in its expected periodic execution. for example,
    if it discovers that its return from poll(2) is later than it
    expects it to be, it would place an estimate of the delay
-   in this variable. the engine will use this to decide if it 
+   in this variable. the engine will use this to decide if it
    plans to continue execution.
 
     JackDriverWaitFunction wait;
@@ -157,8 +157,8 @@ typedef struct _jack_driver {
 
    The JACK engine will call this to ask the driver to move
    data from its inputs to its output port buffers. it should
-   return 0 to indicate successful completion, negative otherwise. 
- 
+   return 0 to indicate successful completion, negative otherwise.
+
    This function will always be called after the wait function (above).
 
     JackDriverReadFunction read;
@@ -166,8 +166,8 @@ typedef struct _jack_driver {
 
    The JACK engine will call this to ask the driver to move
    data from its input port buffers to its outputs. it should
-   return 0 to indicate successful completion, negative otherwise. 
- 
+   return 0 to indicate successful completion, negative otherwise.
+
    this function will always be called after the read function (above).
 
     JackDriverWriteFunction write;
@@ -181,7 +181,7 @@ typedef struct _jack_driver {
 
     JackDriverNullCycleFunction null_cycle;
 
-    
+
    The engine will call this when it plans to stop calling the `wait'
    function for some period of time. the driver should take
    appropriate steps to handle this (possibly no steps at all).
@@ -198,7 +198,7 @@ typedef struct _jack_driver {
    at all). NOTE: The driver may wish to silence its playback buffers
    (if any) from within this function or the function that actually
    implements the change in state.
-   
+
     JackDriverStartFunction start;
 
    The engine will call this to let the driver know that some client
@@ -206,48 +206,48 @@ typedef struct _jack_driver {
    prior to this, and the start function after this one has returned.
 
     JackDriverBufSizeFunction bufsize;
-*/
+ */
 
-/* define the fields here... */	
+/* define the fields here... */
 #define JACK_DRIVER_DECL \
-    jack_time_t period_usecs; \
-    jack_time_t last_wait_ust; \
-    void *handle; \
-    struct _jack_client_internal * internal_client; \
-    void (*finish)(struct _jack_driver *);\
-    JackDriverAttachFunction attach; \
-    JackDriverDetachFunction detach; \
-    JackDriverReadFunction read; \
-    JackDriverWriteFunction write; \
-    JackDriverNullCycleFunction null_cycle; \
-    JackDriverStopFunction stop; \
-    JackDriverStartFunction start; \
-    JackDriverBufSizeFunction bufsize;
+	jack_time_t period_usecs; \
+	jack_time_t last_wait_ust; \
+	void *handle; \
+	struct _jack_client_internal * internal_client;	\
+	void (*finish)(struct _jack_driver *); \
+	JackDriverAttachFunction attach; \
+	JackDriverDetachFunction detach; \
+	JackDriverReadFunction read; \
+	JackDriverWriteFunction write; \
+	JackDriverNullCycleFunction null_cycle;	\
+	JackDriverStopFunction stop; \
+	JackDriverStartFunction start; \
+	JackDriverBufSizeFunction bufsize;
 
-    JACK_DRIVER_DECL			/* expand the macro */
+	JACK_DRIVER_DECL                /* expand the macro */
 
 } jack_driver_t;
 
 
-typedef jack_driver_desc_t * (*JackDriverDescFunction) ();
+typedef jack_driver_desc_t * (*JackDriverDescFunction)();
 
-void jack_driver_init (jack_driver_t *);
-void jack_driver_release (jack_driver_t *);
+void jack_driver_init(jack_driver_t *);
+void jack_driver_release(jack_driver_t *);
 
-jack_driver_t *jack_driver_load (int argc, char **argv);
-void jack_driver_unload (jack_driver_t *);
+jack_driver_t *jack_driver_load(int argc, char **argv);
+void jack_driver_unload(jack_driver_t *);
 
 
 /****************************
- *** Non-Threaded Drivers ***
- ****************************/
+*** Non-Threaded Drivers ***
+****************************/
 
-/* 
+/*
    Call sequence summary:
 
      1) engine loads driver via runtime dynamic linking
-	 - calls jack_driver_load
-	 - we call dlsym for "driver_initialize" and execute it
+         - calls jack_driver_load
+         - we call dlsym for "driver_initialize" and execute it
          - driver_initialize calls jack_driver_nt_init
      2) nt layer attaches to driver
      3) nt layer starts driver
@@ -263,43 +263,43 @@ void jack_driver_unload (jack_driver_t *);
      error return from the `wait' function.
 
 
-*/
+ */
 
 struct _jack_driver_nt;
 
-typedef int       (*JackDriverNTAttachFunction)(struct _jack_driver_nt *);
-typedef int       (*JackDriverNTDetachFunction)(struct _jack_driver_nt *);
-typedef int       (*JackDriverNTStopFunction)(struct _jack_driver_nt *);
-typedef int       (*JackDriverNTStartFunction)(struct _jack_driver_nt *);
-typedef int	  (*JackDriverNTBufSizeFunction)(struct _jack_driver_nt *,
-					       jack_nframes_t nframes);
-typedef int       (*JackDriverNTRunCycleFunction)(struct _jack_driver_nt *);
+typedef int (*JackDriverNTAttachFunction)(struct _jack_driver_nt *);
+typedef int (*JackDriverNTDetachFunction)(struct _jack_driver_nt *);
+typedef int (*JackDriverNTStopFunction)(struct _jack_driver_nt *);
+typedef int (*JackDriverNTStartFunction)(struct _jack_driver_nt *);
+typedef int (*JackDriverNTBufSizeFunction)(struct _jack_driver_nt *,
+					   jack_nframes_t nframes);
+typedef int (*JackDriverNTRunCycleFunction)(struct _jack_driver_nt *);
 
 typedef struct _jack_driver_nt {
 
 #define JACK_DRIVER_NT_DECL \
-    JACK_DRIVER_DECL \
-    struct _jack_engine * engine; \
-    volatile int nt_run; \
-    pthread_t nt_thread; \
-    pthread_mutex_t nt_run_lock; \
-    JackDriverNTAttachFunction nt_attach; \
-    JackDriverNTDetachFunction nt_detach; \
-    JackDriverNTStopFunction nt_stop; \
-    JackDriverNTStartFunction nt_start; \
-    JackDriverNTBufSizeFunction nt_bufsize; \
-    JackDriverNTRunCycleFunction nt_run_cycle;
+	JACK_DRIVER_DECL \
+	struct _jack_engine * engine; \
+	volatile int nt_run; \
+	pthread_t nt_thread; \
+	pthread_mutex_t nt_run_lock; \
+	JackDriverNTAttachFunction nt_attach; \
+	JackDriverNTDetachFunction nt_detach; \
+	JackDriverNTStopFunction nt_stop; \
+	JackDriverNTStartFunction nt_start; \
+	JackDriverNTBufSizeFunction nt_bufsize;	\
+	JackDriverNTRunCycleFunction nt_run_cycle;
 #define nt_read read
 #define nt_write write
 #define nt_null_cycle null_cycle
 
-    JACK_DRIVER_NT_DECL
+	JACK_DRIVER_NT_DECL
 
 
 } jack_driver_nt_t;
 
-void jack_driver_nt_init   (jack_driver_nt_t * driver);
-void jack_driver_nt_finish (jack_driver_nt_t * driver);
+void jack_driver_nt_init(jack_driver_nt_t * driver);
+void jack_driver_nt_finish(jack_driver_nt_t * driver);
 
 
 #endif /* __jack_driver_h__ */

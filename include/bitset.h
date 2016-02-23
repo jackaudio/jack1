@@ -19,12 +19,12 @@
  *  modify it under the terms of the GNU General Public License as
  *  published by the Free Software Foundation; either version 2 of the
  *  License, or (at your option) any later version.
- *  
+ *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  *  General Public License for more details.
- *  
+ *
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -33,8 +33,8 @@
 #ifndef __bitset_h__
 #define __bitset_h__
 
-#include <inttypes.h>			/* POSIX standard fixed-size types */
-#include <assert.h>			/* `#define NDEBUG' to disable */
+#include <inttypes.h>                   /* POSIX standard fixed-size types */
+#include <assert.h>                     /* `#define NDEBUG' to disable */
 
 /* On some 64-bit machines, this implementation may be slightly
  * inefficient, depending on how compilers allocate space for
@@ -45,67 +45,67 @@
 typedef uint32_t _bitset_word_t;
 typedef _bitset_word_t *bitset_t;
 
-#define WORD_SIZE(cardinality) (1+((cardinality)+31)/32)
-#define BYTE_SIZE(cardinality) (WORD_SIZE(cardinality)*sizeof(_bitset_word_t))
-#define WORD_INDEX(element) (1+(element)/32)
-#define BIT_INDEX(element) ((element)&037)
+#define WORD_SIZE(cardinality) (1 + ((cardinality) + 31) / 32)
+#define BYTE_SIZE(cardinality) (WORD_SIZE (cardinality) * sizeof(_bitset_word_t))
+#define WORD_INDEX(element) (1 + (element) / 32)
+#define BIT_INDEX(element) ((element) & 037)
 
 static inline void
-bitset_add(bitset_t set, unsigned int element)
+bitset_add (bitset_t set, unsigned int element)
 {
-	assert(element < set[0]);
-	set[WORD_INDEX(element)] |= (1 << BIT_INDEX(element));
+	assert (element < set[0]);
+	set[WORD_INDEX (element)] |= (1 << BIT_INDEX (element));
 }
 
 static inline void
-bitset_copy(bitset_t to_set, bitset_t from_set)
+bitset_copy (bitset_t to_set, bitset_t from_set)
 {
-	assert(to_set[0] == from_set[0]);
-	memcpy(to_set, from_set, BYTE_SIZE(to_set[0]));
+	assert (to_set[0] == from_set[0]);
+	memcpy (to_set, from_set, BYTE_SIZE (to_set[0]));
 }
 
 static inline void
-bitset_create(bitset_t *set, unsigned int cardinality)
+bitset_create (bitset_t *set, unsigned int cardinality)
 {
-	*set = (bitset_t) calloc(WORD_SIZE(cardinality),
+	*set = (bitset_t)calloc (WORD_SIZE (cardinality),
 				 sizeof(_bitset_word_t));
-	assert(*set);
+	assert (*set);
 	*set[0] = cardinality;
 }
 
 static inline void
-bitset_destroy(bitset_t *set)
+bitset_destroy (bitset_t *set)
 {
 	if (*set) {
-		free(*set);
-		*set = (bitset_t) 0;
+		free (*set);
+		*set = (bitset_t)0;
 	}
 }
 
 static inline int
-bitset_empty(bitset_t set)
+bitset_empty (bitset_t set)
 {
 	int i;
 	_bitset_word_t result = 0;
-	int nwords = WORD_SIZE(set[0]);
-	for (i = 1; i < nwords; i++) {
+	int nwords = WORD_SIZE (set[0]);
+
+	for (i = 1; i < nwords; i++)
 		result |= set[i];
-	}
-	return (result == 0);
+	return result == 0;
 }
 
 static inline int
-bitset_contains(bitset_t set, unsigned int element)
+bitset_contains (bitset_t set, unsigned int element)
 {
-	assert(element < set[0]);
-	return (0 != (set[WORD_INDEX(element)] & (1<<BIT_INDEX(element))));
+	assert (element < set[0]);
+	return 0 != (set[WORD_INDEX (element)] & (1 << BIT_INDEX (element)));
 }
 
 static inline void
-bitset_remove(bitset_t set, unsigned int element)
+bitset_remove (bitset_t set, unsigned int element)
 {
-	assert(element < set[0]);
-	set[WORD_INDEX(element)] &= ~(1<<BIT_INDEX(element));
+	assert (element < set[0]);
+	set[WORD_INDEX (element)] &= ~(1 << BIT_INDEX (element));
 }
 
 #endif /* __bitset_h__ */

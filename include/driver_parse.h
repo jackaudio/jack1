@@ -1,22 +1,22 @@
 /* -*- mode: c; c-file-style: "linux"; -*- */
 /*
-  Copyright (C) 2003 Bob Ham <rah@bash.sh
-    
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
+   Copyright (C) 2003 Bob Ham <rah@bash.sh
 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 2 of the License, or
+   (at your option) any later version.
 
-  You should have received a copy of the GNU General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
 
-*/
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+ */
 
 #ifndef __jack_driver_parse_h__
 #define __jack_driver_parse_h__
@@ -43,10 +43,11 @@ jack_print_driver_options (jack_driver_desc_t * desc, FILE *file)
 			break;
 		case JackDriverParamString:
 			if (desc->params[i].value.str &&
-			    strcmp (desc->params[i].value.str, "") != 0)
+			    strcmp (desc->params[i].value.str, "") != 0) {
 				sprintf (arg_default, "%s", desc->params[i].value.str);
-			else
+			} else {
 				sprintf (arg_default, "none");
+			}
 			break;
 		case JackDriverParamBool:
 			sprintf (arg_default, "%s", desc->params[i].value.i ? "true" : "false");
@@ -66,7 +67,7 @@ jack_print_driver_param_usage (jack_driver_desc_t * desc, unsigned long param, F
 {
 	fprintf (file, "Usage information for the '%s' parameter for driver '%s':\n",
 		 desc->params[param].name, desc->name);
- 
+
 	fprintf (file, "%s\n", desc->params[param].long_desc);
 }
 
@@ -108,14 +109,14 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 
 
 	/* set up the stuff for getopt */
-	options = calloc (desc->nparams*3 + 1, sizeof (char));
-	long_options = calloc (desc->nparams + 1, sizeof (struct option));
+	options = calloc (desc->nparams * 3 + 1, sizeof(char));
+	long_options = calloc (desc->nparams + 1, sizeof(struct option));
 
 	options_ptr = options;
 	for (i = 0; i < desc->nparams; i++) {
 		sprintf (options_ptr, "%c::", desc->params[i].character);
 		options_ptr += 3;
-		
+
 		long_options[i].name    = desc->params[i].name;
 		long_options[i].flag    = NULL;
 		long_options[i].val     = desc->params[i].character;
@@ -125,7 +126,7 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 	/* create the params */
 	optind = 0;
 	opterr = 0;
-	while ((opt = getopt_long(argc, argv, options, long_options, NULL)) != -1) {
+	while ((opt = getopt_long (argc, argv, options, long_options, NULL)) != -1) {
 
 		if (opt == ':' || opt == '?') {
 			if (opt == ':') {
@@ -145,12 +146,12 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 			}
 		}
 
-		driver_param = calloc (1, sizeof (jack_driver_param_t));
+		driver_param = calloc (1, sizeof(jack_driver_param_t));
 
 		driver_param->character = desc->params[param_index].character;
 
 		if (!optarg && optind < argc &&
-		    strlen(argv[optind]) &&
+		    strlen (argv[optind]) &&
 		    argv[optind][0] != '-') {
 			optarg = argv[optind];
 		}
@@ -186,7 +187,7 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 				}
 				break;
 			}
-                } else {
+		} else {
 			if (desc->params[param_index].type == JackDriverParamBool) {
 				driver_param->value.i = TRUE;
 			} else {
@@ -200,8 +201,9 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 	free (options);
 	free (long_options);
 
-	if (param_ptr)
+	if (param_ptr) {
 		*param_ptr = params;
+	}
 
 	return 0;
 }

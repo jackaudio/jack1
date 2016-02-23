@@ -38,16 +38,16 @@
 
 
 #ifdef STANDALONE
-#define MESSAGE(...) fprintf(stderr, __VA_ARGS__)
+#define MESSAGE(...) fprintf (stderr, __VA_ARGS__)
 #else
 #include "messagebuffer.h"
 #endif
 
-#define info_log(...)  MESSAGE(__VA_ARGS__)
-#define error_log(...) MESSAGE(__VA_ARGS__)
+#define info_log(...)  MESSAGE (__VA_ARGS__)
+#define error_log(...) MESSAGE (__VA_ARGS__)
 
 #ifdef JACK_MIDI_DEBUG
-#define debug_log(...) MESSAGE(__VA_ARGS__)
+#define debug_log(...) MESSAGE (__VA_ARGS__)
 #else
 #define debug_log(...)
 #endif
@@ -62,13 +62,13 @@ enum {
 enum {
 #ifndef JACK_MIDI_DEBUG
 	MAX_PFDS = 64,
-	MAX_PORTS = MAX_PFDS-1,
+	MAX_PORTS = MAX_PFDS - 1,
 	MAX_EVENTS = 4096,
-	MAX_DATA = 64*1024,
+	MAX_DATA = 64 * 1024,
 	MIDI_THREAD_PRIO = 80
 #else
 	MAX_PFDS = 6,
-	MAX_PORTS = MAX_PFDS-1,
+	MAX_PORTS = MAX_PFDS - 1,
 	MAX_EVENTS = 16,
 	MAX_DATA = 64,
 	MIDI_THREAD_PRIO = 80
@@ -122,7 +122,7 @@ typedef struct input_port_t {
 
 	// jack
 	midi_unpack_t unpack;
-	
+
 	// midi
 	int overruns;
 } input_port_t;
@@ -132,7 +132,7 @@ typedef struct output_port_t {
 
 	// jack
 	midi_pack_t packer;
-	
+
 	// midi
 	event_head_t next_event;
 	int todo;
@@ -212,33 +212,36 @@ static int do_midi_output(process_midi_t *m);
 
 
 static
-int stream_init(midi_stream_t *s, alsa_rawmidi_t *midi, const char *name)
+int stream_init (midi_stream_t *s, alsa_rawmidi_t *midi, const char *name)
 {
 	s->owner = midi;
 	s->name = name;
-	if (pipe(s->wake_pipe)==-1) {
+	if (pipe (s->wake_pipe) == -1) {
 		s->wake_pipe[0] = -1;
-		error_log("pipe() in stream_init(%s) failed: %s", name, strerror(errno));
+		error_log ("pipe() in stream_init(%s) failed: %s", name, strerror (errno));
 		return -errno;
 	}
-	s->jack.new_ports = jack_ringbuffer_create(sizeof(midi_port_t*)*MAX_PORTS);
-	s->midi.new_ports = jack_ringbuffer_create(sizeof(midi_port_t*)*MAX_PORTS);
-	if (!s->jack.new_ports || !s->midi.new_ports)
+	s->jack.new_ports = jack_ringbuffer_create (sizeof(midi_port_t*) * MAX_PORTS);
+	s->midi.new_ports = jack_ringbuffer_create (sizeof(midi_port_t*) * MAX_PORTS);
+	if (!s->jack.new_ports || !s->midi.new_ports) {
 		return -ENOMEM;
+	}
 	return 0;
 }
 
 static
-void stream_close(midi_stream_t *s)
+void stream_close (midi_stream_t *s)
 {
 	if (s->wake_pipe[0] != -1) {
-		close(s->wake_pipe[0]);
-		close(s->wake_pipe[1]);
+		close (s->wake_pipe[0]);
+		close (s->wake_pipe[1]);
 	}
-	if (s->jack.new_ports)
-		jack_ringbuffer_free(s->jack.new_ports);
-	if (s->midi.new_ports)
-		jack_ringbuffer_free(s->midi.new_ports);
+	if (s->jack.new_ports) {
+		jack_ringbuffer_free (s->jack.new_ports);
+	}
+	if (s->midi.new_ports) {
+		jack_ringbuffer_free (s->midi.new_ports);
+	}
 }
 
 static void alsa_rawmidi_delete(alsa_midi_t *m);
@@ -249,19 +252,22 @@ static int alsa_rawmidi_stop(alsa_midi_t *m);
 static void alsa_rawmidi_read(alsa_midi_t *m, jack_nframes_t nframes);
 static void alsa_rawmidi_write(alsa_midi_t *m, jack_nframes_t nframes);
 
-alsa_midi_t* alsa_rawmidi_new(jack_client_t *jack)
+alsa_midi_t* alsa_rawmidi_new (jack_client_t *jack)
 {
-	alsa_rawmidi_t *midi = calloc(1, sizeof(alsa_rawmidi_t));
-	if (!midi)
+	alsa_rawmidi_t *midi = calloc (1, sizeof(alsa_rawmidi_t));
+
+	if (!midi) {
 		goto fail_0;
+	}
 	midi->client = jack;
-	if (pipe(midi->scan.wake_pipe)==-1) {
-		error_log("pipe() in alsa_midi_new failed: %s", strerror(errno));
+	if (pipe (midi->scan.wake_pipe) == -1) {
+		error_log ("pipe() in alsa_midi_new failed: %s", strerror (errno));
 		goto fail_1;
 	}
 
-	if (stream_init(&midi->in, midi, "in"))
+	if (stream_init (&midi->in, midi, "in")) {
 		goto fail_2;
+	}
 	midi->in.mode = POLLIN;
 	midi->in.port_size = sizeof(input_port_t);
 	midi->in.port_init = input_port_init;
@@ -269,8 +275,9 @@ alsa_midi_t* alsa_rawmidi_new(jack_client_t *jack)
 	midi->in.process_jack = do_jack_input;
 	midi->in.process_midi = do_midi_input;
 
-	if (stream_init(&midi->out, midi, "out"))
+	if (stream_init (&midi->out, midi, "out")) {
 		goto fail_3;
+	}
 	midi->out.mode = POLLOUT;
 	midi->out.port_size = sizeof(output_port_t);
 	midi->out.port_init = output_port_init;
@@ -287,15 +294,15 @@ alsa_midi_t* alsa_rawmidi_new(jack_client_t *jack)
 	midi->ops.write = alsa_rawmidi_write;
 
 	return &midi->ops;
- fail_3:
- 	stream_close(&midi->out);
- fail_2:
- 	stream_close(&midi->in);
- 	close(midi->scan.wake_pipe[1]);
- 	close(midi->scan.wake_pipe[0]);
- fail_1:
- 	free(midi);
- fail_0:
+fail_3:
+	stream_close (&midi->out);
+fail_2:
+	stream_close (&midi->in);
+	close (midi->scan.wake_pipe[1]);
+	close (midi->scan.wake_pipe[0]);
+fail_1:
+	free (midi);
+fail_0:
 	return NULL;
 }
 
@@ -303,90 +310,94 @@ static
 midi_port_t** scan_port_del(alsa_rawmidi_t *midi, midi_port_t **list);
 
 static
-void alsa_rawmidi_delete(alsa_midi_t *m)
+void alsa_rawmidi_delete (alsa_midi_t *m)
 {
 	alsa_rawmidi_t *midi = (alsa_rawmidi_t*)m;
 
-	alsa_rawmidi_detach(m);
+	alsa_rawmidi_detach (m);
 
-	stream_close(&midi->out);
-	stream_close(&midi->in);
-	close(midi->scan.wake_pipe[0]);
-	close(midi->scan.wake_pipe[1]);
+	stream_close (&midi->out);
+	stream_close (&midi->in);
+	close (midi->scan.wake_pipe[0]);
+	close (midi->scan.wake_pipe[1]);
 
-	free(midi);
+	free (midi);
 }
 
 static void* scan_thread(void *);
 static void *midi_thread(void *arg);
 
 static
-int alsa_rawmidi_attach(alsa_midi_t *m)
+int alsa_rawmidi_attach (alsa_midi_t *m)
 {
 	return 0;
 }
 
 static
-int alsa_rawmidi_detach(alsa_midi_t *m)
+int alsa_rawmidi_detach (alsa_midi_t *m)
 {
 	alsa_rawmidi_t *midi = (alsa_rawmidi_t*)m;
 	midi_port_t **list;
 
-	alsa_rawmidi_stop(m);
+	alsa_rawmidi_stop (m);
 
 	list = &midi->scan.ports;
 	while (*list) {
 		(*list)->state = PORT_REMOVED_FROM_JACK;
-		list = scan_port_del(midi, list);
+		list = scan_port_del (midi, list);
 	}
 	return 0;
 }
 
 static
-int alsa_rawmidi_start(alsa_midi_t *m)
+int alsa_rawmidi_start (alsa_midi_t *m)
 {
 	alsa_rawmidi_t *midi = (alsa_rawmidi_t*)m;
 	int err;
 	char c = 'q';
-	if (midi->keep_walking == 1)
+
+	if (midi->keep_walking == 1) {
 		return -EALREADY;
+	}
 
 	midi->keep_walking = 1;
-	if ((err = jack_client_create_thread(midi->client, &midi->in.thread, MIDI_THREAD_PRIO, jack_is_realtime(midi->client), midi_thread, &midi->in))) {
+	if ((err = jack_client_create_thread (midi->client, &midi->in.thread, MIDI_THREAD_PRIO, jack_is_realtime (midi->client), midi_thread, &midi->in))) {
 		midi->keep_walking = 0;
 		return err;
 	}
-	if ((err = jack_client_create_thread(midi->client, &midi->out.thread, MIDI_THREAD_PRIO, jack_is_realtime(midi->client), midi_thread, &midi->out))) {
+	if ((err = jack_client_create_thread (midi->client, &midi->out.thread, MIDI_THREAD_PRIO, jack_is_realtime (midi->client), midi_thread, &midi->out))) {
 		midi->keep_walking = 0;
-		write(midi->in.wake_pipe[1], &c, 1);
-		pthread_join(midi->in.thread, NULL);
+		write (midi->in.wake_pipe[1], &c, 1);
+		pthread_join (midi->in.thread, NULL);
 		return err;
 	}
-	if ((err = jack_client_create_thread(midi->client, &midi->scan.thread, 0, 0, scan_thread, midi))) {
+	if ((err = jack_client_create_thread (midi->client, &midi->scan.thread, 0, 0, scan_thread, midi))) {
 		midi->keep_walking = 0;
-		write(midi->in.wake_pipe[1], &c, 1);
-		write(midi->out.wake_pipe[1], &c, 1);
-		pthread_join(midi->in.thread, NULL);
-		pthread_join(midi->out.thread, NULL);
+		write (midi->in.wake_pipe[1], &c, 1);
+		write (midi->out.wake_pipe[1], &c, 1);
+		pthread_join (midi->in.thread, NULL);
+		pthread_join (midi->out.thread, NULL);
 		return err;
 	}
 	return 0;
 }
 
 static
-int alsa_rawmidi_stop(alsa_midi_t *m)
+int alsa_rawmidi_stop (alsa_midi_t *m)
 {
 	alsa_rawmidi_t *midi = (alsa_rawmidi_t*)m;
 	char c = 'q';
-	if (midi->keep_walking == 0)
+
+	if (midi->keep_walking == 0) {
 		return -EALREADY;
+	}
 	midi->keep_walking = 0;
-	write(midi->in.wake_pipe[1], &c, 1);
-	write(midi->out.wake_pipe[1], &c, 1);
-	write(midi->scan.wake_pipe[1], &c, 1);
-	pthread_join(midi->in.thread, NULL);
-	pthread_join(midi->out.thread, NULL);
-	pthread_join(midi->scan.thread, NULL);
+	write (midi->in.wake_pipe[1], &c, 1);
+	write (midi->out.wake_pipe[1], &c, 1);
+	write (midi->scan.wake_pipe[1], &c, 1);
+	pthread_join (midi->in.thread, NULL);
+	pthread_join (midi->out.thread, NULL);
+	pthread_join (midi->scan.thread, NULL);
 	// ports are freed in alsa_midi_detach()
 	return 0;
 }
@@ -394,59 +405,63 @@ int alsa_rawmidi_stop(alsa_midi_t *m)
 static void jack_process(midi_stream_t *str, jack_nframes_t nframes);
 
 static
-void alsa_rawmidi_read(alsa_midi_t *m, jack_nframes_t nframes)
+void alsa_rawmidi_read (alsa_midi_t *m, jack_nframes_t nframes)
 {
 	alsa_rawmidi_t *midi = (alsa_rawmidi_t*)m;
-	jack_process(&midi->in, nframes);
+
+	jack_process (&midi->in, nframes);
 }
 
 static
-void alsa_rawmidi_write(alsa_midi_t *m, jack_nframes_t nframes)
+void alsa_rawmidi_write (alsa_midi_t *m, jack_nframes_t nframes)
 {
 	alsa_rawmidi_t *midi = (alsa_rawmidi_t*)m;
-	jack_process(&midi->out, nframes);
+
+	jack_process (&midi->out, nframes);
 }
 
 /*
  * -----------------------------------------------------------------------------
  */
 static inline
-int can_pass(size_t sz, jack_ringbuffer_t *in, jack_ringbuffer_t *out)
+int can_pass (size_t sz, jack_ringbuffer_t *in, jack_ringbuffer_t *out)
 {
-	return jack_ringbuffer_read_space(in) >= sz && jack_ringbuffer_write_space(out) >= sz;
+	return jack_ringbuffer_read_space (in) >= sz && jack_ringbuffer_write_space (out) >= sz;
 }
 
 static
-void midi_port_init(const alsa_rawmidi_t *midi, midi_port_t *port, snd_rawmidi_info_t *info, const alsa_id_t *id)
+void midi_port_init (const alsa_rawmidi_t *midi, midi_port_t *port, snd_rawmidi_info_t *info, const alsa_id_t *id)
 {
 	const char *name;
 	char *c;
 
 	port->id = *id;
-	snprintf(port->dev, sizeof(port->dev), "hw:%d,%d,%d", id->id[0], id->id[1], id->id[3]);
-	name = snd_rawmidi_info_get_subdevice_name(info);
-	if (!strlen(name))
-		name = snd_rawmidi_info_get_name(info);
-	snprintf(port->name, sizeof(port->name), "%s %s %s", port->id.id[2] ? "out":"in", port->dev, name);
+	snprintf (port->dev, sizeof(port->dev), "hw:%d,%d,%d", id->id[0], id->id[1], id->id[3]);
+	name = snd_rawmidi_info_get_subdevice_name (info);
+	if (!strlen (name)) {
+		name = snd_rawmidi_info_get_name (info);
+	}
+	snprintf (port->name, sizeof(port->name), "%s %s %s", port->id.id[2] ? "out" : "in", port->dev, name);
 
 	// replace all offending characters with '-'
-	for (c=port->name; *c; ++c)
-	        if (!isalnum(*c))
+	for (c = port->name; *c; ++c)
+		if (!isalnum (*c)) {
 			*c = '-';
+		}
 
 	port->state = PORT_CREATED;
 }
 
 static
-inline int midi_port_open_jack(const alsa_rawmidi_t *midi, midi_port_t *port, int type, const char *name)
+inline int midi_port_open_jack (const alsa_rawmidi_t *midi, midi_port_t *port, int type, const char *name)
 {
-	port->jack = jack_port_register(midi->client, name, JACK_DEFAULT_MIDI_TYPE,
-		type | JackPortIsPhysical|JackPortIsTerminal, 0);
+	port->jack = jack_port_register (midi->client, name, JACK_DEFAULT_MIDI_TYPE,
+					 type | JackPortIsPhysical | JackPortIsTerminal, 0);
 	return port->jack == NULL;
 }
 
 static
-int midi_port_open(const alsa_rawmidi_t *midi, midi_port_t *port)
+int midi_port_open (const alsa_rawmidi_t *midi, midi_port_t *port)
 {
 	int err;
 	int type;
@@ -461,45 +476,49 @@ int midi_port_open(const alsa_rawmidi_t *midi, midi_port_t *port)
 		out = &port->rawmidi;
 		type = JackPortIsInput;
 	}
-	
-	if ((err = snd_rawmidi_open(in, out, port->dev, SND_RAWMIDI_NONBLOCK))<0)
+
+	if ((err = snd_rawmidi_open (in, out, port->dev, SND_RAWMIDI_NONBLOCK)) < 0) {
 		return err;
+	}
 
 	/* Some devices (emu10k1) have subdevs with the same name,
 	 * and we need to generate unique port name for jack */
-	snprintf(name, sizeof(name), "%s", port->name);
-	if (midi_port_open_jack(midi, port, type, name)) {
+	snprintf (name, sizeof(name), "%s", port->name);
+	if (midi_port_open_jack (midi, port, type, name)) {
 		int num;
 		num = port->id.id[3] ? port->id.id[3] : port->id.id[1];
-		snprintf(name, sizeof(name), "%s %d", port->name, num);
-		if (midi_port_open_jack(midi, port, type, name))
+		snprintf (name, sizeof(name), "%s %d", port->name, num);
+		if (midi_port_open_jack (midi, port, type, name)) {
 			return 2;
+		}
 	}
-	if ((port->event_ring = jack_ringbuffer_create(MAX_EVENTS*sizeof(event_head_t)))==NULL)
+	if ((port->event_ring = jack_ringbuffer_create (MAX_EVENTS * sizeof(event_head_t))) == NULL) {
 		return 3;
-	if ((port->data_ring = jack_ringbuffer_create(MAX_DATA))==NULL)
+	}
+	if ((port->data_ring = jack_ringbuffer_create (MAX_DATA)) == NULL) {
 		return 4;
+	}
 
 	return 0;
 }
 
 static
-void midi_port_close(const alsa_rawmidi_t *midi, midi_port_t *port)
+void midi_port_close (const alsa_rawmidi_t *midi, midi_port_t *port)
 {
 	if (port->data_ring) {
-		jack_ringbuffer_free(port->data_ring);
+		jack_ringbuffer_free (port->data_ring);
 		port->data_ring = NULL;
 	}
 	if (port->event_ring) {
-		jack_ringbuffer_free(port->event_ring);
+		jack_ringbuffer_free (port->event_ring);
 		port->event_ring = NULL;
 	}
 	if (port->jack) {
-		jack_port_unregister(midi->client, port->jack);
+		jack_port_unregister (midi->client, port->jack);
 		port->jack = NULL;
 	}
 	if (port->rawmidi) {
-		snd_rawmidi_close(port->rawmidi);
+		snd_rawmidi_close (port->rawmidi);
 		port->rawmidi = NULL;
 	}
 }
@@ -509,31 +528,33 @@ void midi_port_close(const alsa_rawmidi_t *midi, midi_port_t *port)
  */
 
 static
-int alsa_id_before(const alsa_id_t *p1, const alsa_id_t *p2)
+int alsa_id_before (const alsa_id_t *p1, const alsa_id_t *p2)
 {
 	int i;
-	for (i=0; i<4; ++i) {
-		if (p1->id[i] < p2->id[i])
+
+	for (i = 0; i < 4; ++i) {
+		if (p1->id[i] < p2->id[i]) {
 			return 1;
-		else if (p1->id[i] > p2->id[i])
+		} else if (p1->id[i] > p2->id[i]) {
 			return 0;
+		}
 	}
 	return 0;
 }
 
 static
-void alsa_get_id(alsa_id_t *id, snd_rawmidi_info_t *info)
+void alsa_get_id (alsa_id_t *id, snd_rawmidi_info_t *info)
 {
-	id->id[0] = snd_rawmidi_info_get_card(info);
-	id->id[1] = snd_rawmidi_info_get_device(info);
-	id->id[2] = snd_rawmidi_info_get_stream(info) == SND_RAWMIDI_STREAM_OUTPUT ? 1 : 0;
-	id->id[3] = snd_rawmidi_info_get_subdevice(info);
+	id->id[0] = snd_rawmidi_info_get_card (info);
+	id->id[1] = snd_rawmidi_info_get_device (info);
+	id->id[2] = snd_rawmidi_info_get_stream (info) == SND_RAWMIDI_STREAM_OUTPUT ? 1 : 0;
+	id->id[3] = snd_rawmidi_info_get_subdevice (info);
 }
 
 static inline
-void alsa_error(const char *func, int err)
+void alsa_error (const char *func, int err)
 {
-	error_log("%s() failed", snd_strerror(err));
+	error_log ("%s() failed", snd_strerror (err));
 }
 
 typedef struct {
@@ -546,136 +567,145 @@ typedef struct {
 static midi_port_t** scan_port_del(alsa_rawmidi_t *midi, midi_port_t **list);
 
 static
-void scan_cleanup(alsa_rawmidi_t *midi)
+void scan_cleanup (alsa_rawmidi_t *midi)
 {
 	midi_port_t **list = &midi->scan.ports;
+
 	while (*list)
-		list = scan_port_del(midi, list);
+		list = scan_port_del (midi, list);
 }
 
 static void scan_card(scan_t *scan);
 static midi_port_t** scan_port_open(alsa_rawmidi_t *midi, midi_port_t **list);
 
-void scan_cycle(alsa_rawmidi_t *midi)
+void scan_cycle (alsa_rawmidi_t *midi)
 {
 	int card = -1, err;
 	scan_t scan;
 	midi_port_t **ports;
 
 	//debug_log("scan: cleanup");
-	scan_cleanup(midi);
+	scan_cleanup (midi);
 
 	scan.midi = midi;
 	scan.iterator = &midi->scan.ports;
-	snd_rawmidi_info_alloca(&scan.info);
+	snd_rawmidi_info_alloca (&scan.info);
 
 	//debug_log("scan: rescan");
-	while ((err = snd_card_next(&card))>=0 && card>=0) {
+	while ((err = snd_card_next (&card)) >= 0 && card >= 0) {
 		char name[32];
-		snprintf(name, sizeof(name), "hw:%d", card);
-		if ((err = snd_ctl_open(&scan.ctl, name, SND_CTL_NONBLOCK))>=0) {
-			scan_card(&scan);
-			snd_ctl_close(scan.ctl);
-		} else
-			alsa_error("scan: snd_ctl_open", err);
+		snprintf (name, sizeof(name), "hw:%d", card);
+		if ((err = snd_ctl_open (&scan.ctl, name, SND_CTL_NONBLOCK)) >= 0) {
+			scan_card (&scan);
+			snd_ctl_close (scan.ctl);
+		} else {
+			alsa_error ("scan: snd_ctl_open", err);
+		}
 	}
 
 	// delayed open to workaround alsa<1.0.14 bug (can't open more than 1 subdevice if ctl is opened).
 	ports = &midi->scan.ports;
 	while (*ports) {
 		midi_port_t *port = *ports;
-		if (port->state == PORT_CREATED)
-			ports = scan_port_open(midi, ports);
-		else
+		if (port->state == PORT_CREATED) {
+			ports = scan_port_open (midi, ports);
+		} else {
 			ports = &port->next;
+		}
 	}
 }
 
 static void scan_device(scan_t *scan);
 
 static
-void scan_card(scan_t *scan)
+void scan_card (scan_t *scan)
 {
 	int device = -1;
 	int err;
 
-	while ((err = snd_ctl_rawmidi_next_device(scan->ctl, &device))>=0 && device >=0) {
-		snd_rawmidi_info_set_device(scan->info, device);
+	while ((err = snd_ctl_rawmidi_next_device (scan->ctl, &device)) >= 0 && device >= 0) {
+		snd_rawmidi_info_set_device (scan->info, device);
 
-		snd_rawmidi_info_set_stream(scan->info, SND_RAWMIDI_STREAM_INPUT);
-		snd_rawmidi_info_set_subdevice(scan->info, 0);
-		if ((err = snd_ctl_rawmidi_info(scan->ctl, scan->info))>=0)
-			scan_device(scan);
-		else if (err != -ENOENT)
-			alsa_error("scan: snd_ctl_rawmidi_info on device", err);
+		snd_rawmidi_info_set_stream (scan->info, SND_RAWMIDI_STREAM_INPUT);
+		snd_rawmidi_info_set_subdevice (scan->info, 0);
+		if ((err = snd_ctl_rawmidi_info (scan->ctl, scan->info)) >= 0) {
+			scan_device (scan);
+		} else if (err != -ENOENT) {
+			alsa_error ("scan: snd_ctl_rawmidi_info on device", err);
+		}
 
-		snd_rawmidi_info_set_stream(scan->info, SND_RAWMIDI_STREAM_OUTPUT);
-		snd_rawmidi_info_set_subdevice(scan->info, 0);
-		if ((err = snd_ctl_rawmidi_info(scan->ctl, scan->info))>=0)
-			scan_device(scan);
-		else if (err != -ENOENT)
-			alsa_error("scan: snd_ctl_rawmidi_info on device", err);
+		snd_rawmidi_info_set_stream (scan->info, SND_RAWMIDI_STREAM_OUTPUT);
+		snd_rawmidi_info_set_subdevice (scan->info, 0);
+		if ((err = snd_ctl_rawmidi_info (scan->ctl, scan->info)) >= 0) {
+			scan_device (scan);
+		} else if (err != -ENOENT) {
+			alsa_error ("scan: snd_ctl_rawmidi_info on device", err);
+		}
 	}
 }
 
 static void scan_port_update(scan_t *scan);
 
 static
-void scan_device(scan_t *scan)
+void scan_device (scan_t *scan)
 {
 	int err;
 	int sub, nsubs = 0;
-	nsubs = snd_rawmidi_info_get_subdevices_count(scan->info);
 
-	for (sub=0; sub<nsubs; ++sub) {
-		snd_rawmidi_info_set_subdevice(scan->info, sub);
-		if ((err = snd_ctl_rawmidi_info(scan->ctl, scan->info)) < 0) {
-			alsa_error("scan: snd_ctl_rawmidi_info on subdevice", err);
+	nsubs = snd_rawmidi_info_get_subdevices_count (scan->info);
+
+	for (sub = 0; sub < nsubs; ++sub) {
+		snd_rawmidi_info_set_subdevice (scan->info, sub);
+		if ((err = snd_ctl_rawmidi_info (scan->ctl, scan->info)) < 0) {
+			alsa_error ("scan: snd_ctl_rawmidi_info on subdevice", err);
 			continue;
 		}
-		scan_port_update(scan);
+		scan_port_update (scan);
 	}
 }
 
 static midi_port_t** scan_port_add(scan_t *scan, const alsa_id_t *id, midi_port_t **list);
 
 static
-void scan_port_update(scan_t *scan)
+void scan_port_update (scan_t *scan)
 {
 	midi_port_t **list = scan->iterator;
 	alsa_id_t id;
-	alsa_get_id(&id, scan->info);
 
-	while (*list && alsa_id_before(&(*list)->id, &id))
-		list = scan_port_del(scan->midi, list);
+	alsa_get_id (&id, scan->info);
 
-	if (!*list || alsa_id_before(&id, &(*list)->id))
-		list = scan_port_add(scan, &id, list);
-	else if (*list)
+	while (*list && alsa_id_before (&(*list)->id, &id))
+		list = scan_port_del (scan->midi, list);
+
+	if (!*list || alsa_id_before (&id, &(*list)->id)) {
+		list = scan_port_add (scan, &id, list);
+	} else if (*list) {
 		list = &(*list)->next;
+	}
 
 	scan->iterator = list;
 }
 
 static
-midi_port_t** scan_port_add(scan_t *scan, const alsa_id_t *id, midi_port_t **list)
+midi_port_t** scan_port_add (scan_t *scan, const alsa_id_t *id, midi_port_t **list)
 {
 	midi_port_t *port;
 	midi_stream_t *str = id->id[2] ? &scan->midi->out : &scan->midi->in;
 
-	port = calloc(1, str->port_size);
-	if (!port)
+	port = calloc (1, str->port_size);
+	if (!port) {
 		return list;
-	midi_port_init(scan->midi, port, scan->info, id);
+	}
+	midi_port_init (scan->midi, port, scan->info, id);
 
 	port->next = *list;
 	*list = port;
-	error_log("scan: added port %s %s", port->dev, port->name);
+	error_log ("scan: added port %s %s", port->dev, port->name);
 	return &port->next;
 }
 
 static
-midi_port_t** scan_port_open(alsa_rawmidi_t *midi, midi_port_t **list)
+midi_port_t** scan_port_open (alsa_rawmidi_t *midi, midi_port_t **list)
 {
 	midi_stream_t *str;
 	midi_port_t *port;
@@ -683,43 +713,48 @@ midi_port_t** scan_port_open(alsa_rawmidi_t *midi, midi_port_t **list)
 	port = *list;
 	str = port->id.id[2] ? &midi->out : &midi->in;
 
-	if (jack_ringbuffer_write_space(str->jack.new_ports) < sizeof(port))
+	if (jack_ringbuffer_write_space (str->jack.new_ports) < sizeof(port)) {
 		goto fail_0;
+	}
 
-	if (midi_port_open(midi, port))
+	if (midi_port_open (midi, port)) {
 		goto fail_1;
-	if ((str->port_init)(midi, port))
+	}
+	if ((str->port_init)(midi, port)) {
 		goto fail_2;
+	}
 
 	port->state = PORT_ADDED_TO_JACK;
-	jack_ringbuffer_write(str->jack.new_ports, (char*) &port, sizeof(port));
+	jack_ringbuffer_write (str->jack.new_ports, (char*)&port, sizeof(port));
 
-	error_log("scan: opened port %s %s", port->dev, port->name);
+	error_log ("scan: opened port %s %s", port->dev, port->name);
 	return &port->next;
 
- fail_2:
- 	(str->port_close)(midi, port);
- fail_1:
-	midi_port_close(midi, port);
+fail_2:
+	(str->port_close)(midi, port);
+fail_1:
+	midi_port_close (midi, port);
 	port->state = PORT_ZOMBIFIED;
- fail_0:
-	error_log("scan: can't open port %s %s", port->dev, port->name);
+fail_0:
+	error_log ("scan: can't open port %s %s", port->dev, port->name);
 	return &port->next;
 }
 
 static
-midi_port_t** scan_port_del(alsa_rawmidi_t *midi, midi_port_t **list)
+midi_port_t** scan_port_del (alsa_rawmidi_t *midi, midi_port_t **list)
 {
 	midi_port_t *port = *list;
+
 	if (port->state == PORT_REMOVED_FROM_JACK) {
-		error_log("scan: deleted port %s %s", port->dev, port->name);
+		error_log ("scan: deleted port %s %s", port->dev, port->name);
 		*list = port->next;
-		if (port->id.id[2] )
+		if (port->id.id[2] ) {
 			(midi->out.port_close)(midi, port);
-		else
+		} else {
 			(midi->in.port_close)(midi, port);
-		midi_port_close(midi, port);
-		free(port);
+		}
+		midi_port_close (midi, port);
+		free (port);
 		return list;
 	} else {
 		//debug_log("can't delete port %s, wrong state: %d", port->name, (int)port->state);
@@ -727,111 +762,117 @@ midi_port_t** scan_port_del(alsa_rawmidi_t *midi, midi_port_t **list)
 	}
 }
 
-void* scan_thread(void *arg)
+void* scan_thread (void *arg)
 {
 	alsa_rawmidi_t *midi = arg;
 	struct pollfd wakeup;
 
 	wakeup.fd = midi->scan.wake_pipe[0];
-	wakeup.events = POLLIN|POLLERR|POLLNVAL;
+	wakeup.events = POLLIN | POLLERR | POLLNVAL;
 	while (midi->keep_walking) {
 		int res;
 		//error_log("scanning....");
-		scan_cycle(midi);
-		res = poll(&wakeup, 1, 2000);
-		if (res>0) {
+		scan_cycle (midi);
+		res = poll (&wakeup, 1, 2000);
+		if (res > 0) {
 			char c;
-			read(wakeup.fd, &c, 1);
-		} else if (res<0 && errno != EINTR)
+			read (wakeup.fd, &c, 1);
+		} else if (res < 0 && errno != EINTR) {
 			break;
+		}
 	}
 	return NULL;
 }
 
 
-/* 
+/*
  * ------------------------------- Input/Output  ------------------------------
  */
 
 static
-void jack_add_ports(midi_stream_t *str)
+void jack_add_ports (midi_stream_t *str)
 {
 	midi_port_t *port;
-	while (can_pass(sizeof(port), str->jack.new_ports, str->midi.new_ports) && str->jack.nports < MAX_PORTS) {
-		jack_ringbuffer_read(str->jack.new_ports, (char*)&port, sizeof(port));
+
+	while (can_pass (sizeof(port), str->jack.new_ports, str->midi.new_ports) && str->jack.nports < MAX_PORTS) {
+		jack_ringbuffer_read (str->jack.new_ports, (char*)&port, sizeof(port));
 		str->jack.ports[str->jack.nports++] = port;
 		port->state = PORT_ADDED_TO_MIDI;
-		jack_ringbuffer_write(str->midi.new_ports, (char*)&port, sizeof(port));
+		jack_ringbuffer_write (str->midi.new_ports, (char*)&port, sizeof(port));
 	}
 }
 
 static
-void jack_process(midi_stream_t *str, jack_nframes_t nframes)
+void jack_process (midi_stream_t *str, jack_nframes_t nframes)
 {
 	int r, w;
 	process_jack_t proc;
 	jack_nframes_t cur_frames;
 
-	if (!str->owner->keep_walking)
+	if (!str->owner->keep_walking) {
 		return;
+	}
 
 	proc.midi = str->owner;
 	proc.nframes = nframes;
-	proc.frame_time = jack_last_frame_time(proc.midi->client);
-	cur_frames = jack_frame_time(proc.midi->client);
+	proc.frame_time = jack_last_frame_time (proc.midi->client);
+	cur_frames = jack_frame_time (proc.midi->client);
 	if (proc.frame_time + proc.nframes < cur_frames) {
 		int periods_lost = (cur_frames - proc.frame_time) / proc.nframes;
 		proc.frame_time += periods_lost * proc.nframes;
-		debug_log("xrun detected: %d periods lost", periods_lost);
+		debug_log ("xrun detected: %d periods lost", periods_lost);
 	}
 
 	// process existing ports
-	for (r=0, w=0; r<str->jack.nports; ++r) {
+	for (r = 0, w = 0; r < str->jack.nports; ++r) {
 		midi_port_t *port = str->jack.ports[r];
 		proc.port = port;
 
 		assert (port->state > PORT_ADDED_TO_JACK && port->state < PORT_REMOVED_FROM_JACK);
 
-		proc.buffer = jack_port_get_buffer(port->jack, nframes);
-		if (str->mode == POLLIN)
-			jack_midi_clear_buffer(proc.buffer);
+		proc.buffer = jack_port_get_buffer (port->jack, nframes);
+		if (str->mode == POLLIN) {
+			jack_midi_clear_buffer (proc.buffer);
+		}
 
 		if (port->state == PORT_REMOVED_FROM_MIDI) {
-			port->state = PORT_REMOVED_FROM_JACK; // this signals to scan thread
-			continue; // this effectively removes port from the midi->in.jack.ports[]
+			port->state = PORT_REMOVED_FROM_JACK;   // this signals to scan thread
+			continue;                               // this effectively removes port from the midi->in.jack.ports[]
 		}
 
 		(str->process_jack)(&proc);
 
-		if (r != w)
+		if (r != w) {
 			str->jack.ports[w] = port;
+		}
 		++w;
 	}
-	if (str->jack.nports != w)
-		debug_log("jack_%s: nports %d -> %d", str->name, str->jack.nports, w);
+	if (str->jack.nports != w) {
+		debug_log ("jack_%s: nports %d -> %d", str->name, str->jack.nports, w);
+	}
 	str->jack.nports = w;
 
-	jack_add_ports(str); // it makes no sense to add them earlier since they have no data yet
+	jack_add_ports (str); // it makes no sense to add them earlier since they have no data yet
 
 	// wake midi thread
-	write(str->wake_pipe[1], &r, 1);
+	write (str->wake_pipe[1], &r, 1);
 }
 
 static
-void *midi_thread(void *arg)
+void *midi_thread (void *arg)
 {
 	midi_stream_t *str = arg;
 	alsa_rawmidi_t *midi = str->owner;
 	struct pollfd pfds[MAX_PFDS];
 	int npfds;
-	jack_time_t wait_nsec = 1000*1000*1000; // 1 sec
+	jack_time_t wait_nsec = 1000 * 1000 * 1000; // 1 sec
 	process_midi_t proc;
 
 	proc.midi = midi;
 	proc.mode = str->mode;
 
 	pfds[0].fd = str->wake_pipe[0];
-	pfds[0].events = POLLIN|POLLERR|POLLNVAL;
+	pfds[0].events = POLLIN | POLLERR | POLLNVAL;
 	npfds = 1;
 
 	//debug_log("midi_thread(%s): enter", str->name);
@@ -839,47 +880,50 @@ void *midi_thread(void *arg)
 	while (midi->keep_walking) {
 		int poll_timeout;
 		int wait_nanosleep;
-		int r=1, w=1; // read,write pos in pfds
-		int rp=0, wp=0; // read, write pos in ports
+		int r = 1, w = 1;       // read,write pos in pfds
+		int rp = 0, wp = 0;     // read, write pos in ports
 
 		// sleep
 		//if (wait_nsec != 1000*1000*1000) {
 		//	debug_log("midi_thread(%s): ", str->name);
 		//	assert (wait_nsec == 1000*1000*1000);
 		//}
-		poll_timeout = wait_nsec / (1000*1000);
-		wait_nanosleep = wait_nsec % (1000*1000);
+		poll_timeout = wait_nsec / (1000 * 1000);
+		wait_nanosleep = wait_nsec % (1000 * 1000);
 		if (wait_nanosleep > NANOSLEEP_RESOLUTION) {
 			struct timespec ts;
 			ts.tv_sec = 0;
 			ts.tv_nsec = wait_nanosleep;
-			clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, NULL);
+			clock_nanosleep (CLOCK_MONOTONIC, 0, &ts, NULL);
 		}
-		int res = poll((struct pollfd*)&pfds, npfds, poll_timeout);
+		int res = poll ((struct pollfd*)&pfds, npfds, poll_timeout);
 		//debug_log("midi_thread(%s): poll exit: %d", str->name, res);
-		if (!midi->keep_walking)
+		if (!midi->keep_walking) {
 			break;
+		}
 		if (res < 0) {
-			if (errno == EINTR)
+			if (errno == EINTR) {
 				continue;
-			error_log("midi_thread(%s) poll failed: %s", str->name, strerror(errno));
+			}
+			error_log ("midi_thread(%s) poll failed: %s", str->name, strerror (errno));
 			break;
 		}
 
 		// check wakeup pipe
-		if (pfds[0].revents & ~POLLIN)
+		if (pfds[0].revents & ~POLLIN) {
 			break;
+		}
 		if (pfds[0].revents & POLLIN) {
 			char c;
-			read(pfds[0].fd, &c, 1);
+			read (pfds[0].fd, &c, 1);
 		}
 
 		// add new ports
-		while (jack_ringbuffer_read_space(str->midi.new_ports) >= sizeof(midi_port_t*) && str->midi.nports < MAX_PORTS) {
+		while (jack_ringbuffer_read_space (str->midi.new_ports) >= sizeof(midi_port_t*) && str->midi.nports < MAX_PORTS) {
 			midi_port_t *port;
-			jack_ringbuffer_read(str->midi.new_ports, (char*)&port, sizeof(port));
+			jack_ringbuffer_read (str->midi.new_ports, (char*)&port, sizeof(port));
 			str->midi.ports[str->midi.nports++] = port;
-			debug_log("midi_thread(%s): added port %s", str->name, port->name);
+			debug_log ("midi_thread(%s): added port %s", str->name, port->name);
 		}
 
 //		if (res == 0)
@@ -891,26 +935,29 @@ void *midi_thread(void *arg)
 
 		for (rp = 0; rp < str->midi.nports; ++rp) {
 			midi_port_t *port = str->midi.ports[rp];
-			proc.cur_time = jack_frame_time(midi->client);
+			proc.cur_time = jack_frame_time (midi->client);
 			proc.port = port;
 			proc.rpfds = &pfds[r];
 			proc.wpfds = &pfds[w];
 			proc.max_pfds = MAX_PFDS - w;
 			r += port->npfds;
 			if (!(str->process_midi)(&proc)) {
-				port->state = PORT_REMOVED_FROM_MIDI; // this signals to jack thread
-				continue; // this effectively removes port from array
+				port->state = PORT_REMOVED_FROM_MIDI;   // this signals to jack thread
+				continue;                               // this effectively removes port from array
 			}
 			w += port->npfds;
-			if (rp != wp)
+			if (rp != wp) {
 				str->midi.ports[wp] = port;
+			}
 			++wp;
 		}
-		if (str->midi.nports != wp)
-			debug_log("midi_%s: nports %d -> %d", str->name, str->midi.nports, wp);
+		if (str->midi.nports != wp) {
+			debug_log ("midi_%s: nports %d -> %d", str->name, str->midi.nports, wp);
+		}
 		str->midi.nports = wp;
-		if (npfds != w)
-			debug_log("midi_%s: npfds %d -> %d", str->name, npfds, w);
+		if (npfds != w) {
+			debug_log ("midi_%s: npfds %d -> %d", str->name, npfds, w);
+		}
 		npfds = w;
 
 		/*
@@ -919,75 +966,79 @@ void *midi_thread(void *arg)
 		 * So, zero timeout will not cause busy-looping.
 		 */
 		if (proc.next_time < proc.cur_time) {
-			debug_log("%s: late: next_time = %d, cur_time = %d", str->name, (int)proc.next_time, (int)proc.cur_time);
+			debug_log ("%s: late: next_time = %d, cur_time = %d", str->name, (int)proc.next_time, (int)proc.cur_time);
 			wait_nsec = 0; // we are late
 		} else if (proc.next_time != NFRAMES_INF) {
 			jack_time_t wait_frames = proc.next_time - proc.cur_time;
-			jack_nframes_t rate = jack_get_sample_rate(midi->client);
-			wait_nsec = (wait_frames * (1000*1000*1000)) / rate;
-			debug_log("midi_%s: timeout = %d", str->name, (int)wait_frames);
-		} else
-			wait_nsec = 1000*1000*1000;
+			jack_nframes_t rate = jack_get_sample_rate (midi->client);
+			wait_nsec = (wait_frames * (1000 * 1000 * 1000)) / rate;
+			debug_log ("midi_%s: timeout = %d", str->name, (int)wait_frames);
+		} else {
+			wait_nsec = 1000 * 1000 * 1000;
+		}
 		//debug_log("midi_thread(%s): wait_nsec = %lld", str->name, wait_nsec);
 	}
 	return NULL;
 }
 
 static
-int midi_is_ready(process_midi_t *proc)
+int midi_is_ready (process_midi_t *proc)
 {
 	midi_port_t *port = proc->port;
+
 	if (port->npfds) {
 		unsigned short revents = 0;
-		int res = snd_rawmidi_poll_descriptors_revents(port->rawmidi, proc->rpfds, port->npfds, &revents);
+		int res = snd_rawmidi_poll_descriptors_revents (port->rawmidi, proc->rpfds, port->npfds, &revents);
 		if (res) {
-			error_log("snd_rawmidi_poll_descriptors_revents failed on port %s with: %s", port->name, snd_strerror(res));
+			error_log ("snd_rawmidi_poll_descriptors_revents failed on port %s with: %s", port->name, snd_strerror (res));
 			return 0;
 		}
 
 		if (revents & ~proc->mode) {
-			debug_log("midi: port %s failed", port->name);
+			debug_log ("midi: port %s failed", port->name);
 			return 0;
 		}
 		if (revents & proc->mode) {
 			port->is_ready = 1;
-			debug_log("midi: is_ready %s", port->name);
+			debug_log ("midi: is_ready %s", port->name);
 		}
 	}
 	return 1;
 }
 
 static
-int midi_update_pfds(process_midi_t *proc)
+int midi_update_pfds (process_midi_t *proc)
 {
 	midi_port_t *port = proc->port;
+
 	if (port->npfds == 0) {
-		port->npfds = snd_rawmidi_poll_descriptors_count(port->rawmidi);
+		port->npfds = snd_rawmidi_poll_descriptors_count (port->rawmidi);
 		if (port->npfds > proc->max_pfds) {
-			debug_log("midi: not enough pfds for port %s", port->name);
+			debug_log ("midi: not enough pfds for port %s", port->name);
 			return 0;
 		}
-		snd_rawmidi_poll_descriptors(port->rawmidi, proc->wpfds, port->npfds);
+		snd_rawmidi_poll_descriptors (port->rawmidi, proc->wpfds, port->npfds);
 	} else if (proc->rpfds != proc->wpfds) {
-		memmove(proc->wpfds, proc->rpfds, sizeof(struct pollfd) * port->npfds);
+		memmove (proc->wpfds, proc->rpfds, sizeof(struct pollfd) * port->npfds);
 	}
 	return 1;
 }
 
-/* 
+/*
  * ------------------------------------ Input ------------------------------
  */
 
 static
-int input_port_init(alsa_rawmidi_t *midi, midi_port_t *port)
+int input_port_init (alsa_rawmidi_t *midi, midi_port_t *port)
 {
 	input_port_t *in = (input_port_t*)port;
-	midi_unpack_init(&in->unpack);
+
+	midi_unpack_init (&in->unpack);
 	return 0;
 }
 
 static
-void input_port_close(alsa_rawmidi_t *midi, midi_port_t *port)
+void input_port_close (alsa_rawmidi_t *midi, midi_port_t *port)
 {
 }
 
@@ -996,41 +1047,44 @@ void input_port_close(alsa_rawmidi_t *midi, midi_port_t *port)
  */
 
 static
-void do_jack_input(process_jack_t *p)
+void do_jack_input (process_jack_t *p)
 {
-	input_port_t *port = (input_port_t*) p->port;
+	input_port_t *port = (input_port_t*)p->port;
 	event_head_t event;
-	while (jack_ringbuffer_read_space(port->base.event_ring) >= sizeof(event)) {
+
+	while (jack_ringbuffer_read_space (port->base.event_ring) >= sizeof(event)) {
 		jack_ringbuffer_data_t vec[2];
 		jack_nframes_t time;
 		int i, todo;
 
-		jack_ringbuffer_read(port->base.event_ring, (char*)&event, sizeof(event));
+		jack_ringbuffer_read (port->base.event_ring, (char*)&event, sizeof(event));
 		// TODO: take into account possible warping
-		if ((event.time + p->nframes) < p->frame_time)
+		if ((event.time + p->nframes) < p->frame_time) {
 			time = 0;
-		else if (event.time >= p->frame_time)
-			time = p->nframes -1;
-		else
+		} else if (event.time >= p->frame_time) {
+			time = p->nframes - 1;
+		} else {
 			time = event.time + p->nframes - p->frame_time;
+		}
 
-		jack_ringbuffer_get_read_vector(port->base.data_ring, vec);
+		jack_ringbuffer_get_read_vector (port->base.data_ring, vec);
 		assert ((vec[0].len + vec[1].len) >= event.size);
 
-		if (event.overruns)
-			midi_unpack_reset(&port->unpack);
+		if (event.overruns) {
+			midi_unpack_reset (&port->unpack);
+		}
 
 		todo = event.size;
-		for (i=0; i<2 && todo>0; ++i) {
+		for (i = 0; i < 2 && todo > 0; ++i) {
 			int avail = todo < vec[i].len ? todo : vec[i].len;
-			int done = midi_unpack_buf(&port->unpack, (unsigned char*)vec[i].buf, avail, p->buffer, time);
+			int done = midi_unpack_buf (&port->unpack, (unsigned char*)vec[i].buf, avail, p->buffer, time);
 			if (done != avail) {
-				debug_log("jack_in: buffer overflow in port %s", port->base.name);
+				debug_log ("jack_in: buffer overflow in port %s", port->base.name);
 				break;
 			}
 			todo -= done;
 		}
-		jack_ringbuffer_read_advance(port->base.data_ring, event.size);
+		jack_ringbuffer_read_advance (port->base.data_ring, event.size);
 	}
 }
 
@@ -1038,28 +1092,31 @@ void do_jack_input(process_jack_t *p)
  * Low level input.
  */
 static
-int do_midi_input(process_midi_t *proc)
+int do_midi_input (process_midi_t *proc)
 {
-	input_port_t *port = (input_port_t*) proc->port;
-	if (!midi_is_ready(proc))
+	input_port_t *port = (input_port_t*)proc->port;
+
+	if (!midi_is_ready (proc)) {
 		return 0;
+	}
 
 	if (port->base.is_ready) {
 		jack_ringbuffer_data_t vec[2];
 		int res;
 
-		jack_ringbuffer_get_write_vector(port->base.data_ring, vec);
-		if (jack_ringbuffer_write_space(port->base.event_ring) < sizeof(event_head_t) || vec[0].len < 1) {
+		jack_ringbuffer_get_write_vector (port->base.data_ring, vec);
+		if (jack_ringbuffer_write_space (port->base.event_ring) < sizeof(event_head_t) || vec[0].len < 1) {
 			port->overruns++;
-			if (port->base.npfds)
-				debug_log("midi_in: internal overflow on %s", port->base.name);
+			if (port->base.npfds) {
+				debug_log ("midi_in: internal overflow on %s", port->base.name);
+			}
 			// remove from poll to prevent busy-looping
 			port->base.npfds = 0;
 			return 1;
 		}
-		res = snd_rawmidi_read(port->base.rawmidi, vec[0].buf, vec[0].len);
+		res = snd_rawmidi_read (port->base.rawmidi, vec[0].buf, vec[0].len);
 		if (res < 0 && res != -EWOULDBLOCK) {
-			error_log("midi_in: reading from port %s failed: %s", port->base.name, snd_strerror(res));
+			error_log ("midi_in: reading from port %s failed: %s", port->base.name, snd_strerror (res));
 			return 0;
 		} else if (res > 0) {
 			event_head_t event;
@@ -1067,94 +1124,101 @@ int do_midi_input(process_midi_t *proc)
 			event.size = res;
 			event.overruns = port->overruns;
 			port->overruns = 0;
-			debug_log("midi_in: read %d bytes at %d", (int)event.size, (int)event.time);
-			jack_ringbuffer_write_advance(port->base.data_ring, event.size);
-			jack_ringbuffer_write(port->base.event_ring, (char*)&event, sizeof(event));
+			debug_log ("midi_in: read %d bytes at %d", (int)event.size, (int)event.time);
+			jack_ringbuffer_write_advance (port->base.data_ring, event.size);
+			jack_ringbuffer_write (port->base.event_ring, (char*)&event, sizeof(event));
 		}
 		port->base.is_ready = 0;
 	}
 
-	if (!midi_update_pfds(proc))
+	if (!midi_update_pfds (proc)) {
 		return 0;
+	}
 
 	return 1;
 }
 
-/* 
+/*
  * ------------------------------------ Output ------------------------------
  */
 
-static int output_port_init(alsa_rawmidi_t *midi, midi_port_t *port)
+static int output_port_init (alsa_rawmidi_t *midi, midi_port_t *port)
 {
 	output_port_t *out = (output_port_t*)port;
-	midi_pack_reset(&out->packer);
+
+	midi_pack_reset (&out->packer);
 	out->next_event.time = 0;
 	out->next_event.size = 0;
 	out->todo = 0;
 	return 0;
 }
 
-static void output_port_close(alsa_rawmidi_t *midi, midi_port_t *port)
+static void output_port_close (alsa_rawmidi_t *midi, midi_port_t *port)
 {
 }
 
 static
-void do_jack_output(process_jack_t *proc)
+void do_jack_output (process_jack_t *proc)
 {
-	output_port_t *port = (output_port_t*) proc->port;
-	int nevents = jack_midi_get_event_count(proc->buffer);
+	output_port_t *port = (output_port_t*)proc->port;
+	int nevents = jack_midi_get_event_count (proc->buffer);
 	int i;
-	if (nevents)
-		debug_log("jack_out: %d events in %s", nevents, port->base.name);
-	for (i=0; i<nevents; ++i) {
+
+	if (nevents) {
+		debug_log ("jack_out: %d events in %s", nevents, port->base.name);
+	}
+	for (i = 0; i < nevents; ++i) {
 		jack_midi_event_t event;
 		event_head_t hdr;
 
-		jack_midi_event_get(&event, proc->buffer, i);
+		jack_midi_event_get (&event, proc->buffer, i);
 
-		if (jack_ringbuffer_write_space(port->base.data_ring) < event.size || jack_ringbuffer_write_space(port->base.event_ring) < sizeof(hdr)) {
-			debug_log("jack_out: output buffer overflow on %s", port->base.name);
+		if (jack_ringbuffer_write_space (port->base.data_ring) < event.size || jack_ringbuffer_write_space (port->base.event_ring) < sizeof(hdr)) {
+			debug_log ("jack_out: output buffer overflow on %s", port->base.name);
 			break;
 		}
 
-		midi_pack_event(&port->packer, &event);
+		midi_pack_event (&port->packer, &event);
 
-		jack_ringbuffer_write(port->base.data_ring, (char*)event.buffer, event.size);
+		jack_ringbuffer_write (port->base.data_ring, (char*)event.buffer, event.size);
 
 		hdr.time = proc->frame_time + event.time + proc->nframes;
 		hdr.size = event.size;
-		jack_ringbuffer_write(port->base.event_ring, (char*)&hdr, sizeof(hdr));
-		debug_log("jack_out: sent %d-byte event at %ld", (int)event.size, (long)event.time);
+		jack_ringbuffer_write (port->base.event_ring, (char*)&hdr, sizeof(hdr));
+		debug_log ("jack_out: sent %d-byte event at %ld", (int)event.size, (long)event.time);
 	}
 }
 
 static
-int do_midi_output(process_midi_t *proc)
+int do_midi_output (process_midi_t *proc)
 {
 	int worked = 0;
-	output_port_t *port = (output_port_t*) proc->port;
+	output_port_t *port = (output_port_t*)proc->port;
 
-	if (!midi_is_ready(proc))
+	if (!midi_is_ready (proc)) {
 		return 0;
+	}
 
 	// eat events
 	while (port->next_event.time <= proc->cur_time) {
 		port->todo += port->next_event.size;
-		if (jack_ringbuffer_read(port->base.event_ring, (char*)&port->next_event, sizeof(port->next_event))!=sizeof(port->next_event)) {
+		if (jack_ringbuffer_read (port->base.event_ring, (char*)&port->next_event, sizeof(port->next_event)) != sizeof(port->next_event)) {
 			port->next_event.time = 0;
 			port->next_event.size = 0;
 			break;
-		} else
-			debug_log("midi_out: at %ld got %d bytes for %ld", (long)proc->cur_time, (int)port->next_event.size, (long)port->next_event.time);
+		} else {
+			debug_log ("midi_out: at %ld got %d bytes for %ld", (long)proc->cur_time, (int)port->next_event.size, (long)port->next_event.time);
+		}
 	}
-	
-	if (port->todo)
-		debug_log("midi_out: todo = %d at %ld", (int)port->todo, (long)proc->cur_time);
+
+	if (port->todo) {
+		debug_log ("midi_out: todo = %d at %ld", (int)port->todo, (long)proc->cur_time);
+	}
 
 	// calc next wakeup time
 	if (!port->todo && port->next_event.time && port->next_event.time < proc->next_time) {
 		proc->next_time = port->next_event.time;
-		debug_log("midi_out: next_time = %ld", (long)proc->next_time);
+		debug_log ("midi_out: next_time = %ld", (long)proc->next_time);
 	}
 
 	if (port->todo && port->base.is_ready) {
@@ -1163,41 +1227,43 @@ int do_midi_output(process_midi_t *proc)
 		int res;
 		jack_ringbuffer_data_t vec[2];
 
-		jack_ringbuffer_get_read_vector(port->base.data_ring, vec);
+		jack_ringbuffer_get_read_vector (port->base.data_ring, vec);
 		if (size > vec[0].len) {
 			size = vec[0].len;
 			assert (size > 0);
 		}
-		res = snd_rawmidi_write(port->base.rawmidi, vec[0].buf, size);
+		res = snd_rawmidi_write (port->base.rawmidi, vec[0].buf, size);
 		if (res > 0) {
-			jack_ringbuffer_read_advance(port->base.data_ring, res);
-			debug_log("midi_out: written %d bytes to %s", res, port->base.name);
+			jack_ringbuffer_read_advance (port->base.data_ring, res);
+			debug_log ("midi_out: written %d bytes to %s", res, port->base.name);
 			port->todo -= res;
 			worked = 1;
 		} else if (res == -EWOULDBLOCK) {
 			port->base.is_ready = 0;
-			debug_log("midi_out: -EWOULDBLOCK on %s", port->base.name);
+			debug_log ("midi_out: -EWOULDBLOCK on %s", port->base.name);
 			return 1;
 		} else {
-			error_log("midi_out: writing to port %s failed: %s", port->base.name, snd_strerror(res));
+			error_log ("midi_out: writing to port %s failed: %s", port->base.name, snd_strerror (res));
 			return 0;
 		}
-		snd_rawmidi_drain(port->base.rawmidi);
+		snd_rawmidi_drain (port->base.rawmidi);
 	}
 
 	// update pfds for this port
-	if (!midi_update_pfds(proc))
+	if (!midi_update_pfds (proc)) {
 		return 0;
+	}
 
 	if (!port->todo) {
 		int i;
-		if (worked)
-			debug_log("midi_out: relaxing on %s", port->base.name);
-		for (i=0; i<port->base.npfds; ++i)
+		if (worked) {
+			debug_log ("midi_out: relaxing on %s", port->base.name);
+		}
+		for (i = 0; i < port->base.npfds; ++i)
 			proc->wpfds[i].events &= ~POLLOUT;
 	} else {
 		int i;
-		for (i=0; i<port->base.npfds; ++i)
+		for (i = 0; i < port->base.npfds; ++i)
 			proc->wpfds[i].events |= POLLOUT;
 	}
 	return 1;

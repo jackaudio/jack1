@@ -29,8 +29,8 @@
 #ifndef __MD5_LOC_H__
 #define __MD5_LOC_H__
 
-#define HEX_STRING	"0123456789abcdef"	/* to convert to hex */
-#define BLOCK_SIZE_MASK	(MD5_BLOCK_SIZE - 1)
+#define HEX_STRING      "0123456789abcdef"      /* to convert to hex */
+#define BLOCK_SIZE_MASK (MD5_BLOCK_SIZE - 1)
 
 
 #include <config.h>
@@ -44,11 +44,11 @@
  * big endian - big is better
  */
 #define SWAP(n)	\
-    (((n) << 24) | (((n) & 0xff00) << 8) | (((n) >> 8) & 0xff00) | ((n) >> 24))
+	(((n) << 24) | (((n) & 0xff00) << 8) | (((n) >> 8) & 0xff00) | ((n) >> 24))
 #else
 /*
-	+ * little endian
-	+ */
+ + * little endian
+ + */
 #define SWAP(n)    (n)
 #endif
 
@@ -59,17 +59,17 @@
  * implementation).
  */
 /* #define FF(b, c, d) ((b & c) | (~b & d)) */
-#define FF(b, c, d)	(d ^ (b & (c ^ d)))
-#define FG(b, c, d)	FF(d, b, c)
-#define FH(b, c, d)	(b ^ c ^ d)
-#define FI(b, c, d)	(c ^ (b | ~d))
+#define FF(b, c, d)     (d ^ (b & (c ^ d)))
+#define FG(b, c, d)     FF (d, b, c)
+#define FH(b, c, d)     (b ^ c ^ d)
+#define FI(b, c, d)     (c ^ (b | ~d))
 
 /*
  * It is unfortunate that C does not provide an operator for cyclic
  * rotation.  Hope the C compiler is smart enough.  -- Modified to
  * remove the w = at the front - Gray 2/97
  */
-#define CYCLIC(w, s)	((w << s) | (w >> (32 - s)))
+#define CYCLIC(w, s)    ((w << s) | (w >> (32 - s)))
 
 /*
  * First Round: using the given function, the context and a constant
@@ -81,15 +81,15 @@
  * fix the handling of unaligned buffer spaces - Gray 7/97
  */
 #define OP1(a, b, c, d, b_p, c_p, s, T)				\
-     do {							\
-       memcpy(c_p, b_p, sizeof(md5_uint32));       		\
-       *c_p = SWAP(*c_p);					\
-       a += FF (b, c, d) + *c_p + T;				\
-       a = CYCLIC (a, s);					\
-       a += b;							\
-       b_p = (char *)b_p + sizeof(md5_uint32);			\
-       c_p++;							\
-    } while (0)
+	do {							   \
+		memcpy (c_p, b_p, sizeof(md5_uint32));			  \
+		*c_p = SWAP (*c_p);					  \
+		a += FF (b, c, d) + *c_p + T;				 \
+		a = CYCLIC (a, s);					 \
+		a += b;							 \
+		b_p = (char*)b_p + sizeof(md5_uint32);			\
+		c_p++;							 \
+	} while (0)
 
 /*
  * Second to Fourth Round: we have the possibly swapped words in
@@ -97,10 +97,10 @@
  * argument specifying the function to use.
  */
 #define OP234(FUNC, a, b, c, d, k, s, T)		\
-    do { 						\
-      a += FUNC (b, c, d) + k + T;			\
-      a = CYCLIC (a, s);				\
-      a += b;						\
-    } while (0)
+	do {						    \
+		a += FUNC (b, c, d) + k + T;			  \
+		a = CYCLIC (a, s);				  \
+		a += b;						  \
+	} while (0)
 
 #endif /* ! __MD5_LOC_H__ */

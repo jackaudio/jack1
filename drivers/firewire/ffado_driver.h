@@ -23,11 +23,11 @@
  *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/* 
+/*
  * Main Jack driver entry routines
  *
- */ 
- 
+ */
+
 #ifndef __JACK_FFADO_DRIVER_H__
 #define __JACK_FFADO_DRIVER_H__
 
@@ -59,53 +59,53 @@
 #include "../alsa_midi/midi_unpack.h"
 
 // debug print control flags
-#define DEBUG_LEVEL_BUFFERS           	(1<<0)
-#define DEBUG_LEVEL_HANDLERS			(1<<1)
-#define DEBUG_LEVEL_XRUN_RECOVERY     	(1<<2)
-#define DEBUG_LEVEL_WAIT     			(1<<3)
+#define DEBUG_LEVEL_BUFFERS             (1 << 0)
+#define DEBUG_LEVEL_HANDLERS                    (1 << 1)
+#define DEBUG_LEVEL_XRUN_RECOVERY       (1 << 2)
+#define DEBUG_LEVEL_WAIT                        (1 << 3)
 
-#define DEBUG_LEVEL_RUN_CYCLE         	(1<<8)
+#define DEBUG_LEVEL_RUN_CYCLE           (1 << 8)
 
-#define DEBUG_LEVEL_PACKETCOUNTER		(1<<16)
-#define DEBUG_LEVEL_STARTUP				(1<<17)
-#define DEBUG_LEVEL_THREADS				(1<<18)
+#define DEBUG_LEVEL_PACKETCOUNTER               (1 << 16)
+#define DEBUG_LEVEL_STARTUP                             (1 << 17)
+#define DEBUG_LEVEL_THREADS                             (1 << 18)
 
 //#define DEBUG_ENABLED
 #ifdef DEBUG_ENABLED
 
-	// default debug level
+// default debug level
 	#define DEBUG_LEVEL (  DEBUG_LEVEL_RUN_CYCLE | \
-	(DEBUG_LEVEL_XRUN_RECOVERY)| DEBUG_LEVEL_STARTUP | DEBUG_LEVEL_WAIT | DEBUG_LEVEL_PACKETCOUNTER)
+			       (DEBUG_LEVEL_XRUN_RECOVERY) | DEBUG_LEVEL_STARTUP | DEBUG_LEVEL_WAIT | DEBUG_LEVEL_PACKETCOUNTER)
 
 	#warning Building debug build!
 
-	#define printMessage(format, args...) jack_error( "firewire MSG: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
-	#define printError(format, args...) jack_error( "firewire ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
-	
-	#define printEnter() jack_error( "FWDRV ENTERS: %s (%s)\n", __FUNCTION__,  __FILE__)
-	#define printExit() jack_error( "FWDRV EXITS: %s (%s)\n", __FUNCTION__,  __FILE__)
-	#define printEnter() 
-	#define printExit() 
-	
-	#define debugError(format, args...) jack_error( "firewire ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ##args )
-	#define debugPrint(Level, format, args...) if(DEBUG_LEVEL & (Level))  jack_error("DEBUG %s:%d (%s) :"  format, __FILE__, __LINE__, __FUNCTION__, ##args );
-	#define debugPrintShort(Level, format, args...) if(DEBUG_LEVEL & (Level))  jack_error( format,##args );
-	#define debugPrintWithTimeStamp(Level, format, args...) if(DEBUG_LEVEL & (Level)) jack_error( "%16lu: "format, debugGetCurrentUTime(),##args );
-	#define SEGFAULT int *test=NULL;	*test=1;
+	#define printMessage(format, args ...) jack_error ( "firewire MSG: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ## args )
+	#define printError(format, args ...) jack_error ( "firewire ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ## args )
+
+	#define printEnter() jack_error ( "FWDRV ENTERS: %s (%s)\n", __FUNCTION__,  __FILE__)
+	#define printExit() jack_error ( "FWDRV EXITS: %s (%s)\n", __FUNCTION__,  __FILE__)
+	#define printEnter()
+	#define printExit()
+
+	#define debugError(format, args ...) jack_error ( "firewire ERR: %s:%d (%s): " format,  __FILE__, __LINE__, __FUNCTION__, ## args )
+	#define debugPrint(Level, format, args ...) if (DEBUG_LEVEL & (Level)) { jack_error ("DEBUG %s:%d (%s) :"  format, __FILE__, __LINE__, __FUNCTION__, ## args ); }
+	#define debugPrintShort(Level, format, args ...) if (DEBUG_LEVEL & (Level)) { jack_error ( format, ## args ); }
+	#define debugPrintWithTimeStamp(Level, format, args ...) if (DEBUG_LEVEL & (Level)) { jack_error ( "%16lu: "format, debugGetCurrentUTime (), ## args ); }
+	#define SEGFAULT int *test = NULL;        *test = 1;
 #else
 	#define DEBUG_LEVEL
-	
-	#define printMessage(format, args...) if(g_verbose) \
-	                                         jack_error("firewire MSG: " format, ##args )
-	#define printError(format, args...)   jack_error("firewire ERR: " format, ##args )
-	
-	#define printEnter() 
-	#define printExit() 
-	
-	#define debugError(format, args...) 
-	#define debugPrint(Level, format, args...) 
-	#define debugPrintShort(Level, format, args...)	
-	#define debugPrintWithTimeStamp(Level, format, args...)
+
+	#define printMessage(format, args ...) if (g_verbose) \
+		jack_error ("firewire MSG: " format, ## args )
+	#define printError(format, args ...)   jack_error ("firewire ERR: " format, ## args )
+
+	#define printEnter()
+	#define printExit()
+
+	#define debugError(format, args ...)
+	#define debugPrint(Level, format, args ...)
+	#define debugPrintShort(Level, format, args ...)
+	#define debugPrintWithTimeStamp(Level, format, args ...)
 #endif
 
 typedef struct _ffado_driver ffado_driver_t;
@@ -116,39 +116,37 @@ typedef struct _ffado_driver ffado_driver_t;
 
 typedef struct _ffado_jack_settings ffado_jack_settings_t;
 struct _ffado_jack_settings {
-    int verbose_level;
+	int verbose_level;
 
-    int period_size_set;
-    jack_nframes_t period_size;
-    
-    int sample_rate_set;
-    int sample_rate;
-    
-    int buffer_size_set;
-    jack_nframes_t buffer_size;
+	int period_size_set;
+	jack_nframes_t period_size;
 
-    int playback_ports;
-    int capture_ports;
-    
-    jack_nframes_t capture_frame_latency;
-    jack_nframes_t playback_frame_latency;
-    
-    int slave_mode;
-    int snoop_mode;
-    
-    char *device_info;
+	int sample_rate_set;
+	int sample_rate;
+
+	int buffer_size_set;
+	jack_nframes_t buffer_size;
+
+	int playback_ports;
+	int capture_ports;
+
+	jack_nframes_t capture_frame_latency;
+	jack_nframes_t playback_frame_latency;
+
+	int slave_mode;
+	int snoop_mode;
+
+	char *device_info;
 };
 
-typedef struct _ffado_capture_channel
-{
+typedef struct _ffado_capture_channel {
 	ffado_streaming_stream_type stream_type;
 	midi_unpack_t midi_unpack;
 	uint32_t *midi_buffer;
 } ffado_capture_channel_t;
 
 #define MIDI_OVERFLOW_BUFFER_SIZE 4
-typedef struct _ffado_playback_channel
-{
+typedef struct _ffado_playback_channel {
 	ffado_streaming_stream_type stream_type;
 	midi_pack_t midi_pack;
 	uint32_t *midi_buffer;
@@ -161,50 +159,49 @@ typedef struct _ffado_playback_channel
 /*
  * JACK driver structure
  */
-struct _ffado_driver
-{
+struct _ffado_driver {
 	JACK_DRIVER_NT_DECL;
-	
-	jack_nframes_t  sample_rate;
-	jack_nframes_t  period_size;
-	unsigned long   wait_time;
 
-    jack_time_t                   wait_last;
-    jack_time_t                   wait_next;
+	jack_nframes_t sample_rate;
+	jack_nframes_t period_size;
+	unsigned long wait_time;
+
+	jack_time_t wait_last;
+	jack_time_t wait_next;
 	int wait_late;
-	
+
 	jack_client_t  *client;
-	
-	int		xrun_detected;
-	int		xrun_count;
-	
+
+	int xrun_detected;
+	int xrun_count;
+
 	int process_count;
-	
+
 	/* settings from the command line */
 	ffado_jack_settings_t settings;
-	
+
 	/* the firewire virtual device */
 	ffado_device_t *dev;
 
 	ffado_sample_t *nullbuffer;
 	ffado_sample_t *scratchbuffer;
 
-    JSList                       *capture_ports;
-    JSList                       *playback_ports;
-    JSList                       *monitor_ports;
-    channel_t                     playback_nchannels;
-    channel_t                     capture_nchannels;
+	JSList                       *capture_ports;
+	JSList                       *playback_ports;
+	JSList                       *monitor_ports;
+	channel_t playback_nchannels;
+	channel_t capture_nchannels;
 
 	ffado_playback_channel_t *playback_channels;
 	ffado_capture_channel_t  *capture_channels;
 
-	jack_nframes_t  playback_frame_latency;
-	jack_nframes_t  capture_frame_latency;
-    	
+	jack_nframes_t playback_frame_latency;
+	jack_nframes_t capture_frame_latency;
+
 	ffado_device_info_t device_info;
 	ffado_options_t device_options;
 
-}; 
+};
 
 
 

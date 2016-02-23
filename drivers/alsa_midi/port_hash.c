@@ -31,33 +31,36 @@
 
 static inline
 int
-a2j_port_hash(
-  snd_seq_addr_t addr)
+a2j_port_hash (
+	snd_seq_addr_t addr)
 {
-  return (addr.client + addr.port) % PORT_HASH_SIZE;
+	return (addr.client + addr.port) % PORT_HASH_SIZE;
 }
 
 struct a2j_port *
-a2j_port_get(
-  a2j_port_hash_t hash,
-  snd_seq_addr_t addr)
+a2j_port_get (
+	a2j_port_hash_t hash,
+	snd_seq_addr_t addr)
 {
-  struct a2j_port **pport = &hash[a2j_port_hash(addr)];
-  while (*pport) {
-    struct a2j_port *port = *pport;
-    if (port->remote.client == addr.client && port->remote.port == addr.port)
-      return port;
-    pport = &port->next;
-  }
-  return NULL;
+	struct a2j_port **pport = &hash[a2j_port_hash (addr)];
+
+	while (*pport) {
+		struct a2j_port *port = *pport;
+		if (port->remote.client == addr.client && port->remote.port == addr.port) {
+			return port;
+		}
+		pport = &port->next;
+	}
+	return NULL;
 }
 
 void
-a2j_port_insert(
-  a2j_port_hash_t hash,
-  struct a2j_port * port)
+a2j_port_insert (
+	a2j_port_hash_t hash,
+	struct a2j_port * port)
 {
-  struct a2j_port **pport = &hash[a2j_port_hash(port->remote)];
-  port->next = *pport;
-  *pport = port;
+	struct a2j_port **pport = &hash[a2j_port_hash (port->remote)];
+
+	port->next = *pport;
+	*pport = port;
 }

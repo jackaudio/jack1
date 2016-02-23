@@ -19,6 +19,6 @@
 
 #include <config/cpu/generic/atomicity.h>
 
-#endif /* processor selection */
+#endif  /* processor selection */
 
-#endif /* _jack_sysdep_atomicity_h_ */
+#endif  /* _jack_sysdep_atomicity_h_ */

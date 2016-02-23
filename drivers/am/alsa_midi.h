@@ -38,10 +38,10 @@ alsa_midi_t* alsa_seqmidi_new(jack_client_t *jack, const char* alsa_name);
 
 typedef struct _alsa_midi_driver {
 
-    JACK_DRIVER_DECL;
+	JACK_DRIVER_DECL;
 
-    alsa_midi_t *midi;
-    jack_client_t *client;
+	alsa_midi_t *midi;
+	jack_client_t *client;
 
 } alsa_midi_driver_t;
 

@@ -14,9 +14,9 @@
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-    
+
     Grame Research Laboratory, 9, rue du Garet 69001 Lyon - France
     grame@rd.grame.fr
-*/
+ */
 
 #include "/Developer/SDKs/MacOSX10.3.0.sdk/usr/include/getopt.h"

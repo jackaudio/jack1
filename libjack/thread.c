@@ -1,25 +1,25 @@
 /*
-  Copyright (C) 2004 Paul Davis
-  
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU Lesser General Public License as published by
-  the Free Software Foundation; either version 2.1 of the License, or
-  (at your option) any later version.
+   Copyright (C) 2004 Paul Davis
 
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU Lesser General Public License for more details.
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU Lesser General Public License as published by
+   the Free Software Foundation; either version 2.1 of the License, or
+   (at your option) any later version.
 
-  You should have received a copy of the GNU Lesser General Public License
-  along with this program; if not, write to the Free Software
-  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU Lesser General Public License for more details.
 
-  Thread creation function including workarounds for real-time scheduling
-  behaviour on different glibc versions.
+   You should have received a copy of the GNU Lesser General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+   Thread creation function including workarounds for real-time scheduling
+   behaviour on different glibc versions.
 
 
-*/
+ */
 
 #include <config.h>
 
@@ -43,7 +43,7 @@
 jack_thread_creator_t jack_thread_creator = pthread_create;
 
 void
-jack_set_thread_creator (jack_thread_creator_t jtc) 
+jack_set_thread_creator (jack_thread_creator_t jtc)
 {
 	jack_thread_creator = jtc;
 }
@@ -52,10 +52,11 @@ static inline void
 log_result (char *msg, int res)
 {
 	char outbuf[500];
-	snprintf(outbuf, sizeof(outbuf),
-		 "jack_client_create_thread: error %d %s: %s",
-		 res, msg, strerror(res));
-	jack_error(outbuf);
+
+	snprintf (outbuf, sizeof(outbuf),
+		  "jack_client_create_thread: error %d %s: %s",
+		  res, msg, strerror (res));
+	jack_error (outbuf);
 }
 
 static void
@@ -64,24 +65,24 @@ maybe_get_capabilities (jack_client_t* client)
 #ifdef USE_CAPABILITIES
 
 	if (client != 0) {
-		
+
 		jack_request_t req;
 
 		if (client->engine->has_capabilities != 0) {
-			
+
 			/* we need to ask the engine for realtime capabilities
 			   before trying to run the thread work function
-			*/
-			
-                        VALGRIND_MEMSET (&req, 0, sizeof (req));
-		
+			 */
+
+			VALGRIND_MEMSET (&req, 0, sizeof(req));
+
 			req.type = SetClientCapabilities;
-			req.x.cap_pid = getpid();
-			
+			req.x.cap_pid = getpid ();
+
 			jack_client_deliver_request (client, &req);
-			
+
 			if (req.status) {
-				
+
 				/* what to do? engine is running realtime, it
 				   is using capabilities and has them
 				   (otherwise we would not get an error
@@ -89,51 +90,51 @@ maybe_get_capabilities (jack_client_t* client)
 				   give the client the required capabilities.
 				   for now, allow the client to run, albeit
 				   non-realtime.
-				*/
-				
+				 */
+
 				jack_error ("could not receive realtime capabilities, "
 					    "client will run non-realtime");
-				
+
 			}
 		}
 	}
-#endif /* USE_CAPABILITIES */
-}	
+#endif  /* USE_CAPABILITIES */
+}
 
 static void
-jack_thread_touch_stack()
+jack_thread_touch_stack ()
 {
 	char buf[JACK_THREAD_STACK_TOUCH];
 	int i;
 	volatile char *buf_ptr = buf;
 
-	for (i = 0; i < JACK_THREAD_STACK_TOUCH; i++) {
-		buf_ptr[i] = (char) (i & 0xff);
-	}
+	for (i = 0; i < JACK_THREAD_STACK_TOUCH; i++)
+		buf_ptr[i] = (char)(i & 0xff);
 }
 
-typedef void (* stack_touch_t)();
+typedef void (*stack_touch_t)();
 static volatile stack_touch_t ptr_jack_thread_touch_stack = jack_thread_touch_stack;
 
 static void*
 jack_thread_proxy (void* varg)
 {
-	jack_thread_arg_t* arg = (jack_thread_arg_t*) varg;
+	jack_thread_arg_t* arg = (jack_thread_arg_t*)varg;
+
 	void* (*work)(void*);
 	void* warg;
 	jack_client_t* client = arg->client;
 
 	if (arg->realtime) {
-		ptr_jack_thread_touch_stack();
+		ptr_jack_thread_touch_stack ();
 		maybe_get_capabilities (client);
-		jack_acquire_real_time_scheduling (pthread_self(), arg->priority);
+		jack_acquire_real_time_scheduling (pthread_self (), arg->priority);
 	}
 
 	warg = arg->arg;
 	work = arg->work_function;
 
 	free (arg);
-	
+
 	return work (warg);
 }
 
@@ -148,15 +149,15 @@ jack_client_create_thread (jack_client_t* client,
 #ifndef JACK_USE_MACH_THREADS
 	pthread_attr_t attr;
 	jack_thread_arg_t* thread_args;
-#endif /* !JACK_USE_MACH_THREADS */
+#endif  /* !JACK_USE_MACH_THREADS */
 
 	int result = 0;
 
 	if (!realtime) {
 		result = jack_thread_creator (thread, 0, start_routine, arg);
 		if (result) {
-			log_result("creating thread with default parameters",
-				   result);
+			log_result ("creating thread with default parameters",
+				    result);
 		}
 		return result;
 	}
@@ -168,34 +169,34 @@ jack_client_create_thread (jack_client_t* client,
 
 #ifndef JACK_USE_MACH_THREADS
 
-	pthread_attr_init(&attr);
-	result = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+	pthread_attr_init (&attr);
+	result = pthread_attr_setinheritsched (&attr, PTHREAD_EXPLICIT_SCHED);
 	if (result) {
-		log_result("requesting explicit scheduling", result);
+		log_result ("requesting explicit scheduling", result);
 		return result;
 	}
-	result = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	result = pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
 	if (result) {
-		log_result("requesting joinable thread creation", result);
+		log_result ("requesting joinable thread creation", result);
 		return result;
 	}
 #ifdef __OpenBSD__
-	result = pthread_attr_setscope(&attr, PTHREAD_SCOPE_PROCESS);
+	result = pthread_attr_setscope (&attr, PTHREAD_SCOPE_PROCESS);
 #else
-	result = pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+	result = pthread_attr_setscope (&attr, PTHREAD_SCOPE_SYSTEM);
 #endif
 	if (result) {
-		log_result("requesting system scheduling scope", result);
+		log_result ("requesting system scheduling scope", result);
 		return result;
 	}
 
-        result = pthread_attr_setstacksize(&attr, THREAD_STACK); 
-        if (result) {
-                log_result("setting thread stack size", result);
-                return result;
-        }
+	result = pthread_attr_setstacksize (&attr, THREAD_STACK);
+	if (result) {
+		log_result ("setting thread stack size", result);
+		return result;
+	}
 
-	if ((thread_args = (jack_thread_arg_t *) malloc (sizeof (jack_thread_arg_t))) == NULL) {
+	if ((thread_args = (jack_thread_arg_t*)malloc (sizeof(jack_thread_arg_t))) == NULL) {
 		return -1;
 	}
 
@@ -211,7 +212,7 @@ jack_client_create_thread (jack_client_t* client,
 		return result;
 	}
 
-#else /* JACK_USE_MACH_THREADS */
+#else   /* JACK_USE_MACH_THREADS */
 
 	result = jack_thread_creator (thread, 0, start_routine, arg);
 	if (result) {
@@ -221,8 +222,8 @@ jack_client_create_thread (jack_client_t* client,
 
 	/* time constraint thread */
 	setThreadToPriority (*thread, 96, TRUE, 10000000);
-	
-#endif /* JACK_USE_MACH_THREADS */
+
+#endif  /* JACK_USE_MACH_THREADS */
 
 	return 0;
 }
@@ -233,7 +234,7 @@ jack_client_real_time_priority (jack_client_t* client)
 	if (!client->engine->real_time) {
 		return -1;
 	}
-	
+
 	return client->engine->client_priority;
 }
 
@@ -247,20 +248,20 @@ jack_client_max_real_time_priority (jack_client_t* client)
 	return client->engine->max_client_priority;
 }
 
-#if JACK_USE_MACH_THREADS 
+#if JACK_USE_MACH_THREADS
 
 int
 jack_drop_real_time_scheduling (pthread_t thread)
 {
-	setThreadToPriority(thread, 31, FALSE, 10000000);
-	return 0;       
+	setThreadToPriority (thread, 31, FALSE, 10000000);
+	return 0;
 }
 
 int
 jack_acquire_real_time_scheduling (pthread_t thread, int priority)
-	//priority is unused
+//priority is unused
 {
-	setThreadToPriority(thread, 96, TRUE, 10000000);
+	setThreadToPriority (thread, 96, TRUE, 10000000);
 	return 0;
 }
 
@@ -271,8 +272,8 @@ jack_drop_real_time_scheduling (pthread_t thread)
 {
 	struct sched_param rtparam;
 	int x;
-	
-	memset (&rtparam, 0, sizeof (rtparam));
+
+	memset (&rtparam, 0, sizeof(rtparam));
 	rtparam.sched_priority = 0;
 
 	if ((x = pthread_setschedparam (thread, SCHED_OTHER, &rtparam)) != 0) {
@@ -280,7 +281,7 @@ jack_drop_real_time_scheduling (pthread_t thread)
 			    strerror (errno));
 		return -1;
 	}
-        return 0;
+	return 0;
 }
 
 int
@@ -288,20 +289,20 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 {
 	struct sched_param rtparam;
 	int x;
-	
-	memset (&rtparam, 0, sizeof (rtparam));
+
+	memset (&rtparam, 0, sizeof(rtparam));
 	rtparam.sched_priority = priority;
-	
+
 	if ((x = pthread_setschedparam (thread, SCHED_FIFO, &rtparam)) != 0) {
 		jack_error ("cannot use real-time scheduling (FIFO at priority %d) "
-			    "[for thread %d, from thread %d] (%d: %s)", 
-			    rtparam.sched_priority, 
-			    thread, pthread_self(),
+			    "[for thread %d, from thread %d] (%d: %s)",
+			    rtparam.sched_priority,
+			    thread, pthread_self (),
 			    x, strerror (x));
 		return -1;
 	}
 
-        return 0;
+	return 0;
 }
 
 #endif /* JACK_USE_MACH_THREADS */

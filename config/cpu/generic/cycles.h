@@ -1,6 +1,6 @@
 /*
     Copyright (C) 2001 Paul Davis
-    
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -15,7 +15,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-*/
+ */
 
 #ifndef __jack_cycles_h__
 #define __jack_cycles_h__
@@ -26,12 +26,13 @@
 
 typedef long cycles_t;
 
-static inline cycles_t get_cycles(void)
+static inline cycles_t get_cycles (void)
 {
-       struct timespec time;
-       clock_gettime(CLOCK_REALTIME, &time);
+	struct timespec time;
 
-       return ((cycles_t) time.tv_sec * 1000000) + time.tv_nsec*1000;
+	clock_gettime (CLOCK_REALTIME, &time);
+
+	return ((cycles_t)time.tv_sec * 1000000) + time.tv_nsec * 1000;
 }
 
 #endif /* __jack_cycles_h__ */

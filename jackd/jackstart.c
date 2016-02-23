@@ -18,7 +18,7 @@
     Finn Arne Gangstad <finnag@guardian.no> and givertcap.c, written by
     Tommi Ilmonen, Tommi.Ilmonen@hut.fi
 
-*/
+ */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -51,7 +51,7 @@ static char *jackd_md5_sum = JACKD_MD5_SUM;
 
 static int check_capabilities (void)
 {
-	cap_t caps = cap_init();
+	cap_t caps = cap_init ();
 	cap_flag_value_t cap;
 	pid_t pid;
 	int have_all_caps = 1;
@@ -67,28 +67,28 @@ static int check_capabilities (void)
 		return 0;
 	}
 	/* check that we are able to give capabilites to other processes */
-	cap_get_flag(caps, CAP_SETPCAP, CAP_EFFECTIVE, &cap);
+	cap_get_flag (caps, CAP_SETPCAP, CAP_EFFECTIVE, &cap);
 	if (cap == CAP_CLEAR) {
 		have_all_caps = 0;
 		goto done;
 	}
 	/* check that we have the capabilities we want to transfer */
-	cap_get_flag(caps, CAP_SYS_NICE, CAP_EFFECTIVE, &cap);
+	cap_get_flag (caps, CAP_SYS_NICE, CAP_EFFECTIVE, &cap);
 	if (cap == CAP_CLEAR) {
 		have_all_caps = 0;
 		goto done;
 	}
-	cap_get_flag(caps, CAP_SYS_RESOURCE, CAP_EFFECTIVE, &cap);
+	cap_get_flag (caps, CAP_SYS_RESOURCE, CAP_EFFECTIVE, &cap);
 	if (cap == CAP_CLEAR) {
 		have_all_caps = 0;
 		goto done;
 	}
-	cap_get_flag(caps, CAP_IPC_LOCK, CAP_EFFECTIVE, &cap);
+	cap_get_flag (caps, CAP_IPC_LOCK, CAP_EFFECTIVE, &cap);
 	if (cap == CAP_CLEAR) {
 		have_all_caps = 0;
 		goto done;
 	}
-  done:
+done:
 	cap_free (caps);
 	return have_all_caps;
 }
@@ -96,23 +96,23 @@ static int check_capabilities (void)
 
 static int give_capabilities (pid_t pid)
 {
-	cap_t caps = cap_init();
+	cap_t caps = cap_init ();
 	const unsigned caps_size = 4;
 	cap_value_t cap_list[] =
-		{ CAP_SETPCAP, CAP_SYS_NICE, CAP_SYS_RESOURCE, CAP_IPC_LOCK} ;
+	{ CAP_SETPCAP, CAP_SYS_NICE, CAP_SYS_RESOURCE, CAP_IPC_LOCK };
 
 	if (caps == NULL) {
 		fprintf (stderr, "jackstart: could not allocate capability working storage\n");
 		return -1;
 	}
-	cap_clear(caps);
+	cap_clear (caps);
 	if (capgetp (pid, caps)) {
 		fprintf (stderr, "jackstart: could not get capabilities for process %d\n", pid);
-		cap_clear(caps);
+		cap_clear (caps);
 	}
-	cap_set_flag(caps, CAP_EFFECTIVE, caps_size, cap_list , CAP_SET);
-	cap_set_flag(caps, CAP_INHERITABLE, caps_size, cap_list , CAP_SET);
-	cap_set_flag(caps, CAP_PERMITTED, caps_size, cap_list , CAP_SET);
+	cap_set_flag (caps, CAP_EFFECTIVE, caps_size, cap_list, CAP_SET);
+	cap_set_flag (caps, CAP_INHERITABLE, caps_size, cap_list, CAP_SET);
+	cap_set_flag (caps, CAP_PERMITTED, caps_size, cap_list, CAP_SET);
 	if (capsetp (pid, caps)) {
 		fprintf (stderr, "jackstart: could not give capabilities: %s\n", strerror (errno));
 		cap_free (caps);
@@ -127,12 +127,12 @@ static int check_binary (const char *binpath)
 	struct stat status;
 	FILE *binstream;
 
-	if (lstat(jackd_bin_path, &status)) {
+	if (lstat (jackd_bin_path, &status)) {
 		fprintf (stderr, "jackstart: could not stat %s: %s\n",
-			 binpath, strerror(errno));
+			 binpath, strerror (errno));
 		return -1;
 	}
-	if (!(S_ISREG(status.st_mode))) {
+	if (!(S_ISREG (status.st_mode))) {
 		fprintf (stderr, "jackstart: %s is not a regular file\n",
 			 binpath);
 		return -1;
@@ -149,8 +149,8 @@ static int check_binary (const char *binpath)
 		return -1;
 	}
 	if ((binstream = fopen (binpath, "r")) == NULL) {
-		fprintf (stderr, "jackstart: can't open %s for reading: %s\n", 
-			 binpath, strerror(errno));
+		fprintf (stderr, "jackstart: can't open %s for reading: %s\n",
+			 binpath, strerror (errno));
 		return -1;
 	} else {
 		/* md5sum the executable file, check man evp for more details */
@@ -161,7 +161,7 @@ static int check_binary (const char *binpath)
 		char md_string[3];
 		int i, j;
 
-		md5_init(&ctx);
+		md5_init (&ctx);
 		while (1) {
 			size_t n;
 			sum = 0;
@@ -170,24 +170,25 @@ static int check_binary (const char *binpath)
 				sum += n;
 			} while (sum < READ_BLOCKSIZE && n != 0);
 			if (n == 0 && ferror (binstream)) {
-				fprintf (stderr, "jackstart: error while reading %s: %s\n", binpath, strerror(errno));
+				fprintf (stderr, "jackstart: error while reading %s: %s\n", binpath, strerror (errno));
 				return -1;
 			}
 			if (n == 0) {
 				break;
 			}
-			md5_process(&ctx, buffer, READ_BLOCKSIZE);
+			md5_process (&ctx, buffer, READ_BLOCKSIZE);
 		}
-		if (sum > 0)
-			md5_process(&ctx, buffer, sum);
+		if (sum > 0) {
+			md5_process (&ctx, buffer, sum);
+		}
 		if (fclose (binstream)) {
-			fprintf (stderr, "jackstart: could not close %s after reading: %s\n", binpath, strerror(errno));
+			fprintf (stderr, "jackstart: could not close %s after reading: %s\n", binpath, strerror (errno));
 		}
-		md5_finish(&ctx, md_value);
-		for(i = 0, j = 0; i < sizeof(md_value); i++, j+=2) {
-			sprintf(md_string, "%02x", md_value[i]);
+		md5_finish (&ctx, md_value);
+		for (i = 0, j = 0; i < sizeof(md_value); i++, j += 2) {
+			sprintf (md_string, "%02x", md_value[i]);
 			if (md_string[0] != jackd_md5_sum[j] ||
-			    md_string[1] != jackd_md5_sum[j+1]) {
+			    md_string[1] != jackd_md5_sum[j + 1]) {
 				fprintf (stderr, "jackstart: md5 checksum for %s does not match\n", binpath);
 				return -1;
 			}
@@ -196,7 +197,7 @@ static int check_binary (const char *binpath)
 	return 0;
 }
 
-int main(int argc, char **argv)
+int main (int argc, char **argv)
 {
 	uid_t uid, euid;
 	pid_t pid, parent_pid;
@@ -222,97 +223,97 @@ int main(int argc, char **argv)
 	/* see if we can get the required capabilities */
 	if (check_capabilities () == 0) {
 		size_t size;
-		cap_t cap = cap_init();
-		capgetp(0, cap);
+		cap_t cap = cap_init ();
+		capgetp (0, cap);
 		fprintf (stderr, "jackstart: cannot get realtime capabilities, current capabilities are:\n");
-		fprintf (stderr, "           %s\n", cap_to_text(cap, &size));
+		fprintf (stderr, "           %s\n", cap_to_text (cap, &size));
 		fprintf (stderr, "    probably running under a kernel with capabilities disabled,\n");
 		fprintf (stderr, "    a suitable kernel would have printed something like \"=eip\"\n\n");
 	}
 
 	/* check the executable, owner, permissions, md5 checksum */
-	if (check_binary(jackd_bin_path)) {
-		exit(1);
+	if (check_binary (jackd_bin_path)) {
+		exit (1);
 	}
 
 	/* set process group to current pid */
-	if (setpgid (0, getpid())) {
-		fprintf (stderr, "jackstart: failed to set process group: %s\n", 
-			 strerror(errno));
+	if (setpgid (0, getpid ())) {
+		fprintf (stderr, "jackstart: failed to set process group: %s\n",
+			 strerror (errno));
 		exit (1);
 	}
 
 	/* create pipe to synchronize with jackd */
 	if (pipe (pipe_fds)) {
 		fprintf (stderr, "jackstart: could not create pipe: %s\n",
-			 strerror(errno));
+			 strerror (errno));
 		exit (1);
 	}
 
 	/* make sure the file descriptors are the right ones,
 	   otherwise dup them, this is to make sure that both
 	   jackstart and jackd use the same fds
-	*/
+	 */
 	if (pipe_fds[0] != PIPE_READ_FD) {
 		if (dup2 (pipe_fds[0], PIPE_READ_FD) != PIPE_READ_FD) {
 			fprintf (stderr, "jackstart: could not dup pipe read file descriptor: %s\n",
-				 strerror(errno));
+				 strerror (errno));
 			exit (1);
 		}
 	}
 	if (pipe_fds[1] != PIPE_WRITE_FD) {
-		if (dup2(pipe_fds[1], PIPE_WRITE_FD)!=PIPE_WRITE_FD) {
+		if (dup2 (pipe_fds[1], PIPE_WRITE_FD) != PIPE_WRITE_FD) {
 			fprintf (stderr, "jackstart: could not dup pipe write file descriptor: %s\n",
-				 strerror(errno));
+				 strerror (errno));
 			exit (1);
 		}
 	}
 	/* fork off a child to wait for jackd to start */
-	fflush(NULL);
-	pid = fork();
+	fflush (NULL);
+	pid = fork ();
 	if (pid == -1) {
 		fprintf (stderr, "jackstart: fork failed\n");
 		exit (1);
 	}
 	if (pid) {
 		/* mother process: drops privileges, execs jackd */
-		close(PIPE_READ_FD);
+		close (PIPE_READ_FD);
 
 		/* get rid of any supplemental groups */
 		if (!getuid () && setgroups (0, 0)) {
-			fprintf (stderr, "jackstart: setgroups failed: %s\n", strerror(errno));
+			fprintf (stderr, "jackstart: setgroups failed: %s\n", strerror (errno));
 			exit (1);
 		}
 
 		/* set gid and uid */
-		setregid(gid, gid);
-		setreuid(uid, uid);
-		execvp(jackd_bin_path, argv);
-	
+		setregid (gid, gid);
+		setreuid (uid, uid);
+		execvp (jackd_bin_path, argv);
+
 		/* we could not start jackd, clean up and exit */
-		fprintf(stderr, "jackstart: unable to execute %s: %s\n", jackd_bin_path, strerror(errno));
+		fprintf (stderr, "jackstart: unable to execute %s: %s\n", jackd_bin_path, strerror (errno));
 		close (PIPE_WRITE_FD);
 		wait (&err);
 		exit (1);
 	} else {
 		/* child process: grants privileges to jackd */
-		close(PIPE_WRITE_FD);
+		close (PIPE_WRITE_FD);
 
 		/* wait for jackd to start */
 		while (1) {
-		  	int ret;
+			int ret;
 			char c;
 
-			/* picking up pipe closure is a tricky business. 
+			/* picking up pipe closure is a tricky business.
 			   this seems to work as well as anything else.
-			*/
+			 */
 
-			ret = read(PIPE_READ_FD, &c, 1);
+			ret = read (PIPE_READ_FD, &c, 1);
 			fprintf (stderr, "back from read, ret = %d errno == %s\n", ret, strerror (errno));
 			if (ret == 1) {
-			  break;
+				break;
 			} else if (errno != EINTR) {
-			  break;
+				break;
 			}
 		}
 

@@ -14,7 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-*/
+ */
 
 
 #ifndef __JACK_DUMMY_DRIVER_H__
@@ -36,27 +36,26 @@
 
 typedef struct _dummy_driver dummy_driver_t;
 
-struct _dummy_driver
-{
-    JACK_DRIVER_NT_DECL;
+struct _dummy_driver {
+	JACK_DRIVER_NT_DECL;
 
-    jack_nframes_t  sample_rate;
-    jack_nframes_t  period_size;
-    unsigned long   wait_time;
+	jack_nframes_t sample_rate;
+	jack_nframes_t period_size;
+	unsigned long wait_time;
 
 #ifdef HAVE_CLOCK_GETTIME
-    struct timespec next_wakeup;
+	struct timespec next_wakeup;
 #else
-    jack_time_t     next_time;
+	jack_time_t next_time;
 #endif
 
-    unsigned int    capture_channels;
-    unsigned int    playback_channels;
+	unsigned int capture_channels;
+	unsigned int playback_channels;
 
-    JSList	   *capture_ports;
-    JSList	   *playback_ports;
+	JSList         *capture_ports;
+	JSList         *playback_ports;
 
-    jack_client_t  *client;
+	jack_client_t  *client;
 };
 
 #endif /* __JACK_DUMMY_DRIVER_H__ */

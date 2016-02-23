@@ -1,6 +1,6 @@
 /*
     Copyright (C) 2001 Paul Davis
-    
+
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
@@ -15,12 +15,12 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-*/
+ */
 
 #ifndef __jack_generic_h__
 #define __jack_generic_h__
 
 jack_hardware_t *
-jack_alsa_generic_hw_new (alsa_driver_t *driver);
+jack_alsa_generic_hw_new(alsa_driver_t *driver);
 
 #endif /* __jack_generic_h__*/

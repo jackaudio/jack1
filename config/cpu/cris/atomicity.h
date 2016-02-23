@@ -28,51 +28,51 @@
 // the GNU General Public License.
 
 #ifndef _GLIBCXX_ATOMICITY_H
-#define _GLIBCXX_ATOMICITY_H	1
+#define _GLIBCXX_ATOMICITY_H    1
 
 // This entity must not cross a page boundary.
 typedef int _Atomic_word __attribute__ ((__aligned__ (4)));
 
 static inline _Atomic_word
 __attribute__ ((__unused__))
-__exchange_and_add(_Atomic_word* __mem, int __val)
+__exchange_and_add (_Atomic_word* __mem, int __val)
 {
-  int __tmp;
-  _Atomic_word __result;
+	int __tmp;
+	_Atomic_word __result;
 
 #if (__CRIS_arch_version >= 10)
-  __asm__ __volatile__ (" clearf		\n"
-			"0:			\n"
-			" move.d %4,%2		\n"
-			" move.d [%3],%0	\n"
-			" add.d %0,%2		\n"
-			" ax			\n"
-			" move.d %2,[%3]	\n"
-			" bwf 0b		\n"
-			" clearf		\n"
-			:  "=&r" (__result), "=m" (*__mem), "=&r" (__tmp)
-			: "r" (__mem), "g" (__val), "m" (*__mem));
+	__asm__ __volatile__ (" clearf		\n"
+			      "0:			\n"
+			      " move.d %4,%2		\n"
+			      " move.d [%3],%0	\n"
+			      " add.d %0,%2		\n"
+			      " ax			\n"
+			      " move.d %2,[%3]	\n"
+			      " bwf 0b		\n"
+			      " clearf		\n"
+			      :  "=&r" (__result), "=m" (*__mem), "=&r" (__tmp)
+			      : "r" (__mem), "g" (__val), "m" (*__mem));
 #else
-  __asm__ __volatile__ (" move $ccr,$r9		\n"
-			" di			\n"
-			" move.d %4,%2		\n"
-			" move.d [%3],%0	\n"
-			" add.d %0,%2		\n"
-			" move.d %2,[%3]	\n"
-			" move $r9,$ccr		\n"
-			:  "=&r" (__result), "=m" (*__mem), "=&r" (__tmp)
-			: "r" (__mem), "g" (__val), "m" (*__mem)
-			: "r9");
+	__asm__ __volatile__ (" move $ccr,$r9		\n"
+			      " di			\n"
+			      " move.d %4,%2		\n"
+			      " move.d [%3],%0	\n"
+			      " add.d %0,%2		\n"
+			      " move.d %2,[%3]	\n"
+			      " move $r9,$ccr		\n"
+			      :  "=&r" (__result), "=m" (*__mem), "=&r" (__tmp)
+			      : "r" (__mem), "g" (__val), "m" (*__mem)
+			      : "r9");
 #endif
 
-  return __result;
+	return __result;
 }
 
 static inline void
 __attribute__ ((__unused__))
-__atomic_add(_Atomic_word* __mem, int __val)
+__atomic_add (_Atomic_word* __mem, int __val)
 {
-  __exchange_and_add(__mem, __val);
+	__exchange_and_add (__mem, __val);
 }
 
 #endif /* atomicity.h */

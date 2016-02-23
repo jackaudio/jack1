@@ -24,12 +24,12 @@
 
 void
 a2j_port_insert(
-  a2j_port_hash_t hash,
-  struct a2j_port * port);
+	a2j_port_hash_t hash,
+	struct a2j_port * port);
 
 struct a2j_port *
 a2j_port_get(
-  a2j_port_hash_t hash,
-  snd_seq_addr_t addr);
+	a2j_port_hash_t hash,
+	snd_seq_addr_t addr);
 
 #endif /* #ifndef PORT_HASH_H__A44CBCD6_E075_49CB_8F73_DF9772511D55__INCLUDED */

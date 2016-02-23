@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2001 Paul Davis 
+    Copyright (C) 2001 Paul Davis
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-*/
+ */
 
 #include "hardware.h"
 #include "alsa_driver.h"
@@ -25,7 +25,7 @@ static int generic_set_input_monitor_mask (jack_hardware_t *hw, unsigned long ma
 	return -1;
 }
 
-static int generic_change_sample_clock (jack_hardware_t *hw, SampleClockMode mode) 
+static int generic_change_sample_clock (jack_hardware_t *hw, SampleClockMode mode)
 {
 	return -1;
 }
@@ -42,11 +42,11 @@ jack_alsa_generic_hw_new (alsa_driver_t *driver)
 {
 	jack_hardware_t *hw;
 
-	hw = (jack_hardware_t *) malloc (sizeof (jack_hardware_t));
+	hw = (jack_hardware_t*)malloc (sizeof(jack_hardware_t));
 
 	hw->capabilities = 0;
 	hw->input_monitor_mask = 0;
-	
+
 	hw->set_input_monitor_mask = generic_set_input_monitor_mask;
 	hw->change_sample_clock = generic_change_sample_clock;
 	hw->release = generic_release;

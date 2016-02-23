@@ -28,112 +28,113 @@
 // the GNU General Public License.
 
 #ifndef _GLIBCXX_ATOMICITY_H
-#define _GLIBCXX_ATOMICITY_H	1
+#define _GLIBCXX_ATOMICITY_H    1
 
 typedef int _Atomic_word;
 
 #if ( defined(__mc68020__) || defined(__mc68030__) \
-      || defined(__mc68040__) || defined(__mc68060__) ) \
-    && !defined(__mcpu32__)
+	|| defined(__mc68040__) || defined(__mc68060__) ) \
+	&& !defined(__mcpu32__)
 // These variants support compare-and-swap.
 
-static inline _Atomic_word 
+static inline _Atomic_word
 __attribute__ ((__unused__))
-__exchange_and_add(volatile _Atomic_word* __mem, int __val)
+__exchange_and_add (volatile _Atomic_word* __mem, int __val)
 {
-  register _Atomic_word __result = *__mem;
-  register _Atomic_word __temp;
-  __asm__ __volatile__ ("1: move%.l %0,%1\n\t"
-			"add%.l %3,%1\n\t"
-			"cas%.l %0,%1,%2\n\t"
-			"jne 1b"
-			: "=d" (__result), "=&d" (__temp), "=m" (*__mem)
-			: "d" (__val), "0" (__result), "m" (*__mem));
-  return __result;
+	register _Atomic_word __result = *__mem;
+	register _Atomic_word __temp;
+
+	__asm__ __volatile__ ("1: move%.l %0,%1\n\t"
+			      "add%.l %3,%1\n\t"
+			      "cas%.l %0,%1,%2\n\t"
+			      "jne 1b"
+			      : "=d" (__result), "=&d" (__temp), "=m" (*__mem)
+			      : "d" (__val), "0" (__result), "m" (*__mem));
+	return __result;
 }
 
 #elif defined(__rtems__)
-  /*
-   * TAS/JBNE is unsafe on systems with strict priority-based scheduling.
-   * Disable interrupts, which we can do only from supervisor mode.
-   */
+/*
+ * TAS/JBNE is unsafe on systems with strict priority-based scheduling.
+ * Disable interrupts, which we can do only from supervisor mode.
+ */
 static inline _Atomic_word
 __attribute__ ((__unused__))
-__exchange_and_add(volatile _Atomic_word* __mem, int __val)
+__exchange_and_add (volatile _Atomic_word* __mem, int __val)
 {
-  _Atomic_word __result;
-  short __level, __tmpsr;
-  __asm__ __volatile__ ("move%.w %%sr,%0\n\tor%.l %0,%1\n\tmove%.w %1,%%sr"
-                       : "=d"(__level), "=d"(__tmpsr) : "1"(0x700));
+	_Atomic_word __result;
+	short __level, __tmpsr;
 
-  __result = *__mem;
-  *__mem = __result + __val;
+	__asm__ __volatile__ ("move%.w %%sr,%0\n\tor%.l %0,%1\n\tmove%.w %1,%%sr"
+			      : "=d" (__level), "=d" (__tmpsr) : "1" (0x700));
 
-  __asm__ __volatile__ ("move%.w %0,%%sr" : : "d"(__level));
+	__result = *__mem;
+	*__mem = __result + __val;
 
-  return __result;
+	__asm__ __volatile__ ("move%.w %0,%%sr" : : "d" (__level));
+
+	return __result;
 }
 
 #else
 
 template<int __inst>
-  struct __Atomicity_lock
-  {
-    static volatile unsigned char _S_atomicity_lock;
-  };
+struct __Atomicity_lock {
+	static volatile unsigned char _S_atomicity_lock;
+};
 
 template<int __inst>
 volatile unsigned char __Atomicity_lock<__inst>::_S_atomicity_lock = 0;
 
 template volatile unsigned char __Atomicity_lock<0>::_S_atomicity_lock;
 
-static inline _Atomic_word 
+static inline _Atomic_word
 __attribute__ ((__unused__))
-__exchange_and_add(volatile _Atomic_word* __mem, int __val)
+__exchange_and_add (volatile _Atomic_word* __mem, int __val)
 {
-  _Atomic_word __result;
+	_Atomic_word __result;
 
 // bset with no immediate addressing (not SMP-safe)
 #if defined(__mcf5200__) || defined(__mcf5300__)
-  __asm__ __volatile__("1: bset.b #7,%0@\n\tjbne 1b"
-		       : /* no outputs */
-		       : "a"(&__Atomicity_lock<0>::_S_atomicity_lock)
-		       : "cc", "memory");
+	__asm__ __volatile__ ("1: bset.b #7,%0@\n\tjbne 1b"
+			      : /* no outputs */
+			      : "a" (&__Atomicity_lock<0>::_S_atomicity_lock)
+			      : "cc", "memory");
 
 // CPU32 and MCF5400 support test-and-set (SMP-safe).
 #elif defined(__mcpu32__) || defined(__mcf5400__)
-  __asm__ __volatile__("1: tas %0\n\tjbne 1b"
-		       : "+m"(__Atomicity_lock<0>::_S_atomicity_lock)
-		       : /* none */
-		       : "cc");
+	__asm__ __volatile__ ("1: tas %0\n\tjbne 1b"
+			      : "+m" (__Atomicity_lock<0>::_S_atomicity_lock)
+			      : /* none */
+			      : "cc");
 
 // Use bset with immediate addressing for 68000/68010 (not SMP-safe)
 // NOTE: TAS is available on the 68000, but unsupported by some Amiga
 // memory controllers.
 #else
-  __asm__ __volatile__("1: bset.b #7,%0\n\tjbne 1b"
-		       : "+m"(__Atomicity_lock<0>::_S_atomicity_lock)
-		       : /* none */
-		       : "cc");
+	__asm__ __volatile__ ("1: bset.b #7,%0\n\tjbne 1b"
+			      : "+m" (__Atomicity_lock<0>::_S_atomicity_lock)
+			      : /* none */
+			      : "cc");
 #endif
 
-  __result = *__mem;
-  *__mem = __result + __val;
+	__result = *__mem;
+	*__mem = __result + __val;
 
-  __Atomicity_lock<0>::_S_atomicity_lock = 0;
+	__Atomicity_lock<0>::_S_atomicity_lock = 0;
 
-  return __result;
+	return __result;
 }
 
 #endif /* TAS / BSET */
 
 static inline void
 __attribute__ ((__unused__))
-__atomic_add(volatile _Atomic_word* __mem, int __val)
+__atomic_add (volatile _Atomic_word* __mem, int __val)
 {
-  // Careful: using add.l with a memory destination is not
-  // architecturally guaranteed to be atomic.
-  (void) __exchange_and_add(__mem, __val);
+	// Careful: using add.l with a memory destination is not
+	// architecturally guaranteed to be atomic.
+	(void)__exchange_and_add (__mem, __val);
 }
 
 #endif /* !_GLIBCXX_ATOMICITY_H */
