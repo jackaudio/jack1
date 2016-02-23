@@ -103,22 +103,43 @@ a2j_port_fill_name (struct a2j_port * port_ptr, int dir, snd_seq_client_info_t *
 		    const snd_seq_port_info_t * port_info_ptr, bool make_unique)
 {
 	char *c;
+	const char* const client_name = snd_seq_client_info_get_name (client_info_ptr);
+	const char* const port_name = snd_seq_port_info_get_name (port_info_ptr);
 
 	if (make_unique) {
-		snprintf (port_ptr->name,
-			  sizeof(port_ptr->name),
-			  "%s [%d] %s %s",
-			  snd_seq_client_info_get_name (client_info_ptr),
-			  snd_seq_client_info_get_client (client_info_ptr),
-			  snd_seq_port_info_get_name (port_info_ptr),
+		if (strstr (port_name, client_name) == port_name) {
+			/* entire client name is part of the port name so don't replicate it */
+			snprintf (port_ptr->name,
+			          sizeof(port_ptr->name),
+			          "[%d] %s %s",
+			          snd_seq_client_info_get_client (client_info_ptr),
+			          port_name,
 			  (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+		} else {
+			snprintf (port_ptr->name,
+			          sizeof(port_ptr->name),
+			          "%s [%d] %s %s",
+			          client_name,
+			          snd_seq_client_info_get_client (client_info_ptr),
+			          port_name,
+			          (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+		}
 	} else {
-		snprintf (port_ptr->name,
-			  sizeof(port_ptr->name),
-			  "%s %s %s",
-			  snd_seq_client_info_get_name (client_info_ptr),
-			  snd_seq_port_info_get_name (port_info_ptr),
-			  (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+		if (strstr (port_name, client_name) == port_name) {
+			/* entire client name is part of the port name so don't replicate it */
+			snprintf (port_ptr->name,
+			          sizeof(port_ptr->name),
+			          "%s %s",
+			          port_name,
+			          (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+		} else {
+			snprintf (port_ptr->name,
+			          sizeof(port_ptr->name),
+			          "%s %s %s",
+			          client_name,
+			          snd_seq_port_info_get_name (port_info_ptr),
+			          (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+		}
 	}
 
 	// replace all offending characters with ' '
