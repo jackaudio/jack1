@@ -62,13 +62,13 @@ jack_client_disconnect_ports (jack_engine_t *engine,
 	}
 
 	jack_slist_free (client->ports);
-	jack_slist_free (client->truefeeds);
-	jack_slist_free (client->sortfeeds);
-	client->truefeeds = 0;
-	client->sortfeeds = 0;
 	client->ports = 0;
 }
 
+
+/* Modified for new client execution order algorithm.
+ * FA 08/2015
+ */
 int
 jack_client_do_deactivate (jack_engine_t *engine,
 			   jack_client_internal_t *client, int sort_graph)
@@ -88,6 +88,7 @@ jack_client_do_deactivate (jack_engine_t *engine,
 	}
 
 	if (sort_graph) {
+		engine->execlist_request = EXECLIST_ORDER | EXECLIST_CYCLE;
 		jack_sort_graph (engine);
 	}
 	return 0;
@@ -162,7 +163,6 @@ jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *client)
 		 client->control->name);
 
 	/* caller must hold the client_lock */
-
 	/* this stops jack_deliver_event() from contacing this client */
 
 	client->control->dead = TRUE;
@@ -337,6 +337,9 @@ jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 	return errs;
 }
 
+/* Modified for new client execution order algorithm.
+ * FA 08/2015
+ */
 void
 jack_remove_clients (jack_engine_t* engine, int* exit_freewheeling_when_done)
 {
@@ -404,6 +407,7 @@ jack_remove_clients (jack_engine_t* engine, int* exit_freewheeling_when_done)
 	}
 
 	if (need_sort) {
+		engine->execlist_request = EXECLIST_ORDER | EXECLIST_CYCLE;
 		jack_sort_graph (engine);
 	}
 
@@ -564,6 +568,9 @@ jack_client_name_invalid (jack_engine_t *engine, char *name,
 
 /* Set up the engine's client internal and control structures for both
  * internal and external clients. */
+/* Modified for new client execution order algorithm.
+ * FA 08/2015
+ */
 static jack_client_internal_t *
 jack_setup_client_control (jack_engine_t *engine, int fd, ClientType type, const char *name, jack_uuid_t uuid)
 {
@@ -575,10 +582,11 @@ jack_setup_client_control (jack_engine_t *engine, int fd, ClientType type, const
 	client->request_fd = fd;
 	client->event_fd = -1;
 	client->ports = 0;
-	client->truefeeds = 0;
-	client->sortfeeds = 0;
+	client->feedlist = 0;
+	client->depcount = 0;
+	client->depcheck = 0;
+	client->execlist_next = 0;
 	client->execution_order = UINT_MAX;
-	client->next_client = NULL;
 	client->handle = NULL;
 	client->finish = NULL;
 	client->error = 0;
@@ -764,19 +772,15 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 	jack_engine_reset_rolling_usecs (engine);
 
 	if (jack_client_is_internal (client)) {
-
-
 		jack_unlock_graph (engine);
 
 		/* Call its initialization function.  This function
 		 * may make requests of its own, so we temporarily
 		 * release and then reacquire the request_lock.  */
 		if (client->control->type == ClientInternal) {
-
 			pthread_mutex_unlock (&engine->request_lock);
 			if (client->initialize (client->private_client,
 						object_data)) {
-
 				/* failed: clean up client data */
 				VERBOSE (engine,
 					 "%s jack_initialize() failed!",
@@ -792,8 +796,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 			pthread_mutex_lock (&engine->request_lock);
 		}
 
-	} else {                        /* external client */
-
+	} else {
 		jack_unlock_graph (engine);
 	}
 
@@ -864,6 +867,7 @@ jack_get_reserved_name (jack_engine_t *engine, jack_uuid_t uuid)
 	}
 	return 0;
 }
+
 int
 jack_client_create (jack_engine_t *engine, int client_fd)
 {
@@ -973,6 +977,10 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 	return 0;
 }
 
+
+/* Modified for new client execution order algorithm.
+ * FA 08/2015
+ */
 int
 jack_client_activate (jack_engine_t *engine, jack_uuid_t id)
 {
@@ -997,8 +1005,8 @@ jack_client_activate (jack_engine_t *engine, jack_uuid_t id)
 		 * this point.
 		 */
 
-		jack_get_fifo_fd (engine,
-				  ++engine->external_client_cnt);
+		jack_get_fifo_fd (engine, ++engine->external_client_cnt);
+		engine->execlist_request = EXECLIST_ORDER;
 		jack_sort_graph (engine);
 
 

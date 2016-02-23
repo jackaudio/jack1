@@ -71,7 +71,6 @@ typedef struct {
 
 	jack_port_internal_t *source;
 	jack_port_internal_t *destination;
-	signed int dir; /* -1 = feedback, 0 = self, 1 = forward */
 	jack_client_internal_t *srcclient;
 	jack_client_internal_t *dstclient;
 } jack_connection_internal_t;
@@ -127,11 +126,6 @@ static void jack_engine_delay(jack_engine_t *engine,
 			      float delayed_usecs);
 static void jack_engine_driver_exit(jack_engine_t* engine);
 static int  jack_start_freewheeling(jack_engine_t* engine, jack_uuid_t);
-static int jack_client_feeds_transitive(jack_client_internal_t *source,
-					jack_client_internal_t *dest);
-static int jack_client_sort(jack_client_internal_t *a,
-			    jack_client_internal_t *b);
-static void jack_check_acyclic(jack_engine_t* engine);
 static void jack_compute_all_port_total_latencies(jack_engine_t *engine);
 static void jack_compute_port_total_latency(jack_engine_t *engine, jack_port_shared_t*);
 static int jack_check_client_status(jack_engine_t* engine);
@@ -572,21 +566,20 @@ jack_set_buffer_size_request (jack_engine_t *engine, jack_nframes_t nframes)
 }
 
 
-static JSList *
-jack_process_internal (jack_engine_t *engine, JSList *node,
+/* Modified to use the new double-linked list of clients in execution order
+ * FA 08/2015
+ */
+static jack_client_internal_t*
+jack_process_internal (jack_engine_t *engine, jack_client_internal_t *client,
 		       jack_nframes_t nframes)
 {
-	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
 
-	client = (jack_client_internal_t*)node->data;
 	ctl = client->control;
-
-	/* internal client */
-
-	DEBUG ("invoking an internal client's (%s) callbacks", ctl->name);
 	ctl->state = Running;
 	engine->current_client = client;
+
+	DEBUG ("invoking an internal client's (%s) callbacks", ctl->name);
 
 	/* XXX how to time out an internal client? */
 
@@ -608,11 +601,10 @@ jack_process_internal (jack_engine_t *engine, JSList *node,
 	ctl->state = Finished;
 
 	if (engine->process_errors) {
-		return NULL;            /* will stop the loop */
-	} else {
-		return jack_slist_next (node);
-	}
+		return NULL;
+	} else {      return client->execlist_next; }
 }
+
 
 #ifdef __linux
 
@@ -650,18 +642,22 @@ linux_poll_bug_encountered (jack_engine_t* engine, jack_time_t then, jack_time_t
 }
 #endif
 
+
 #ifdef JACK_USE_MACH_THREADS
-static JSList *
-jack_process_external (jack_engine_t *engine, JSList *node)
+
+/* Modified to use the new double-linked list of clients in execution order.
+ * Unlike the Linux version, this just returns the next client in the list,
+ * as did the original. I'm not sure if I understand how this works and
+ * can't test it, but it seems to be correct.
+ * FA 08/2015
+ */
+static jack_client_internal *
+jack_process_external (jack_engine_t *engine, jack_client_internal_t *client)
 {
-	jack_client_internal_t * client = (jack_client_internal_t*)node->data;
 	jack_client_control_t *ctl;
 
-	client = (jack_client_internal_t*)node->data;
-	ctl = client->control;
-
 	engine->current_client = client;
-
+	ctl = client->control;
 	// a race exists if we do this after the write(2)
 	ctl->state = Triggered;
 	ctl->signalled_at = jack_get_microseconds ();
@@ -671,34 +667,31 @@ jack_process_external (jack_engine_t *engine, JSList *node)
 		ctl->state = Finished;
 	}
 
-	return jack_slist_next (node);
+	return client->execlist_next;
 }
+
 #else /* !JACK_USE_MACH_THREADS */
-static JSList *
-jack_process_external (jack_engine_t *engine, JSList *node)
+
+/* Modified to use the new double-linked list of clients in execution order.
+ * FA 08/2015
+ */
+static jack_client_internal_t *
+jack_process_external (jack_engine_t *engine, jack_client_internal_t *client)
 {
 	int status = 0;
 	char c = 0;
 	struct pollfd pfd[1];
 	int poll_timeout;
 	jack_time_t poll_timeout_usecs;
-	jack_client_internal_t *client;
 	jack_client_control_t *ctl;
 	jack_time_t now, then;
 	int pollret;
 
-	client = (jack_client_internal_t*)node->data;
-
+	engine->current_client = client;
 	ctl = client->control;
-
-	/* external subgraph */
-
 	/* a race exists if we do this after the write(2) */
 	ctl->state = Triggered;
-
 	ctl->signalled_at = jack_get_microseconds ();
-
-	engine->current_client = client;
 
 	DEBUG ("calling process() on an external subgraph, fd==%d",
 	       client->subgraph_start_fd);
@@ -744,22 +737,16 @@ again:
 	}
 
 	if (pfd[0].revents & POLLIN) {
-
 		status = 0;
 
 	} else if (status == 0) {
-
-		/* no events, no errors, we woke up because poll()
-		   decided that time was up ...
-		 */
-
+		/* no events, no errors, we woke up because poll() decided that time was up ... */
 		if (engine->freewheeling) {
 			if (jack_check_client_status (engine)) {
 				return NULL;
 			} else {
 				/* all clients are fine - we're just not done yet. since
-				   we're freewheeling, that is fine.
-				 */
+				   we're freewheeling, that is fine. */
 				goto again;
 			}
 		}
@@ -773,7 +760,6 @@ again:
 			VERBOSE (engine, "FALSE WAKEUP skipped, remaining = %lld usec", poll_timeout_usecs);
 		} else {
 #endif
-
 		jack_error ("subgraph starting at %s timed out "
 			    "(subgraph_wait_fd=%d, status = %d, state = %s, pollret = %d revents = 0x%x)",
 			    client->control->name,
@@ -805,7 +791,6 @@ again:
 					     ctl->signalled_at) : 0);
 
 		if (jack_check_clients (engine, 1)) {
-
 			engine->process_errors++;
 			return NULL;            /* will stop the loop */
 		}
@@ -830,57 +815,56 @@ again:
 	}
 
 	/* Move to next internal client (or end of client list) */
-	while (node) {
-		if (jack_client_is_internal ((jack_client_internal_t*)
-					     node->data)) {
+	while (client) {
+		if (jack_client_is_internal (client)) {
 			break;
 		}
-		node = jack_slist_next (node);
+		client = client->execlist_next;
 	}
-
-	return node;
+	return client;
 }
 
 #endif /* JACK_USE_MACH_THREADS */
 
+
+/* Modified to use the new double-linked list of clients in execution order.
+ * FA 08/2015
+ */
 static int
 jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
 {
 	/* precondition: caller has graph_lock */
 	jack_client_internal_t *client;
-	JSList *node;
 
 	engine->process_errors = 0;
 
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		jack_client_control_t *ctl =
-			((jack_client_internal_t*)node->data)->control;
+	for (client = engine->execlist_head; client; client = client->execlist_next) {
+		jack_client_control_t *ctl = client->control;
 		ctl->state = NotTriggered;
 		ctl->timed_out = 0;
 		ctl->awake_at = 0;
 		ctl->finished_at = 0;
 	}
 
-	for (node = engine->clients; engine->process_errors == 0 && node; ) {
 
-		client = (jack_client_internal_t*)node->data;
-
-		DEBUG ("considering client %s for processing",
-		       client->control->name);
+	client = engine->execlist_head;
+	while (client) {
+		DEBUG ("considering client %s for processing", client->control->name);
 
 		if (!client->control->active ||
 		    (!client->control->process_cbset && !client->control->thread_cb_cbset) ||
 		    client->control->dead) {
-			node = jack_slist_next (node);
+			client = client->execlist_next;
 		} else if (jack_client_is_internal (client)) {
-			node = jack_process_internal (engine, node, nframes);
+			client = jack_process_internal (engine, client, nframes);
 		} else {
-			node = jack_process_external (engine, node);
+			client = jack_process_external (engine, client);
 		}
 	}
 
 	return engine->process_errors > 0;
 }
+
 
 static void
 jack_calc_cpu_load (jack_engine_t *engine)
@@ -1846,6 +1830,13 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	engine->clients = 0;
 	engine->reserved_client_names = 0;
+
+	/* Added new double-linked list of clients in execution order.
+	 * FA 08/2015
+	 */
+	engine->execlist_head = 0;
+	engine->execlist_tail = 0;
+	engine->execlist_request = 0;
 
 	engine->pfd_size = 0;
 	engine->pfd_max = 0;
@@ -3179,159 +3170,89 @@ again:
 	return status;
 }
 
+
+/* Modified to use the new double-linked list of clients in execution order
+ * FA 08/2015
+ */
 int
 jack_rechain_graph (jack_engine_t *engine)
 {
-	JSList *node, *next;
-	unsigned long n;
-	int err = 0;
-	jack_client_internal_t *subgraph_client, *next_client;
+	jack_client_internal_t *client, *subgraph_client;
 	jack_event_t event;
 	int upstream_is_jackd;
+	unsigned long n;
 
+
+	VERBOSE (engine, "++ jack_rechain_graph():");
 	VALGRIND_MEMSET (&event, 0, sizeof(event));
 
 	jack_clear_fifos (engine);
-
 	subgraph_client = 0;
-
-	VERBOSE (engine, "++ jack_rechain_graph():");
 
 	event.type = GraphReordered;
 
-	for (n = 0, node = engine->clients, next = NULL; node; node = next) {
-
-		jack_client_internal_t* client = (jack_client_internal_t*)node->data;
-
-		next = jack_slist_next (node);
-
-		if (!client->control->process_cbset && !client->control->thread_cb_cbset) {
+	n = 0;
+	for (client = engine->execlist_head; client; client = client->execlist_next) {
+		/* We are only interested in active clients that have a process callback */
+		if (!client->control->active ||
+		    (!client->control->process_cbset && !client->control->thread_cb_cbset)) {
 			continue;
 		}
 
-		VERBOSE (engine, "+++ client is now %s active ? %d",
-			 client->control->name, client->control->active);
-
-		if (client->control->active) {
-
-			/* find the next active client. its ok for
-			 * this to be NULL */
-
-			while (next) {
-				if (client->control->active && (client->control->process_cbset || client->control->thread_cb_cbset)) {
-					break;
-				}
-				next = jack_slist_next (next);
-			}
-			;
-
-			if (next == NULL) {
-				next_client = NULL;
-			} else {
-				next_client = (jack_client_internal_t*)
-					      next->data;
-			}
+		VERBOSE (engine, "+++ client is now %s", client->control->name);
 
 			client->execution_order = n;
-			client->next_client = next_client;
 
 			if (jack_client_is_internal (client)) {
-
-				/* break the chain for the current
-				 * subgraph. the server will wait for
-				 * chain on the nth FIFO, and will
-				 * then execute this internal
-				 * client. */
-
+			/* Break the chain for the current subgraph. The server will
+			 * wait for the chain on the nth FIFO, and will then execute
+			 * this internal client. */
 				if (subgraph_client) {
-					subgraph_client->subgraph_wait_fd =
-						jack_get_fifo_fd (engine, n);
-					VERBOSE (engine, "client %s: wait_fd="
-						 "%d, execution_order="
-						 "%lu.",
-						 subgraph_client->
-						 control->name,
-						 subgraph_client->
-						 subgraph_wait_fd, n);
+				subgraph_client->subgraph_wait_fd = jack_get_fifo_fd (engine, n);
+				VERBOSE (engine, "client %s: wait_fd=%d execution_order=%lu.",
+					 subgraph_client->control->name,
+					 subgraph_client->subgraph_wait_fd, n);
 					n++;
 				}
-
-				VERBOSE (engine, "client %s: internal "
-					 "client, execution_order="
-					 "%lu.",
+			VERBOSE (engine, "client %s: internal client, execution_order=%lu.",
 					 client->control->name, n);
 
-				/* this does the right thing for
-				 * internal clients too
-				 */
-
+			/* this does the right thing for internal clients too */
 				jack_deliver_event (engine, client, &event);
-
 				subgraph_client = 0;
-
 			} else {
-
-				if (subgraph_client == NULL) {
-
-					/* start a new subgraph. the
-					 * engine will start the chain
-					 * by writing to the nth
-					 * FIFO.
-					 */
-
-					subgraph_client = client;
-					subgraph_client->subgraph_start_fd =
-						jack_get_fifo_fd (engine, n);
-					VERBOSE (engine, "client %s: "
-						 "start_fd=%d, execution"
-						 "_order=%lu.",
-						 subgraph_client->
-						 control->name,
-						 subgraph_client->
-						 subgraph_start_fd, n);
-
-					/* this external client after
-					   this will have jackd as its
-					   upstream connection.
-					 */
-
-					upstream_is_jackd = 1;
-
-				} else {
-					VERBOSE (engine, "client %s: in"
-						 " subgraph after %s, "
-						 "execution_order="
-						 "%lu.",
-						 client->control->name,
-						 subgraph_client->
-						 control->name, n);
+			if (subgraph_client) {
+				/* continue current subgraph. */
 					subgraph_client->subgraph_wait_fd = -1;
-
-					/* this external client after
-					   this will have another
-					   client as its upstream
-					   connection.
-					 */
-
 					upstream_is_jackd = 0;
+				VERBOSE (engine, "client %s: in subgraph after %s, "
+					 "execution_order=%lu.",
+					 client->control->name,
+					 subgraph_client->control->name, n);
+			} else {
+				/* start a new subgraph. The engine will start the chain
+				 * by writing to the nth FIFO. */
+				subgraph_client = client;
+				subgraph_client->subgraph_start_fd = jack_get_fifo_fd (engine, n);
+				upstream_is_jackd = 1;
+				VERBOSE (engine, "client %s: start_fd=%d "
+					 "execution_order=%lu.",
+					 subgraph_client->control->name,
+					 subgraph_client->subgraph_start_fd, n);
 				}
 
-				/* make sure fifo for 'n + 1' exists
-				 * before issuing client reorder
-				 */
-				(void)jack_get_fifo_fd (
-					engine, client->execution_order + 1);
+			/* make sure fifo for 'n + 1' exists before issuing client reorder. */
+			(void)jack_get_fifo_fd (engine, client->execution_order + 1);
 				event.x.n = client->execution_order;
 				event.y.n = upstream_is_jackd;
 				jack_deliver_event (engine, client, &event);
 				n++;
 			}
 		}
-	}
 
 	if (subgraph_client) {
-		subgraph_client->subgraph_wait_fd =
-			jack_get_fifo_fd (engine, n);
+		/* finish current subgraph. */
+		subgraph_client->subgraph_wait_fd = jack_get_fifo_fd (engine, n);
 		VERBOSE (engine, "client %s: wait_fd=%d, "
 			 "execution_order=%lu (last client).",
 			 subgraph_client->control->name,
@@ -3339,9 +3260,9 @@ jack_rechain_graph (jack_engine_t *engine)
 	}
 
 	VERBOSE (engine, "-- jack_rechain_graph()");
-
-	return err;
+	return 0;
 }
+
 
 static jack_nframes_t
 jack_get_port_total_latency (jack_engine_t *engine,
@@ -3475,13 +3396,11 @@ jack_compute_all_port_total_latencies (jack_engine_t *engine)
 
 	for (i = 0; i < engine->control->port_max; i++) {
 		if (shared[i].in_use) {
-
 			if (shared[i].flags & JackPortIsOutput) {
 				toward_port = FALSE;
 			} else {
 				toward_port = TRUE;
 			}
-
 			shared[i].total_latency =
 				jack_get_port_total_latency (
 					engine, &engine->internal_ports[i],
@@ -3490,84 +3409,321 @@ jack_compute_all_port_total_latencies (jack_engine_t *engine)
 	}
 }
 
+
+/* Modified to use the new double-linked list of clients in execution order
+ * FA 08/2015
+ */
 static void
 jack_compute_new_latency (jack_engine_t *engine)
 {
-	JSList *node;
-	JSList *reverse_list = NULL;
+	jack_client_internal_t* client;
 	jack_event_t event;
 
 	VALGRIND_MEMSET (&event, 0, sizeof(event));
-
 	event.type = LatencyCallback;
-	event.x.n  = 0;
 
-	/* iterate over all clients in graph order, and emit
-	 * capture latency callback.
-	 * also builds up list in reverse graph order.
-	 */
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-
-		jack_client_internal_t* client = (jack_client_internal_t*)node->data;
-		reverse_list = jack_slist_prepend (reverse_list, client);
+	/* iterate over all clients in graph order and emit capture latency callback. */
+	event.x.n = 0;
+	for (client = engine->execlist_head; client; client = client->execlist_next)
 		jack_deliver_event (engine, client, &event);
-	}
-
 	if (engine->driver) {
 		jack_deliver_event (engine, engine->driver->internal_client, &event);
 	}
 
-	/* now issue playback latency callbacks in reverse graphorder
-	 */
+	/* iterate over all clients in reverse order and emit playback latency callback. */
 	event.x.n  = 1;
-	for (node = reverse_list; node; node = jack_slist_next (node)) {
-		jack_client_internal_t* client = (jack_client_internal_t*)node->data;
+	for (client = engine->execlist_tail; client; client = client->execlist_prev)
 		jack_deliver_event (engine, client, &event);
-	}
-
 	if (engine->driver) {
 		jack_deliver_event (engine, engine->driver->internal_client, &event);
 	}
-
-	jack_slist_free (reverse_list);
 }
 
 
-/* How the sort works:
+/* HOW THE SORT WORKS (new version)
+ * FA 08/2015
  *
- * Each client has a "sortfeeds" list of clients indicating which clients
- * it should be considered as feeding for the purposes of sorting the
- * graph. This list differs from the clients it /actually/ feeds in the
- * following ways:
+ * Each client has a linked list called 'feedlist' of other clients
+ * directly depending on data from it. Element of the list are structs
+ * of type jack_feedcounts_t, which contains:
  *
- * 1. Connections from a client to itself are disregarded
+ *   .next      : pointer to the next list element (this is not a JSlist).
+ *   .client    : pointer to the destination client depending on this one.
+ *   .fwd_count : counter of forward direct connections.
+ *   .rev_count : counter of reversed direct connections.
  *
- * 2. Connections to a driver client are disregarded
+ * The counters are incremented or decremented by port connect or disconnect
+ * requests. At least one of them will be non-zero. Reversed dependencies
+ * are those created by connections that create a cycle.
  *
- * 3. If a connection from A to B is a feedback connection (ie there was
- *    already a path from B to A when the connection was made) then instead
- *    of B appearing on A's sortfeeds list, A will appear on B's sortfeeds
- *    list.
+ * As in the previous version, connections having the driver as destination
+ * are ignored in order to avoid apparent cycles. Note: things just work
+ * this way so this was not changed, but it would be cleaner to represent
+ * the driver as two clients. This would allow to represent all dependencies
+ * (which could be interesting for debugging) without creating fake cycles.
  *
- * If client A is on client B's sortfeeds list, client A must come after
- * client B in the execution order. The above 3 rules ensure that the
- * sortfeeds relation is always acyclic so that all ordering constraints
- * can actually be met.
+ * In contrast to the previous version, there is no implicit dependency
+ * of each client on the driver, this is created only when there is an
+ * actual connection from the capture part. Other logic ensures that the
+ * driver will run first anyway, even if no clients are connected to it
+ * at all.
  *
- * Each client also has a "truefeeds" list which is the same as sortfeeds
- * except that feedback connections appear normally instead of reversed.
- * This is used to detect whether the graph has become acyclic.
+ * Each client also has a counter 'depcount' indicating from how many
+ * other clients it requires input. This is always equal to the number
+ * of other clients having a feedlist element referring to this one.
  *
+ * The algorithm that actually determines the execution order is run only
+ * when an element is added or revomed from any of the 'feedlist' lists,
+ * and when clients are activated or deactivated. It consists of two
+ * parts, each of them controlled by a binary flag maintained in
+ * engine->execlist_requestm and, if necessary, set by the port connect
+ * and disconnect routines.
+ *
+ * First, if the EXECLIST_CYCLE flag is set, we test if any feedback
+ * connections can be reverted to normal ones. If there are any, we
+ * also set the EXECLIST_ORDER flag in case it was not already set.
+ * Second, if the EXECLIST_ORDER flag is set, a double linked list
+ * of clients in execution order is constructed. This list is then
+ * used by all other routines that control running a cycle.
+ *
+ * The 'sorting' works as follows. Each client has a 'depcheck' field
+ * which is originally set to its 'depcount' value. The list is reset,
+ * and the driver is added to it. Then we loop over the engine->clients
+ * JSlist, and add any clients which have their 'depcheck' equal to
+ * zero to the new list.
+ *
+ * Whenever a client is added to the new list, its 'depcheck' is set to
+ * -1 so that client won't be considered again, and we loop over its
+ * 'feedlist' and decrement the 'depcheck' of each client on it. When
+ * this decrements to zero, that client is added to the list recursively.
+ *
+ * The complexity of this algorithm is linear in the number of clients
+ * plus the number of direct dependencies between them (i.e. the sum
+ * of the lenghts of all feedlists). Multiple port connections between
+ * the same clients count as a single dependency.
+ *
+ * Finally, the new double linked list is copied to the original
+ * engine->clients JSlist. This ensures that in this list the driver
+ * will always come before any active clients. It's not clear if this
+ * is actually necessary, as all code related to running a cycle is
+ * using the new list anyway (as far as I could verify), and all
+ * other uses seem to be related to looking up client data only.
+ *
+ * Another open question is if jack_rechain_graph() needs to be
+ * called if the order didn't change. If not, the call could be
+ * moved to the place indicated in jack_check_execorder().
  */
 
+
+/* Test if there is a direct dependency of client B on client A.
+ * This may be because A feeds B directly, or because there is
+ * a feedback connection from B to A.
+ * Returns the jack_feedcounts_t for the dependency if it exists,
+ * zero otherwise.
+ */
+static jack_feedcounts_t *
+depends_direct (jack_client_internal_t *A, jack_client_internal_t *B)
+{
+	jack_feedcounts_t *F;
+
+	for (F = A->feedlist; F; F = F->next)
+		if (F->client == B) {
+			return F;
+	}
+	return 0;
+}
+
+/* Test if client B depends on output from client A, either directly
+ * or via other clients. Feedback connections are not considered in
+ * this case. This is used to detect cycles.
+ * Returns 1 if the dependency exists, 0 otherwise.
+ */
+static int
+depends_closure (jack_client_internal_t *A, jack_client_internal_t *B)
+{
+	jack_feedcounts_t *F;
+
+	for (F = A->feedlist; F; F = F->next) {
+		if (F->fwd_count == 0) {
+			continue;
+	}
+		if (F->client == B) {
+			return 1;
+		} else {              return depends_closure (F->client, B); }
+		}
+	return 0;
+}
+
+/* Create a new direct dependency of client B on client A.
+ */
+static void
+add_depends (jack_client_internal_t *A, jack_client_internal_t *B, int fwd, int rev)
+{
+	jack_feedcounts_t *F;
+
+	F = (jack_feedcounts_t*)malloc (sizeof(jack_feedcounts_t));
+	F->client = B;
+	F->fwd_count = fwd;
+	F->rev_count = rev;
+	F->next = A->feedlist;
+	A->feedlist = F;
+	B->depcount++;
+	}
+
+/* Delete a direct dependency of client B on client A.
+ */
+static void
+rem_depends (jack_client_internal_t *A, jack_client_internal_t *B)
+{
+	jack_feedcounts_t *X, *Y;
+
+	for (X = 0, Y = A->feedlist; Y; X = Y, Y = Y->next) {
+		if (Y->client == B) {
+			if (X) {
+				X->next = Y->next;
+			} else {                      A->feedlist = Y->next; }
+			B->depcount--;
+			free (Y);
+			return;
+		}
+	}
+}
+
+
+/* Add client C at the tail of the execution order list, and then
+ * recursively test if any others can be run after C has finished.
+ */
+static void
+append_execlist (jack_engine_t *engine, jack_client_internal_t *C)
+{
+	jack_client_internal_t *D;
+	jack_feedcounts_t *F;
+
+	/* This client must not be considered again. */
+	C->depcheck = -1;
+	/* Append at end of list */
+	C->execlist_next = 0;
+	if (engine->execlist_tail) {
+		C->execlist_prev = engine->execlist_tail;
+		engine->execlist_tail->execlist_next = C;
+	} else {
+		C->execlist_prev = 0;
+		engine->execlist_head = C;
+				}
+	engine->execlist_tail = C;
+	/* Check if any others can be run after this one. */
+	for (F = C->feedlist; F; F = F->next) {
+		D = F->client;
+		if (--(D->depcheck) == 0) {
+			append_execlist (engine, D);
+			}
+		}
+	}
+
+
+/* Recreate the execution order client list if necessary.
+ */
+void
+jack_check_execorder (jack_engine_t *engine)
+{
+	jack_client_internal_t *C, *D;
+	jack_feedcounts_t *F;
+	JSList *N;
+
+	if (engine->execlist_request & EXECLIST_CYCLE) {
+		/* Test if any feedback connections can be reverted
+		 * to normal */
+		for (C = engine->execlist_head; C; C = C->execlist_next) {
+			for (F = C->feedlist; F; F = F->next) {
+				int rev;
+				D = F->client;
+				if (F->rev_count == 0) {
+					continue;
+					}
+				if (depends_closure (C, D)) {
+					continue;
+				}
+				/* printf ("Reverting feedback %s -> %s\n", D->control->name, C->control->name); */
+				rev = F->rev_count;
+				rem_depends (C, D);
+				add_depends (D, C, rev, 0);
+				engine->execlist_request |= EXECLIST_ORDER;
+			}
+		}
+	}
+/*
+        puts ("---------------------------------------------");
+        printf ("Original client list:\n");
+        for (N = engine->clients; N; N = jack_slist_next (N))
+        {
+                C = (jack_client_internal_t *) N->data;
+                printf ("%-20s %d\n", C->control->name, C->depcount);
+                for (F = C->feedlist; F; F = F->next)
+                {
+                        printf ("    %-20s %3d %3d\n", F->client->control->name, F->fwd_count, F->rev_count);
+	}
+}
+        puts ("---------------------------------------------");
+ */
+	if (engine->execlist_request & EXECLIST_ORDER) {
+/*
+                puts ("Re-ordering...");
+ */
+		/* Put clients in correct execution order depending
+		   on their dependencies. */
+		D = 0;
+		for (N = engine->clients; N; N = jack_slist_next (N)) {
+			C = (jack_client_internal_t*)N->data;
+			C->depcheck = C->depcount;
+			if (C->control->type == ClientDriver) {
+				D = C;
+			}
+		}
+		/* Reset bidirectional linked list and build it again. */
+		engine->execlist_head = 0;
+		engine->execlist_tail = 0;
+		/* The driver must be first even if nobody is using capture data. */
+		if (D) {
+			append_execlist (engine, D);
+		}
+		/* Then loop over all the other clients. */
+		for (N = engine->clients; N; N = jack_slist_next (N)) {
+			C = (jack_client_internal_t*)N->data;
+			if (C->depcheck == 0) {
+				append_execlist (engine, C);
+			}
+		}
+
+		/* Copy execlist to engine->clients. Just overwrite the data pointers. */
+		for (C = engine->execlist_head, N = engine->clients;
+		     C && N;
+		     C = C->execlist_next, N = N->next)
+			N->data = C;
+
+		/* ??? Maybe call jack_rechain_graph here instead of in jack_sort_graph() ??? */
+	}
+/*
+        puts ("---------------------------------------------");
+        printf ("Ordered client list:\n");
+        for (C = engine->execlist_head; C; C = C->execlist_next)
+        {
+                printf ("   %-20s\n", C->control->name);
+        }
+        puts ("---------------------------------------------");
+ */
+	engine->execlist_request = 0;
+}
+
+
+/* Modified for new client execution order algorithm.
+ * FA 08/2015
+ */
 void
 jack_sort_graph (jack_engine_t *engine)
 {
-	/* called, obviously, must hold engine->client_lock */
-
+	/* caller, obviously, must hold engine->client_lock */
 	VERBOSE (engine, "++ jack_sort_graph");
-	engine->clients = jack_slist_sort (engine->clients,
-					   (JCompareFunc)jack_client_sort);
+	jack_check_execorder (engine);
 	jack_compute_all_port_total_latencies (engine);
 	jack_compute_new_latency (engine);
 	jack_rechain_graph (engine);
@@ -3575,153 +3731,6 @@ jack_sort_graph (jack_engine_t *engine)
 	VERBOSE (engine, "-- jack_sort_graph");
 }
 
-static int
-jack_client_sort (jack_client_internal_t *a, jack_client_internal_t *b)
-{
-	/* drivers are forced to the front, ie considered as sources
-	   rather than sinks for purposes of the sort */
-
-	if (jack_client_feeds_transitive (a, b) ||
-	    (a->control->type == ClientDriver &&
-	     b->control->type != ClientDriver)) {
-		return -1;
-	} else if (jack_client_feeds_transitive (b, a) ||
-		   (b->control->type == ClientDriver &&
-		    a->control->type != ClientDriver)) {
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-/* transitive closure of the relation expressed by the sortfeeds lists. */
-static int
-jack_client_feeds_transitive (jack_client_internal_t *source,
-			      jack_client_internal_t *dest )
-{
-	jack_client_internal_t *med;
-	JSList *node;
-
-	if (jack_slist_find (source->sortfeeds, dest)) {
-		return 1;
-	}
-
-	for (node = source->sortfeeds; node; node = jack_slist_next (node)) {
-
-		med = (jack_client_internal_t*)node->data;
-
-		if (jack_client_feeds_transitive (med, dest)) {
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-/**
- * Checks whether the graph has become acyclic and if so modifies client
- * sortfeeds lists to turn leftover feedback connections into normal ones.
- * This lowers latency, but at the expense of some data corruption.
- */
-static void
-jack_check_acyclic (jack_engine_t *engine)
-{
-	JSList *srcnode, *dstnode, *portnode, *connnode;
-	jack_client_internal_t *src, *dst;
-	jack_port_internal_t *port;
-	jack_connection_internal_t *conn;
-	int stuck;
-	int unsortedclients = 0;
-
-	VERBOSE (engine, "checking for graph become acyclic");
-
-	for (srcnode = engine->clients; srcnode;
-	     srcnode = jack_slist_next (srcnode)) {
-
-		src = (jack_client_internal_t*)srcnode->data;
-		src->tfedcount = src->fedcount;
-		unsortedclients++;
-	}
-
-	stuck = FALSE;
-
-	/* find out whether a normal sort would have been possible */
-	while (unsortedclients && !stuck) {
-
-		stuck = TRUE;
-
-		for (srcnode = engine->clients; srcnode;
-		     srcnode = jack_slist_next (srcnode)) {
-
-			src = (jack_client_internal_t*)srcnode->data;
-
-			if (!src->tfedcount) {
-
-				stuck = FALSE;
-				unsortedclients--;
-				src->tfedcount = -1;
-
-				for (dstnode = src->truefeeds; dstnode;
-				     dstnode = jack_slist_next (dstnode)) {
-
-					dst = (jack_client_internal_t*)
-					      dstnode->data;
-					dst->tfedcount--;
-				}
-			}
-		}
-	}
-
-	if (stuck) {
-
-		VERBOSE (engine, "graph is still cyclic" );
-	} else {
-
-		VERBOSE (engine, "graph has become acyclic");
-
-		/* turn feedback connections around in sortfeeds */
-		for (srcnode = engine->clients; srcnode;
-		     srcnode = jack_slist_next (srcnode)) {
-
-			src = (jack_client_internal_t*)srcnode->data;
-
-			for (portnode = src->ports; portnode;
-			     portnode = jack_slist_next (portnode)) {
-
-				port = (jack_port_internal_t*)portnode->data;
-
-				for (connnode = port->connections; connnode;
-				     connnode = jack_slist_next (connnode)) {
-
-					conn = (jack_connection_internal_t*)
-					       connnode->data;
-
-					if (conn->dir == -1 ) {
-						/*&&
-						        conn->srcclient == src) */
-
-						VERBOSE (engine,
-							 "reversing connection from "
-							 "%s to %s",
-							 conn->srcclient->control->name,
-							 conn->dstclient->control->name);
-						conn->dir = 1;
-						conn->dstclient->sortfeeds =
-							jack_slist_remove
-								(conn->dstclient->sortfeeds,
-								conn->srcclient);
-
-						conn->srcclient->sortfeeds =
-							jack_slist_prepend
-								(conn->srcclient->sortfeeds,
-								conn->dstclient );
-					}
-				}
-			}
-		}
-		engine->feedbackcount = 0;
-	}
-}
 
 /**
  * Dumps current engine configuration.
@@ -3788,6 +3797,11 @@ void jack_dump_configuration (jack_engine_t *engine, int take_lock)
 	jack_info ("engine.c: <-- dump ends -->");
 }
 
+
+
+/* Modified for new client execution order algorithm.
+ * FA 08/2015
+ */
 static int
 jack_port_do_connect (jack_engine_t *engine,
 		      const char *source_port,
@@ -3867,9 +3881,16 @@ jack_port_do_connect (jack_engine_t *engine,
 		}
 	}
 
+	if (dstport->connections && !dstport->shared->has_mixdown) {
+		jack_port_type_info_t *port_type =
+			jack_port_type_info (engine, dstport);
+		jack_error ("cannot make multiple connections to a port of"
+			    " type [%s]", port_type->type_name);
+		return -1;
+	}
+
 	connection = (jack_connection_internal_t*)
 		     malloc (sizeof(jack_connection_internal_t));
-
 	connection->source = srcport;
 	connection->destination = dstport;
 	connection->srcclient = srcclient;
@@ -3877,18 +3898,7 @@ jack_port_do_connect (jack_engine_t *engine,
 
 	src_id = srcport->shared->id;
 	dst_id = dstport->shared->id;
-
 	jack_lock_graph (engine);
-
-	if (dstport->connections && !dstport->shared->has_mixdown) {
-		jack_port_type_info_t *port_type =
-			jack_port_type_info (engine, dstport);
-		jack_error ("cannot make multiple connections to a port of"
-			    " type [%s]", port_type->type_name);
-		free (connection);
-		jack_unlock_graph (engine);
-		return -1;
-	} else {
 
 		if (dstclient->control->type == ClientDriver) {
 			/* Ignore output connections to drivers for purposes
@@ -3896,66 +3906,60 @@ jack_port_do_connect (jack_engine_t *engine,
 			   order anyway, and we don't want to treat graphs
 			   such as driver -> client -> driver as containing
 			   feedback */
-
 			VERBOSE (engine,
 				 "connect %s and %s (output)",
 				 srcport->shared->name,
 				 dstport->shared->name);
-
-			connection->dir = 1;
-
 		} else if (srcclient != dstclient) {
+		jack_feedcounts_t *F;
+		int dir = 0;
 
-			srcclient->truefeeds = jack_slist_prepend
-						       (srcclient->truefeeds, dstclient);
+		if ((F = depends_direct (srcclient, dstclient)) != 0) {
+			/* We already have a direct dependency,
+			   just increment the connection count. */
+			F->fwd_count++;
+			dir = 1;
+		} else if ((F = depends_direct (dstclient, srcclient)) != 0) {
+			/* We already have a reverse direct dependency,
+			   just increment the reverse connection count. */
+			F->rev_count++;
+			dir = -1;
+		} else if (depends_closure (dstclient, srcclient)) {
+			/* We have an inverse dependency, this
+			   connection must be a delayed one. */
+			add_depends (dstclient, srcclient, 0, 1);
+			engine->execlist_request = EXECLIST_ORDER;
+			dir = -1;
+		} else {
+			/* First normal connection from source
+			   to destination client. */
+			add_depends (srcclient, dstclient, 1, 0);
+			engine->execlist_request = EXECLIST_ORDER;
+			dir = 1;
+		}
 
-			dstclient->fedcount++;
-
-			if (jack_client_feeds_transitive (dstclient,
-							  srcclient ) ||
-			    (dstclient->control->type == ClientDriver &&
-			     srcclient->control->type != ClientDriver)) {
-
-				/* dest is running before source so
-				   this is a feedback connection */
-
+		if (dir > 0) {
+			VERBOSE (engine,
+				 "connect %s and %s (forward)",
+				 srcport->shared->name,
+				 dstport->shared->name);
+		} else {
 				VERBOSE (engine,
 					 "connect %s and %s (feedback)",
 					 srcport->shared->name,
 					 dstport->shared->name);
-
-				dstclient->sortfeeds = jack_slist_prepend
-							       (dstclient->sortfeeds, srcclient);
-
-				connection->dir = -1;
 				engine->feedbackcount++;
 				VERBOSE (engine,
 					 "feedback count up to %d",
 					 engine->feedbackcount);
-
-			} else {
-
-				/* this is not a feedback connection */
-
-				VERBOSE (engine,
-					 "connect %s and %s (forward)",
-					 srcport->shared->name,
-					 dstport->shared->name);
-
-				srcclient->sortfeeds = jack_slist_prepend
-							       (srcclient->sortfeeds, dstclient);
-
-				connection->dir = 1;
 			}
 		} else {
 			/* this is a connection to self */
-
 			VERBOSE (engine,
 				 "connect %s and %s (self)",
 				 srcport->shared->name,
 				 dstport->shared->name);
 
-			connection->dir = 0;
 		}
 
 		dstport->connections =
@@ -3963,29 +3967,28 @@ jack_port_do_connect (jack_engine_t *engine,
 		srcport->connections =
 			jack_slist_prepend (srcport->connections, connection);
 
-		DEBUG ("actually sorted the graph...");
-
 		jack_send_connection_notification (engine,
 						   srcport->shared->client_id,
 						   src_id, dst_id, TRUE);
-
-
 		jack_send_connection_notification (engine,
 						   dstport->shared->client_id,
 						   dst_id, src_id, TRUE);
 
-		/* send a port connection notification just once to everyone who cares excluding clients involved in the connection */
-
-		jack_notify_all_port_interested_clients (engine, srcport->shared->client_id, dstport->shared->client_id, src_id, dst_id, 1);
-
+	/* send a port connection notification just once to everyone who
+	 * cares excluding clients involved in the connection */
+	jack_notify_all_port_interested_clients (engine,
+						 srcport->shared->client_id,
+						 dstport->shared->client_id,
+						 src_id, dst_id, 1);
 		jack_sort_graph (engine);
-	}
-
 	jack_unlock_graph (engine);
-
 	return 0;
 }
 
+
+/* Modified for new client execution order algorithm.
+ * FA 08/2015
+ */
 int
 jack_port_disconnect_internal (jack_engine_t *engine,
 			       jack_port_internal_t *srcport,
@@ -3994,19 +3997,15 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 {
 	JSList *node;
 	jack_connection_internal_t *connect;
-	int ret = -1;
+	jack_client_internal_t *src, *dst;
 	jack_port_id_t src_id, dst_id;
-	int check_acyclic = engine->feedbackcount;
+	int ret = -1;
 
 	/* call tree **** MUST HOLD **** engine->client_lock. */
-	for (node = srcport->connections; node;
-	     node = jack_slist_next (node)) {
-
+	for (node = srcport->connections; node; node = jack_slist_next (node)) {
 		connect = (jack_connection_internal_t*)node->data;
 
-		if (connect->source == srcport &&
-		    connect->destination == dstport) {
-
+		if (connect->source == srcport &&  connect->destination == dstport) {
 			VERBOSE (engine, "DIS-connect %s and %s",
 				 srcport->shared->name,
 				 dstport->shared->name);
@@ -4017,7 +4016,7 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 			dstport->connections =
 				jack_slist_remove (dstport->connections,
 						   connect);
-
+			free (connect);
 			src_id = srcport->shared->id;
 			dst_id = dstport->shared->id;
 
@@ -4040,58 +4039,59 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 				engine, dstport->shared->client_id, dst_id,
 				src_id, FALSE);
 
-			/* send a port connection notification just once to everyone who cares excluding clients involved in the connection */
+			/* send a port connection notification just once to everyone
+			   who cares excluding clients involved in the connection */
+			jack_notify_all_port_interested_clients (engine,
+								 srcport->shared->client_id,
+								 dstport->shared->client_id,
+								 src_id, dst_id, 0);
 
-			jack_notify_all_port_interested_clients (engine, srcport->shared->client_id, dstport->shared->client_id, src_id, dst_id, 0);
-
-			if (connect->dir) {
-
-				jack_client_internal_t *src;
-				jack_client_internal_t *dst;
-
-				src = jack_client_internal_by_id
-					      (engine, srcport->shared->client_id);
-
-				dst =  jack_client_internal_by_id
-					      (engine, dstport->shared->client_id);
-
-				src->truefeeds = jack_slist_remove
-							 (src->truefeeds, dst);
-
-				dst->fedcount--;
-
-				if (connect->dir == 1) {
-					/* normal connection: remove dest from
-					   source's sortfeeds list */
-					src->sortfeeds = jack_slist_remove
-								 (src->sortfeeds, dst);
-				} else {
-					/* feedback connection: remove source
-					   from dest's sortfeeds list */
-					dst->sortfeeds = jack_slist_remove
-								 (dst->sortfeeds, src);
+			/* Update client dependencies */
+			src = jack_client_internal_by_id (engine, srcport->shared->client_id);
+			dst = jack_client_internal_by_id (engine, dstport->shared->client_id);
+			/* Again we ignore connections if the destination is the driver. */
+			if ((src != dst) && (dst->control->type != ClientDriver)) {
+				jack_feedcounts_t *F;
+				if ((F = depends_direct (src, dst)) != 0) {
+					if (F->fwd_count > 0) {
+						F->fwd_count--;
+					}
+					if (F->fwd_count == 0) {
+						/* A direct forward dependency no longer exists.
+						   This could break a cycle, so we'll test. */
+						engine->execlist_request = EXECLIST_CYCLE;
+						if (F->rev_count == 0) {
+							/* A direct dependency no longer exists,
+							   remove the corresponding list element. */
+							rem_depends (src, dst);
+							engine->execlist_request |= EXECLIST_ORDER;
+						}
+					}
+				} else if ((F = depends_direct (dst, src)) != 0) {
+					/* Removing a feedback connection. */
+					if (F->rev_count > 0) {
+						F->rev_count--;
+					}
+					if ((F->fwd_count | F->rev_count) == 0) {
+						/* A direct dependency no longer exists,
+						   remove the corresponding list element. */
+						rem_depends (dst, src);
+						engine->execlist_request = EXECLIST_ORDER;
+					}
 					engine->feedbackcount--;
 					VERBOSE (engine,
 						 "feedback count down to %d",
 						 engine->feedbackcount);
 
 				}
-			} /* else self-connection: do nothing */
-
-			free (connect);
-			ret = 0;
-			break;
 		}
+			jack_sort_graph (engine);
+			return 0;
 	}
-
-	if (check_acyclic) {
-		jack_check_acyclic (engine);
 	}
-
-	jack_sort_graph (engine);
-
-	return ret;
+	return -1;
 }
+
 
 static int
 jack_port_do_disconnect_all (jack_engine_t *engine,
