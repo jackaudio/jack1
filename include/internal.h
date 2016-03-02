@@ -554,7 +554,7 @@ extern jack_port_t *jack_port_by_id_int(const jack_client_t *client,
 					jack_port_id_t id, int* free);
 
 extern jack_port_t *jack_port_by_name_int(jack_client_t *client,
-					  const char *port_name);
+                                          const char *port_name, int* free);
 extern int jack_port_name_equals(jack_port_shared_t* port, const char* target);
 
 /** Get the size (in bytes) of the data structure used to store
