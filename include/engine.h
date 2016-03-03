@@ -144,13 +144,6 @@ struct _jack_engine {
 	JSList         *clients_waiting;
 	JSList         *reserved_client_names;
 
-	/* Double linked list of clients in running order */
-	jack_client_internal_t  *execlist_head;
-	jack_client_internal_t  *execlist_tail;
-#define EXECLIST_ORDER 1        /* Re-order clients */
-#define EXECLIST_CYCLE 2        /* Check cycles */
-	int execlist_request;
-
 	jack_port_internal_t    *internal_ports;
 	jack_client_internal_t  *timebase_client;
 	jack_port_buffer_info_t *silent_buffer;
