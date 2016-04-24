@@ -488,8 +488,16 @@ jack_port_by_id (jack_client_t *client, jack_port_id_t id)
 }
 
 jack_port_t *
-jack_port_by_name_int (jack_client_t *client, const char *port_name)
+jack_port_by_name_int (jack_client_t *client, const char *port_name, int* free)
 {
+	JSList *node;
+	for (node = client->ports; node; node = jack_slist_next (node)) {
+		if (jack_port_name_equals(((jack_port_t *) node->data)->shared, port_name)) {
+			*free = FALSE;
+			return (jack_port_t *) node->data;
+		}
+	}
+
 	unsigned long i, limit;
 	jack_port_shared_t *port;
 
@@ -498,6 +506,7 @@ jack_port_by_name_int (jack_client_t *client, const char *port_name)
 
 	for (i = 0; i < limit; i++) {
 		if (port[i].in_use && jack_port_name_equals (&port[i], port_name)) {
+			*free = TRUE;
 			return jack_port_new (client, port[i].id,
 					      client->engine);
 		}
@@ -511,6 +520,7 @@ jack_port_by_name (jack_client_t *client,  const char *port_name)
 {
 	JSList *node;
 	jack_port_t* port;
+	int need_free = FALSE;
 
 	for (node = client->ports_ext; node; node = jack_slist_next (node)) {
 		port = node->data;
@@ -522,8 +532,8 @@ jack_port_by_name (jack_client_t *client,  const char *port_name)
 
 	/* Otherwise allocate a new port structure, keep it in the
 	 * ports_ext list for later use. */
-	port = jack_port_by_name_int (client, port_name);
-	if (port != NULL) {
+	port = jack_port_by_name_int (client, port_name, &need_free);
+	if (port != NULL && need_free) {
 		client->ports_ext =
 			jack_slist_prepend (client->ports_ext, port);
 	}
@@ -972,8 +982,3 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 #endif /* USE_DYNSIMD */
 	}
 }
-
-
-
-
-

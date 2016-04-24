@@ -452,18 +452,6 @@ struct _jack_request {
 	int32_t status;
 } POST_PACKED_STRUCTURE;
 
-
-/* Data used by the algorithm determining running order
- * of clients.
- */
-typedef struct _jack_feedcounts {
-	struct _jack_feedcounts  *next;
-	struct _jack_client_internal *client;
-	int fwd_count;
-	int rev_count;
-} jack_feedcounts_t;
-
-
 /* Per-client structure allocated in the server's address space.
  * It's here because its not part of the engine structure.
  */
@@ -476,18 +464,14 @@ typedef struct _jack_client_internal {
 	int event_fd;
 	int subgraph_start_fd;
 	int subgraph_wait_fd;
-
-	/* protected by engine->client_lock */
-	JSList    *ports;
-
-	jack_feedcounts_t  *feedlist;
-	struct  _jack_client_internal *execlist_next;
-	struct  _jack_client_internal *execlist_prev;
-	int depcount;
-	int depcheck;
-
+	JSList    *ports;       /* protected by engine->client_lock */
+	JSList    *truefeeds;   /* protected by engine->client_lock */
+	JSList    *sortfeeds;   /* protected by engine->client_lock */
+	int fedcount;
+	int tfedcount;
 	jack_shm_info_t control_shm;
 	unsigned long execution_order;
+	struct  _jack_client_internal *next_client;     /* not a linked list! */
 	dlhandle handle;
 	int (*initialize)(jack_client_t*, const char*); /* int. clients only */
 	void (*finish)(void *);                         /* internal clients only */
@@ -554,7 +538,7 @@ extern jack_port_t *jack_port_by_id_int(const jack_client_t *client,
 					jack_port_id_t id, int* free);
 
 extern jack_port_t *jack_port_by_name_int(jack_client_t *client,
-					  const char *port_name);
+                                          const char *port_name, int* free);
 extern int jack_port_name_equals(jack_port_shared_t* port, const char* target);
 
 /** Get the size (in bytes) of the data structure used to store
