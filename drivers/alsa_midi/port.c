@@ -111,34 +111,36 @@ a2j_port_fill_name (struct a2j_port * port_ptr, int dir, snd_seq_client_info_t *
 			/* entire client name is part of the port name so don't replicate it */
 			snprintf (port_ptr->name,
 			          sizeof(port_ptr->name),
-			          "[%d] %s %s",
+			          "[%d:%d] %s (%s)",
 			          snd_seq_client_info_get_client (client_info_ptr),
+			          snd_seq_port_info_get_port (port_info_ptr),
 			          port_name,
-			  (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+			  (dir == A2J_PORT_CAPTURE ? "out" : "in"));
 		} else {
 			snprintf (port_ptr->name,
 			          sizeof(port_ptr->name),
-			          "%s [%d] %s %s",
-			          client_name,
+			          "[%d:%d] %s %s (%s)",
 			          snd_seq_client_info_get_client (client_info_ptr),
+			          snd_seq_port_info_get_port (port_info_ptr),
+			          client_name,
 			          port_name,
-			          (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+			          (dir == A2J_PORT_CAPTURE ? "out" : "in"));
 		}
 	} else {
 		if (strstr (port_name, client_name) == port_name) {
 			/* entire client name is part of the port name so don't replicate it */
 			snprintf (port_ptr->name,
 			          sizeof(port_ptr->name),
-			          "%s %s",
+			          "%s (%s)",
 			          port_name,
-			          (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+			          (dir == A2J_PORT_CAPTURE ? "out" : "in"));
 		} else {
 			snprintf (port_ptr->name,
 			          sizeof(port_ptr->name),
-			          "%s %s %s",
+			          "%s %s (%s)",
 			          client_name,
 			          snd_seq_port_info_get_name (port_info_ptr),
-			          (dir == A2J_PORT_CAPTURE ? "in" : "out"));
+			          (dir == A2J_PORT_CAPTURE ? "out" : "in"));
 		}
 	}
 
