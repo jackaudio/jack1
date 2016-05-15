@@ -843,7 +843,7 @@ get_realtime_priority_constraint ()
 
 	return constraint_ptr;
 #else
-	return NULL
+	return NULL;
 #endif
 }
 
