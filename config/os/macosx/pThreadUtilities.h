@@ -66,7 +66,15 @@
 #define __PTHREADUTILITIES_H__
 
 #import "pthread.h"
+
+#import <Availability.h>
+#ifdef __MAC_OS_X_VERSION_MAX_ALLOWED
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101100
+#import <MacTypes.h>
+#else
 #import <CoreServices/../Frameworks/CarbonCore.framework/Headers/MacTypes.h>
+#endif
+#endif
 
 #define THREAD_SET_PRIORITY                     0
 #define THREAD_SCHEDULED_PRIORITY               1
