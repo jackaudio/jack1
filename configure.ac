@@ -285,6 +285,20 @@ AC_CHECK_FUNC(clock_gettime,
 	   ])
 )
 
+AC_CHECK_FUNC(clock_nanosleep,
+       [
+           AC_DEFINE(HAVE_CLOCK_NANOSLEEP,0,"Whether or not clock_nanosleep can be found in system libraries")
+       ],
+       #
+       # if not found, check librt specifically
+       #
+       AC_CHECK_LIB(rt, clock_nanosleep,
+           [
+              AC_DEFINE(HAVE_CLOCK_NANOSLEEP,1,"Whether or not clock_nanosleep can be found in system libraries")
+	      OS_LDFLAGS="$OS_LDFLAGS -lrt"
+	   ])
+)
+
 # should we use mlockall() on this platform?
 if test "x$JACK_DO_NOT_MLOCK" = "x"; then
     AC_CHECK_HEADER(sys/mman.h,

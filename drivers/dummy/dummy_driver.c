@@ -73,7 +73,7 @@ FakeVideoSync ( dummy_driver_t *driver )
 	}
 }
 
-#ifdef HAVE_CLOCK_GETTIME
+#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_CLOCK_NANOSLEEP)
 static inline unsigned long long ts_to_nsec (struct timespec ts)
 {
 	return ts.tv_sec * 1000000000LL + ts.tv_nsec;
