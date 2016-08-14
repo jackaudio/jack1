@@ -19,6 +19,7 @@ addons:
 before_install:
     - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew update; fi
     - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew outdated pkg-config || brew upgrade pkg-config; fi
+    - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew uninstall libtool && brew install libtool; fi
     - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install libsamplerate; fi
     - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install libsndfile; fi
     - if [ "$TRAVIS_OS_NAME" == "osx" ]; then brew install readline; fi
