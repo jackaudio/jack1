@@ -227,16 +227,22 @@ make_socket_subdirectories (const char *server_name)
 {
 	struct stat statbuf;
 	char server_dir[PATH_MAX + 1] = "";
+	const char *tmpdir = jack_get_tmpdir ();
+
+	if (tmpdir == NULL) {
+		jack_error ("Unable to get tmpdir in engine");
+		return -1;
+	}
 
 	/* check tmpdir directory */
-	if (stat (jack_tmpdir, &statbuf)) {
+	if (stat (tmpdir, &statbuf)) {
 		jack_error ("cannot stat() %s (%s)\n",
-			    jack_tmpdir, strerror (errno));
+			    tmpdir, strerror (errno));
 		return -1;
 	} else {
 		if (!S_ISDIR (statbuf.st_mode)) {
 			jack_error ("%s exists, but is not a directory!\n",
-				    jack_tmpdir);
+				    tmpdir);
 			return -1;
 		}
 	}

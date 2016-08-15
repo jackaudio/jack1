@@ -812,7 +812,8 @@ main (int argc, char *argv[])
 
 		case 'l':
 			/* special flag to allow libjack to determine jackd's idea of where tmpdir is */
-			printf ("%s\n", jack_tmpdir);
+			printf("%s\n", DEFAULT_TMP_DIR);
+
 			exit (0);
 
 		case 'I':
