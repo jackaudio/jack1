@@ -509,7 +509,7 @@ extern jack_client_t *jack_client_alloc_internal(jack_client_control_t*,
 /* internal clients call this. it's defined in jack/engine.c */
 void handle_internal_client_request(jack_control_t*, jack_request_t*);
 
-extern char *jack_tmpdir;
+extern const char *jack_get_tmpdir(void);
 
 extern char *jack_user_dir(void);
 
