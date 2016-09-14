@@ -2395,6 +2395,7 @@ jack_activate (jack_client_t *client)
 {
 	jack_request_t req;
 
+	VALGRIND_MEMSET (&req, 0, sizeof(req));
 
 	if (client->control->type == ClientInternal ||
 	    client->control->type == ClientDriver) {
@@ -2413,8 +2414,6 @@ jack_activate (jack_client_t *client)
 		/* we need to ask the engine for realtime capabilities
 		   before trying to start the realtime thread
 		 */
-
-		VALGRIND_MEMSET (&req, 0, sizeof(req));
 
 		req.type = SetClientCapabilities;
 		req.x.client_id = client->control->id;
