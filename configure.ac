@@ -165,15 +165,18 @@ CFLAGS="$ORIGINAL_CFLAGS"
 AC_MSG_CHECKING([platform dependencies])
 
 HOST_DEFAULT_TMP_DIR=/dev/shm
+USE_MD5SUM=1
 case "${host_os}" in
   freebsd*)
     # current FreeBSD header files conflict with the OSS driver's
     # barrier code, this may be fixed in 5.3, stay tuned.
     USE_BARRIER="no"
+    USE_MD5SUM=0
     ;;
   openbsd*)
     # pthread_barrier* not implemented
     USE_BARRIER="no"
+    USE_MD5SUM=0
     # need small realtime stack
     JACK_THREAD_STACK_TOUCH=10000
     ;;
@@ -189,6 +192,9 @@ case "${host_os}" in
 esac
 
 AC_SUBST(OS_LDFLAGS)
+AC_SUBST(USE_MD5SUM)
+AC_DEFINE_UNQUOTED(USE_MD5SUM,"$USE_MD5SUM",[Using md5sum command line if available])
+AM_CONDITIONAL(USE_MD5SUM, $USE_MD5SUM)
 
 #
 # We need to establish suitable defaults for a 64-bit OS
@@ -228,7 +234,7 @@ if test "x$JACK_USE_MACH_THREADS" != "x"; then
 fi
 
 # headers
-AC_CHECK_HEADERS(string.h strings.h alloca.h db.h, [],
+AC_CHECK_HEADERS(string.h strings.h db.h, [],
      AC_MSG_ERROR([*** a required header file is missing]))
 
 AC_CHECK_HEADERS(getopt.h, [], [
@@ -797,7 +803,7 @@ AC_SUBST(NETJACK_CFLAGS)
 
 # Check which backend drivers can be built.  The last one successfully
 # configured becomes the default JACK driver; so the order of
-# precedence is: alsa, sun, oss, coreaudio, portaudio, dummy.
+# precedence is: alsa, sun, oss, coreaudio, portaudio, sndio, dummy.
 
 JACK_DEFAULT_DRIVER=\"dummy\"
 
@@ -856,6 +862,20 @@ then
               JACK_DEFAULT_DRIVER=\"sun\"])
 fi
 AM_CONDITIONAL(HAVE_SUN, $HAVE_SUN)
+
+AC_ARG_ENABLE(sndio, AC_HELP_STRING([--disable-sndio],[ignore sndio driver ]),
+			TRY_SNDIO=$enableval , TRY_SNDIO=yes ) 
+HAVE_SNDIO="false"
+if test "x$TRY_SNDIO" = "xyes"
+then
+	# check for sndio audio API
+	AC_CHECK_HEADER([sndio.h],
+	     [HAVE_SNDIO="true"
+              JACK_DEFAULT_DRIVER=\"sndio\"])
+	SNDIO_LIBS="-lsndio"
+	AC_SUBST([SNDIO_LIBS])
+fi
+AM_CONDITIONAL(HAVE_SNDIO, $HAVE_SNDIO)
 
 AC_ARG_ENABLE(freebob, AC_HELP_STRING([--disable-freebob],[ignore FreeBob driver ]),
 			TRY_FREEBOB=$enableval , TRY_FREEBOB=yes )
@@ -989,6 +1009,7 @@ drivers/alsa_midi/Makefile
 drivers/dummy/Makefile
 drivers/oss/Makefile
 drivers/sun/Makefile
+drivers/sndio/Makefile
 drivers/portaudio/Makefile
 drivers/coreaudio/Makefile
 drivers/freebob/Makefile
@@ -1020,6 +1041,7 @@ echo \| Build with old FireWire \(FreeBob\) support............. : $HAVE_FREEBOB
 echo \| Build with new FireWire \(FFADO\) support............... : $HAVE_FIREWIRE
 echo \| Build with OSS support................................ : $HAVE_OSS
 echo \| Build with Sun audio support.......................... : $HAVE_SUN
+echo \| Build with Sndio audio support........................ : $HAVE_SNDIO
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
 echo \| Build with Celt support............................... : $HAVE_CELT

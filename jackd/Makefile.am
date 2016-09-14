@@ -37,7 +37,11 @@ jack_md5.h: jackd
 if STRIPPED_JACKD
 	strip -R .note -R .comment .libs/jackd
 endif
+if USE_MD5SUM
 	echo "#define JACKD_MD5_SUM \"`md5sum .libs/jackd | awk '{print $$1}'`\"" > jack_md5.h
+else
+	echo "#define JACKD_MD5_SUM \"`md5 -q .libs/jackd | awk '{print $$1}'`\"" > jack_md5.h
+endif
 
 jackstart_SOURCES = jackstart.c md5.c
 jackstart_LDFLAGS = -lcap

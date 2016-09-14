@@ -1435,7 +1435,7 @@ handle_external_client_request (jack_engine_t *engine, int fd)
 	if ((r = read (client->request_fd, &req, sizeof(req)))
 	    < (ssize_t)sizeof(req)) {
 		if (r == 0) {
-#ifdef JACK_USE_MACH_THREADS
+#if defined(JACK_USE_MACH_THREADS) || defined(__OpenBSD__)
 			/* poll is implemented using
 			   select (see the macosx/fakepoll
 			   code). When the socket is closed

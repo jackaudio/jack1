@@ -537,7 +537,7 @@ static void usage (FILE *file)
 #ifdef __APPLE__
 		 "             Available backends may include: coreaudio, dummy, net, portaudio.\n\n"
 #else
-		 "             Available backends may include: alsa, dummy, freebob, firewire, net, oss, sun, or portaudio.\n\n"
+		 "             Available backends may include: alsa, dummy, freebob, firewire, net, oss, sun, portaudio or sndio.\n\n"
 #endif
 		 "       jackd -d backend --help\n"
 		 "             to display options for each backend\n\n");

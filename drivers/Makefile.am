@@ -48,5 +48,11 @@ else
 FIREWIRE_DIR =
 endif
 
-SUBDIRS = $(ALSA_MIDI_DIR) $(ALSA_DIR) dummy $(OSS_DIR) $(SUN_DIR) $(PA_DIR) $(CA_DIR) $(FREEBOB_DIR) $(FIREWIRE_DIR) netjack
-DIST_SUBDIRS = alsa alsa_midi dummy oss sun portaudio coreaudio freebob firewire netjack
+if HAVE_SNDIO
+SNDIO_DIR = sndio
+else
+SNDIO_DIR =
+endif
+
+SUBDIRS = $(ALSA_MIDI_DIR) $(ALSA_DIR) dummy $(OSS_DIR) $(SUN_DIR) $(PA_DIR) $(CA_DIR) $(FREEBOB_DIR) $(FIREWIRE_DIR) ${SNDIO_DIR} netjack
+DIST_SUBDIRS = alsa alsa_midi dummy oss sun portaudio coreaudio freebob firewire netjack sndio
