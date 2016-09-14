@@ -822,12 +822,22 @@ static jack_driver_t *coreaudio_driver_new (char* name,
 	}
 
 	// AUHAL
+#if defined(MAC_OS_X_VERSION_10_6) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+	AudioComponentDescription cd = { kAudioUnitType_Output, kAudioUnitSubType_HALOutput, kAudioUnitManufacturer_Apple, 0, 0 };
+	AudioComponent HALOutput = AudioComponentFindNext (NULL, &cd);
+	err1 = AudioComponentInstanceNew (HALOutput, &driver->au_hal);
+#else
 	ComponentDescription cd = { kAudioUnitType_Output, kAudioUnitSubType_HALOutput, kAudioUnitManufacturer_Apple, 0, 0 };
 	Component HALOutput = FindNextComponent (NULL, &cd);
-
 	err1 = OpenAComponent (HALOutput, &driver->au_hal);
+#endif
+
 	if (err1 != noErr) {
+#if defined(MAC_OS_X_VERSION_10_6) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+		jack_error ("Error calling AudioComponentInstanceNew");
+#else
 		jack_error ("Error calling OpenAComponent");
+#endif
 		printError (err1);
 		goto error;
 	}
@@ -1001,7 +1011,11 @@ static jack_driver_t *coreaudio_driver_new (char* name,
 
 error:
 	AudioUnitUninitialize (driver->au_hal);
+#if defined(MAC_OS_X_VERSION_10_6) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+	AudioComponentInstanceDispose (driver->au_hal);
+#else
 	CloseComponent (driver->au_hal);
+#endif
 	jack_error ("Cannot open the coreaudio driver");
 	free (driver);
 	return NULL;
@@ -1014,7 +1028,11 @@ static void coreaudio_driver_delete (coreaudio_driver_t * driver)
 	AudioDeviceRemovePropertyListener (driver->device_id, 0, true, kAudioDeviceProcessorOverload, notification);
 	free (driver->input_list);
 	AudioUnitUninitialize (driver->au_hal);
+#if defined(MAC_OS_X_VERSION_10_6) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+	AudioComponentInstanceDispose (driver->au_hal);
+#else
 	CloseComponent (driver->au_hal);
+#endif
 	free (driver);
 }
 
