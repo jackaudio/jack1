@@ -1780,10 +1780,11 @@ alsa_driver_latency_callback (jack_latency_callback_mode_t mode, void* arg)
 	jack_latency_range_t range;
 	JSList* node;
 
+
 	if (mode == JackPlaybackLatency) {
-		range.min = range.max = driver->frames_per_cycle + driver->playback_frame_latency;
+		range.min = range.max = ((driver->playback_nperiods - 1) * driver->frames_per_cycle) + driver->playback_frame_latency;
 	} else {
-		range.min = range.max = driver->frames_per_cycle + driver->capture_frame_latency;
+		range.min = range.max = ((driver->capture_nperiods - 1) * driver->frames_per_cycle) + driver->capture_frame_latency;
 	}
 
 	for (node = client->ports; node; node = jack_slist_next (node))
