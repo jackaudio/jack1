@@ -573,6 +573,11 @@ alsa_driver_configure_stream (alsa_driver_t *driver, char *device_name,
 		return -1;
 	}
 
+	if ((err = snd_pcm_sw_params_set_tstamp_mode(handle, sw_params, SND_PCM_TSTAMP_ENABLE)) < 0) {
+		jack_error("ALSA: cannot set tstamp mode for %s", stream_name);
+		return -1;
+	}
+
 	if ((err = snd_pcm_sw_params (handle, sw_params)) < 0) {
 		jack_error ("ALSA: cannot set software parameters for %s\n",
 			    stream_name);
@@ -1780,9 +1785,16 @@ alsa_driver_latency_callback (jack_latency_callback_mode_t mode, void* arg)
 	jack_latency_range_t range;
 	JSList* node;
 
+
 	if (mode == JackPlaybackLatency) {
-		range.min = range.max = driver->frames_per_cycle + driver->playback_frame_latency;
+		/* Playback latency is defined as the maximum time between the data being delivered to the device buffer and it
+		   emerging from the interface, which is dependent on the number of periods and the period size.
+		*/
+		range.min = range.max = ((driver->playback_nperiods - 1) * driver->frames_per_cycle) + driver->playback_frame_latency;
 	} else {
+		/* Input latency is defined as the maximum time between the data arriving at the interface and it becoming available to
+		   the CPU, which is always 1 period
+		*/
 		range.min = range.max = driver->frames_per_cycle + driver->capture_frame_latency;
 	}
 

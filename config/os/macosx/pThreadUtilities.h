@@ -66,7 +66,6 @@
 #define __PTHREADUTILITIES_H__
 
 #import "pthread.h"
-#import <CoreServices/../Frameworks/CarbonCore.framework/Headers/MacTypes.h>
 
 #define THREAD_SET_PRIORITY                     0
 #define THREAD_SCHEDULED_PRIORITY               1
@@ -75,6 +74,13 @@
 #include <mach/thread_policy.h>
 #include <mach/thread_act.h>
 #include <CoreAudio/HostTime.h>
+#import <Availability.h>
+
+#if defined(MAC_OS_X_VERSION_10_7) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7
+#import <MacTypes.h>
+#else
+#import <CoreServices/../Frameworks/CarbonCore.framework/Headers/MacTypes.h>
+#endif
 
 static inline UInt32
 _getThreadPriority (pthread_t inThread, int inWhichPriority)

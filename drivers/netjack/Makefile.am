@@ -16,4 +16,6 @@ noinst_HEADERS = netjack.h net_driver.h netjack_packet.h
 
 noinst_LTLIBRARIES = libnetjack_packet.la
 
+libnetjack_packet_la_LDFLAGS = @NETJACK_LIBS@
+libnetjack_packet_la_CFLAGS = @NETJACK_CFLAGS@
 libnetjack_packet_la_SOURCES = netjack_packet.c

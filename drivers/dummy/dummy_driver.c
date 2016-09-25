@@ -73,7 +73,7 @@ FakeVideoSync ( dummy_driver_t *driver )
 	}
 }
 
-#ifdef HAVE_CLOCK_GETTIME
+#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_CLOCK_NANOSLEEP)
 static inline unsigned long long ts_to_nsec (struct timespec ts)
 {
 	return ts.tv_sec * 1000000000LL + ts.tv_nsec;
@@ -111,6 +111,7 @@ dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
 {
 	jack_nframes_t nframes = driver->period_size;
 	struct timespec now;
+    struct timespec ts;
 
 	*status = 0;
 	/* this driver doesn't work so well if we report a delay */
@@ -136,7 +137,9 @@ dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
 		}
 		driver->next_wakeup = add_ts (driver->next_wakeup, driver->wait_time);
 	} else {
-		if (clock_nanosleep (CLOCK_REALTIME, TIMER_ABSTIME, &driver->next_wakeup, NULL)) {
+        ts.tv_sec = 0;
+        ts.tv_nsec = ts_to_nsec(driver->next_wakeup) - ts_to_nsec(now);
+		if (nanosleep (&ts, NULL)) {
 			jack_error ("error while sleeping");
 			*status = -1;
 		} else {

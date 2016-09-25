@@ -119,17 +119,21 @@ init_cpu ()
 
 #endif  /* USE_DYNSIMD */
 
-char *jack_tmpdir = DEFAULT_TMP_DIR;
-
-static int
+const char *
 jack_get_tmpdir ()
 {
+	static char tmpdir[PATH_MAX + 1] = "";
 	FILE* in;
 	size_t len;
 	char buf[PATH_MAX + 2]; /* allow tmpdir to live anywhere, plus newline, plus null */
 	char *pathenv;
 	char *pathcopy;
 	char *p;
+
+	/* return tmpdir if set */
+	if (tmpdir[0] != '\0') {
+		return tmpdir;
+	}
 
 	/* some implementations of popen(3) close a security loophole by
 	   resetting PATH for the exec'd command. since we *want* to
@@ -138,13 +142,13 @@ jack_get_tmpdir ()
 	 */
 
 	if ((pathenv = getenv ("PATH")) == 0) {
-		return -1;
+		return NULL;
 	}
 
 	/* don't let strtok(3) mess with the real environment variable */
 
 	if ((pathcopy = strdup (pathenv)) == NULL) {
-		return -1;
+		return NULL;
 	}
 	p = strtok (pathcopy, ":");
 
@@ -169,13 +173,13 @@ jack_get_tmpdir ()
 	if (p == NULL) {
 		/* no command successfully started */
 		free (pathcopy);
-		return -1;
+		return NULL;
 	}
 
 	if (fgets (buf, sizeof(buf), in) == NULL) {
 		pclose (in);
 		free (pathcopy);
-		return -1;
+		return NULL;
 	}
 
 	len = strlen (buf);
@@ -184,21 +188,16 @@ jack_get_tmpdir ()
 		/* didn't get a whole line */
 		pclose (in);
 		free (pathcopy);
-		return -1;
+		return NULL;
 	}
 
-	if ((jack_tmpdir = (char*)malloc (len)) == NULL) {
-		free (pathcopy);
-		return -1;
-	}
-
-	memcpy (jack_tmpdir, buf, len - 1);
-	jack_tmpdir[len - 1] = '\0';
+	memcpy (tmpdir, buf, len - 1);
+	tmpdir[len - 1] = '\0';
 
 	pclose (in);
 	free (pathcopy);
 
-	return 0;
+	return tmpdir;
 }
 
 void
@@ -1260,7 +1259,7 @@ jack_client_open_aux (const char *client_name,
 	/* External clients need to know where the tmpdir used for
 	   communication with the server lives
 	 */
-	if (jack_get_tmpdir ()) {
+	if (jack_get_tmpdir () == NULL) {
 		*status |= JackFailure;
 		jack_messagebuffer_exit ();
 		return NULL;
@@ -1458,15 +1457,24 @@ char *
 jack_user_dir (void)
 {
 	static char user_dir[PATH_MAX + 1] = "";
+	const char *tmpdir;
 
 	/* format the path name on the first call */
 	if (user_dir[0] == '\0') {
+		tmpdir = jack_get_tmpdir ();
+
+		/* previous behavior of jack_tmpdir, should be changed later */
+		if (tmpdir == NULL) {
+			jack_error ("Unable to get tmpdir in user dir");
+			tmpdir = DEFAULT_TMP_DIR;
+		}
+
 		if (getenv ("JACK_PROMISCUOUS_SERVER")) {
 			snprintf (user_dir, sizeof(user_dir), "%s/jack",
-				  jack_tmpdir);
+				  tmpdir);
 		} else {
 			snprintf (user_dir, sizeof(user_dir), "%s/jack-%d",
-				  jack_tmpdir, getuid ());
+				  tmpdir, getuid ());
 		}
 	}
 
@@ -2387,6 +2395,7 @@ jack_activate (jack_client_t *client)
 {
 	jack_request_t req;
 
+	VALGRIND_MEMSET (&req, 0, sizeof(req));
 
 	if (client->control->type == ClientInternal ||
 	    client->control->type == ClientDriver) {
@@ -2405,8 +2414,6 @@ jack_activate (jack_client_t *client)
 		/* we need to ask the engine for realtime capabilities
 		   before trying to start the realtime thread
 		 */
-
-		VALGRIND_MEMSET (&req, 0, sizeof(req));
 
 		req.type = SetClientCapabilities;
 		req.x.client_id = client->control->id;
