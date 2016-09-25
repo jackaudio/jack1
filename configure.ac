@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl $Id$
 
-AC_INIT([jack-audio-connection-kit],[0.125.0rc1],
+AC_INIT([jack-audio-connection-kit],[0.125.1],
                 [jack-devel@lists.jackaudio.org],[],[http://www.jackaudio.org/])
 
 AC_CONFIG_SRCDIR([jackd/jackd.c])
@@ -195,27 +195,6 @@ AC_SUBST(OS_LDFLAGS)
 AC_SUBST(USE_MD5SUM)
 AC_DEFINE_UNQUOTED(USE_MD5SUM,"$USE_MD5SUM",[Using md5sum command line if available])
 AM_CONDITIONAL(USE_MD5SUM, $USE_MD5SUM)
-
-#
-# We need to establish suitable defaults for a 64-bit OS
-libnn=lib
-case "${host_os}" in
-    linux*)
-    case "${host_cpu}" in
-	x86_64|mips64|ppc64|sparc64|s390x)
-        libnn=lib64
-	;;
-    esac
-    ;;
-    solaris*)
-    ## libnn=lib/sparcv9 ## on 64-bit only, but that's compiler-specific
-    ;;
-esac
-
-## take care not to  override the command-line setting
-if test "${libdir}" = '${exec_prefix}/lib'; then
-  libdir='${exec_prefix}/'${libnn}
-fi
 
 # system-dependent config.h values
 test "x$JACK_THREAD_STACK_TOUCH" = "x" && JACK_THREAD_STACK_TOUCH=500000
