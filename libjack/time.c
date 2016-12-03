@@ -37,7 +37,6 @@
 #include <jack/jack.h>
 
 #include <sysdeps/time.h>
-#include <sysdeps/cycles.h>
 
 #include "local.h"
 

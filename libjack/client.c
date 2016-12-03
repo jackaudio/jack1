@@ -60,7 +60,6 @@
 
 #include <sysdeps/poll.h>
 #include <sysdeps/ipc.h>
-#include <sysdeps/cycles.h>
 
 #ifdef JACK_USE_MACH_THREADS
 #include <sysdeps/pThreadUtilities.h>
