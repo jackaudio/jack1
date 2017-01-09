@@ -258,28 +258,28 @@ AC_EGREP_CPP( ppoll,
 
 AC_CHECK_FUNC(clock_gettime,
        [
-           AC_DEFINE(HAVE_CLOCK_GETTIME,0,"Whether or not clock_gettime can be found in system libraries")
+           AC_DEFINE(HAVE_CLOCK_GETTIME,1,"Whether or not clock_gettime can be found in system libraries")
        ],
        #
        # if not found, check librt specifically
        #
        AC_CHECK_LIB(rt, clock_gettime,
            [
-              AC_DEFINE(HAVE_CLOCK_GETTIME,1,"Whether or not clock_gettime can be found in system libraries")
+              AC_DEFINE(HAVE_CLOCK_GETTIME,1,"Whether or not clock_gettime can be found in system libraries (via -lrt)")
 	      OS_LDFLAGS="$OS_LDFLAGS -lrt"
 	   ])
 )
 
 AC_CHECK_FUNC(clock_nanosleep,
        [
-           AC_DEFINE(HAVE_CLOCK_NANOSLEEP,0,"Whether or not clock_nanosleep can be found in system libraries")
+           AC_DEFINE(HAVE_CLOCK_NANOSLEEP,1,"Whether or not clock_nanosleep can be found in system libraries")
        ],
        #
        # if not found, check librt specifically
        #
        AC_CHECK_LIB(rt, clock_nanosleep,
            [
-              AC_DEFINE(HAVE_CLOCK_NANOSLEEP,1,"Whether or not clock_nanosleep can be found in system libraries")
+              AC_DEFINE(HAVE_CLOCK_NANOSLEEP,1,"Whether or not clock_nanosleep can be found in system libraries (via -lrt)")
 	      OS_LDFLAGS="$OS_LDFLAGS -lrt"
 	   ])
 )
