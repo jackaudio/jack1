@@ -43,7 +43,7 @@ struct _dummy_driver {
 	jack_nframes_t period_size;
 	unsigned long wait_time;
 
-#if defined(HAVE_CLOCK_GETTIME) && defined(HAVE_CLOCK_NANOSLEEP)
+#if HAVE_CLOCK_GETTIME && HAVE_CLOCK_NANOSLEEP
 	struct timespec next_wakeup;
 #else
 	jack_time_t next_time;
