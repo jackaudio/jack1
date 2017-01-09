@@ -627,7 +627,7 @@ jack_process_internal (jack_engine_t *engine, JSList *node,
    to know that that jack_get_microseconds() is monotonic.
  */
 
-#ifdef HAVE_CLOCK_GETTIME
+#if HAVE_CLOCK_GETTIME
 static const int system_clock_monotonic = 1;
 #else
 static const int system_clock_monotonic = 0;

@@ -48,7 +48,7 @@ jack_clock_source_name (jack_timer_type_t src)
 	case JACK_TIMER_HPET:
 		return "hpet";
 	case JACK_TIMER_SYSTEM_CLOCK:
-#ifdef HAVE_CLOCK_GETTIME
+#if HAVE_CLOCK_GETTIME
 		return "system clock via clock_gettime";
 #else
 		return "system clock via gettimeofday";
@@ -60,20 +60,7 @@ jack_clock_source_name (jack_timer_type_t src)
 	return "unknown";
 }
 
-#ifndef HAVE_CLOCK_GETTIME
-
-jack_time_t
-jack_get_microseconds_from_system (void)
-{
-	jack_time_t jackTime;
-	struct timeval tv;
-
-	gettimeofday (&tv, NULL);
-	jackTime = (jack_time_t)tv.tv_sec * 1000000 + (jack_time_t)tv.tv_usec;
-	return jackTime;
-}
-
-#else
+#if HAVE_CLOCK_GETTIME
 
 jack_time_t
 jack_get_microseconds_from_system (void)
@@ -84,6 +71,19 @@ jack_get_microseconds_from_system (void)
 	clock_gettime (CLOCK_MONOTONIC, &time);
 	jackTime = (jack_time_t)time.tv_sec * 1e6 +
 		   (jack_time_t)time.tv_nsec / 1e3;
+	return jackTime;
+}
+
+#else
+
+jack_time_t
+jack_get_microseconds_from_system (void)
+{
+	jack_time_t jackTime;
+	struct timeval tv;
+
+	gettimeofday (&tv, NULL);
+	jackTime = (jack_time_t)tv.tv_sec * 1000000 + (jack_time_t)tv.tv_usec;
 	return jackTime;
 }
 
