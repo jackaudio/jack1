@@ -965,16 +965,9 @@ AC_OUTPUT(
 Makefile
 config/Makefile
 config/cpu/Makefile
-config/cpu/alpha/Makefile
-config/cpu/cris/Makefile
 config/cpu/generic/Makefile
 config/cpu/i386/Makefile
-config/cpu/i486/Makefile
-config/cpu/ia64/Makefile
-config/cpu/m68k/Makefile
-config/cpu/mips/Makefile
 config/cpu/powerpc/Makefile
-config/cpu/s390/Makefile
 config/os/Makefile
 config/os/generic/Makefile
 config/os/gnu-linux/Makefile

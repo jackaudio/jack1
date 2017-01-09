@@ -8,7 +8,6 @@ noinst_HEADERS =		\
         systemtest.c            \
         sanitycheck.c           \
 	atomicity.h		\
-	cycles.h		\
 	getopt.h		\
 	ipc.h			\
 	mach_port.h		\
