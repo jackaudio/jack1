@@ -33,6 +33,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#if defined(__FreeBSD__)
+#include <sys/types.h>
+#include <sys/rtprio.h>
+#include <unistd.h>
+#endif
 
 #include "local.h"
 
@@ -267,20 +272,45 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 
 #else /* !JACK_USE_MACH_THREADS */
 
+static int
+jack_process_already_has_real_time_scheduling (int priority)
+{
+#if defined(__FreeBSD__)
+	int res;
+	struct rtprio rtp;
+	res = rtprio(RTP_LOOKUP, getpid(), &rtp);
+	if (res == 0 && rtp.type == RTP_PRIO_REALTIME && rtp.prio <= priority) {
+		jack_info("process already runs at sufficient realtime priority %u (<=%d)",
+			  (unsigned)rtp.prio,
+			  priority);
+		return 1; // process priority is sufficient
+	}
+#endif
+	return 0; // no or don't know
+}
+
 int
 jack_drop_real_time_scheduling (pthread_t thread)
 {
 	struct sched_param rtparam;
-	int x;
+	int x, policy;
+
+	if ((x = pthread_getschedparam (thread, &policy, &rtparam)) != 0) {
+		jack_error ("cannot read thread scheduling priority(%s)\n",
+			    strerror (errno));
+		return -1;
+	}
+	if (policy == SCHED_OTHER)
+		return 0; // already
 
 	memset (&rtparam, 0, sizeof(rtparam));
-	rtparam.sched_priority = 0;
 
 	if ((x = pthread_setschedparam (thread, SCHED_OTHER, &rtparam)) != 0) {
 		jack_error ("cannot switch to normal scheduling priority(%s)\n",
 			    strerror (errno));
 		return -1;
 	}
+
 	return 0;
 }
 
@@ -289,6 +319,9 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 {
 	struct sched_param rtparam;
 	int x;
+
+	if (jack_process_already_has_real_time_scheduling (priority) != 0)
+		return 0;
 
 	memset (&rtparam, 0, sizeof(rtparam));
 	rtparam.sched_priority = priority;
