@@ -300,8 +300,9 @@ jack_drop_real_time_scheduling (pthread_t thread)
 			    strerror (errno));
 		return -1;
 	}
-	if (policy == SCHED_OTHER)
+	if (policy == SCHED_OTHER) {
 		return 0; // already
+	}
 
 	memset (&rtparam, 0, sizeof(rtparam));
 
@@ -320,8 +321,9 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 	struct sched_param rtparam;
 	int x;
 
-	if (jack_process_already_has_real_time_scheduling (priority) != 0)
+	if (jack_process_already_has_real_time_scheduling (priority) != 0) {
 		return 0;
+	}
 
 	memset (&rtparam, 0, sizeof(rtparam));
 	rtparam.sched_priority = priority;
