@@ -88,25 +88,6 @@ Be sure to place any generic implementation alternative in the @c
 \#else or use an @c \#ifndef, so no other code needs to know your
 conditional labels.
 
-@section portcpu Processor Dependencies
-
-JACK uses some low-level machine operations for thread-safe updates to
-shared memory.  A low-level implementation of @c <sysdeps/atomicity.h>
-is provided for every target processor architecture.  There is also a
-generic implementation using POSIX spin locks, but that is not a good
-enough solution for serious use.
-
-The GCC package provides versions that work on most modern hardware.
-We've tried to keep things as close to the original as possible, while
-removing a bunch of os-specific files that didn't seem relevant.  A
-primary goal has been to avoid changing the CPU-dependent @c
-<sysdeps/atomicity.h> headers.
-
-The relevant GCC documentation provides some helpful background,
-especially the @c atomicity.h discussion at
-<http://gcc.gnu.org/onlinedocs/porting/Thread-safety.html>.
-
-
 @section portissues Issues Not Addressed
 
   - Cross-compilation has not been tested, or even thought through in
