@@ -7,7 +7,6 @@ MAINTAINERCLEANFILES = Makefile.in
 noinst_HEADERS =		\
         systemtest.c            \
         sanitycheck.c           \
-	atomicity.h		\
 	getopt.h		\
 	ipc.h			\
 	mach_port.h		\
