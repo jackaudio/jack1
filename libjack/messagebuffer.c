@@ -161,7 +161,7 @@ jack_messagebuffer_add (const char *fmt, ...)
 		pthread_cond_signal (&mb_ready_cond);
 		pthread_mutex_unlock (&mb_write_lock);
 	} else {                        /* lock collision */
-		atomic_add (&mb_overruns, 1);
+		exchange_and_add (&mb_overruns, 1);
 	}
 }
 

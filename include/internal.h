@@ -60,7 +60,7 @@ void jack_set_clock_source (jack_timer_type_t);
 const char* jack_clock_source_name (jack_timer_type_t);
 
 #include <sysdeps/time.h>
-#include <sysdeps/atomicity.h>
+#include "atomicity.h"
 
 #ifdef JACK_USE_MACH_THREADS
 #include <sysdeps/mach_port.h>
