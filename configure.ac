@@ -964,10 +964,6 @@ AM_CONDITIONAL(HAVE_ZITA_BRIDGE_DEPS, $HAVE_ZITA_BRIDGE_DEPS)
 AC_OUTPUT(
 Makefile
 config/Makefile
-config/cpu/Makefile
-config/cpu/generic/Makefile
-config/cpu/i386/Makefile
-config/cpu/powerpc/Makefile
 config/os/Makefile
 config/os/generic/Makefile
 config/os/gnu-linux/Makefile

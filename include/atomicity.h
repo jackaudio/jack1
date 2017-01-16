@@ -20,19 +20,26 @@
 #ifndef __jack_atomicity_h__
 #define __jack_atomicity_h__
 
-/*
- * Interface with various machine-dependent headers derived from the
- * gcc/libstdc++.v3 sources.  We try to modify the GCC sources as
- * little as possible.  The following include is resolved using the
- * config/configure.hosts mechanism.  It will use an OS-dependent
- * version if available, otherwise the one for this CPU.  Some of
- * these files might not work with older GCC compilers.
- */
-#include <sysdeps/atomicity.h>
+#if __STDC_VERSION__ >= 201112L && !defined(__STDC_NO_ATOMICS__)
 
-/* These functions are defined for each platform.  The C++ library
- * function names start with "__" to avoid namespace pollution. */
-#define exchange_and_add __exchange_and_add
-#define atomic_add __atomic_add
+#include <stdatomic.h>
+
+typedef atomic_int _Atomic_word;
+
+static inline int exchange_and_add(volatile _Atomic_word* obj, int value)
+{
+    return atomic_fetch_add_explicit(obj, value, memory_order_relaxed);
+}
+
+#else
+
+typedef int _Atomic_word;
+
+static inline int exchange_and_add(volatile _Atomic_word* obj, int value)
+{
+    return __atomic_fetch_add(obj, value, __ATOMIC_RELAXED);
+}
+
+#endif
 
 #endif /* __jack_atomicity_h__ */
