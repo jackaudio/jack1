@@ -821,14 +821,28 @@ AM_CONDITIONAL(HAVE_COREAUDIO, $HAVE_COREAUDIO)
 AC_ARG_ENABLE(oss, AC_HELP_STRING([--disable-oss],[ignore OSS driver ]),
 			TRY_OSS=$enableval , TRY_OSS=yes )
 HAVE_OSS="false"
+USE_OSS_COOKEDMODE="false"
 if test "x$TRY_OSS" = "xyes"
 then
 	# check for Open Sound System
 	AC_CHECK_HEADER([sys/soundcard.h],
 	     [HAVE_OSS="true"
               JACK_DEFAULT_DRIVER=\"oss\"])
+
+	# enable OSS cookedmode to allow hardware with mismatching sample rates
+	if test "x$HAVE_OSS" = "xtrue"
+	then
+		AC_ARG_ENABLE(oss-cookedmode, AC_HELP_STRING([--enable-oss-cookedmode],[Enable cooked mode in OSS to accommodate hardware with mismatching sample rate]),
+				ENABLE_OSS_COOKEDMODE=$enableval, ENABLE_OSS_COOKEDMODE=no)
+		if test "x$ENABLE_OSS_COOKEDMODE" = "xyes"
+		then
+			USE_OSS_COOKEDMODE=true
+			AC_DEFINE(USE_OSS_COOKEDMODE, 1, [Enable cooked mode in OSS to accommodate hardware with mismatching sample rate])
+		fi
+	fi
 fi
 AM_CONDITIONAL(HAVE_OSS, $HAVE_OSS)
+AM_CONDITIONAL(USE_OSS_COOKEDMODE, $USE_OSS_COOKEDMODE)
 
 AC_ARG_ENABLE(sun, AC_HELP_STRING([--disable-sun],[ignore Sun driver ]),
 			TRY_SUN=$enableval , TRY_SUN=yes )
@@ -1008,6 +1022,7 @@ echo \| Build with ALSA support............................... : $HAVE_ALSA
 echo \| Build with old FireWire \(FreeBob\) support............. : $HAVE_FREEBOB
 echo \| Build with new FireWire \(FFADO\) support............... : $HAVE_FIREWIRE
 echo \| Build with OSS support................................ : $HAVE_OSS
+echo \| Enable OSS COOKEDMODE for hardware flexibility........ : $USE_OSS_COOKEDMODE
 echo \| Build with Sun audio support.......................... : $HAVE_SUN
 echo \| Build with Sndio audio support........................ : $HAVE_SNDIO
 echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
