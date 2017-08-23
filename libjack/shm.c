@@ -419,6 +419,9 @@ jack_register_server (const char *server_name, int new_registry)
 			return EEXIST;  /* other server running */
 		}
 
+		/* invalidate the dead pid */
+		jack_shm_header->server[i].pid = 0;
+
 		/* it's gone, reclaim this entry */
 		memset (&jack_shm_header->server[i], 0,
 			sizeof(jack_shm_server_t));
