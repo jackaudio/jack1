@@ -330,8 +330,9 @@ AC_ARG_ENABLE(ancient_libc,
 JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS $JACK_LIBC_HELPER_FLAGS"
 
 case $build_os in
-     # we need weak linkage which appeared in 10.2, but lets ask for 10.4 anyway
-     darwin*) JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS -mmacosx-version-min=10.4" ;;
+     # we need weak linkage which appeared in 10.2, but for compatibility with
+     # macOS 10.14 and above we cannot set a minimum version below 10.6 here.
+     darwin*) JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS -mmacosx-version-min=10.6" ;;
 esac
 
 AC_ARG_WITH(cpu-target,
