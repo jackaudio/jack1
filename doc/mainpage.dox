@@ -152,7 +152,7 @@ porting-guide document.
 
 @section license License
 
-Copyright (C) 2001-2011 by Paul Davis, Stephane Letz, Jack O'Quinn, Torben Hohn and others.
+Copyright (C) 2001-2019 by Paul Davis, Stephane Letz, Jack O'Quinn, Torben Hohn, Filipe Coelho and others.
 
 JACK is free software; you can redistribute it and/or modify it under
 the terms of the GNU GPL and LGPL licenses as published by the Free
