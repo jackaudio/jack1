@@ -84,22 +84,22 @@ The JACK programming interfaces are described in several header files.
 We present them here broken into useful categories to make the API a
 little clearer:
 
-    - @ref ClientFunctions
-    - @ref ClientCallbacks
-    - @ref ClientThreads
-    - @ref ServerControl
-    - @ref PortFunctions
-    - @ref PortSearching
-    - @ref LatencyFunctions
-    - @ref TimeFunctions
-    - @ref TransportControl
-    - @ref ErrorOutput
-    - @ref NonCallbackAPI
-    - @ref MIDIAPI
-    - @ref SessionClientFunctions
-    - @ref WeakLinkage
-    - @ref ControlAPI
-    - @ref Metadata
+ - @ref ClientFunctions
+ - @ref ClientCallbacks
+ - @ref ClientThreads
+ - @ref ServerControl
+ - @ref PortFunctions
+ - @ref PortSearching
+ - @ref LatencyFunctions
+ - @ref TimeFunctions
+ - @ref TransportControl
+ - @ref ErrorOutput
+ - @ref NonCallbackAPI
+ - @ref MIDIAPI
+ - @ref SessionClientFunctions
+ - @ref WeakLinkage
+ - @ref ControlAPI
+ - @ref Metadata
 
 The full API is described in:
 
