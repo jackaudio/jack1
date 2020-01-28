@@ -2662,14 +2662,18 @@ jack_port_disconnect (jack_client_t *client, jack_port_t *port)
 {
 	jack_request_t req;
 
-	pthread_mutex_lock (&port->connection_lock);
+	if (port->shared->client_id == client->control->uuid) {
 
-	if (port->connections == NULL) {
+		pthread_mutex_lock (&port->connection_lock);
+
+		if (port->connections == NULL) {
+			printf ("JACK port not connected\n");
+			pthread_mutex_unlock (&port->connection_lock);
+			return 0;
+		}
+
 		pthread_mutex_unlock (&port->connection_lock);
-		return 0;
 	}
-
-	pthread_mutex_unlock (&port->connection_lock);
 
 	VALGRIND_MEMSET (&req, 0, sizeof(req));
 
