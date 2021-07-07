@@ -279,7 +279,12 @@ jack_process_already_has_real_time_scheduling (int priority)
 	int res;
 	struct rtprio rtp;
 	res = rtprio(RTP_LOOKUP, getpid(), &rtp);
-	if (res == 0 && rtp.type == RTP_PRIO_REALTIME && rtp.prio <= priority) {
+	if (res) {
+		jack_error("failed to read realtime priority of the process (error=%d: %s)",
+			   res, strerror (res));
+		return 0; // act like priority isn't sufficient
+	}
+	if (rtp.type == RTP_PRIO_REALTIME && rtp.prio <= priority) {
 		jack_info("process already runs at sufficient realtime priority %u (<=%d)",
 			  (unsigned)rtp.prio,
 			  priority);
@@ -296,8 +301,8 @@ jack_drop_real_time_scheduling (pthread_t thread)
 	int x, policy;
 
 	if ((x = pthread_getschedparam (thread, &policy, &rtparam)) != 0) {
-		jack_error ("cannot read thread scheduling priority(%s)\n",
-			    strerror (errno));
+		jack_error ("cannot read thread scheduling priority (error=%d: %s)\n",
+			    x, strerror (x));
 		return -1;
 	}
 	if (policy == SCHED_OTHER) {
@@ -307,8 +312,8 @@ jack_drop_real_time_scheduling (pthread_t thread)
 	memset (&rtparam, 0, sizeof(rtparam));
 
 	if ((x = pthread_setschedparam (thread, SCHED_OTHER, &rtparam)) != 0) {
-		jack_error ("cannot switch to normal scheduling priority(%s)\n",
-			    strerror (errno));
+		jack_error ("cannot switch to normal scheduling priority (error=%d: %s)\n",
+			    x, strerror (x));
 		return -1;
 	}
 
@@ -330,7 +335,7 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 
 	if ((x = pthread_setschedparam (thread, SCHED_FIFO, &rtparam)) != 0) {
 		jack_error ("cannot use real-time scheduling (FIFO at priority %d) "
-			    "[for thread %d, from thread %d] (%d: %s)",
+			    "[for thread %d, from thread %d] (error=%d: %s)",
 			    rtparam.sched_priority,
 			    thread, pthread_self (),
 			    x, strerror (x));
