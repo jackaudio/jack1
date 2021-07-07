@@ -569,6 +569,13 @@ static int oss_driver_start (oss_driver_t *driver)
 				"OSS: failed to set samplerate for %s: %s@%i, errno=%d",
 				indev, __FILE__, __LINE__, errno);
 		}
+		if (samplerate != driver->sample_rate) {
+			jack_error (
+				"OSS: failed to set the recording sample-rate for %s: %s@%i, requested-sample-rate=%d, obtained-sample-rate=%d",
+				indev, __FILE__, __LINE__, driver->sample_rate, samplerate);
+			jack_error ("OSS: please consider configuring with --enable-oss-cookedmode");
+			return -1;
+		}
 		jack_info ("oss_driver: %s : 0x%x/%i/%i (%i)", indev,
 			   format, channels, samplerate, get_fragment (infd));
 
@@ -607,6 +614,13 @@ static int oss_driver_start (oss_driver_t *driver)
 			jack_error (
 				"OSS: failed to set samplerate for %s: %s@%i, errno=%d",
 				outdev, __FILE__, __LINE__, errno);
+		}
+		if (samplerate != driver->sample_rate) {
+			jack_error (
+				"OSS: failed to set the playback sample-rate for %s: %s@%i, requested-sample-rate=%d, obtained-sample-rate=%d",
+				indev, __FILE__, __LINE__, driver->sample_rate, samplerate);
+			jack_error ("OSS: please consider configuring with --enable-oss-cookedmode");
+			return -1;
 		}
 		jack_info ("oss_driver: %s : 0x%x/%i/%i (%i)", outdev,
 			   format, channels, samplerate,
