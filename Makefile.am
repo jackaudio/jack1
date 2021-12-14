@@ -33,19 +33,19 @@ dist-hook: dist-check-doxygen
 libjackincludedir = $(includedir)/jack
 
 libjackinclude_HEADERS =   \
+	jack/control.h     \
 	jack/intclient.h   \
 	jack/jack.h        \
+	jack/jslist.h      \
+	jack/metadata.h    \
+	jack/midiport.h    \
 	jack/ringbuffer.h  \
-	jack/statistics.h  \
 	jack/session.h     \
+	jack/statistics.h  \
+	jack/systemdeps.h  \
 	jack/thread.h      \
 	jack/transport.h   \
 	jack/types.h       \
-	jack/midiport.h    \
-	jack/weakmacros.h  \
+	jack/uuid.h        \
 	jack/weakjack.h    \
-	jack/control.h     \
-	jack/metadata.h     \
-	jack/uuid.h     \
-	jack/jslist.h
-
+	jack/weakmacros.h
