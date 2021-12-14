@@ -7,16 +7,22 @@ DOX=reference.doxygen
 DOXSOURCES=mainpage.dox transport.dox porting.dox fsm.png fsm.eps \
 	../example-clients/inprocess.c \
 	../example-clients/simple_client.c \
+	../jack/control.h \
 	../jack/intclient.h \
 	../jack/jack.h \
+	../jack/jslist.h \
+	../jack/metadata.h \
+	../jack/midiport.h \
 	../jack/ringbuffer.h \
+	../jack/session.h \
+	../jack/statistics.h \
+	../jack/systemdeps.h \
 	../jack/thread.h \
 	../jack/transport.h \
 	../jack/types.h \
-	../jack/midiport.h \
-	../jack/session.h \
+	../jack/uuid.h \
 	../jack/weakjack.h \
-	../jack/control.h
+	../jack/weakmacros.h
 
 EXTRA_DIST=mainpage.dox transport.dox fsm.png fsm.eps porting.dox
 
