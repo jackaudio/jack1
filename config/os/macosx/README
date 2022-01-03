@@ -17,8 +17,6 @@ optional tools
   libtool >= 1.5	(to build from CVS)
   pkg-config >= 0.15.0  (to build from CVS)
   doxygen		(to build documentation)
-  libsndfile >= 1.0.0	(for some example-clients)
-  GNU readline		(for some example-clients)
 
 All non-Apple tools are available from `fink' or `darwinports'.
 

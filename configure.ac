@@ -679,13 +679,6 @@ if test "x$USE_BARRIER" = "xyes"; then
 		AC_DEFINE(USE_BARRIER, 1, [Use pthread barrier functions]))
 fi
 
-# some example-clients need libsndfile
-HAVE_SNDFILE=false
-PKG_CHECK_MODULES(SNDFILE, sndfile >= 1.0,[HAVE_SNDFILE=true], [true])
-if test x$HAVE_SNDFILE = xfalse; then
-             AC_MSG_WARN([*** the jackrec example client will not be built])
-fi
-
 # NetJack backend and internal client need libsamplerate
 HAVE_SAMPLERATE=false
 PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 0.1.2,[HAVE_SAMPLERATE=true], [true])
@@ -697,45 +690,6 @@ else
 	NETJACK_LIBS="$NETJACK_LIBS $SAMPLERATE_LIBS"
     	AC_DEFINE(HAVE_SAMPLERATE,1,"Whether libsamplerate is available")
 fi
-
-# if we have Fons Adriensen's zita libs installed, we can build the zita-based
-# internal clients for using additional (ALSA) devices with JACK
-
-HAVE_ZITA_BRIDGE_DEPS=false
-HAVE_ZITA_RESAMPLE=false
-HAVE_ZITA_ALSA_PCMI=false
-
-case $build_os in
-     linux*)
-      AC_CHECK_LIB(zita-resampler, _Z28zita_resampler_major_versionv,
-            [
-               HAVE_ZITA_RESAMPLE=true
-               AC_MSG_RESULT(yes)
-            ])
-      AC_CHECK_LIB(zita-alsa-pcmi, _Z28zita_alsa_pcmi_major_versionv,
-            [
-               HAVE_ZITA_ALSA_PCMI=true
-               AC_MSG_RESULT(yes)
-            ])
-
-     AC_ARG_ENABLE(zalsa,
-           AC_HELP_STRING([--enable-zalsa],[Build clients using Fons Adriensen\'s Zita libraries for access to multiple devices (default=yes if required libraries are present)]),
-           [
-               if test x$enable_zalsa != xno -a x$HAVE_ZITA_RESAMPLE = xtrue -a x$HAVE_ZITA_ALSA_PCMI = xtrue ; then
-                   AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
-                   HAVE_ZITA_BRIDGE_DEPS=true
-               fi
-           ],
-           [
-               if test x$HAVE_ZITA_RESAMPLE = xtrue -a x$HAVE_ZITA_ALSA_PCMI = xtrue ; then
-                   AC_DEFINE(HAVE_ZITA_BRIDGE_DEPS,1,"Whether we have the libs needed for Zita ALSA bridge support")
-                   HAVE_ZITA_BRIDGE_DEPS=true
-               fi
-           ]
-     )
-     ;;
-esac
-AM_CONDITIONAL(HAVE_ZITA_ALSA_PCMI, $HAVE_ZITA_ALSA_PCMI)
 
 # Celt low-latency audio codec. netjack transmission via internet.
 HAVE_CELT=false
@@ -923,44 +877,18 @@ AC_DEFINE_UNQUOTED(JACK_SEMAPHORE_KEY,
 	  [ an integer constant used as the semaphore and SysV SHM key. see libjack/shm.c for usage])
 AC_SUBST(JACK_SEMAPHORE_KEY)
 
-# On some systems, readline depends on termcap or ncurses.  But, the
-# MacOSX linker complains bitterly if these libraries are explicitly
-# referenced.
-#
-# AC_CHECK_LIB() foolishly assumes that checking a library for an entry
-# point always returns the same result regardless of any dependent
-# libraries specified.  The `unset ac_cv_lib_readline_readline' erases
-# the cached result to work around this problem.
-READLINE_DEPS=""
-HAVE_READLINE=true
-AC_CHECK_LIB(readline, readline, [:],
-    [unset ac_cv_lib_readline_readline
-     AC_CHECK_LIB(readline, readline, [READLINE_DEPS="-ltermcap"],
-        [unset ac_cv_lib_readline_readline
-	 AC_CHECK_LIB(readline, readline,
-	    [READLINE_DEPS="-lncurses"], [HAVE_READLINE=false], "-lncurses")],
-	"-ltermcap")])
-AC_CHECK_HEADER(readline/chardefs.h, [], [HAVE_READLINE=false])
-if test x$HAVE_READLINE = xfalse; then
-	AC_MSG_WARN([*** the jack_transport example client will not be built])
-fi
-AC_SUBST(READLINE_DEPS)
-
 # you need doxygen to make dist.
 AC_CHECK_PROG(HAVE_DOXYGEN, doxygen, true, false)
 if test $HAVE_DOXYGEN = "false"; then
              AC_MSG_WARN([*** doxygen not found, docs will not be built])
 fi
 
-AM_CONDITIONAL(HAVE_SNDFILE, $HAVE_SNDFILE)
 AM_CONDITIONAL(HAVE_CELT, $HAVE_CELT)
 AM_CONDITIONAL(HAVE_SAMPLERATE, $HAVE_SAMPLERATE)
-AM_CONDITIONAL(HAVE_READLINE, $HAVE_READLINE)
 AM_CONDITIONAL(HAVE_DOXYGEN, $HAVE_DOXYGEN)
 AM_CONDITIONAL(USE_CAPABILITIES, $USE_CAPABILITIES)
 AM_CONDITIONAL(STRIPPED_JACKD, $STRIPPED_JACKD)
 AM_CONDITIONAL(HAVE_PPOLL, $HAVE_PPOLL)
-AM_CONDITIONAL(HAVE_ZITA_BRIDGE_DEPS, $HAVE_ZITA_BRIDGE_DEPS)
 
 AC_OUTPUT(
 Makefile
@@ -984,9 +912,6 @@ drivers/coreaudio/Makefile
 drivers/freebob/Makefile
 drivers/firewire/Makefile
 drivers/netjack/Makefile
-example-clients/Makefile
-tools/Makefile
-tools/zalsa/Makefile
 man/Makefile
 jack.pc
 jack.spec
@@ -1015,7 +940,6 @@ echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
 echo \| Build with PortAudio support.......................... : $HAVE_PA
 echo \| Build with Celt support............................... : $HAVE_CELT
 echo \| Build with dynamic buffer size support................ : $buffer_resizing
-echo \| Build with ZITA ALSA bridge support................... : $HAVE_ZITA_BRIDGE_DEPS
 echo \| Compiler optimization flags........................... : $JACK_OPT_CFLAGS
 echo \| Compiler full flags................................... : $CFLAGS
 echo \| Install dir for libjack + backends.................... : $libdir/jack

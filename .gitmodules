@@ -1,9 +1,3 @@
-[submodule "example-clients"]
-	path = example-clients
-	url = https://github.com/jackaudio/example-clients
 [submodule "jack"]
 	path = jack
 	url = https://github.com/jackaudio/headers
-[submodule "tools"]
-	path = tools
-	url = https://github.com/jackaudio/tools
