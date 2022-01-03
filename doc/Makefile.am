@@ -5,8 +5,6 @@ CLEANFILES=doxygen-build.stamp
 
 DOX=reference.doxygen
 DOXSOURCES=mainpage.dox transport.dox porting.dox fsm.png fsm.eps \
-	../example-clients/inprocess.c \
-	../example-clients/simple_client.c \
 	../jack/control.h \
 	../jack/intclient.h \
 	../jack/jack.h \

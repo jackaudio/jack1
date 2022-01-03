@@ -516,8 +516,6 @@ WARN_LOGFILE           =
 INPUT                  = @top_srcdir@/doc/mainpage.dox \
                          @top_srcdir@/doc/transport.dox \
                          @top_srcdir@/doc/porting.dox \
-                         @top_srcdir@/example-clients/inprocess.c \
-                         @top_srcdir@/example-clients/simple_client.c \
                          @top_srcdir@/jack/control.h \
                          @top_srcdir@/jack/intclient.h \
                          @top_srcdir@/jack/jack.h \
