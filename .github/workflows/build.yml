@@ -1,50 +1,53 @@
-name: Release tarball archive
+name: Source Code tarball
+
 on:
   push:
-    tags:
-    - '[0-9]*'
+
 jobs:
   archive_source_code:
-    if: startsWith(github.ref, 'refs/tags/')
-    name: Source Code Tarball
+    name: Create source code tarball
     runs-on: ubuntu-18.04
     env:
       ARCHIVE_BASENAME: jack1-${{ github.ref_name }}
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
-      with:
-        submodules: recursive
-    - name: Dependencies setup
-      run: |
-        sudo apt-get update
-        sudo apt-get install python-pip
-        sudo pip install git-archive-all
-    - name: Archive source code
-      shell: bash
-      run: |
-        cd "${GITHUB_WORKSPACE}"
-        git-archive-all --prefix="${ARCHIVE_BASENAME}/" -9 "${{runner.workspace}}/${ARCHIVE_BASENAME}.tar.gz"
-    - uses: actions/upload-artifact@v2
-      with:
-        name: Source code tarball
-        path: ${{runner.workspace}}/${{env.ARCHIVE_BASENAME}}.tar.gz
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Archive source code
+        shell: bash
+        run: |
+          ./autogen.sh
+          autoreconf -fiv
+          rm -rf autom4te.cache
+          rm -f config.h.in~
+          tar -c -z \
+              --exclude=".git*" \
+              --transform="s,^\.,${ARCHIVE_BASENAME}," \
+              -f ~/${ARCHIVE_BASENAME}.tar.gz \
+              .
+      - uses: actions/upload-artifact@v2
+        with:
+          name: Source code tarball
+          path: ~/${{env.ARCHIVE_BASENAME}}.tar.gz
+
   deploy:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-18.04
+    env:
+      ARCHIVE_BASENAME: jack1-${{ github.ref_name }}
+      GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
     needs:
-    - archive_source_code
+      - archive_source_code
     steps:
-    - uses: actions/download-artifact@v2
-      with:
-        name: Source code tarball
-    - uses: softprops/action-gh-release@v1
-      env:
-        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      with:
-        tag_name: ${{ github.ref_name }}
-        name: Release ${{ github.ref_name }}
-        draft: false
-        prerelease: false
-        files: |
-          jack1-${{ github.ref_name }}.*
+      - uses: actions/download-artifact@v2
+        with:
+          name: Source code tarball
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: |
+            ${{ env.ARCHIVE_BASENAME }}.tar.gz
