@@ -20,6 +20,7 @@ jobs:
           ./autogen.sh
           autoreconf -fiv
           rm -rf autom4te.cache
+          rm -f config.h.in~
           tar -c -z \
               --exclude=".git*" \
               --transform="s,^\.,${ARCHIVE_BASENAME}," \
