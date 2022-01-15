@@ -1,8 +1,0 @@
-.deps
-.libs
-Makefile
-Makefile.in
-jack_md5.h
-jackd
-jackd.1
-jackstart
