@@ -18,6 +18,7 @@ jobs:
         shell: bash
         run: |
           ./autogen.sh
+          autoreconf -fiv
           rm -rf autom4te.cache
           tar -c -z \
               --exclude=".git*" \
