@@ -1,11 +1,8 @@
 name: Release tarball archive
 on:
   push:
-    tags:
-    - '[0-9]*'
 jobs:
   archive_source_code:
-    if: startsWith(github.ref, 'refs/tags/')
     name: Source Code Tarball
     runs-on: ubuntu-18.04
     env:
@@ -17,13 +14,15 @@ jobs:
         submodules: recursive
     - name: Dependencies setup
       run: |
-        sudo apt-get update
-        sudo apt-get install python-pip
+        sudo apt-get update -qq
+        sudo apt-get install -yqq python-pip
         sudo pip install git-archive-all
     - name: Archive source code
       shell: bash
       run: |
         cd "${GITHUB_WORKSPACE}"
+        ./autogen.sh
+        rm -rf autom4te.cache
         git-archive-all --prefix="${ARCHIVE_BASENAME}/" -9 "${{runner.workspace}}/${ARCHIVE_BASENAME}.tar.gz"
     - uses: actions/upload-artifact@v2
       with:
