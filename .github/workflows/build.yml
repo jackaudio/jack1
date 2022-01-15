@@ -48,4 +48,4 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            jack1-${{ env.ARCHIVE_BASENAME }}.*
+            ${{ env.ARCHIVE_BASENAME }}.tar.gz
