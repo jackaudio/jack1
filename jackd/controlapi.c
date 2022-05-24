@@ -1026,7 +1026,7 @@ jackctl_server_t * jackctl_server_create (
 		    &server_ptr->parameters,
 		    'Z',
 		    "nozombies",
-		    "dont zombifiy offending clients",
+		    "don't zombifiy offending clients",
 		    "",
 		    JackParamBool,
 		    &server_ptr->nozombies,

@@ -182,7 +182,7 @@ This cancels the effect any specified timeout value.
 \fB\-C, \-\-timeout-thres \fItime\fR
 .br
 Stop processing clients if JACK cannot complete the process cycle in time (typically caused by CPU overloading or misbehaved clients). The optional \fItime\fR 
-argument specifies the number of miliseconds, during which consectutive process cycles must fail before JACK gives up (if the argument is not given, it defaults to 250). Processing will resume on the next change to the port 
+argument specifies the number of milliseconds, during which consectutive process cycles must fail before JACK gives up (if the argument is not given, it defaults to 250). Processing will resume on the next change to the port 
 graph (i.e. a port is added, removed, connected or disconnected)
 .TP
 \fB\-u, \-\-unlock\fR
@@ -412,7 +412,7 @@ Whether to use Autoconfig, or just start. (default: true)
 Send packets N times (default: 1)
 .TP 
 \fB\-e, \-\-native\-endian \fIint\fR
-Dont convert samples to network byte order. (default: false)
+Don't convert samples to network byte order. (default: false)
 .TP 
 \fB\-J, \-\-jitterval \fIint\fR
 attempted jitterbuffer microseconds on master (default: 0)

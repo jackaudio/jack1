@@ -319,7 +319,7 @@ cache_packet_add_fragment (cache_packet *pack, char *packet_buf, int rcv_len)
 	jack_nframes_t framecnt    = ntohl (pkthdr->framecnt);
 
 	if (framecnt != pack->framecnt) {
-		jack_error ("errror. framecnts dont match");
+		jack_error ("error. framecnts don't match");
 		return;
 	}
 
