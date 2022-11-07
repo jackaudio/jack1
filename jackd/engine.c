@@ -3833,7 +3833,7 @@ jack_port_do_connect (jack_engine_t *engine,
 	}
 
 	if (srcport->shared->ptype_id != dstport->shared->ptype_id) {
-		jack_error ("ports used in attemped connection are not of "
+		jack_error ("ports used in attempted connection are not of "
 			    "the same data type");
 		return -1;
 	}

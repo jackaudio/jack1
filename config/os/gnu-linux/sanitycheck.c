@@ -59,7 +59,7 @@ int sanitycheck (int care_about_realtime,
 		fprintf (stderr, "\n--------------------------------------------------------------------------------\n");
 		fprintf (stderr, "WARNING: Your system seems to use frequency scaling.\n\n");
 		fprintf (stderr, "   This can have a serious impact on audio latency. You have two choices:\n");
-		fprintf (stderr, "\t(1)turn it off, e.g. by chosing the 'performance' governor.\n");
+		fprintf (stderr, "\t(1)turn it off, e.g. by choosing the 'performance' governor.\n");
 		fprintf (stderr, "\t(2)Use the HPET clocksource by passing \"-c h\" to JACK\n");
 		fprintf (stderr, "\t   (this second option only works on relatively recent computers)\n");
 		fprintf (stderr, "--------------------------------------------------------------------------------\n\n");
