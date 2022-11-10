@@ -429,7 +429,11 @@ static int oss_driver_detach (oss_driver_t *driver, jack_engine_t *engine)
 
 static int oss_driver_start (oss_driver_t *driver)
 {
-	int flags = 0;
+#if defined(USE_OSS_COOKEDMODE)
+	int cookedmode = 1;
+#else
+	int cookedmode = 0;
+#endif
 	int format;
 	int channels;
 	int samplerate;
@@ -464,7 +468,7 @@ static int oss_driver_start (oss_driver_t *driver)
 					indev, __FILE__, __LINE__, errno);
 			}
 #ifndef OSS_NO_COOKED_MODE
-			ioctl (infd, SNDCTL_DSP_COOKEDMODE, &flags);
+			ioctl (infd, SNDCTL_DSP_COOKEDMODE, &cookedmode);
 #endif
 			fragsize = driver->period_size *
 				   driver->capture_channels * samplesize;
@@ -479,7 +483,7 @@ static int oss_driver_start (oss_driver_t *driver)
 					outdev, __FILE__, __LINE__, errno);
 			}
 #ifndef OSS_NO_COOKED_MODE
-			ioctl (outfd, SNDCTL_DSP_COOKEDMODE, &flags);
+			ioctl (outfd, SNDCTL_DSP_COOKEDMODE, &cookedmode);
 #endif
 			fragsize = driver->period_size *
 				   driver->playback_channels * samplesize;
@@ -497,7 +501,7 @@ static int oss_driver_start (oss_driver_t *driver)
 				return -1;
 			}
 #ifndef OSS_NO_COOKED_MODE
-			ioctl (infd, SNDCTL_DSP_COOKEDMODE, &flags);
+			ioctl (infd, SNDCTL_DSP_COOKEDMODE, &cookedmode);
 #endif
 		} else if (driver->capture_channels == 0 &&
 			   driver->playback_channels != 0) {
@@ -510,7 +514,7 @@ static int oss_driver_start (oss_driver_t *driver)
 				return -1;
 			}
 #ifndef OSS_NO_COOKED_MODE
-			ioctl (outfd, SNDCTL_DSP_COOKEDMODE, &flags);
+			ioctl (outfd, SNDCTL_DSP_COOKEDMODE, &cookedmode);
 #endif
 		} else {
 			infd = outfd = open (indev, O_RDWR | O_EXCL);
@@ -521,7 +525,7 @@ static int oss_driver_start (oss_driver_t *driver)
 				return -1;
 			}
 #ifndef OSS_NO_COOKED_MODE
-			ioctl (infd, SNDCTL_DSP_COOKEDMODE, &flags);
+			ioctl (infd, SNDCTL_DSP_COOKEDMODE, &cookedmode);
 #endif
 		}
 		if (infd >= 0 && outfd >= 0) {
