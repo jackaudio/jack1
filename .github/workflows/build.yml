@@ -40,7 +40,7 @@ jobs:
     needs:
       - archive_source_code
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Source code tarball
       - uses: softprops/action-gh-release@v1
